@@ -43,6 +43,36 @@ cp local.properties.example local.properties
 Set `sdk.dir` in `local.properties` to the local Android SDK path. The file is
 ignored and must never be committed.
 
+## Git worktrees
+
+Use a linked worktree for an isolated feature lane. The repository convention is
+to keep linked worktrees under the ignored `.worktrees/` directory:
+
+```bash
+git worktree list
+git worktree add .worktrees/ui-development -b ui/development main
+cd .worktrees/ui-development
+cp local.properties.example local.properties
+```
+
+Ignored files are not copied into a new worktree. If the UI lane needs private
+design material, expose the approved primary-checkout `internal/design/` folder
+through a local symlink or a local copy inside the worktree. Keep the worktree's
+`internal/` directory ignored and never use `git add --force` for it. Configure
+the external SDK and cache variables in the shell before building; do not put
+machine paths or credentials in tracked files.
+
+Inspect and remove a linked worktree only after its changes are integrated:
+
+```bash
+git worktree list
+git worktree remove .worktrees/ui-development
+git branch -d ui/development
+```
+
+The remove command affects only the linked checkout. It must not be used on the
+primary checkout or on the external private design directory.
+
 ## Source-only workspace
 
 The checkout should contain source and reproducible configuration, not machine
