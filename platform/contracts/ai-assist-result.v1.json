@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/ai-assist-result.v1.json",
+  "title": "Evidrilo AI assist result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "text", "reasonCode", "promptVersion", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.ai-assist-result" },
+    "version": { "const": "1" },
+    "status": { "enum": ["success", "fallback"] },
+    "text": { "type": ["string", "null"], "maxLength": 2000 },
+    "reasonCode": { "type": ["string", "null"], "pattern": "^[A-Z0-9_]{3,64}$" },
+    "promptVersion": { "type": "string", "pattern": "^[a-z0-9._-]{1,64}$" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

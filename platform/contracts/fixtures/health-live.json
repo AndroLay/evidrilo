@@ -1,0 +1,7 @@
+{
+  "schema": "evidrilo.health",
+  "version": "1",
+  "check": "live",
+  "status": "ok",
+  "requestId": "req-live-001"
+}

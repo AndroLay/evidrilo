@@ -1,0 +1,19 @@
+{
+  "schema": "evidrilo.progress-daily",
+  "version": "1",
+  "calculationVersion": "progress.v1",
+  "items": [
+    {
+      "projectionDate": "2026-09-10",
+      "calculationVersion": "progress.v1",
+      "attemptsObserved": 2,
+      "completedAttempts": 2,
+      "revisionsObserved": 1,
+      "passCount": 1,
+      "actionRequiredCount": 1,
+      "abstentionCount": 0,
+      "coverage": 1
+    }
+  ],
+  "requestId": "req-progress-daily-01"
+}

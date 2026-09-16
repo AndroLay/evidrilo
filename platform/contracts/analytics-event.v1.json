@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/analytics-event.v1.json",
+  "title": "Evidrilo analytics event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "clientEventId",
+    "eventName",
+    "eventVersion",
+    "occurredAt",
+    "source",
+    "consent",
+    "properties"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.analytics-event" },
+    "version": { "const": "1" },
+    "clientEventId": { "type": "string", "format": "uuid" },
+    "eventName": {
+      "type": "string",
+      "enum": [
+        "practice_started",
+        "attempt_completed",
+        "revision_recorded",
+        "paywall_viewed",
+        "premium_action",
+        "client_error",
+        "recommendation_shown",
+        "recommendation_accepted",
+        "recommendation_dismissed"
+      ]
+    },
+    "eventVersion": { "type": "integer", "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "enum": ["mobile"] },
+    "consent": { "const": "granted" },
+    "properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": { "type": ["string", "null"], "format": "uuid" },
+        "caseVersionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+        "outcome": {
+          "type": ["string", "null"],
+          "enum": ["PASS", "ACTION_REQUIRED", "INCOMPLETE", "CANNOT_ASSESS", null]
+        },
+        "skillId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+        "revisionChanged": { "type": ["boolean", "null"] },
+        "surfaceId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+        "action": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9_]{2,63}$" },
+        "productId": { "type": ["string", "null"], "enum": ["monthly", "yearly", null] },
+        "errorCode": { "type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]{2,63}$" }
+      }
+    }
+  }
+}

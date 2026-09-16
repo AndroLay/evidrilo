@@ -1,0 +1,13 @@
+{
+  "schema": "evidrilo.progress-summary",
+  "version": "1",
+  "calculationVersion": "progress.v1",
+  "attemptsObserved": 4,
+  "completedAttempts": 3,
+  "revisionsObserved": 2,
+  "passCount": 1,
+  "actionRequiredCount": 2,
+  "abstentionCount": 0,
+  "coverage": 0.75,
+  "requestId": "progress01"
+}

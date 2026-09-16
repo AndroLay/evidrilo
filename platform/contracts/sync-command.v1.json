@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/sync-command.v1.json",
+  "title": "Evidrilo sync command v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "commandId", "attemptId", "caseVersionId", "commandType", "revisionNumber", "clientOccurredAt", "snapshotDigest"],
+  "properties": {
+    "schema": { "const": "evidrilo.sync-command" },
+    "version": { "const": "1" },
+    "commandId": { "type": "string", "format": "uuid" },
+    "attemptId": { "type": "string", "format": "uuid" },
+    "caseVersionId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "commandType": { "type": "string", "enum": ["attempt_started", "attempt_submitted", "revision_recorded"] },
+    "revisionNumber": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "clientOccurredAt": { "type": "string", "format": "date-time" },
+    "snapshotDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

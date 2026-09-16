@@ -1,0 +1,13 @@
+// Copy this file to a local xcconfig if you need local overrides.
+// Do not commit private machine configuration or credentials.
+#include "Config.xcconfig"
+
+// RevenueCat public SDK keys are safe to ship in an app binary, but keep
+// environment-specific values local until the project is ready to publish.
+REVENUECAT_PUBLIC_SDK_KEY =
+REVENUECAT_ENTITLEMENT_ID =
+REVENUECAT_PRODUCT_IDS =
+SUPABASE_URL =
+SUPABASE_PUBLISHABLE_KEY =
+SUPABASE_AUTH_REDIRECT_URL = evidrilo://auth/callback
+EVIDRILO_API_BASE_URL =

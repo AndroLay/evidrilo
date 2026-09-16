@@ -1,0 +1,87 @@
+# Local secrets and machine-specific configuration
+local.properties
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.cer
+*.pem
+*.p8
+*.key
+*.crt
+*.der
+*.mobileconfig
+*.secret
+*.secrets
+*.credentials
+*.env
+*.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+service-account*.json
+credentials*.json
+
+# IDE, OS, and generated build output
+.idea/
+*.iml
+.DS_Store
+build/
+**/build/
+bin/
+**/bin/
+obj/
+**/obj/
+.vs/
+TestResults/
+coverage/
+.gradle/
+.gradle-local/
+.dotnet-local/
+.dotnet-tmp/
+.tmp/
+.cache/
+.direnv/
+.envrc
+captures/
+*.log
+.playwright/
+.playwright-cli/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Internal research, audit, media, and historical submission material
+/Gurwi/
+/audit/
+/research/
+/next-gen/
+/video-notes/
+/design/
+/internal/
+/docs/submission/
+/docs/operations/
+/docs/business/
+/docs/product/*
+!/docs/product/m0-product-contract.md
+/docs/licenses/audio-narration-source-inventory.md
+/docs/architecture/revenuecat-integration.md
+/NEXT_GEN_IDEATION.md
+
+# Internal planning and specification material; keep local, never publish
+/docs/superpowers/
+
+# Machine-specific Apple build settings. Config.xcconfig is the checked-in
+# empty baseline; put local overrides in one of these ignored files.
+/iosApp/Configuration/*.xcconfig
+!/iosApp/Configuration/Config.xcconfig
+/iosApp/Configuration/Local.xcconfig
+/iosApp/Configuration/*.xcconfig.local
+
+# Temporary local repository metadata used by tooling
+.codex/
+.agents/
+.superpowers/
+.worktrees/
+.local/
+.kotlin/

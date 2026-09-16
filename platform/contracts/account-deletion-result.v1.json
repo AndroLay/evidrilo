@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/account-deletion-result.v1.json",
+  "title": "Evidrilo account deletion result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.account-deletion-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["accepted", "already_completed"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

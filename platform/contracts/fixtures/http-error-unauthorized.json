@@ -1,0 +1,7 @@
+{
+  "schema": "evidrilo.http-error",
+  "version": "1",
+  "code": "AUTH_REQUIRED",
+  "message": "Authentication is required.",
+  "requestId": "req-auth-001"
+}

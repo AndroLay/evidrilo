@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/billing-webhook-result.v1.json",
+  "title": "Evidrilo billing webhook result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.billing-webhook-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["accepted", "duplicate", "ignored"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

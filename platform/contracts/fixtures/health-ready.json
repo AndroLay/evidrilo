@@ -1,0 +1,12 @@
+{
+  "schema": "evidrilo.health",
+  "version": "1",
+  "check": "ready",
+  "status": "ready",
+  "requestId": "req-ready-001",
+  "dependencies": {
+    "config": "ready",
+    "auth": "ready",
+    "database": "ready"
+  }
+}

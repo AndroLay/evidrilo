@@ -1,0 +1,18 @@
+{
+  "schema": "evidrilo.sync-push-result",
+  "version": "1",
+  "results": [
+    {
+      "commandId": "123e4567-e89b-42d3-a456-426614174000",
+      "outcome": "accepted",
+      "serverSequence": 41
+    },
+    {
+      "commandId": "123e4567-e89b-42d3-a456-426614174001",
+      "outcome": "duplicate",
+      "reasonCode": "IDEMPOTENT_REPLAY"
+    }
+  ],
+  "nextCursor": 41,
+  "requestId": "req-sync-push-001"
+}

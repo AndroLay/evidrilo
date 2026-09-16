@@ -1,0 +1,24 @@
+{
+  "schema": "evidrilo.case-summary",
+  "version": "1",
+  "caseId": "case-it",
+  "caseVersionId": "case-published-it",
+  "title": "Published integration case",
+  "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "evaluatorVersion": "evidrilo.v1",
+  "skillTags": ["evidence"],
+  "objective": "Compare supplied observations",
+  "difficulty": 2,
+  "evidenceReferences": ["OBS-WARM-01", "OBS-ROOM-01"],
+  "facts": [
+    { "id": "OBS-WARM-01", "type": "observation", "text": "Warm water: 32 seconds." },
+    { "id": "LIMIT-TRIAL-01", "type": "limitation", "text": "Each condition was measured once." }
+  ],
+  "rules": [
+    { "id": "RULE-1", "outcome": "PASS", "anchorIds": ["OBS-WARM-01"] }
+  ],
+  "variants": [
+    { "id": "CHALLENGE-1", "removedFactIds": ["OBS-WARM-01"] }
+  ],
+  "requestId": "req-case-004"
+}

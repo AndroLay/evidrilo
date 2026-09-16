@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/recommendation-interaction-result.v1.json",
+  "title": "Evidrilo recommendation interaction result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.recommendation-interaction-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["accepted", "duplicate"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/case-authoring-result.v1.json",
+  "title": "Evidrilo case authoring result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "caseVersionId", "state", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.case-authoring-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["accepted"] },
+    "caseVersionId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "state": { "enum": ["draft", "review", "approved", "published", "retired"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

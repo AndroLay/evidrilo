@@ -1,0 +1,12 @@
+{
+  "schema": "evidrilo.health",
+  "version": "1",
+  "check": "ready",
+  "status": "degraded",
+  "requestId": "req-degraded-001",
+  "dependencies": {
+    "config": "missing",
+    "auth": "missing",
+    "database": "missing"
+  }
+}

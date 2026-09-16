@@ -1,0 +1,27 @@
+{
+  "schema": "evidrilo.case-lifecycle-audit",
+  "version": "1",
+  "caseVersionId": "case-1:v1",
+  "events": [
+    {
+      "auditEventId": "123e4567-e89b-42d3-a456-426614174010",
+      "actorAccountId": null,
+      "eventType": "created",
+      "fromState": null,
+      "toState": "draft",
+      "reason": "draft_created",
+      "createdAt": "2026-09-13T08:00:00Z"
+    },
+    {
+      "auditEventId": "123e4567-e89b-42d3-a456-426614174011",
+      "actorAccountId": "123e4567-e89b-42d3-a456-426614174000",
+      "eventType": "transitioned",
+      "fromState": "draft",
+      "toState": "review",
+      "reason": null,
+      "createdAt": "2026-09-13T08:01:00Z"
+    }
+  ],
+  "truncated": false,
+  "requestId": "audit001"
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/progress-summary.v1.json",
+  "title": "Evidrilo progress summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "calculationVersion",
+    "attemptsObserved",
+    "completedAttempts",
+    "revisionsObserved",
+    "passCount",
+    "actionRequiredCount",
+    "abstentionCount",
+    "coverage",
+    "requestId"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.progress-summary" },
+    "version": { "const": "1" },
+    "calculationVersion": { "type": "string", "pattern": "^[a-z0-9._-]{1,64}$" },
+    "attemptsObserved": { "type": "integer", "minimum": 0 },
+    "completedAttempts": { "type": "integer", "minimum": 0 },
+    "revisionsObserved": { "type": "integer", "minimum": 0 },
+    "passCount": { "type": "integer", "minimum": 0 },
+    "actionRequiredCount": { "type": "integer", "minimum": 0 },
+    "abstentionCount": { "type": "integer", "minimum": 0 },
+    "coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

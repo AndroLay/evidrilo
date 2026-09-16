@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/recommendation.v1.json",
+  "title": "Evidrilo recommendation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "calculationVersion", "caseVersionId", "objective", "reasonCode", "evidenceReferences", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.recommendation" },
+    "version": { "const": "1" },
+    "status": { "enum": ["recommended", "abstain"] },
+    "calculationVersion": { "const": "recommendation.v1" },
+    "caseVersionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "objective": { "type": ["string", "null"], "minLength": 1, "maxLength": 200 },
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[A-Z0-9_]{3,64}$",
+      "enum": ["START_HERE", "PRACTICE_ACTION_REQUIRED", "NEXT_PRACTICE", "NO_ELIGIBLE_CASE", "INSUFFICIENT_PROJECTION"]
+    },
+    "evidenceReferences": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" }
+    },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "recommended" } } },
+      "then": {
+        "required": ["caseVersionId", "objective"],
+        "properties": {
+          "caseVersionId": { "type": "string" },
+          "objective": { "type": "string", "minLength": 1 },
+          "evidenceReferences": { "minItems": 1 },
+          "reasonCode": { "enum": ["START_HERE", "PRACTICE_ACTION_REQUIRED", "NEXT_PRACTICE"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "abstain" } } },
+      "then": {
+        "properties": {
+          "caseVersionId": { "type": "null" },
+          "objective": { "type": "null" },
+          "evidenceReferences": { "maxItems": 0 },
+          "reasonCode": { "enum": ["NO_ELIGIBLE_CASE", "INSUFFICIENT_PROJECTION"] }
+        }
+      }
+    }
+  ]
+}

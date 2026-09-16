@@ -1,0 +1,18 @@
+{
+  "schema": "evidrilo.analytics-event",
+  "version": "1",
+  "clientEventId": "123e4567-e89b-42d3-a456-426614174010",
+  "eventName": "attempt_completed",
+  "eventVersion": 1,
+  "occurredAt": "2026-09-10T09:00:00.000Z",
+  "source": "mobile",
+  "consent": "granted",
+  "properties": {
+    "attemptId": "123e4567-e89b-42d3-a456-426614174011",
+    "caseVersionId": "M0_T2:1",
+    "outcome": "ACTION_REQUIRED",
+    "skillId": "evidence-linking",
+    "revisionChanged": true
+  },
+  "requestId": "evtFixture01"
+}

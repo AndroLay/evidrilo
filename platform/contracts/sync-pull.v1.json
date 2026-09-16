@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/sync-pull.v1.json",
+  "title": "Evidrilo sync pull response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "cursor", "nextCursor", "hasMore", "changes", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.sync-pull" },
+    "version": { "const": "1" },
+    "cursor": { "type": "integer", "minimum": 0 },
+    "nextCursor": { "type": "integer", "minimum": 0 },
+    "hasMore": { "type": "boolean" },
+    "changes": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["serverSequence", "attemptId", "caseVersionId", "commandType", "revisionNumber", "snapshotDigest"],
+        "properties": {
+          "serverSequence": { "type": "integer", "minimum": 1 },
+          "attemptId": { "type": "string", "format": "uuid" },
+          "caseVersionId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+          "commandType": { "type": "string", "enum": ["attempt_started", "attempt_submitted", "revision_recorded"] },
+          "revisionNumber": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "snapshotDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "requestId": { "type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$" }
+  }
+}

@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evidrilo
+      POSTGRES_USER: evidrilo
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evidrilo -d evidrilo"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - evidrilo-postgres-local:/var/lib/postgresql/data
+
+  auth-shim:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../platform/database/integration/auth-shim.sql:/auth-shim.sql:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        psql --no-psqlrc --set ON_ERROR_STOP=on
+        --dbname=postgresql://evidrilo@postgres:5432/evidrilo
+        --file=/auth-shim.sql
+    restart: "no"
+
+  migrations:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-shim:
+        condition: service_completed_successfully
+    volumes:
+      - ../platform/database/migrations:/migrations:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        EVIDRILO_MIGRATION_DATABASE_URL=postgresql://evidrilo@postgres:5432/evidrilo
+        EVIDRILO_MIGRATIONS_DIR=/migrations
+        sh /migrations/apply-migrations.sh
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/api.Dockerfile
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5080
+      PORT: "5080"
+      DATABASE_URL: Host=postgres;Port=5432;Database=evidrilo;Username=evidrilo;Include Error Detail=false
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "${EVIDRILO_API_PORT:-5080}:5080"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/docker/worker.Dockerfile
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: Host=postgres;Port=5432;Database=evidrilo;Username=evidrilo;Include Error Detail=false
+      WORKER_POLL_INTERVAL_SECONDS: "5"
+      WORKER_BATCH_SIZE: "10"
+    restart: unless-stopped
+
+volumes:
+  evidrilo-postgres-local:

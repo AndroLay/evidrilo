@@ -1,0 +1,66 @@
+{
+  "schema": "evidrilo.audio-manifest",
+  "version": "1",
+  "entries": [
+    {
+      "id": "CHALLENGE_REVEAL",
+      "locale": "en-US",
+      "sourceText": "Evidence-change reveal cue.",
+      "sourceTextSha256": "02f7c84ac3ab8536ee4b6f0352823a7c353cd6898cb0211383ee018aa2b27eff",
+      "file": "effects/challenge-reveal.wav",
+      "durationMs": 280,
+      "byteLength": 12426,
+      "format": "wav",
+      "voiceLabel": "Evidrilo in-house sound design",
+      "licenseReference": "docs/licenses/audio-assets.md"
+    },
+    {
+      "id": "ERROR",
+      "locale": "en-US",
+      "sourceText": "Error feedback cue.",
+      "sourceTextSha256": "877ca21d8788f48d56acfaf89e69c1736e930527e4fba0d86a35a06b4e2bd595",
+      "file": "effects/error.wav",
+      "durationMs": 160,
+      "byteLength": 7134,
+      "format": "wav",
+      "voiceLabel": "Evidrilo in-house sound design",
+      "licenseReference": "docs/licenses/audio-assets.md"
+    },
+    {
+      "id": "PREMIUM_STATE",
+      "locale": "en-US",
+      "sourceText": "Premium access state cue.",
+      "sourceTextSha256": "13447231b174bf68fd0836196cefc0f0bca2aef40490f3d75577a23a3e53932a",
+      "file": "effects/premium-state.wav",
+      "durationMs": 240,
+      "byteLength": 10662,
+      "format": "wav",
+      "voiceLabel": "Evidrilo in-house sound design",
+      "licenseReference": "docs/licenses/audio-assets.md"
+    },
+    {
+      "id": "SELECTION",
+      "locale": "en-US",
+      "sourceText": "Selection feedback cue.",
+      "sourceTextSha256": "897fc13cd462fa70cb8c73d97037865f9db42717885e555461d174ea712d5bde",
+      "file": "effects/selection.wav",
+      "durationMs": 90,
+      "byteLength": 4048,
+      "format": "wav",
+      "voiceLabel": "Evidrilo in-house sound design",
+      "licenseReference": "docs/licenses/audio-assets.md"
+    },
+    {
+      "id": "SUCCESS",
+      "locale": "en-US",
+      "sourceText": "Success confirmation cue.",
+      "sourceTextSha256": "9744b7795a973a2e8f1024b0ba4f47b0e38b47319f631aacb845c132d6275920",
+      "file": "effects/success.wav",
+      "durationMs": 220,
+      "byteLength": 9780,
+      "format": "wav",
+      "voiceLabel": "Evidrilo in-house sound design",
+      "licenseReference": "docs/licenses/audio-assets.md"
+    }
+  ]
+}

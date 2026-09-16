@@ -1,0 +1,18 @@
+{
+  "schema": "evidrilo.sync-pull",
+  "version": "1",
+  "cursor": 40,
+  "nextCursor": 41,
+  "hasMore": false,
+  "changes": [
+    {
+      "serverSequence": 41,
+      "attemptId": "123e4567-e89b-42d3-a456-426614174002",
+      "caseVersionId": "M0_T2:1",
+      "commandType": "attempt_submitted",
+      "revisionNumber": 0,
+      "snapshotDigest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ],
+  "requestId": "req-sync-pull-001"
+}

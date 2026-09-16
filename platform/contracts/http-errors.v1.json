@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/http-errors.v1.json",
+  "title": "Evidrilo HTTP error response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "code", "message", "requestId"],
+  "properties": {
+    "schema": {
+      "const": "evidrilo.http-error"
+    },
+    "version": {
+      "const": "1"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    }
+  }
+}

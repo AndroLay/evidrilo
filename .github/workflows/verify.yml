@@ -1,0 +1,140 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Mobile compile and JVM tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run shared and Android checks
+        run: >-
+          ./gradlew --no-daemon --no-configuration-cache
+          :composeApp:jvmTest
+          :composeApp:compileKotlinJvm
+          :composeApp:compileDebugKotlinAndroid
+
+      - name: Validate mobile release configuration
+        run: bash scripts/check-mobile-release.sh "$GITHUB_WORKSPACE"
+
+      - name: Build unsigned Android release bundle
+        run: >-
+          ./gradlew --no-daemon --no-configuration-cache
+          :androidApp:bundleRelease
+
+      - name: Verify Android release artifact
+        run: bash scripts/check-mobile-release.sh "$GITHUB_WORKSPACE" --require-android-artifact
+
+  ios-host:
+    name: iOS Release host compile
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build unsigned iOS Release host
+        run: >-
+          xcodebuild
+          -project iosApp/iosApp.xcodeproj
+          -scheme Evidrilo
+          -configuration Release
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+
+  contracts:
+    name: Contract and migration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run deterministic contract checks
+        run: >-
+          node --test
+          platform/contracts/contracts.test.mjs
+          platform/database/migrations/migrations.test.mjs
+          scripts/check-public-package.test.mjs
+          scripts/check-github-safety.test.mjs
+          scripts/check-mobile-platform.test.mjs
+          scripts/check-deployment.test.mjs
+          scripts/validate-audio-assets.test.mjs
+          scripts/validate-submission-assets.test.mjs
+          scripts/export-public-package.test.mjs
+
+  platform:
+    name: ASP.NET Core and worker tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test API
+        run: dotnet test platform/api.Tests/Evidrilo.Api.Tests.csproj --configuration Release
+
+      - name: Test worker
+        run: dotnet test platform/worker.Tests/Evidrilo.Worker.Tests.csproj --configuration Release
+
+  public-package:
+    name: Public package boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check public package
+        run: bash scripts/check-public-package.sh "$GITHUB_WORKSPACE"
+
+      - name: Check deployment preparation
+        run: bash scripts/check-deployment.sh "$GITHUB_WORKSPACE"
+
+      - name: Check GitHub safety boundary
+        run: bash scripts/check-github-safety.sh "$GITHUB_WORKSPACE"

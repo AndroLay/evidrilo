@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/membership-operation-result.v1.json",
+  "title": "Evidrilo membership operation result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "organizationId", "targetAccountId", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.membership-operation-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["granted", "role_changed", "already_active", "revoked", "already_revoked", "left", "already_left"] },
+    "organizationId": { "type": "string", "format": "uuid" },
+    "targetAccountId": { "type": "string", "format": "uuid" },
+    "role": { "type": ["string", "null"], "enum": ["learner", "author", "teacher", "reviewer", "maintainer", "owner", null] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

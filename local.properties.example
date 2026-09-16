@@ -1,0 +1,32 @@
+# Copy this file to local.properties and replace the path for your machine.
+# local.properties is ignored and must never be committed.
+sdk.dir=/absolute/path/to/Android/sdk
+
+# Optional local-only Android RevenueCat Test Store configuration. The Gradle
+# build reads these names from ignored local.properties; command-line -P values
+# take precedence. Keep values out of source control and do not use production
+# credentials here.
+# revenuecatAndroidApiKey=replace-with-local-test-store-public-key
+# revenuecatEntitlementId=evidrilo_pro
+# Approved target packages are monthly and yearly; lifetime is not offered.
+# revenuecatProductIds=monthly,yearly
+
+# Release version values. Keep these aligned with MARKETING_VERSION and
+# CURRENT_PROJECT_VERSION in the iOS release xcconfig.
+# androidVersionCode=1
+# androidVersionName=0.1.0
+
+# Optional local-only Android release signing. Never commit a keystore or
+# passwords. The release build stays unsigned unless all four settings exist.
+# androidReleaseKeystore=/absolute/path/to/evidrilo-upload.jks
+# androidReleaseStorePassword=provided-only-in-local.properties
+# androidReleaseKeyAlias=evidrilo
+# androidReleaseKeyPassword=provided-only-in-local.properties
+# Before uploading an AAB, run:
+# ./gradlew :androidApp:verifyReleaseSigning :androidApp:bundleRelease
+
+# Optional local-only Android account/platform configuration.
+# supabaseUrl=https://your-project.supabase.co
+# supabasePublishableKey=replace-with-local-publishable-key
+# supabaseAuthRedirectUrl=evidrilo://auth/callback
+# evidriloApiBaseUrl=https://api.example.invalid

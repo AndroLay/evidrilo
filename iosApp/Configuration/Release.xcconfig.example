@@ -1,0 +1,18 @@
+// Copy this file to Release.xcconfig or Local.xcconfig on macOS.
+// Both copies are ignored; never commit signing or provider credentials.
+#include "Config.xcconfig"
+
+// Replace with the Apple Developer Team ID used for the app bundle.
+TEAM_ID = YOUR_APPLE_TEAM_ID
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Distribution
+
+// Keep the version synchronized with the release candidate.
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+// Optional local-only provider settings. Leave empty for the free-core build.
+REVENUECAT_PUBLIC_SDK_KEY =
+REVENUECAT_ENTITLEMENT_ID = evidrilo_pro
+REVENUECAT_PRODUCT_IDS = monthly,yearly
+SUPABASE_AUTH_REDIRECT_URL = evidrilo://auth/callback

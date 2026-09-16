@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/health.v1.json",
+  "title": "Evidrilo health response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "check", "status", "requestId"],
+  "properties": {
+    "schema": {
+      "const": "evidrilo.health"
+    },
+    "version": {
+      "const": "1"
+    },
+    "check": {
+      "type": "string",
+      "enum": ["live", "ready"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "ready", "degraded"]
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "type": "string",
+          "enum": ["ready", "missing", "degraded"]
+        },
+        "database": {
+          "type": "string",
+          "enum": ["ready", "missing", "degraded"]
+        },
+        "auth": {
+          "type": "string",
+          "enum": ["ready", "missing", "degraded"]
+        }
+      }
+    }
+  }
+}

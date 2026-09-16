@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/account-summary.v1.json",
+  "title": "Evidrilo account summary response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "accountId", "emailVerified", "serverTime", "requestId"],
+  "properties": {
+    "schema": {
+      "const": "evidrilo.account-summary"
+    },
+    "version": {
+      "const": "1"
+    },
+    "accountId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "emailVerified": {
+      "type": "boolean"
+    },
+    "serverTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    }
+  }
+}
