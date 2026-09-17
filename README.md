@@ -13,7 +13,7 @@ conclusion changes when one observation is no longer available.
 > Device runtime, provider, deployment, human review, store, and submission
 > gates remain separate and are not implied by source changes.
 
-Current structural baseline: `d196c6a` — the repository shell, contracts,
+Current structural baseline: `f2d532e` — the repository shell, contracts,
 domain, design-system, local-persistence modules, and categorized verification
 lanes are aligned with the source-first layout while keeping the existing app
 task names and public behavior.
