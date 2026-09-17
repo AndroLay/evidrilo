@@ -25,7 +25,7 @@ function createFixture() {
     'apps/mobile-shared',
     'deploy',
     'gradle',
-    'iosApp',
+    'apps/ios',
     'platform',
     'scripts',
     'docs/architecture',
@@ -49,7 +49,7 @@ function createFixture() {
     'apps/mobile-shared/src.txt',
     'deploy/README.md',
     'gradle/libs.versions.toml',
-    'iosApp/README.md',
+    'apps/ios/README.md',
     'platform/README.md',
     'scripts/check-github-safety.sh',
     'docs/README.md',
@@ -161,9 +161,9 @@ test('rejects a force-added internal design path', () => {
 test('rejects a force-added machine-specific Apple configuration', () => {
   const root = createFixture();
   try {
-    fs.mkdirSync(path.join(root, 'iosApp', 'Configuration'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'iosApp', 'Configuration', 'Debug.xcconfig'), 'SUPABASE_URL=local-only\n');
-    runGit(root, ['add', '--force', 'iosApp/Configuration/Debug.xcconfig']);
+    fs.mkdirSync(path.join(root, 'apps/ios', 'Configuration'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'apps/ios', 'Configuration', 'Debug.xcconfig'), 'SUPABASE_URL=local-only\n');
+    runGit(root, ['add', '--force', 'apps/ios/Configuration/Debug.xcconfig']);
     const result = runChecker(root);
     assert.notEqual(result.status, 0);
     assert.match(`${result.stdout}${result.stderr}`, /credential|configuration|xcconfig|forbidden/i);

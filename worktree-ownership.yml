@@ -30,6 +30,7 @@ lanes:
     structural:
       - composeApp/**
       - apps/mobile-shared/**
+      - apps/ios/**
       - androidApp/**
       - iosApp/**
       - platform/contracts/**
@@ -65,6 +66,8 @@ lanes:
       - apps/android/src/main/res/**
       - iosApp/iosApp/Assets.xcassets/**
       - iosApp/README.md
+      - apps/ios/iosApp/Assets.xcassets/**
+      - apps/ios/README.md
       - modules/features/**
       - modules/design-system/**
 

@@ -73,10 +73,10 @@ DerivedData/
 
 # Machine-specific Apple build settings. Config.xcconfig is the checked-in
 # empty baseline; put local overrides in one of these ignored files.
-/iosApp/Configuration/*.xcconfig
-!/iosApp/Configuration/Config.xcconfig
-/iosApp/Configuration/Local.xcconfig
-/iosApp/Configuration/*.xcconfig.local
+/apps/ios/Configuration/*.xcconfig
+!/apps/ios/Configuration/Config.xcconfig
+/apps/ios/Configuration/Local.xcconfig
+/apps/ios/Configuration/*.xcconfig.local
 
 # Temporary local repository metadata used by tooling
 .codex/

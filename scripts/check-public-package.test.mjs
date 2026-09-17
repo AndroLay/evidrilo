@@ -11,7 +11,7 @@ const checker = path.join(scriptsDirectory, 'check-public-package.sh');
 
 function createCandidate() {
   const candidate = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-package-'));
-  for (const directory of ['apps/mobile-shared', 'apps/android', 'iosApp', 'contracts', 'platform', 'scripts']) {
+  for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform', 'scripts']) {
     fs.mkdirSync(path.join(candidate, directory), { recursive: true });
   }
   for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'gradlew', 'settings.gradle.kts']) {
@@ -92,10 +92,10 @@ test('rejects the private narration source inventory', () => {
 test('rejects an incomplete public package', () => {
   const candidate = createCandidate();
   try {
-    fs.rmSync(path.join(candidate, 'iosApp'), { recursive: true, force: true });
+    fs.rmSync(path.join(candidate, 'apps/ios'), { recursive: true, force: true });
     const result = runChecker(candidate);
     assert.notEqual(result.status, 0);
-    assert.match(`${result.stdout}${result.stderr}`, /missing required public path.*iosApp/i);
+    assert.match(`${result.stdout}${result.stderr}`, /missing required public path.*apps\/ios/i);
   } finally {
     fs.rmSync(candidate, { recursive: true, force: true });
   }

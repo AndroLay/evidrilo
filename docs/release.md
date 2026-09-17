@@ -33,7 +33,7 @@ The repository-owned release configuration is now explicit for both platforms:
   `:androidApp:verifyReleaseSigning` as a fail-closed upload gate.
 - iOS `Release` uses `Apple Distribution`, removes preview-only settings, and
   takes `TEAM_ID` from an ignored local xcconfig. The template is
-  `iosApp/Configuration/Release.xcconfig.example`.
+  `apps/ios/Configuration/Release.xcconfig.example`.
 - The release configuration contract is checked by
   `bash scripts/check-mobile-release.sh .`.
 

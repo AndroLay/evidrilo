@@ -29,7 +29,7 @@ required_paths=(
   settings.gradle.kts
   apps/mobile-shared
   apps/android
-  iosApp
+  apps/ios
   contracts
   platform
   scripts
@@ -76,7 +76,7 @@ done
 while IFS= read -r sensitive_path; do
   relative_path=${sensitive_path#"$candidate_root"/}
   case "$relative_path" in
-    local.properties.example|*.env.example|iosApp/Configuration/Config.xcconfig)
+    local.properties.example|*.env.example|apps/ios/Configuration/Config.xcconfig)
       continue
       ;;
   esac

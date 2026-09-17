@@ -128,7 +128,7 @@ flowchart TD
 | `apps/mobile-shared/src/commonMain` | Shared domain, evaluator, reducer, persistence contract, feature state, and Compose UI |
 | `apps/mobile-shared/src/commonTest` | Cross-platform deterministic tests and regression boundaries |
 | `apps/android` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
-| `iosApp` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |
+| `apps/ios` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |
 | `platform/api` | ASP.NET Core modular monolith API and storage adapters |
 | `contracts` | Versioned JSON contracts, schemas, and fixtures |
 | `platform/database` | PostgreSQL/Supabase migrations, ledger, RLS, and integration smoke tests |
@@ -223,7 +223,7 @@ the isolated local network and must not be used for staging or production.
 
 ### Run iOS
 
-Open `iosApp/iosApp.xcodeproj` in Xcode on macOS. Kotlin/Native compilation on
+Open `apps/ios/iosApp.xcodeproj` in Xcode on macOS. Kotlin/Native compilation on
 Linux does not prove that the iOS host launches, renders, or runs on a
 simulator/device.
 

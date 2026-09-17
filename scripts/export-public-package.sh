@@ -132,7 +132,7 @@ public_paths=(
   .github
   apps/mobile-shared
   apps/android
-  iosApp
+  apps/ios
   contracts
   platform
   deploy

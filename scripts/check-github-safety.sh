@@ -52,8 +52,8 @@ is_generated_path() {
 
 is_sensitive_path() {
   case "$1" in
-    local.properties|*/local.properties|*.keystore|*.jks|*.p12|*.mobileprovision|*.cer|*.pem|*.p8|*.key|*.crt|*.der|*.mobileconfig|*.secret|*.secrets|*.credentials|*.env|*.env.*|google-services.json|*/google-services.json|GoogleService-Info.plist|*/GoogleService-Info.plist|service-account*.json|*/service-account*.json|credentials*.json|*/credentials*.json|iosApp/Configuration/*.xcconfig|iosApp/Configuration/*.xcconfig.local)
-      [[ "$1" == iosApp/Configuration/Config.xcconfig ]] && return 1
+    local.properties|*/local.properties|*.keystore|*.jks|*.p12|*.mobileprovision|*.cer|*.pem|*.p8|*.key|*.crt|*.der|*.mobileconfig|*.secret|*.secrets|*.credentials|*.env|*.env.*|google-services.json|*/google-services.json|GoogleService-Info.plist|*/GoogleService-Info.plist|service-account*.json|*/service-account*.json|credentials*.json|*/credentials*.json|apps/ios/Configuration/*.xcconfig|apps/ios/Configuration/*.xcconfig.local)
+      [[ "$1" == apps/ios/Configuration/Config.xcconfig ]] && return 1
       [[ "$1" == *.env.example ]] && return 1
       return 0
       ;;
@@ -66,7 +66,7 @@ is_public_path() {
     README.md|LICENSE|CONTRIBUTING.md|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml)
       return 0
       ;;
-    .github/*|apps/*|androidApp/*|composeApp/*|contracts/*|deploy/*|gradle/*|iosApp/*|platform/*|scripts/*)
+    .github/*|apps/*|androidApp/*|composeApp/*|contracts/*|deploy/*|gradle/*|platform/*|scripts/*)
       return 0
       ;;
     docs/README.md|docs/decisions.md|docs/development.md|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/licenses/SourceSans3-OFL-1.1.md|docs/licenses/audio-assets.md|docs/product/m0-product-contract.md)
@@ -111,9 +111,9 @@ check_ignored_probes() {
     local.properties
     platform/api/.env.local
     google-services.json
-    iosApp/GoogleService-Info.plist
-    iosApp/Configuration/Debug.xcconfig
-    iosApp/Configuration/Local.xcconfig
+    apps/ios/GoogleService-Info.plist
+    apps/ios/Configuration/Debug.xcconfig
+    apps/ios/Configuration/Local.xcconfig
     design/evidrilo/mockup.png
     internal/design/mockup.png
     docs/licenses/audio-narration-source-inventory.md

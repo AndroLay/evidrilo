@@ -14,7 +14,7 @@ if [[ ! -d "$repository_root" ]]; then
 fi
 repository_root=$(CDPATH= cd -- "$repository_root" && pwd)
 
-icon_path="$repository_root/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+icon_path="$repository_root/apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
 screenshot_path=''
 video_path=''
 

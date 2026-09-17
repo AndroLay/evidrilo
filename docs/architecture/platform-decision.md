@@ -122,7 +122,7 @@ dependency.
 
 Build Evidrilo with **Kotlin Multiplatform and Compose
 Multiplatform**, targeting Android and iOS from a shared `apps/mobile-shared` module.
-Keep `apps/android` and `iosApp` as separate platform entry points.
+Keep `apps/android` and `apps/ios` as separate platform entry points.
 
 The approved product name is **Evidrilo**. The current technical namespace is
 still `dev.nextgen.mobile` and remains temporary until a deliberate package
@@ -162,7 +162,7 @@ demonstrates a need.
 ## Trade-offs accepted
 
 - iOS still requires an Xcode host project; the initial thin host is now
-  committed under `iosApp/`.
+  committed under `apps/ios/`.
 - Full iOS build and runtime validation require macOS/Xcode or a macOS CI
   runner.
 - Compose Multiplatform and the RevenueCat KMP SDK must be kept on compatible

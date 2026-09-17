@@ -11,7 +11,8 @@ const repositoryRoot = path.dirname(scriptsDirectory);
 const validator = path.join(scriptsDirectory, 'validate-submission-assets.sh');
 const currentIcon = path.join(
   repositoryRoot,
-  'iosApp',
+  'apps',
+  'ios',
   'iosApp',
   'Assets.xcassets',
   'AppIcon.appiconset',

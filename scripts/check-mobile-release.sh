@@ -56,16 +56,16 @@ require_text() {
 
 android_gradle='apps/android/build.gradle.kts'
 android_manifest='apps/android/src/main/AndroidManifest.xml'
-ios_project='iosApp/iosApp.xcodeproj/project.pbxproj'
+ios_project='apps/ios/iosApp.xcodeproj/project.pbxproj'
 
 for relative_path in \
   "$android_gradle" \
   "$android_manifest" \
   apps/android/proguard-rules.pro \
   "$ios_project" \
-  iosApp/iosApp/Info.plist \
-  iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png \
-  iosApp/Configuration/Release.xcconfig.example
+  apps/ios/iosApp/Info.plist \
+  apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png \
+  apps/ios/Configuration/Release.xcconfig.example
 do
   require_path "$relative_path"
 done
@@ -100,8 +100,8 @@ if grep -Eq 'Apple Development|DEVELOPMENT_ASSET_PATHS|ENABLE_PREVIEWS' <<< "$io
   printf '%s\n' 'iOS Release contains development-only signing or preview settings' >&2
   failed=1
 fi
-require_text iosApp/Configuration/Release.xcconfig.example apple-team-placeholder 'TEAM_ID[[:space:]]*='
-require_text iosApp/Configuration/Release.xcconfig.example release-identity 'CODE_SIGN_IDENTITY[[:space:]]*=[[:space:]]*Apple Distribution'
+require_text apps/ios/Configuration/Release.xcconfig.example apple-team-placeholder 'TEAM_ID[[:space:]]*='
+require_text apps/ios/Configuration/Release.xcconfig.example release-identity 'CODE_SIGN_IDENTITY[[:space:]]*=[[:space:]]*Apple Distribution'
 
 android_artifact="$repository_root/apps/android/build/outputs/bundle/release/androidApp-release.aab"
 if [[ "$require_android_artifact" -eq 1 ]]; then

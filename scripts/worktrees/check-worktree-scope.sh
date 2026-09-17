@@ -87,7 +87,7 @@ is_owned() {
         .github/*|.dockerignore|.gitignore|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|worktree-ownership.yml|docs/architecture/*|scripts/*|tooling/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt|modules/core/*|modules/application/access/*)
           return 0
           ;;
-        composeApp/*|apps/mobile-shared/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)
+        composeApp/*|apps/mobile-shared/*|apps/ios/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)
           [[ "$allow_structural" -eq 1 ]]
           return
           ;;
@@ -102,7 +102,7 @@ is_owned() {
       ;;
     mobile-ui)
       case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/kotlin/dev/nextgen/mobile/resources/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/resources/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/AndroidManifest.xml|androidApp/src/main/res/*|apps/android/src/main/AndroidManifest.xml|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|iosApp/README.md|modules/features/*|modules/design-system/*)
+        composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/kotlin/dev/nextgen/mobile/resources/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/resources/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/AndroidManifest.xml|androidApp/src/main/res/*|apps/android/src/main/AndroidManifest.xml|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|iosApp/README.md|apps/ios/iosApp/Assets.xcassets/*|apps/ios/README.md|modules/features/*|modules/design-system/*)
           return 0
           ;;
       esac
@@ -159,7 +159,7 @@ for path in "${changed_paths[@]}"; do
       composeApp/src/*/kotlin/dev/nextgen/mobile/billing/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/billing/*|platform/api/Billing/*) owner=revenuecat ;;
       platform/*|contracts/*) owner=platform ;;
       composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*) owner=ingestion ;;
-      composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/res/*|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*) owner=mobile-ui ;;
+      composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/res/*|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|apps/ios/iosApp/Assets.xcassets/*) owner=mobile-ui ;;
       tests/*|docs/*|audit/*) owner=qa ;;
       .github/*|gradle/*|scripts/*|tooling/*|settings.gradle.kts|build.gradle.kts|worktree-ownership.yml) owner=integration ;;
     esac

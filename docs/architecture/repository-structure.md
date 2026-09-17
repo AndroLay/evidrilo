@@ -224,7 +224,7 @@ evidrilo/
 │       ├── build.gradle.kts
 │       └── src/main/
 │
-├── iosApp/                  # committed Xcode host; runtime sign-off remains open
+├── apps/ios/                # committed Xcode host; runtime sign-off remains open
 │
 ├── platform/                # optional post-gate platform lane
 │   ├── api/                 # ASP.NET Core API
@@ -262,7 +262,7 @@ adapter. The M2 free core is local-first and does not initialize billing.
 The Android application entry point, Android manifest, Android-specific
 configuration, and Android RevenueCat public API key configuration.
 
-### `iosApp`
+### `apps/ios`
 
 The thin Xcode host application and iOS-specific configuration. It presents the
 shared `App()` composable through `MainViewController()` and invokes the
@@ -319,7 +319,7 @@ billing adapter ───┘
 
 ui ───> billing interface
 RevenueCat adapter ───> RevenueCat KMP SDK
-apps/android / iosApp ───> apps/mobile-shared
+apps/android / apps/ios ───> apps/mobile-shared
 ```
 
 The `core` directory must remain small. It is not a general-purpose dumping
@@ -343,7 +343,7 @@ cross-cutting role is clear.
 
 | Concern | Assessment | Decision |
 |---|---|---|
-| Android and iOS support | Required by the chosen direction | Use KMP with separate `apps/android` and `iosApp` entry points |
+| Android and iOS support | Required by the chosen direction | Use KMP with separate `apps/android` and `apps/ios` entry points |
 | Shared UI | Appropriate for a small demo and consistent experience | Use Compose Multiplatform in `commonMain` |
 | Shared business logic | Essential for consistent scoring and feedback | Keep it in pure Kotlin `domain` |
 | RevenueCat | Required by Shipaton and available for KMP | Isolate it in `billing`; validate the current SDK version during scaffold |

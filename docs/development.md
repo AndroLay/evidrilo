@@ -225,7 +225,7 @@ authoring, and worker-lease tests remain separate external gates. Raw SQL
 migration replay must not bypass the ledger.
 The free mobile flow does not depend on the API or .NET SDK.
 
-Open `iosApp/iosApp.xcodeproj` in Xcode to run the iOS host. Linux can compile
+Open `apps/ios/iosApp.xcodeproj` in Xcode to run the iOS host. Linux can compile
 Kotlin/Native targets in suitable environments, but compilation alone is not an
 iOS simulator or device observation.
 
@@ -760,7 +760,7 @@ Keep the following local:
   explicitly named proxy IPs; forwarded headers are ignored by default
 - machine-specific Xcode settings
 - iOS release signing and version overrides from the ignored
-  `iosApp/Configuration/Release.xcconfig` or `Local.xcconfig`, based on
+  `apps/ios/Configuration/Release.xcconfig` or `Local.xcconfig`, based on
   `Release.xcconfig.example`
 
 The configuration files in this repository contain only examples and empty

@@ -29,10 +29,10 @@ test('Android host registers only the Evidrilo auth callback route', () => {
 });
 
 test('iOS host registers the same auth callback scheme', () => {
-  const plist = read('iosApp/iosApp/Info.plist');
+  const plist = read('apps/ios/iosApp/Info.plist');
   assert.match(plist, /<key>CFBundleURLTypes<\/key>/);
   assert.match(plist, /<string>evidrilo<\/string>/);
-  assert.match(read('iosApp/iosApp/iosApp.swift'), /submitAccountAuthRedirect/);
+  assert.match(read('apps/ios/iosApp/iosApp.swift'), /submitAccountAuthRedirect/);
 });
 
 test('Android release configuration is optimized and signing-safe', () => {
@@ -51,13 +51,13 @@ test('Android release disables backup and cleartext transport', () => {
 });
 
 test('iOS Release uses distribution signing with an owner-supplied team', () => {
-  const project = read('iosApp/iosApp.xcodeproj/project.pbxproj');
+  const project = read('apps/ios/iosApp.xcodeproj/project.pbxproj');
   const releaseTarget = project.slice(project.indexOf('7555FFA7242A565B00829871 /* Release */'));
   assert.match(releaseTarget, /CODE_SIGN_IDENTITY = "Apple Distribution";/);
   assert.match(releaseTarget, /DEVELOPMENT_TEAM = "\$\(TEAM_ID\)";/);
   assert.doesNotMatch(releaseTarget, /CODE_SIGN_IDENTITY = "Apple Development";/);
   assert.doesNotMatch(releaseTarget, /DEVELOPMENT_ASSET_PATHS/);
-  assert.match(read('iosApp/Configuration/Release.xcconfig.example'), /TEAM_ID =/);
+  assert.match(read('apps/ios/Configuration/Release.xcconfig.example'), /TEAM_ID =/);
 });
 
 test('mobile release configuration checker passes without exposing signing material', () => {

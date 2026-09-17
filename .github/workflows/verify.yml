@@ -68,7 +68,7 @@ jobs:
       - name: Build unsigned iOS Release host
         run: >-
           xcodebuild
-          -project iosApp/iosApp.xcodeproj
+          -project apps/ios/iosApp.xcodeproj
           -scheme Evidrilo
           -configuration Release
           -destination 'generic/platform=iOS Simulator'

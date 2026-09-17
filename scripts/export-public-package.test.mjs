@@ -31,7 +31,7 @@ function createExporterFixture() {
   ]) {
     fs.copyFileSync(path.join(repositoryRoot, file), path.join(root, file));
   }
-  for (const directory of ['apps/mobile-shared', 'apps/android', 'iosApp', 'contracts', 'platform']) {
+  for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'deploy'), path.join(root, 'deploy'), { recursive: true });
@@ -39,10 +39,10 @@ function createExporterFixture() {
   for (const file of ['check-public-package.sh', 'check-deployment.sh', 'export-public-package.sh', 'sanitize-public-markdown-links.mjs', 'validate-audio-assets.mjs']) {
     fs.copyFileSync(path.join(repositoryRoot, 'scripts', file), path.join(root, 'scripts', file));
   }
-  writeFixtureFile(root, 'iosApp/Configuration/Config.xcconfig', '// safe checked-in baseline\n');
-  writeFixtureFile(root, 'iosApp/Configuration/Debug.xcconfig.example', '// safe example\n');
-  writeFixtureFile(root, 'iosApp/Configuration/Local.xcconfig', 'SUPABASE_URL=local-only\n');
-  writeFixtureFile(root, 'iosApp/Configuration/Debug.xcconfig', 'SUPABASE_URL=local-only\n');
+  writeFixtureFile(root, 'apps/ios/Configuration/Config.xcconfig', '// safe checked-in baseline\n');
+  writeFixtureFile(root, 'apps/ios/Configuration/Debug.xcconfig.example', '// safe example\n');
+  writeFixtureFile(root, 'apps/ios/Configuration/Local.xcconfig', 'SUPABASE_URL=local-only\n');
+  writeFixtureFile(root, 'apps/ios/Configuration/Debug.xcconfig', 'SUPABASE_URL=local-only\n');
     writeFixtureFile(root, 'apps/android/google-services.json', '{}\n');
   const databasePasswordName = ['DATABASE', 'PASSWORD'].join('_');
   writeFixtureFile(root, 'platform/api/.env.local', `${databasePasswordName}=local-only\n`);
@@ -148,11 +148,11 @@ test('does not export local Apple or provider configuration files', () => {
   try {
     const result = spawnSync('bash', [exporter, source, destination], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.existsSync(path.join(destination, 'iosApp/Configuration/Config.xcconfig')), true);
-    assert.equal(fs.existsSync(path.join(destination, 'iosApp/Configuration/Debug.xcconfig.example')), true);
+    assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Config.xcconfig')), true);
+    assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Debug.xcconfig.example')), true);
     for (const forbiddenPath of [
-      'iosApp/Configuration/Local.xcconfig',
-      'iosApp/Configuration/Debug.xcconfig',
+      'apps/ios/Configuration/Local.xcconfig',
+      'apps/ios/Configuration/Debug.xcconfig',
       'apps/android/google-services.json',
       'platform/api/.env.local',
       'internal/design/mockup.png',

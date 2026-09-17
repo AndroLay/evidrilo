@@ -2,13 +2,13 @@
 
 This folder contains the thin Xcode host for the shared Kotlin/Compose app.
 The product UI, reducer, feedback engine, and RevenueCat adapter remain in
-`composeApp`; the Swift layer only presents the shared `App()` composable.
+`apps/mobile-shared`; the Swift layer only presents the shared `App()` composable.
 
 ## Run on macOS
 
 1. Install a macOS/Xcode version that supports the project's iOS deployment
    target.
-2. Open `iosApp/iosApp.xcodeproj` in Xcode.
+2. Open `apps/ios/iosApp.xcodeproj` in Xcode.
 3. Select the currently committed host scheme and an iOS simulator or device.
    The committed host target and displayed product name are Evidrilo.
 4. Build and run. The Xcode build phase invokes
@@ -33,11 +33,11 @@ free rehearsal usable and the premium offer unavailable.
 
    ```bash
    xcodebuild \
-     -project iosApp/iosApp.xcodeproj \
+     -project apps/ios/iosApp.xcodeproj \
      -scheme Evidrilo \
      -configuration Release \
      -destination 'generic/platform=iOS Simulator' \
-     -xcconfig iosApp/Configuration/Local.xcconfig \
+     -xcconfig apps/ios/Configuration/Local.xcconfig \
      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
    ```
 
