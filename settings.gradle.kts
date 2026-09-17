@@ -14,7 +14,11 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "next-gen-app"
+rootProject.name = "evidrilo"
+
+include(":modules:domain")
+project(":modules:domain").projectDir = file("modules/domain")
+
 include(":composeApp")
 project(":composeApp").projectDir = file("apps/mobile-shared")
 include(":androidApp")

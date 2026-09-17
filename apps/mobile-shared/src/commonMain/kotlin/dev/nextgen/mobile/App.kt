@@ -313,8 +313,9 @@ private fun PremiumLockedScreen(
             }
         }
         Text(state.offerStatusLabel, style = MaterialTheme.typography.bodyMedium)
-        if (state.notice != null) {
-            Text(state.notice, color = MaterialTheme.colorScheme.error)
+        val notice = state.notice
+        if (notice != null) {
+            Text(notice, color = MaterialTheme.colorScheme.error)
         }
         Button(
             onClick = onPurchase,

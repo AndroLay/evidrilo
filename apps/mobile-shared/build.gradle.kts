@@ -39,6 +39,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":modules:domain"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
