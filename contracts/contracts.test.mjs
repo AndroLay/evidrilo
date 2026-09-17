@@ -438,7 +438,7 @@ test('current status page points to the latest evidence record', {
     'utf8',
   );
 
-  assert.match(status, /recorded through E186/i);
+  assert.match(status, /recorded through\s+E187/i);
   assert.doesNotMatch(status, /recorded through E151/i);
 });
 
