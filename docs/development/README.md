@@ -47,13 +47,23 @@ ignored and must never be committed.
 
 ## Git worktrees
 
-The repository uses one integration checkout and two active feature lanes. Keep
-linked worktrees under the ignored `.worktrees/` directory:
+The repository uses one integration checkout and two active feature lanes. With
+Orca, create the managed worktrees from the repository card; Orca keeps them in
+its workspace directory and registers their full worktree identity. The
+equivalent Git-only fallback keeps linked checkouts under the ignored
+`.worktrees/` directory:
+
+```bash
+orca-ide worktree create --name frontend --base-branch main --no-parent --setup skip --json
+orca-ide worktree create --name backend --base-branch main --no-parent --setup skip --json
+```
+
+For a Git-only checkout:
 
 ```bash
 git worktree list
-git worktree add .worktrees/frontend -b feat/frontend main
-git worktree add .worktrees/backend -b feat/backend main
+git worktree add .worktrees/frontend -b frontend main
+git worktree add .worktrees/backend -b backend main
 cd .worktrees/frontend
 cp local.properties.example local.properties
 ```
@@ -89,12 +99,13 @@ its non-ignored status is clean:
 git worktree list
 git status --short --untracked-files=all
 git worktree remove .worktrees/frontend
-git branch -d feat/frontend
+git branch -d frontend
 ```
 
-The remove command affects only the linked checkout. It must not be used on the
-primary checkout, the private design directory, or a preserved legacy checkout
-that still contains user changes.
+For Orca-managed worktrees, use the Orca worktree remove action so Orca and Git
+stay in sync. The remove command affects only the linked checkout. It must not
+be used on the primary checkout, the private design directory, or a preserved
+legacy checkout that still contains user changes.
 
 ## Source-only workspace
 

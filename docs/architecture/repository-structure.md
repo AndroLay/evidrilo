@@ -199,6 +199,23 @@ can be verified with the available .NET toolchain. The shared mobile host still
 owns Compose screen implementations and provider adapters, while the extracted
 KMP modules provide the verified lower-level boundaries.
 
+## Worktree collaboration baseline
+
+The active development topology is intentionally small: `main` is the
+integration/release checkout, while `frontend` and `backend` are the only
+active feature worktrees. Frontend owns `apps/**`, `modules/features/**`, and
+`modules/design-system/**`; backend owns the core/domain/application/data
+modules, `contracts/**`, `platform/**`, and `infra/**`. Root configuration,
+documentation, scripts, tooling, tests, and structural moves remain owned by
+`main`. The enforceable source for this split is
+[`worktree-ownership.yml`](../../worktree-ownership.yml), checked by
+[`check-worktree-scope.sh`](../../scripts/worktrees/check-worktree-scope.sh).
+
+The former domain, ingestion, platform, RevenueCat, QA, and integration lanes
+are retired. A legacy UI checkout may remain only as a preserved, non-active
+checkout while it contains user changes; it is not current architecture or
+release evidence.
+
 ## Historical mobile baseline tree
 
 ```text
