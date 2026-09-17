@@ -64,14 +64,35 @@ if [ "$gradle_available" -eq 1 ] && [ -n "$gradle_java_home" ]; then
 fi
 
 if [ "$gradle_available" -eq 1 ]; then
-    printf '%s\n' '1/4 Kotlin JVM tests, JVM compilation, Android compilation, and Android release bundle'
+    printf '%s\n' '1/4 Kotlin module tests, cross-target compilation, and Android release bundle'
     ./gradlew --gradle-user-home "$gradle_user_home" \
         --no-configuration-cache \
-        :composeApp:jvmTest :composeApp:compileKotlinJvm :composeApp:compileDebugKotlinAndroid \
+        :modules:core:jvmTest \
+        :modules:core:compileKotlinJvm \
+        :modules:core:compileKotlinIosSimulatorArm64 \
+        :modules:core:compileDebugKotlinAndroid \
+        :modules:domain:jvmTest \
+        :modules:domain:compileKotlinJvm \
+        :modules:data:jvmTest \
+        :modules:data:compileKotlinJvm \
+        :modules:design-system:jvmTest \
+        :modules:design-system:compileKotlinJvm \
+        :modules:application:jvmTest \
+        :modules:application:compileKotlinJvm \
+        :modules:application:compileKotlinIosSimulatorArm64 \
+        :modules:application:compileDebugKotlinAndroid \
+        :modules:features:jvmTest \
+        :modules:features:compileKotlinJvm \
+        :modules:features:compileKotlinIosSimulatorArm64 \
+        :modules:features:compileDebugKotlinAndroid \
+        :composeApp:jvmTest \
+        :composeApp:compileKotlinJvm \
+        :composeApp:compileKotlinIosSimulatorArm64 \
+        :composeApp:compileDebugKotlinAndroid \
         :androidApp:bundleRelease
     bash scripts/release/check-mobile-release.sh "$repo_root" --require-android-artifact
 else
-    printf '%s\n' '1/4 Kotlin JVM tests, JVM compilation, Android compilation, and Android release bundle: UNAVAILABLE (JDK 21 with java and javac is not installed)' >&2
+    printf '%s\n' '1/4 Kotlin module tests, cross-target compilation, and Android release bundle: UNAVAILABLE (JDK 21 with java and javac is not installed)' >&2
     bash scripts/release/check-mobile-release.sh "$repo_root"
 fi
 

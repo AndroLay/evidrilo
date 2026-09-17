@@ -241,7 +241,40 @@ test('the repository verification harness is documented and non-secret', () => {
   const harnessPath = path.join(repositoryRoot, 'scripts', 'ci', 'verify-local.sh');
   assert.equal(fs.existsSync(harnessPath), true, 'scripts/ci/verify-local.sh must exist');
   const harness = fs.readFileSync(harnessPath, 'utf8');
-  assert.match(harness, /:composeApp:jvmTest/);
+  for (const task of [
+    ':modules:core:jvmTest',
+    ':modules:domain:jvmTest',
+    ':modules:data:jvmTest',
+    ':modules:design-system:jvmTest',
+    ':modules:application:jvmTest',
+    ':modules:features:jvmTest',
+    ':composeApp:jvmTest',
+  ]) {
+    assert.match(
+      harness,
+      new RegExp(task.replaceAll(':', '\\:')),
+      `${task} must be part of the local verification harness`,
+    );
+  }
+  const workflow = fs.readFileSync(
+    path.join(repositoryRoot, '.github', 'workflows', 'verify.yml'),
+    'utf8',
+  );
+  for (const task of [
+    ':modules:core:jvmTest',
+    ':modules:domain:jvmTest',
+    ':modules:data:jvmTest',
+    ':modules:design-system:jvmTest',
+    ':modules:application:jvmTest',
+    ':modules:features:jvmTest',
+    ':composeApp:jvmTest',
+  ]) {
+    assert.match(
+      workflow,
+      new RegExp(task.replaceAll(':', '\\:')),
+      `${task} must be part of the CI mobile verification job`,
+    );
+  }
   assert.match(harness, /contracts\/contracts\.test\.mjs/);
   assert.match(harness, /platform\/database\/migrations\/migrations\.test\.mjs/);
   assert.match(harness, /toolchain-paths\.sh/);

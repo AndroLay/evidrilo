@@ -33,9 +33,27 @@ jobs:
       - name: Run shared and Android checks
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
+          :modules:core:jvmTest
+          :modules:core:compileKotlinJvm
+          :modules:core:compileKotlinIosSimulatorArm64
+          :modules:core:compileDebugKotlinAndroid
           :modules:domain:jvmTest
+          :modules:domain:compileKotlinJvm
+          :modules:data:jvmTest
+          :modules:data:compileKotlinJvm
+          :modules:design-system:jvmTest
+          :modules:design-system:compileKotlinJvm
+          :modules:application:jvmTest
+          :modules:application:compileKotlinJvm
+          :modules:application:compileKotlinIosSimulatorArm64
+          :modules:application:compileDebugKotlinAndroid
+          :modules:features:jvmTest
+          :modules:features:compileKotlinJvm
+          :modules:features:compileKotlinIosSimulatorArm64
+          :modules:features:compileDebugKotlinAndroid
           :composeApp:jvmTest
           :composeApp:compileKotlinJvm
+          :composeApp:compileKotlinIosSimulatorArm64
           :composeApp:compileDebugKotlinAndroid
 
       - name: Validate mobile release configuration
