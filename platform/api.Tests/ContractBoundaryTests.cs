@@ -27,13 +27,20 @@ public sealed class ContractBoundaryTests
     public void Versioned_schemas_are_closed_at_the_response_root()
     {
         var root = FindRepositoryRoot();
-        var schemaDirectory = Path.Combine(root, "contracts");
+        var schemaDirectory = Path.Combine(root, "contracts", "schemas");
 
-        foreach (var file in new[] { "health.v1.json", "http-errors.v1.json", "account-summary.v1.json" })
+        var files = Directory.EnumerateFiles(schemaDirectory, "*.v1.json")
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        Assert.NotEmpty(files);
+
+        foreach (var file in files)
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(schemaDirectory, file)));
+            using var document = JsonDocument.Parse(File.ReadAllText(file));
             var json = document.RootElement;
             Assert.Equal("https://json-schema.org/draft/2020-12/schema", json.GetProperty("$schema").GetString());
+            Assert.Equal(JsonValueKind.Object, json.ValueKind);
+            Assert.Equal("object", json.GetProperty("type").GetString());
             Assert.False(json.GetProperty("additionalProperties").GetBoolean());
             Assert.StartsWith("https://evidrilo.dev/contracts/", json.GetProperty("$id").GetString());
         }
