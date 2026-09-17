@@ -84,7 +84,7 @@ is_owned() {
   case "$lane" in
     integration)
       case "$path" in
-        .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/architecture/*|scripts/*|tooling/*|modules/README.md|modules/core/*|modules/application/README.md|modules/application/access/*|modules/data/README.md|modules/features/README.md|modules/design-system/README.md|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt)
+        .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/architecture/*|scripts/*|tooling/*|modules/README.md|modules/core/*|modules/application/*|modules/data/*|modules/features/*|modules/design-system/*|modules/domain/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt)
           return 0
           ;;
         composeApp/*|apps/mobile-shared/*|apps/ios/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|infra/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)

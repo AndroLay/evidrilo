@@ -175,10 +175,11 @@ separate deliberate milestone.
 evidrilo/
 ├── apps/                 # Android, iOS host, and shared mobile application
 ├── modules/
+│   ├── core/             # real KMP PKCE/secure-random foundation
 │   ├── domain/           # real framework-independent KMP module
-│   ├── application/      # documented boundary; extraction deferred
+│   ├── application/      # real KMP account/sync/analytics/recommendation layer
 │   ├── data/             # real KMP local-persistence module
-│   ├── features/         # documented boundary; extraction deferred
+│   ├── features/         # real KMP feature-presentation contracts
 │   └── design-system/    # real Compose visual module
 ├── contracts/            # schemas, fixtures, OpenAPI/events documentation
 ├── platform/             # API, worker, database, integration, solution
@@ -194,8 +195,9 @@ evidrilo/
 The API remains a verified modular monolith under `platform/api`; the separate
 `Evidrilo.Application`, `Evidrilo.Domain`, and `Evidrilo.Infrastructure`
 projects are intentionally not fabricated until a dependency-preserving split
-can be verified with the available .NET toolchain. Likewise, the existing
-mobile package layout remains stable while the domain module is extracted.
+can be verified with the available .NET toolchain. The shared mobile host still
+owns Compose screen implementations and provider adapters, while the extracted
+KMP modules provide the verified lower-level boundaries.
 
 ## Historical mobile baseline tree
 
@@ -301,12 +303,12 @@ evidrilo/
 │   ├── ios/                  # Xcode host
 │   └── mobile-shared/        # shared Compose/KMP app; compatibility task :composeApp
 ├── modules/
+│   ├── core/                 # real PKCE and secure-random foundation
 │   ├── domain/               # real framework-independent KMP module
-│   ├── core/                 # reserved boundary; no production extraction yet
-│   ├── application/          # reserved boundary; no production extraction yet
-│   ├── data/                 # reserved boundary; no production extraction yet
-│   ├── features/             # reserved boundary; no production extraction yet
-│   └── design-system/        # reserved boundary; private design stays ignored
+│   ├── application/          # real account/sync/analytics/recommendation layer
+│   ├── data/                 # real local-persistence KMP module
+│   ├── features/             # real feature-presentation contract module
+│   └── design-system/        # real Compose visual module
 ├── contracts/                # versioned language-neutral payloads and fixtures
 ├── platform/
 │   ├── Evidrilo.sln          # API/worker/integration solution boundary
@@ -323,12 +325,13 @@ evidrilo/
 └── internal/                 # ignored/private design, research, and audit data
 ```
 
-`modules/domain` is the first real extraction. The remaining module names are
-documented boundaries, not fake services or empty production libraries. Each
-will be extracted only after its import graph, interfaces, tests, and offline
-behavior can be verified independently. `platform/Evidrilo.sln` groups the
-current executable projects; separate Application/Domain/Infrastructure .NET
-projects are not claimed until a safe dependency split exists.
+The Kotlin core, domain, application, data, features, and design-system
+boundaries now own code, tests, and enforceable dependency direction. Compose
+screen implementations that require host-owned audio, billing, or navigation
+adapters remain in `apps/mobile-shared`; this is an intentional boundary, not an
+empty placeholder. `platform/Evidrilo.sln` groups the current executable
+projects; separate Application/Domain/Infrastructure .NET projects are not
+claimed until a safe dependency split exists.
 
 The public repository shell also includes `SECURITY.md`, `CHANGELOG.md`,
 `THIRD_PARTY_NOTICES.md`, `.editorconfig`, `.gitattributes`, GitHub governance,
@@ -340,9 +343,10 @@ submission, and provider material remains excluded from public export.
 
 ### `apps/mobile-shared`
 
-The shared Kotlin Multiplatform module. It owns the shared Compose UI, domain
-logic, scenario data, local session snapshot contract, and the RevenueCat KMP
-adapter. The M2 free core is local-first and does not initialize billing.
+The shared Kotlin Multiplatform host. It owns Compose screen implementations,
+scenario wiring, the local-first free-core coordinator, content reader, audio
+and RevenueCat adapters. Lower-level domain, application, data, feature
+presentation, and design-system code is consumed from `modules/`.
 
 ### `apps/android`
 
@@ -362,6 +366,24 @@ logic or business rules.
 
 Pure Kotlin models and deterministic behavior. This layer should not depend on
 Compose, Android APIs, iOS APIs, RevenueCat, or network services.
+
+### `modules/core`
+
+Framework-neutral PKCE and secure-random primitives. Platform random sources
+are implemented only in the module's platform source sets; no provider or UI
+code is allowed here.
+
+### `modules/application`
+
+Account/session, consented analytics, sync queue/coordinator, and
+recommendation orchestration. It depends downward on core, domain, and data;
+it does not depend on Compose, billing, or backend implementation details.
+
+### `modules/features`
+
+Feature presentation contracts for onboarding, guide, home, history, and
+accessibility disclosures. It consumes lower-level contracts and leaves
+platform/provider behavior to the host.
 
 ### `data`
 

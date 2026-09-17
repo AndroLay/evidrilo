@@ -8,15 +8,16 @@ A learner reads a case, selects relevant evidence, writes a conclusion,
 receives explainable feedback, makes one revision, and then tests how the
 conclusion changes when one observation is no longer available.
 
-> Status: **Structural migration in progress**. The first real reusable
-> `modules/domain` boundary and the public repository shell are now in place.
+> Status: **Structural migration in progress**. The reusable Kotlin boundaries
+> for core, domain, application, data, features, and design-system are now in
+> place alongside the public repository shell.
 > Device runtime, provider, deployment, human review, store, and submission
 > gates remain separate and are not implied by source changes.
 
 Current structural baseline: `f2d532e` — the repository shell, contracts,
-domain, design-system, local-persistence modules, and categorized verification
-lanes are aligned with the source-first layout while keeping the existing app
-task names and public behavior.
+Kotlin module boundaries, and categorized verification lanes are aligned with
+the source-first layout while keeping the existing app task names and public
+behavior.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
@@ -127,8 +128,13 @@ flowchart TD
 
 | Path | Responsibility |
 | --- | --- |
+| `modules/core` | Framework-neutral PKCE and platform secure-random primitives |
 | `modules/domain` | Real multiplatform domain module: deterministic evaluator, reducers, feedback, and access identifiers |
-| `apps/mobile-shared/src/commonMain` | Shared domain, evaluator, reducer, persistence contract, feature state, and Compose UI |
+| `modules/application` | Account/session, consented analytics, sync coordination, and recommendation orchestration |
+| `modules/data` | Local persistence contracts, codecs, recovery, and platform storage adapters |
+| `modules/features` | Feature presentation contracts for onboarding, guide, home, history, and disclosures |
+| `modules/design-system` | Shared Compose visual tokens, components, icons, fonts, and reviewed assets |
+| `apps/mobile-shared/src/commonMain` | Compose screen implementations, host wiring, content/audio/billing adapters, and free-core coordinator |
 | `apps/mobile-shared/src/commonTest` | Cross-platform deterministic tests and regression boundaries |
 | `apps/android` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
 | `apps/ios` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |

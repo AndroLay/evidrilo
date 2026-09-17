@@ -18,6 +18,36 @@ for domain_root in \
   fi
 done
 
+core_root="$repository_root/modules/core/src/commonMain"
+if [[ -d "$core_root" ]]; then
+  pattern='^(import (android\.|androidx\.|com\.revenuecat\.|io\.ktor\.|org\.postgresql\.|org\.jetbrains\.exposed\.|java\.sql\.|javax\.sql\.|dev\.nextgen\.mobile\.(domain|data|application|billing|sync|account)\.))'
+  if rg -n --glob '*.kt' "$pattern" "$core_root" >/dev/null 2>&1; then
+    printf 'ARCHITECTURE_BOUNDARY_VIOLATION: core imports an upper or platform layer\n' >&2
+    rg -n --glob '*.kt' "$pattern" "$core_root" | sed -n '1,20p' >&2
+    failed=1
+  fi
+fi
+
+application_root="$repository_root/modules/application/src/commonMain"
+if [[ -d "$application_root" ]]; then
+  pattern='^(import (android\.|androidx\.|com\.revenuecat\.|io\.ktor\.|org\.postgresql\.|org\.jetbrains\.exposed\.|java\.sql\.|javax\.sql\.|dev\.nextgen\.mobile\.(billing|audio|content|surfaces|design)\.))'
+  if rg -n --glob '*.kt' "$pattern" "$application_root" >/dev/null 2>&1; then
+    printf 'ARCHITECTURE_BOUNDARY_VIOLATION: application imports UI/provider/infrastructure\n' >&2
+    rg -n --glob '*.kt' "$pattern" "$application_root" | sed -n '1,20p' >&2
+    failed=1
+  fi
+fi
+
+feature_root="$repository_root/modules/features/src/commonMain"
+if [[ -d "$feature_root" ]]; then
+  pattern='^(import (android\.|androidx\.|com\.revenuecat\.|io\.ktor\.|org\.postgresql\.|org\.jetbrains\.exposed\.|java\.sql\.|javax\.sql\.|dev\.nextgen\.mobile\.(billing|security|account|audio)\.))'
+  if rg -n --glob '*.kt' "$pattern" "$feature_root" >/dev/null 2>&1; then
+    printf 'ARCHITECTURE_BOUNDARY_VIOLATION: features imports provider/platform infrastructure\n' >&2
+    rg -n --glob '*.kt' "$pattern" "$feature_root" | sed -n '1,20p' >&2
+    failed=1
+  fi
+fi
+
 for feature_root in \
   "$repository_root/apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/surfaces" \
   "$repository_root/modules/features" \
