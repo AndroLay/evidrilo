@@ -27,9 +27,9 @@ lanes:
       - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt
       - modules/core/**
       - modules/application/access/**
-      - apps/**
     structural:
       - composeApp/**
+      - apps/mobile-shared/**
       - androidApp/**
       - iosApp/**
       - platform/contracts/**
@@ -42,6 +42,7 @@ lanes:
   domain:
     owns:
       - composeApp/src/**/kotlin/dev/nextgen/mobile/domain/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/domain/**
       - modules/domain/**
       - modules/application/evidence-graph/**
       - modules/application/verification/**
@@ -49,10 +50,15 @@ lanes:
   mobile-ui:
     owns:
       - composeApp/src/**/kotlin/dev/nextgen/mobile/surfaces/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/surfaces/**
       - composeApp/src/**/kotlin/dev/nextgen/mobile/navigation/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/navigation/**
       - composeApp/src/**/kotlin/dev/nextgen/mobile/resources/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/resources/**
       - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt
+      - apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt
       - composeApp/src/**/composeResources/**
+      - apps/mobile-shared/src/**/composeResources/**
       - androidApp/src/main/AndroidManifest.xml
       - androidApp/src/main/res/**
       - apps/android/src/main/AndroidManifest.xml
@@ -65,8 +71,11 @@ lanes:
   ingestion:
     owns:
       - composeApp/src/**/kotlin/dev/nextgen/mobile/content/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/content/**
       - composeApp/src/**/kotlin/dev/nextgen/mobile/storage/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/storage/**
       - composeApp/src/**/kotlin/dev/nextgen/mobile/audio/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/audio/**
       - modules/application/ingestion/**
       - modules/data/documents/**
       - modules/data/ai/**
@@ -81,6 +90,7 @@ lanes:
   revenuecat:
     owns:
       - composeApp/src/**/kotlin/dev/nextgen/mobile/billing/**
+      - apps/mobile-shared/src/**/kotlin/dev/nextgen/mobile/billing/**
       - modules/data/billing/**
       - modules/features/paywall/**
       - platform/api/Billing/**

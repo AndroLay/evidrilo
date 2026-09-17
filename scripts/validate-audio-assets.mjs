@@ -106,7 +106,8 @@ function main() {
 
   const audioRoot = path.join(
     repositoryRoot,
-    'composeApp',
+    'apps',
+    'mobile-shared',
     'src',
     'commonMain',
     'composeResources',

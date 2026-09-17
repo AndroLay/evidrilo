@@ -27,7 +27,7 @@ required_paths=(
   worktree-ownership.yml
   gradlew
   settings.gradle.kts
-  composeApp
+  apps/mobile-shared
   apps/android
   iosApp
   contracts

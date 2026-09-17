@@ -18,7 +18,8 @@ function createFixture({ entries = [], files = {}, license = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-audio-'));
   const audioRoot = path.join(
     root,
-    'composeApp',
+    'apps',
+    'mobile-shared',
     'src',
     'commonMain',
     'composeResources',
@@ -69,7 +70,8 @@ function runValidator(root, args = []) {
 function writeEntries(root, entries, files = {}) {
   const audioRoot = path.join(
     root,
-    'composeApp',
+    'apps',
+    'mobile-shared',
     'src',
     'commonMain',
     'composeResources',

@@ -12,7 +12,7 @@ function run(...args) {
 }
 
 test('allows a domain-owned path in the domain lane', () => {
-  const result = run('domain', '--paths', 'composeApp/src/commonMain/kotlin/dev/nextgen/mobile/domain/access/EntitlementIds.kt');
+  const result = run('domain', '--paths', 'apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/domain/access/EntitlementIds.kt');
   assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
   assert.match(result.stdout, /WORKTREE_SCOPE_PASS/);
 });
@@ -25,7 +25,7 @@ test('rejects a platform path from the domain lane and names the owner', () => {
 });
 
 test('requires an explicit structural override for integration moves', () => {
-  const structuralPath = 'composeApp/src/commonMain/kotlin/dev/nextgen/mobile/surfaces/Example.kt';
+  const structuralPath = 'apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/surfaces/Example.kt';
   const blocked = run('integration', '--paths', structuralPath);
   assert.notEqual(blocked.status, 0);
   const allowed = run('integration', '--allow-structural', '--paths', structuralPath);

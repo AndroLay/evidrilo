@@ -7,7 +7,7 @@ repository_root=$(CDPATH= cd -- "$repository_root" && pwd)
 failed=0
 
 for domain_root in \
-  "$repository_root/composeApp/src/commonMain/kotlin/dev/nextgen/mobile/domain" \
+  "$repository_root/apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/domain" \
   "$repository_root/modules/domain"; do
   [[ -d "$domain_root" ]] || continue
   pattern='^(import (android\\.|androidx\\.|com\\.revenuecat\\.|io\\.ktor\\.|org\\.postgresql\\.|org\\.jetbrains\\.exposed\\.|java\\.sql\\.|javax\\.sql\\.|dev\\.nextgen\\.mobile\\.(billing|storage|sync|account|analytics|audio|content|security)\\.))'
@@ -19,7 +19,7 @@ for domain_root in \
 done
 
 for feature_root in \
-  "$repository_root/composeApp/src/commonMain/kotlin/dev/nextgen/mobile/surfaces" \
+  "$repository_root/apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/surfaces" \
   "$repository_root/modules/features" \
   "$repository_root/modules/design-system"; do
   [[ -d "$feature_root" ]] || continue

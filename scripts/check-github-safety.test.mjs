@@ -22,7 +22,7 @@ function createFixture() {
   for (const directory of [
     '.github',
     'apps/android',
-    'composeApp',
+    'apps/mobile-shared',
     'deploy',
     'gradle',
     'iosApp',
@@ -46,7 +46,7 @@ function createFixture() {
     'local.properties.example',
     '.github/workflows/verify.yml',
     'apps/android/src.txt',
-    'composeApp/src.txt',
+    'apps/mobile-shared/src.txt',
     'deploy/README.md',
     'gradle/libs.versions.toml',
     'iosApp/README.md',

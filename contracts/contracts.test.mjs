@@ -122,7 +122,8 @@ test('Android draft persistence does not synchronously commit on the UI event pa
     path.join(
       root,
       '..',
-      'composeApp',
+      'apps',
+      'mobile-shared',
       'src',
       'androidMain',
       'kotlin',
@@ -284,7 +285,7 @@ test('billing webhook and forwarded headers have explicit boundaries', () => {
 test('Android local billing configuration uses the documented ignored properties', () => {
   const repositoryRoot = path.resolve(root, '..');
   const composeBuild = fs.readFileSync(
-    path.join(repositoryRoot, 'composeApp', 'build.gradle.kts'),
+    path.join(repositoryRoot, 'apps', 'mobile-shared', 'build.gradle.kts'),
     'utf8',
   );
 
@@ -460,7 +461,7 @@ test('runtime matrix separates the current boundary from historical Android evid
 test('conclusion choices use native radio and checkbox semantics', () => {
   const repositoryRoot = path.resolve(root, '..');
   const source = fs.readFileSync(
-    path.join(repositoryRoot, 'composeApp', 'src', 'commonMain', 'kotlin', 'dev', 'nextgen', 'mobile', 'EvidriloApp.kt'),
+    path.join(repositoryRoot, 'apps', 'mobile-shared', 'src', 'commonMain', 'kotlin', 'dev', 'nextgen', 'mobile', 'EvidriloApp.kt'),
     'utf8',
   );
   const choiceButton = source.slice(
@@ -554,13 +555,14 @@ test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', (
     'utf8',
   );
   const build = fs.readFileSync(
-    path.join(repositoryRoot, 'composeApp', 'build.gradle.kts'),
+    path.join(repositoryRoot, 'apps', 'mobile-shared', 'build.gradle.kts'),
     'utf8',
   );
   const commonUi = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'composeApp',
+      'apps',
+      'mobile-shared',
       'src',
       'commonMain',
       'kotlin',
@@ -575,7 +577,8 @@ test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', (
   const androidUi = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'composeApp',
+      'apps',
+      'mobile-shared',
       'src',
       'androidMain',
       'kotlin',
@@ -590,7 +593,8 @@ test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', (
   const iosUi = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'composeApp',
+      'apps',
+      'mobile-shared',
       'src',
       'iosMain',
       'kotlin',
@@ -605,7 +609,8 @@ test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', (
   const jvmUi = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'composeApp',
+      'apps',
+      'mobile-shared',
       'src',
       'jvmMain',
       'kotlin',

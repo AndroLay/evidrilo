@@ -31,7 +31,7 @@ function createExporterFixture() {
   ]) {
     fs.copyFileSync(path.join(repositoryRoot, file), path.join(root, file));
   }
-  for (const directory of ['composeApp', 'apps/android', 'iosApp', 'contracts', 'platform']) {
+  for (const directory of ['apps/mobile-shared', 'apps/android', 'iosApp', 'contracts', 'platform']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'deploy'), path.join(root, 'deploy'), { recursive: true });
@@ -47,7 +47,7 @@ function createExporterFixture() {
   const databasePasswordName = ['DATABASE', 'PASSWORD'].join('_');
   writeFixtureFile(root, 'platform/api/.env.local', `${databasePasswordName}=local-only\n`);
 
-  const audioRoot = path.join(root, 'composeApp', 'src', 'commonMain', 'composeResources', 'files', 'audio');
+  const audioRoot = path.join(root, 'apps', 'mobile-shared', 'src', 'commonMain', 'composeResources', 'files', 'audio');
   const audioFile = 'narration/onboarding.m4a';
   const audioBytes = Buffer.from('synthetic-reviewed-audio-fixture\n');
   const sourceText = 'Start with the evidence.';

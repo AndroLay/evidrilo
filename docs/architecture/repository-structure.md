@@ -182,46 +182,47 @@ evidrilo/
 │       ├── gradle-wrapper.jar
 │       └── gradle-wrapper.properties
 │
-├── composeApp/
-│   ├── build.gradle.kts
-│   └── src/
-│       ├── commonMain/
-│       │   └── kotlin/dev/nextgen/mobile/
-│       │       ├── App.kt
-│       │       ├── EvidriloApp.kt
-│       │       ├── EvidriloPresentation.kt
-│       │       ├── storage/
-│       │       │   ├── ConclusionSessionStore.kt
-│       │       │   ├── ConclusionSessionStoreFactory.kt
-│       │       │   ├── ConclusionHistoryStore.kt
-│       │       │   └── ConclusionHistoryStoreFactory.kt
-│       │       ├── billing/
-│       │       │   ├── BillingModels.kt
-│       │       │   └── PlatformBillingGateway.kt
-│       │       └── domain/
-│       │           ├── askready/
-│       │           ├── feedback/
-│       │           ├── model/
-│       │           └── practice/
-│       │
-│       ├── commonTest/
-│       │   └── kotlin/dev/nextgen/mobile/
-│       │       ├── EvidriloPresentationTest.kt
-│       │       └── storage/ConclusionSessionCodecTest.kt
-│       │
-│       ├── androidMain/
-│       │   └── kotlin/dev/nextgen/mobile/
-│       │       └── storage/ConclusionSessionStore.android.kt
-│       │
-│       ├── iosMain/
-│           └── kotlin/dev/nextgen/mobile/
-│               └── storage/ConclusionSessionStore.ios.kt
-│
-│       └── jvmMain/           # no-op store for JVM/Desktop checks
-│
 ├── apps/
+│   ├── mobile-shared/
+│   │   ├── build.gradle.kts
+│   │   └── src/
+│   │       ├── commonMain/
+│   │       │   └── kotlin/dev/nextgen/mobile/
+│   │       │       ├── App.kt
+│   │       │       ├── EvidriloApp.kt
+│   │       │       ├── EvidriloPresentation.kt
+│   │       │       ├── storage/
+│   │       │       │   ├── ConclusionSessionStore.kt
+│   │       │       │   ├── ConclusionSessionStoreFactory.kt
+│   │       │       │   ├── ConclusionHistoryStore.kt
+│   │       │       │   └── ConclusionHistoryStoreFactory.kt
+│   │       │       ├── billing/
+│   │       │       │   ├── BillingModels.kt
+│   │       │       │   └── PlatformBillingGateway.kt
+│   │       │       └── domain/
+│   │       │           ├── askready/
+│   │       │           ├── feedback/
+│   │       │           ├── model/
+│   │       │           └── practice/
+│   │       │
+│   │       ├── commonTest/
+│   │       │   └── kotlin/dev/nextgen/mobile/
+│   │       │       ├── EvidriloPresentationTest.kt
+│   │       │       └── storage/ConclusionSessionCodecTest.kt
+│   │       │
+│   │       ├── androidMain/
+│   │       │   └── kotlin/dev/nextgen/mobile/
+│   │       │       └── storage/ConclusionSessionStore.android.kt
+│   │       │
+│   │       ├── iosMain/
+│   │       │   └── kotlin/dev/nextgen/mobile/
+│   │       │       └── storage/ConclusionSessionStore.ios.kt
+│   │       │
+│   │       └── jvmMain/       # no-op store for JVM/Desktop checks
+│   │
 │   └── android/
-│   └── src/main/
+│       ├── build.gradle.kts
+│       └── src/main/
 │
 ├── iosApp/                  # committed Xcode host; runtime sign-off remains open
 │
@@ -250,7 +251,7 @@ evidrilo/
 
 ## Responsibility of each area
 
-### `composeApp`
+### `apps/mobile-shared`
 
 The shared Kotlin Multiplatform module. It owns the shared Compose UI, domain
 logic, scenario data, local session snapshot contract, and the RevenueCat KMP
@@ -318,7 +319,7 @@ billing adapter ───┘
 
 ui ───> billing interface
 RevenueCat adapter ───> RevenueCat KMP SDK
-apps/android / iosApp ───> composeApp
+apps/android / iosApp ───> apps/mobile-shared
 ```
 
 The `core` directory must remain small. It is not a general-purpose dumping

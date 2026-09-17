@@ -117,7 +117,7 @@ older checkout, inspect the directories before any action:
 
 ```bash
 du -sh .local .gradle-local .dotnet-local .gradle build \
-  apps/android/build composeApp/build platform/api/bin platform/api/obj \
+  apps/android/build apps/mobile-shared/build platform/api/bin platform/api/obj \
   platform/worker/bin platform/worker/obj design Gurwi video-notes 2>/dev/null
 ```
 

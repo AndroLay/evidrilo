@@ -130,7 +130,7 @@ public_paths=(
   local.properties.example
   .dockerignore
   .github
-  composeApp
+  apps/mobile-shared
   apps/android
   iosApp
   contracts
