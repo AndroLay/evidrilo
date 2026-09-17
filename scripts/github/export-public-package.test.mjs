@@ -45,11 +45,35 @@ function createExporterFixture() {
     'apps/android',
     'apps/ios',
     'gradle',
+    'modules/core',
     'modules/domain',
+    'modules/application',
+    'modules/data',
+    'modules/features',
+    'modules/design-system',
     'contracts',
+    'contracts/openapi',
+    'contracts/schemas',
+    'contracts/events',
+    'contracts/fixtures',
     'platform',
+    'infra/docker',
+    'infra/environments/local',
+    'infra/environments/staging',
+    'infra/environments/production',
+    'infra/monitoring',
+    'infra/deployment',
     'tests',
+    'tests/architecture',
+    'tests/contracts',
+    'tests/e2e',
+    'tests/resilience',
+    'tests/performance',
     'tooling',
+    'tooling/lint',
+    'tooling/formatting',
+    'tooling/architecture-rules',
+    'tooling/codegen',
     'examples',
     '.github',
     'docs/api',
@@ -59,7 +83,15 @@ function createExporterFixture() {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'infra'), path.join(root, 'infra'), { recursive: true });
-  for (const directory of ['scripts/github', 'scripts/verification']) {
+  for (const directory of [
+    'scripts/bootstrap',
+    'scripts/ci',
+    'scripts/github',
+    'scripts/release',
+    'scripts/security',
+    'scripts/worktrees',
+    'scripts/verification',
+  ]) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   for (const [sourcePath, destinationPath] of [
@@ -72,6 +104,8 @@ function createExporterFixture() {
     fs.copyFileSync(path.join(repositoryRoot, sourcePath), path.join(root, destinationPath));
   }
   writeFixtureFile(root, 'modules/domain/README.md');
+  writeFixtureFile(root, 'modules/design-system/README.md');
+  writeFixtureFile(root, 'platform/Evidrilo.sln');
   writeFixtureFile(root, 'tests/architecture/README.md');
   writeFixtureFile(root, 'tooling/lint/README.md');
   writeFixtureFile(root, 'examples/README.md');
