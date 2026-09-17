@@ -1,0 +1,9 @@
+# Keep ownership explicit. Replace the individual owner with an approved
+# organization/team when repository governance is configured.
+* @AndroLay
+
+/modules/domain/ @AndroLay
+/platform/ @AndroLay
+/contracts/ @AndroLay
+/infra/ @AndroLay
+/internal/ @AndroLay

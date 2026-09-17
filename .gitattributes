@@ -1,0 +1,16 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.cs text eol=lf
+*.sql text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.png binary
+*.wav binary
+*.ttf binary
+*.jar binary
+*.aab binary
+*.apk binary

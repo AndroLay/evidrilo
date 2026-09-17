@@ -2,7 +2,9 @@
 
 ## Status
 
-Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
+This public guide documents reproducible repository workflows. Environment,
+provider, device, human-validation, and submission evidence is tracked outside
+the public source package and must not be inferred from this guide.
 
 The repository contains a reusable Kotlin Multiplatform foundation and the M2
 free-core Evidrilo loop, including the evidence-change challenge and local
@@ -161,7 +163,7 @@ dotnet test platform/worker.Tests/Evidrilo.Worker.Tests.csproj --configuration R
 bash platform/worker/integration/run-local-worker-smoke.sh
 ```
 
-The public workflow at [`../.github/workflows/verify.yml`](../.github/workflows/verify.yml)
+The public workflow at [`../../.github/workflows/verify.yml`](../../.github/workflows/verify.yml)
 keeps the deterministic mobile, contract, migration, API, and worker checks
 repeatable on pushes and pull requests. Before creating a public repository
 snapshot, check the exact candidate tree with:
@@ -205,7 +207,7 @@ The local Compose database uses trust authentication only inside its isolated
 development network. Use a managed secret store, a protected PostgreSQL
 connection, explicit origins/proxies, and the migration ledger before any
 staging or production deployment. The full handoff and rollback boundaries are
-in [`../infra/README.md`](../infra/README.md).
+in [`../../infra/README.md`](../../infra/README.md).
 
 These checks use synthetic local authentication and do not contact Supabase.
 The local PostgreSQL harness applies migrations
@@ -271,12 +273,12 @@ persistence, Java toolchain selection, API rate-limit metadata/order, review
 decision privacy, billing and sync timestamps, missing enum fields, and the
 Supabase email-verification claim boundary. It also removed an unnecessary
 projection sort and byte-boxing allocation. The latest verification is
-recorded in [the E114 audit record](../audit/evidence/evidrilo-whole-repository-audit-2026-09-11.md).
+recorded in [the E114 audit record](../../audit/evidence/evidrilo-whole-repository-audit-2026-09-11.md).
 
 E115 records the repository-owned closure after that audit: the active-case
 Home regression, public-package boundary checker, read-only CI workflow,
 stale-Gradle-cache protection, and fresh local verification are recorded in
-[the E115 closure record](../audit/evidence/evidrilo-open-gates-closure-2026-09-12.md).
+[the E115 closure record](../../audit/evidence/evidrilo-open-gates-closure-2026-09-12.md).
 
 E116 records the RevenueCat follow-up: the owner-authorized Test Store catalog
 is configured with the `evidrilo_pro` entitlement and monthly/yearly/lifetime
@@ -312,7 +314,7 @@ fresh PostgreSQL/worker smoke, deployment checks, Compose configuration, and
 allowlisted public export. It also hardens sync cursor/version integrity,
 timestamp validation, and HTTP token material. Device, provider, managed
 deployment, human, publication, and submission evidence remains open; see the
-[E118 record](../audit/evidence/evidrilo-all-areas-closure-2026-09-13.md).
+[E118 record](../../audit/evidence/evidrilo-all-areas-closure-2026-09-13.md).
 
 E119 adds the versioned analytics funnel boundary: practice start, paywall
 view, monthly/yearly premium actions, and bounded client-error codes. The app
@@ -470,19 +472,19 @@ E143 makes the recommendation engine abstain for invalid projection counter
 shapes and evaluates the count invariant with overflow-safe arithmetic. The
 focused recommendation suite passes `12/12` and the full API suite passes
 `138/138`; mobile recommendation integration remains pending explicit design
-approval. See the [E143 record](../audit/evidence/evidrilo-recommendation-projection-validation-2026-09-13.md).
+approval. See the [E143 record](../../audit/evidence/evidrilo-recommendation-projection-validation-2026-09-13.md).
 
 E144 requires a non-empty skill identifier on every selected recommendation
 candidate so the result remains explainable. The focused recommendation suite
 passes `13/13` and the full API suite passes `139/139`; managed content and
-mobile integration remain external or pending. See the [E144 record](../audit/evidence/evidrilo-recommendation-candidate-validation-2026-09-13.md).
+mobile integration remain external or pending. See the [E144 record](../../audit/evidence/evidrilo-recommendation-candidate-validation-2026-09-13.md).
 
 E145 verifies the complete local verifier and the allowlisted exporter. The
 current run passes Gradle, Node `74/74`, API `139/139`, worker `5/5`,
 deployment, and the exported candidate checks, while the workspace Git checker
 remains blocked by unusable Git metadata. This does not prove a clean index,
 remote visibility, push, or submission. See the
-[E145 record](../audit/evidence/evidrilo-public-package-preflight-2026-09-13.md).
+[E145 record](../../audit/evidence/evidrilo-public-package-preflight-2026-09-13.md).
 
 E146 integrates the mobile recommendation parser, gateway, exact case registry,
 safe Home card, lifecycle controller, and typed analytics. Focused
@@ -491,7 +493,7 @@ recommendation coverage passes `28/28`, the full Kotlin/JVM suite passes
 also fixes the server idempotency collision by assigning separate UUIDs to
 `shown`, `accepted`, and `dismissed`, reusing each only across retries of that
 same event. See the
-[E146 record](../audit/evidence/evidrilo-recommendation-mobile-integration-2026-09-13.md).
+[E146 record](../../audit/evidence/evidrilo-recommendation-mobile-integration-2026-09-13.md).
 
 E147 locks AI to optional, non-grading assistance for deterministic feedback
 explanation, one evidence-scope/limitation reflection question, or a
@@ -500,41 +502,41 @@ keeps verified identity, explicit opt-in, redaction, bounds, quota, timeout,
 typed fallback, and metadata-only audit; focused AI API tests pass `39/39` and
 the full API suite passes `139/139`. The provider remains disabled pending
 external approval and configuration. See the
-[E147 record](../audit/evidence/evidrilo-ai-bounded-assistance-2026-09-13.md).
+[E147 record](../../audit/evidence/evidrilo-ai-bounded-assistance-2026-09-13.md).
 
 E148 adds a local-only PostgreSQL backup/restore rehearsal. It applies the
 current migration ledger, dumps synthetic sentinel data in custom format,
 restores into a fresh database, and verifies the restored sentinel and ledger.
 The opt-in Docker test passes; managed retention, IAM, point-in-time recovery,
 staging, and production rollback remain external gates. See the
-[E148 record](../audit/evidence/evidrilo-local-backup-restore-2026-09-13.md).
+[E148 record](../../audit/evidence/evidrilo-local-backup-restore-2026-09-13.md).
 
 E149 fixes the server billing configuration boundary: the webhook can become
 usable only with webhook authentication and the exact `evidrilo_pro` entitlement.
 A focused configuration regression passes `11/11` and the full API suite passes
 `140/140`; a provider or production configuration result is not implied. See the
-[E149 record](../audit/evidence/evidrilo-billing-entitlement-allowlist-2026-09-13.md).
+[E149 record](../../audit/evidence/evidrilo-billing-entitlement-allowlist-2026-09-13.md).
 
 E150 synchronizes the RevenueCat Test Store runbook, backend execution register,
 current status page, platform README, root README, and all-area audit with the current
 E149/Node `77/77`/API `140/140` boundary. The focused contract passes `22/22`;
 this is documentation evidence only and does not imply
 provider, runtime, managed, human, or production verification. See the
-[E150 record](../audit/evidence/evidrilo-runbook-status-synchronization-2026-09-13.md).
+[E150 record](../../audit/evidence/evidrilo-runbook-status-synchronization-2026-09-13.md).
 
 E151 closes the server-side RevenueCat product allowlist gap. Active grants now
 require exact `monthly` or `yearly` products, and a signed canonical-entitlement
 `lifetime` event is ignored before persistence. Focused BillingTests pass
 `10/10`; the full API suite passes `141/141`. Provider, runtime, managed,
 human, and production verification remain open. See the
-[E151 record](../audit/evidence/evidrilo-billing-product-allowlist-2026-09-14.md).
+[E151 record](../../audit/evidence/evidrilo-billing-product-allowlist-2026-09-14.md).
 
 E152 protects the last active organization owner during account deletion.
 Migration `027_account_deletion_owner_guard` locks affected organizations and
 maps the fail-closed database boundary to `409 OWNER_TRANSFER_REQUIRED` in the
 API. Fresh PostgreSQL smoke observes `LAST_OWNER_DELETION_GUARD_PASS` and the
 existing deletion assertions; provider, managed, deployment, and human gates
-remain open. See the [E152 record](../audit/evidence/evidrilo-account-deletion-owner-guard-2026-09-14.md).
+remain open. See the [E152 record](../../audit/evidence/evidrilo-account-deletion-owner-guard-2026-09-14.md).
 
 E153 hardens client/request boundaries: mobile billing requires canonical
 `evidrilo_pro` plus an approved `monthly`/`yearly` product, content/sync/
@@ -544,83 +546,83 @@ and caller cancellation is propagated through optional AI. The current local
 boundary passes Kotlin `267/267`, API `144/144`, Node `77/77`, worker `5/5`,
 shared iOS target compilation, and fresh PostgreSQL/worker smoke. External
 provider, runtime, managed, staging, production, human, and submission gates
-remain open. See [E153](../audit/evidence/evidrilo-client-boundary-hardening-2026-09-14.md).
+remain open. See [E153](../../audit/evidence/evidrilo-client-boundary-hardening-2026-09-14.md).
 
 E154 bounds custom-scheme auth callbacks to 8 KiB before parsing or pending
 retention. The callback parser/bus regression, full local verifier, and shared
 iOS target compilation pass; the current verifier records API `144/144`, Node
 `77/77`, and worker `5/5`. Native callback runtime and provider-backed account
-verification remain open. See [E154](../audit/evidence/evidrilo-auth-callback-boundary-2026-09-14.md).
+verification remain open. See [E154](../../audit/evidence/evidrilo-auth-callback-boundary-2026-09-14.md).
 
 E155 requires one to 32 meaningful challenge variants in every accepted
 authoring document. Focused content/authoring coverage passes `22/22` and the
 full API suite passes `145/145`; managed content publication, provider,
-runtime, staging, human, and submission gates remain open. See [E155](../audit/evidence/evidrilo-content-challenge-required-2026-09-14.md).
+runtime, staging, human, and submission gates remain open. See [E155](../../audit/evidence/evidrilo-content-challenge-required-2026-09-14.md).
 
 E156 revalidates stored authoring JSON under the transition row lock before
 `approved` or `published`. Focused content/authoring coverage passes `23/23`
 and the full API suite passes `146/146`; managed database replay, content
 publication, provider, runtime, staging, human, and submission gates remain
-open. See [E156](../audit/evidence/evidrilo-stored-content-transition-guard-2026-09-14.md).
+open. See [E156](../../audit/evidence/evidrilo-stored-content-transition-guard-2026-09-14.md).
 
 E157 makes the Kotlin published-case reader reject an empty challenge-variant
 array. Focused reader coverage passes `8/8`; the full Kotlin/JVM suite passes
 `269/269`, JVM/Android compilation passes, and shared iOS targets compile.
 Managed content publication, provider, device, staging, human, and submission
-gates remain open. See [E157](../audit/evidence/evidrilo-mobile-content-challenge-required-2026-09-14.md).
+gates remain open. See [E157](../../audit/evidence/evidrilo-mobile-content-challenge-required-2026-09-14.md).
 
 E158 adds `minItems: 1` to the published-case schema, and E159 aligns its
 identifier, title, and skill-tag bounds with the API and Kotlin readers. The
 focused contract and full local verifier pass with Kotlin `269/269`, Node
 `77/77`, API `146/146`, worker `5/5`, and deployment checks. Cross-field
-references remain runtime validation. See [E159](../audit/evidence/evidrilo-case-schema-identifier-bounds-2026-09-14.md).
+references remain runtime validation. See [E159](../../audit/evidence/evidrilo-case-schema-identifier-bounds-2026-09-14.md).
 
 E160 corrects the content-authoring runbook's stale “optional challenge
 variants” instruction and protects the required one-to-32 invariant with the
 documentation contract. The focused contract and full local verifier pass;
-managed editorial publication remains external. See [E160](../audit/evidence/evidrilo-content-runbook-challenge-required-2026-09-14.md).
+managed editorial publication remains external. See [E160](../../audit/evidence/evidrilo-content-runbook-challenge-required-2026-09-14.md).
 
 E161 aligns the recommendation schema with the mobile/API status-specific
 response rules. The focused contract and full local verifier pass with Kotlin
 `269/269`, Node `78/78`, API `146/146`, worker `5/5`, and deployment checks.
-Provider and runtime evidence remain external. See [E161](../audit/evidence/evidrilo-recommendation-schema-alignment-2026-09-14.md).
+Provider and runtime evidence remain external. See [E161](../../audit/evidence/evidrilo-recommendation-schema-alignment-2026-09-14.md).
 
 E162 synchronizes the current Node verification snapshot after the E161
-contract addition; historical counts remain provenance. See [E162](../audit/evidence/evidrilo-node-verification-snapshot-2026-09-14.md).
+contract addition; historical counts remain provenance. See [E162](../../audit/evidence/evidrilo-node-verification-snapshot-2026-09-14.md).
 
 E163 hardens local conclusion-session restoration by rejecting unknown enum
 values, malformed escaped lists, and encoded values over 8 KiB before parsing.
 The final local verifier passes Kotlin/JVM `271/271`, Node `78/78`, API
 `146/146`, worker `5/5`, and deployment checks. External provider, device,
-managed, staging, human, and submission gates remain open. See [E163](../audit/evidence/evidrilo-local-session-decoder-hardening-2026-09-14.md).
+managed, staging, human, and submission gates remain open. See [E163](../../audit/evidence/evidrilo-local-session-decoder-hardening-2026-09-14.md).
 
 E164 hardens the cohort aggregate boundary so stale enrollments are excluded
 when organization membership is inactive. Migration 028, the `28/28` migration
 contract, focused API readiness `4/4`, and fresh PostgreSQL/RLS smoke pass. The
 tracker remains `78/92`; managed database, provider, device, staging, human,
-publication, and submission gates remain open. See [E164](../audit/evidence/evidrilo-cohort-active-membership-boundary-2026-09-14.md).
+publication, and submission gates remain open. See [E164](../../audit/evidence/evidrilo-cohort-active-membership-boundary-2026-09-14.md).
 
 E165 hardens the cohort role boundary so only active `learner` memberships are
 counted. Migration 029, its focused contract, API readiness `4/4`, and fresh
 PostgreSQL/RLS smoke pass; the tracker remains `78/92` and managed database,
 provider, device, staging, human, publication, and submission gates remain open.
-See [E165](../audit/evidence/evidrilo-cohort-learner-role-boundary-2026-09-14.md).
+See [E165](../../audit/evidence/evidrilo-cohort-learner-role-boundary-2026-09-14.md).
 
 E166 hardens membership role changes so a grant cannot demote the last active
 organization owner. The store locks the organization before counting owners;
-the focused policy regression and full API suite pass `147/147`. See [E166](../audit/evidence/evidrilo-last-owner-role-change-2026-09-14.md).
+the focused policy regression and full API suite pass `147/147`. See [E166](../../audit/evidence/evidrilo-last-owner-role-change-2026-09-14.md).
 
 E167 hardens the billing webhook identity boundary. The RevenueCat parser now
 ignores an all-zero `app_user_id` before the store is called; the focused
 billing suite passes `11/11` and the full API suite passes `148/148`. See
-[E167](../audit/evidence/evidrilo-billing-empty-account-guard-2026-09-14.md).
+[E167](../../audit/evidence/evidrilo-billing-empty-account-guard-2026-09-14.md).
 
 E169 hardens the auth provider boundary so non-string confirmation metadata
 cannot mark a local session as email-verified. Focused auth coverage passes
 `13/13`, and Kotlin/JVM passes `271/271` with JVM, Android, and shared-iOS
 compilation. Provider, native runtime, managed, staging, human, publication,
 and submission gates remain open. See
-[E169](../audit/evidence/evidrilo-auth-provider-type-boundary-2026-09-14.md).
+[E169](../../audit/evidence/evidrilo-auth-provider-type-boundary-2026-09-14.md).
 
 E170 adds explicit regression coverage for learner, teacher, and reviewer
 membership role-assignment attempts. The existing authorization policy denies
@@ -628,14 +630,14 @@ those actors; focused access-policy coverage passes `9/9` and the full API
 suite passes `151/151` without changing authorization behavior. Provider,
 native runtime, managed, staging, human, publication, and submission gates
 remain open. See
-[E170](../audit/evidence/evidrilo-membership-role-assignment-coverage-2026-09-14.md).
+[E170](../../audit/evidence/evidrilo-membership-role-assignment-coverage-2026-09-14.md).
 
 E171 records the repository-owned offline-audio implementation: focused audio
 coverage passes `28/28`, five bounded interaction effects pass manifest and
 budget checks, and the full local boundary passes Kotlin/JVM `299/299`, Node
 `87/87`, API `151/151`, and worker `5/5`. Reviewed narration, device playback,
 accessibility-service, and human audio-quality evidence remain open. See
-[E171](../audit/evidence/evidrilo-offline-audio-implementation-2026-09-14.md).
+[E171](../../audit/evidence/evidrilo-offline-audio-implementation-2026-09-14.md).
 
 E172 hardens local restoration boundaries. Session phases are bound to the
 supported main/challenge case IDs, and secure-session records reject unsafe
@@ -644,7 +646,7 @@ passes `5/5` for each boundary; the full local boundary passes Kotlin/JVM
 `301/301`, Node `87/87`, API `151/151`, worker `5/5`, Android compilation,
 shared iOS target compilation, and deployment checks. Provider, native runtime,
 managed, staging, human, publication, and submission gates remain open. See
-[E172](../audit/evidence/evidrilo-local-session-boundary-2026-09-14.md).
+[E172](../../audit/evidence/evidrilo-local-session-boundary-2026-09-14.md).
 
 E173 hardens asynchronous sync and billing state boundaries. Network results
 must still match the local queue snapshot and request generation before they
@@ -654,7 +656,7 @@ preserved. Focused coverage passes `18/18`; the full local boundary passes
 Kotlin/JVM `306/306`, Node `87/87`, API `151/151`, worker `5/5`, Android and
 shared iOS compilation, and deployment checks. External runtime, provider,
 managed, human, publication, and submission gates remain open. See
-[E173](../audit/evidence/evidrilo-async-state-boundaries-2026-09-14.md).
+[E173](../../audit/evidence/evidrilo-async-state-boundaries-2026-09-14.md).
 
 E174 hardens response and refresh boundaries with fail-closed validation. Sync
 rejects non-monotonic or skipping cursors and unrelated push results; auth
@@ -664,7 +666,7 @@ and billing suites pass `18/18`, `14/14`, and `9/9`; the latest full local
 boundary passes Kotlin/JVM `311/311`, Node `87/87`, API `151/151`, worker `5/5`,
 Android/shared-iOS target compilation, deployment checks, and audio asset
 checks. External runtime, provider, managed, staging, human, publication, and
-submission gates remain open. See [E174](../audit/evidence/evidrilo-fail-closed-response-and-refresh-boundaries-2026-09-14.md).
+submission gates remain open. See [E174](../../audit/evidence/evidrilo-fail-closed-response-and-refresh-boundaries-2026-09-14.md).
 
 E175 closes the remaining pull-response lower-bound gap: returned changes must
 have `serverSequence > cursor` and `serverSequence <= nextCursor`. The focused
@@ -672,34 +674,34 @@ sync regression passes `29/29`; the latest full local boundary passes
 Kotlin/JVM `312/312`, Node `87/87`, API `151/151`, worker `5/5`,
 Android/shared-iOS target compilation, deployment, and audio checks. External
 runtime, provider, managed, staging, human, publication, and submission gates
-remain open. See [E175](../audit/evidence/evidrilo-sync-cursor-lower-bound-2026-09-14.md).
+remain open. See [E175](../../audit/evidence/evidrilo-sync-cursor-lower-bound-2026-09-14.md).
 
 E176 hardens cancellation and malformed-input boundaries across the mobile
 transport, API write endpoints, sync validation, recommendation state, and
 account redirect lifecycle. The current local boundary passes Kotlin/JVM
 `317/317`, Node `87/87`, API `153/153`, worker `5/5`, Android/shared-iOS target
 compilation, deployment, and audio checks. Runtime, provider, managed, staging,
-human, publication, and submission gates remain open. See [E176](../audit/evidence/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md).
+human, publication, and submission gates remain open. See [E176](../../audit/evidence/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md).
 
 E177 hardens sync pull pagination by passing the validated requested `limit`
 into response validation. A smaller `hasMore=true` page is accepted, while an
 oversized response is rejected. Kotlin/JVM `319/319`, Node `87/87`, API
 `153/153`, worker `5/5`, Android/shared-iOS target compilation, deployment,
 and audio checks pass. Runtime, provider, managed, staging, human,
-publication, and submission gates remain open. See [E177](../audit/evidence/evidrilo-sync-page-size-boundary-2026-09-14.md).
+publication, and submission gates remain open. See [E177](../../audit/evidence/evidrilo-sync-page-size-boundary-2026-09-14.md).
 
 E178 hardens API full-match validation and staging environment normalization.
 Identifiers, digests, actions, reason codes, case-version IDs, and request IDs
 reject trailing-newline boundary bypasses; conventional `Staging` is accepted
 as canonical `staging`. API `158/158` passes. Runtime, provider, managed
-staging, human, publication, and submission gates remain open. See [E178](../audit/evidence/evidrilo-api-input-and-staging-boundary-2026-09-14.md).
+staging, human, publication, and submission gates remain open. See [E178](../../audit/evidence/evidrilo-api-input-and-staging-boundary-2026-09-14.md).
 
 E179 hardens consent-bound sync orchestration. Failed or invalidated pulls do
 not start a push, active sync jobs are cancelled on account/consent changes,
 enablement has one state-driven launch owner, and failed queue clears preserve
 truthful pending-count state. Kotlin/JVM `321/321` passes; runtime, provider,
 managed, staging, human, publication, and submission gates remain open. See
-[E179](../audit/evidence/evidrilo-sync-consent-cancellation-boundary-2026-09-14.md).
+[E179](../../audit/evidence/evidrilo-sync-consent-cancellation-boundary-2026-09-14.md).
 
 E181 hardens the case-authoring transition boundary. The endpoint now rejects
 unknown schema, version, and target-state values before storage; focused
@@ -708,7 +710,7 @@ Kotlin/Android build boundary, Node `93/93`, API `162/162`, worker `5/5`,
 deployment, and asset checks. This is repository-local evidence only; runtime,
 provider, managed, staging, human, publication, and submission gates remain
 open. See
-[E181](../audit/evidence/evidrilo-case-transition-contract-boundary-2026-09-15.md).
+[E181](../../audit/evidence/evidrilo-case-transition-contract-boundary-2026-09-15.md).
 
 E183 hardens the shared Compose choice control. Radio-style choices use native
 selectable semantics, multi-select evidence facts use native toggleable
@@ -717,7 +719,7 @@ semantics, and the card merges label/state information. Direct contracts pass
 `5/5`, the current Kotlin/Android build boundary, Android release packaging,
 deployment, and asset checks. This is repository/build evidence only; runtime,
 provider, managed, staging, human, publication, and submission gates remain
-open. See [E183](../audit/evidence/evidrilo-choice-accessibility-semantics-2026-09-15.md).
+open. See [E183](../../audit/evidence/evidrilo-choice-accessibility-semantics-2026-09-15.md).
 
 E182 aligns the server sync-pull cursor boundary with the mobile parser. Cursors
 outside `0..1_000_000_000_000_000` are rejected before storage; the focused
@@ -725,7 +727,7 @@ regression passes `1/1`. The full local verifier passes the current
 Kotlin/Android build boundary, Node `93/93`, API `163/163`, worker `5/5`,
 deployment, and asset checks. Runtime, provider, managed, staging, human,
 publication, and submission gates remain open. See
-[E182](../audit/evidence/evidrilo-sync-cursor-contract-boundary-2026-09-15.md).
+[E182](../../audit/evidence/evidrilo-sync-cursor-contract-boundary-2026-09-15.md).
 
 E180 prepares the mobile release candidate. Android's optimized release bundle,
 fail-closed signing task, manifest security defaults, and explicit version
@@ -734,7 +736,7 @@ an unsigned CI host-build lane. Kotlin/JVM `324/324`, Node `93/93`, API
 `161/161`, worker `5/5`, Android release packaging, shared iOS target
 compilation, and release checks pass. Device runtime, archive/export, signing,
 store, provider, managed, accessibility, human, publication, and submission
-gates remain open. See [E180](../audit/evidence/evidrilo-mobile-release-candidate-preparation-2026-09-14.md).
+gates remain open. See [E180](../../audit/evidence/evidrilo-mobile-release-candidate-preparation-2026-09-14.md).
 
 ## Local configuration
 

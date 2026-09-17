@@ -6,7 +6,7 @@ review the application.
 
 ## Start here
 
-1. [`development.md`](development.md) — local setup and useful commands.
+1. [`development/`](development/) — local setup and useful commands.
 2. [`roadmap.md`](roadmap.md) — end-to-end goals, milestones, gates, and
    definition of done, including the current evidence-change challenge and
    Next Gen submission gates.

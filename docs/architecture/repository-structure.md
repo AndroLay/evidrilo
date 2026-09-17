@@ -1,4 +1,4 @@
-# Repository Structure — Evidrilo Mobile App
+# Repository Structure — Evidrilo
 
 Latest increment: E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED / E176 / REQUEST_LIFECYCLE_AND_INPUT_BOUNDARIES_HARDENED / E175 / SYNC_PULL_CURSOR_LOWER_BOUND_GUARDED / E174 / FAIL_CLOSED_RESPONSE_REFRESH_BOUNDARIES / E173 / ASYNC_STATE_BOUNDARIES_HARDENED / E172 / LOCAL_SESSION_BOUNDARIES_HARDENED / E171 / OFFLINE_AUDIO_REPOSITORY_IMPLEMENTATION / E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED.
 
@@ -163,7 +163,7 @@ separate deliberate milestone.
 - Keep the submission lane local-first while building the optional platform lane
   behind explicit milestones and independent verification.
 
-## Current public repository tree
+## Historical mobile baseline tree
 
 ```text
 evidrilo/
@@ -255,6 +255,53 @@ evidrilo/
 └── local.properties.example
 ```
 
+## Current structural baseline
+
+The repository is being migrated incrementally toward a source-first modular
+monorepo. The current verified boundary is:
+
+```text
+evidrilo/
+├── apps/
+│   ├── android/              # Android host; compatibility Gradle task :androidApp
+│   ├── ios/                  # Xcode host
+│   └── mobile-shared/        # shared Compose/KMP app; compatibility task :composeApp
+├── modules/
+│   ├── domain/               # real framework-independent KMP module
+│   ├── core/                 # reserved boundary; no production extraction yet
+│   ├── application/          # reserved boundary; no production extraction yet
+│   ├── data/                 # reserved boundary; no production extraction yet
+│   ├── features/             # reserved boundary; no production extraction yet
+│   └── design-system/        # reserved boundary; private design stays ignored
+├── contracts/                # versioned language-neutral payloads and fixtures
+├── platform/
+│   ├── Evidrilo.sln          # API/worker/integration solution boundary
+│   ├── api/                  # ASP.NET Core modular-monolith implementation
+│   ├── worker/               # projection/background worker
+│   ├── database/             # migrations and local integration harness
+│   └── integration/          # local API/worker harness
+├── infra/                    # local Docker plus explicit deployment boundaries
+├── scripts/                  # compatibility verification and worktree tools
+├── tests/                    # cross-boundary test indexes
+├── tooling/                  # pinned-rule/configuration boundaries
+├── docs/                     # public engineering documentation
+├── examples/                 # synthetic public examples only
+└── internal/                 # ignored/private design, research, and audit data
+```
+
+`modules/domain` is the first real extraction. The remaining module names are
+documented boundaries, not fake services or empty production libraries. Each
+will be extracted only after its import graph, interfaces, tests, and offline
+behavior can be verified independently. `platform/Evidrilo.sln` groups the
+current executable projects; separate Application/Domain/Infrastructure .NET
+projects are not claimed until a safe dependency split exists.
+
+The public repository shell also includes `SECURITY.md`, `CHANGELOG.md`,
+`THIRD_PARTY_NOTICES.md`, `.editorconfig`, `.gitattributes`, GitHub governance,
+public-safe `docs/operations/README.md`, and explicit staging/production
+handoff boundaries. Private `internal/`, audit, research, participant,
+submission, and provider material remains excluded from public export.
+
 ## Responsibility of each area
 
 ### `apps/mobile-shared`
@@ -277,7 +324,7 @@ Gradle framework embed task. The shared module compiles for
 required before claiming iOS launch. It must not contain duplicated scenario
 logic or business rules.
 
-### `domain`
+### `modules/domain`
 
 Pure Kotlin models and deterministic behavior. This layer should not depend on
 Compose, Android APIs, iOS APIs, RevenueCat, or network services.

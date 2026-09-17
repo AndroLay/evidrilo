@@ -24,16 +24,38 @@ function createExporterFixture() {
     'LICENSE',
     'CONTRIBUTING.md',
     '.gitignore',
+    '.editorconfig',
+    '.gitattributes',
     'worktree-ownership.yml',
+    'SECURITY.md',
+    'CHANGELOG.md',
+    'THIRD_PARTY_NOTICES.md',
     'version.props',
     'Directory.Build.props',
     '.dockerignore',
     'gradlew',
+    'gradle.properties',
+    'build.gradle.kts',
     'settings.gradle.kts',
   ]) {
     fs.copyFileSync(path.join(repositoryRoot, file), path.join(root, file));
   }
-  for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform']) {
+  for (const directory of [
+    'apps/mobile-shared',
+    'apps/android',
+    'apps/ios',
+    'gradle',
+    'modules/domain',
+    'contracts',
+    'platform',
+    'tests',
+    'tooling',
+    'examples',
+    '.github',
+    'docs/api',
+    'docs/adr',
+    'docs/operations',
+  ]) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'infra'), path.join(root, 'infra'), { recursive: true });
@@ -41,6 +63,15 @@ function createExporterFixture() {
   for (const file of ['check-public-package.sh', 'check-deployment.sh', 'export-public-package.sh', 'sanitize-public-markdown-links.mjs', 'validate-audio-assets.mjs']) {
     fs.copyFileSync(path.join(repositoryRoot, 'scripts', file), path.join(root, 'scripts', file));
   }
+  writeFixtureFile(root, 'modules/domain/README.md');
+  writeFixtureFile(root, 'tests/architecture/README.md');
+  writeFixtureFile(root, 'tooling/lint/README.md');
+  writeFixtureFile(root, 'examples/README.md');
+  writeFixtureFile(root, 'docs/api/README.md');
+  writeFixtureFile(root, 'docs/adr/README.md');
+  writeFixtureFile(root, 'docs/operations/README.md');
+  writeFixtureFile(root, '.github/workflows/verify.yml');
+  writeFixtureFile(root, 'gradle/libs.versions.toml');
   writeFixtureFile(root, 'apps/ios/Configuration/Config.xcconfig', '// safe checked-in baseline\n');
   writeFixtureFile(root, 'apps/ios/Configuration/Debug.xcconfig.example', '// safe example\n');
   writeFixtureFile(root, 'apps/ios/Configuration/Local.xcconfig', 'SUPABASE_URL=local-only\n');

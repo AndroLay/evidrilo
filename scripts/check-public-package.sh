@@ -23,19 +23,33 @@ required_paths=(
   README.md
   LICENSE
   CONTRIBUTING.md
+  SECURITY.md
+  CHANGELOG.md
+  THIRD_PARTY_NOTICES.md
+  .editorconfig
+  .gitattributes
   .gitignore
+  .dockerignore
   worktree-ownership.yml
   version.props
   Directory.Build.props
   gradlew
+  gradle
   settings.gradle.kts
+  build.gradle.kts
+  gradle.properties
   apps/mobile-shared
   apps/android
   apps/ios
+  modules/domain
   contracts
   platform
   infra
   scripts
+  tests
+  tooling
+  examples
+  .github
 )
 
 for required_path in "${required_paths[@]}"; do
@@ -55,7 +69,6 @@ forbidden_paths=(
   internal
   docs/licenses/audio-narration-source-inventory.md
   docs/submission
-  docs/operations
   docs/business
   docs/superpowers
   docs/architecture/revenuecat-integration.md
@@ -75,6 +88,13 @@ for forbidden_path in "${forbidden_paths[@]}"; do
     failed=1
   fi
 done
+
+if [[ -d "$candidate_root/docs/operations" ]]; then
+  while IFS= read -r operation_path; do
+    printf 'private operations file present: %s\n' "${operation_path#"$candidate_root"/}" >&2
+    failed=1
+  done < <(find "$candidate_root/docs/operations" -type f ! -path "$candidate_root/docs/operations/README.md" -print)
+fi
 
 while IFS= read -r sensitive_path; do
   relative_path=${sensitive_path#"$candidate_root"/}

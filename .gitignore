@@ -60,7 +60,9 @@ DerivedData/
 /design/
 /internal/
 /docs/submission/
-/docs/operations/
+/docs/operations/*
+!/docs/operations/
+!/docs/operations/README.md
 /docs/business/
 /docs/product/*
 !/docs/product/m0-product-contract.md

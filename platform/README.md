@@ -1,5 +1,11 @@
 # Evidrilo platform lane
 
+The checked-in [`Evidrilo.sln`](Evidrilo.sln) is the solution boundary for the
+current API, worker, integration harness, and their tests. The projects remain
+physically grouped by executable responsibility while deeper Application,
+Domain, and Infrastructure extraction is deferred until dependency analysis
+proves a safe move.
+
 Current repository increment: E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED. Engine validation, local snapshot preflight, canonical local-to-server case identity, published-only sync admission, and the migration 030 database trigger are now locally verified alongside the earlier API and mobile boundary hardening; external runtime, provider, managed, staging, and human gates remain open.
 
 The platform lane is optional infrastructure for accounts, cloud sync,

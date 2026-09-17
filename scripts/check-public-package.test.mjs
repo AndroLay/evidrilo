@@ -11,10 +11,42 @@ const checker = path.join(scriptsDirectory, 'check-public-package.sh');
 
 function createCandidate() {
   const candidate = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-package-'));
-  for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform', 'infra', 'scripts']) {
+  for (const directory of [
+    'apps/mobile-shared',
+    'apps/android',
+    'apps/ios',
+    'gradle',
+    'modules/domain',
+    'contracts',
+    'platform',
+    'infra',
+    'scripts',
+    'tests',
+    'tooling',
+    'examples',
+    '.github',
+  ]) {
     fs.mkdirSync(path.join(candidate, directory), { recursive: true });
   }
-  for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'version.props', 'Directory.Build.props', 'gradlew', 'settings.gradle.kts']) {
+  for (const file of [
+    'README.md',
+    'LICENSE',
+    'CONTRIBUTING.md',
+    'SECURITY.md',
+    'CHANGELOG.md',
+    'THIRD_PARTY_NOTICES.md',
+    '.editorconfig',
+    '.gitattributes',
+    '.gitignore',
+    '.dockerignore',
+    'worktree-ownership.yml',
+    'version.props',
+    'Directory.Build.props',
+    'gradlew',
+    'gradle.properties',
+    'build.gradle.kts',
+    'settings.gradle.kts',
+  ]) {
     fs.writeFileSync(path.join(candidate, file), 'synthetic public package fixture\n');
   }
   return candidate;

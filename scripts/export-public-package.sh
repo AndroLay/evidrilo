@@ -120,6 +120,11 @@ public_paths=(
   README.md
   LICENSE
   CONTRIBUTING.md
+  SECURITY.md
+  CHANGELOG.md
+  THIRD_PARTY_NOTICES.md
+  .editorconfig
+  .gitattributes
   .gitignore
   worktree-ownership.yml
   version.props
@@ -132,15 +137,22 @@ public_paths=(
   local.properties.example
   .dockerignore
   .github
+  examples
   apps/mobile-shared
   apps/android
   apps/ios
+  modules
   contracts
   platform
   infra
   scripts
+  tests
+  tooling
   docs/README.md
-  docs/development.md
+  docs/api
+  docs/adr
+  docs/operations/README.md
+  docs/development
   docs/decisions.md
   docs/release.md
   docs/roadmap.md

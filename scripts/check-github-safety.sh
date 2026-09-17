@@ -33,8 +33,11 @@ reject() {
 }
 
 is_forbidden_path() {
+  if [[ "$1" == docs/operations/* && "$1" != docs/operations/README.md ]]; then
+    return 0
+  fi
   case "$1" in
-    audit|audit/*|research|research/*|next-gen|next-gen/*|video-notes|video-notes/*|Gurwi|Gurwi/*|design|design/*|internal|internal/*|docs/submission|docs/submission/*|docs/operations|docs/operations/*|docs/business|docs/business/*|docs/superpowers|docs/superpowers/*|docs/licenses/audio-narration-source-inventory.md|.agents|.agents/*|.superpowers|.superpowers/*|.codex|.codex/*|.local|.local/*|.kotlin|.kotlin/*|.gradle-local|.gradle-local/*|.dotnet-local|.dotnet-local/*|.dotnet-tmp|.dotnet-tmp/*)
+    audit|audit/*|research|research/*|next-gen|next-gen/*|video-notes|video-notes/*|Gurwi|Gurwi/*|design|design/*|internal|internal/*|docs/submission|docs/submission/*|docs/business|docs/business/*|docs/superpowers|docs/superpowers/*|docs/licenses/audio-narration-source-inventory.md|.agents|.agents/*|.superpowers|.superpowers/*|.codex|.codex/*|.local|.local/*|.kotlin|.kotlin/*|.gradle-local|.gradle-local/*|.dotnet-local|.dotnet-local/*|.dotnet-tmp|.dotnet-tmp/*)
       return 0
       ;;
   esac
@@ -63,13 +66,13 @@ is_sensitive_path() {
 
 is_public_path() {
   case "$1" in
-    README.md|LICENSE|CONTRIBUTING.md|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
+    README.md|LICENSE|CONTRIBUTING.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
       return 0
       ;;
-    .github/*|apps/*|androidApp/*|composeApp/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*)
+    .github/*|apps/*|androidApp/*|composeApp/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)
       return 0
       ;;
-    docs/README.md|docs/decisions.md|docs/development.md|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/licenses/SourceSans3-OFL-1.1.md|docs/licenses/audio-assets.md|docs/product/m0-product-contract.md)
+    docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/licenses/SourceSans3-OFL-1.1.md|docs/licenses/audio-assets.md|docs/product/m0-product-contract.md|docs/operations/README.md|docs/api/*|docs/adr/*)
       return 0
       ;;
   esac
@@ -117,6 +120,7 @@ check_ignored_probes() {
     design/evidrilo/mockup.png
     internal/design/mockup.png
     docs/licenses/audio-narration-source-inventory.md
+    docs/operations/private-runbook.md
     audit/private-note.md
     research/next-gen/private-note.md
     internal/research/next-gen/private-note.md

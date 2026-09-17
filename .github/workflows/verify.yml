@@ -33,6 +33,7 @@ jobs:
       - name: Run shared and Android checks
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
+          :modules:domain:jvmTest
           :composeApp:jvmTest
           :composeApp:compileKotlinJvm
           :composeApp:compileDebugKotlinAndroid

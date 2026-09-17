@@ -10,6 +10,8 @@ lanes:
     owns:
       - .github/**
       - .dockerignore
+      - .editorconfig
+      - .gitattributes
       - .gitignore
       - settings.gradle.kts
       - build.gradle.kts
@@ -20,7 +22,11 @@ lanes:
       - README.md
       - CONTRIBUTING.md
       - LICENSE
+      - SECURITY.md
+      - CHANGELOG.md
+      - THIRD_PARTY_NOTICES.md
       - worktree-ownership.yml
+      - examples/**
       - docs/architecture/**
       - scripts/**
       - tooling/**
@@ -28,7 +34,13 @@ lanes:
       - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt
       - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt
       - modules/core/**
+      - modules/README.md
+      - modules/application/README.md
+      - modules/data/README.md
+      - modules/features/README.md
+      - modules/design-system/README.md
       - modules/application/access/**
+      - tests/**
     structural:
       - composeApp/**
       - apps/mobile-shared/**

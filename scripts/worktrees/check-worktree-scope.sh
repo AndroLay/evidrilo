@@ -84,7 +84,7 @@ is_owned() {
   case "$lane" in
     integration)
       case "$path" in
-        .github/*|.dockerignore|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|worktree-ownership.yml|docs/architecture/*|scripts/*|tooling/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt|modules/core/*|modules/application/access/*)
+        .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/architecture/*|scripts/*|tooling/*|modules/README.md|modules/core/*|modules/application/README.md|modules/application/access/*|modules/data/README.md|modules/features/README.md|modules/design-system/README.md|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt)
           return 0
           ;;
         composeApp/*|apps/mobile-shared/*|apps/ios/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|infra/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)
@@ -130,7 +130,7 @@ is_owned() {
     qa)
       case "$path" in
         docs/architecture/*) return 1 ;;
-        tests/*|docs/*|audit/*|docs/submission/*|docs/operations/*) return 0 ;;
+      tests/*|docs/*|audit/*|docs/submission/*|docs/operations/*) return 0 ;;
       esac
       ;;
   esac
@@ -161,7 +161,7 @@ for path in "${changed_paths[@]}"; do
       composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*) owner=ingestion ;;
       composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/res/*|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|apps/ios/iosApp/Assets.xcassets/*) owner=mobile-ui ;;
       tests/*|docs/*|audit/*) owner=qa ;;
-      .github/*|gradle/*|scripts/*|tooling/*|settings.gradle.kts|build.gradle.kts|worktree-ownership.yml) owner=integration ;;
+      .github/*|gradle/*|scripts/*|tooling/*|examples/*|modules/*|settings.gradle.kts|build.gradle.kts|worktree-ownership.yml|.editorconfig|.gitattributes|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md) owner=integration ;;
     esac
     printf 'WORKTREE_SCOPE_VIOLATION lane=%s path=%s owner=%s\n' "$lane" "$path" "$owner" >&2
     violations=$((violations + 1))

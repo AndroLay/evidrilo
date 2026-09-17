@@ -8,13 +8,13 @@ A learner reads a case, selects relevant evidence, writes a conclusion,
 receives explainable feedback, makes one revision, and then tests how the
 conclusion changes when one observation is no longer available.
 
-> Status: **E186 — Backend engine and sync boundary hardened**. RevenueCat price
-> migration and transaction verification remain open. Repository
-> implementation and local verification are available, but device runtime,
-> provider, deployment, human review, store, and submission gates remain
-> separate.
+> Status: **Structural migration in progress**. The first real reusable
+> `modules/domain` boundary and the public repository shell are now in place.
+> Device runtime, provider, deployment, human review, store, and submission
+> gates remain separate and are not implied by source changes.
 
-Current repository increment: E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED.
+Current structural increment: `c82abbf` — extracted the framework-independent
+domain module while keeping the existing app task names and public behavior.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
@@ -125,17 +125,22 @@ flowchart TD
 
 | Path | Responsibility |
 | --- | --- |
+| `modules/domain` | Real multiplatform domain module: deterministic evaluator, reducers, feedback, and access identifiers |
 | `apps/mobile-shared/src/commonMain` | Shared domain, evaluator, reducer, persistence contract, feature state, and Compose UI |
 | `apps/mobile-shared/src/commonTest` | Cross-platform deterministic tests and regression boundaries |
 | `apps/android` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
 | `apps/ios` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |
-| `platform/api` | ASP.NET Core modular monolith API and storage adapters |
 | `contracts` | Versioned JSON contracts, schemas, and fixtures |
+| `platform/Evidrilo.sln` | Solution boundary for the current API, worker, integration harness, and tests |
+| `platform/api` | ASP.NET Core modular monolith API and storage adapters |
 | `platform/database` | PostgreSQL/Supabase migrations, ledger, RLS, and integration smoke tests |
 | `platform/worker` | Projection worker plus lease/retry handling |
-| `infra` | Dockerfiles and local Compose; not a production deployment |
-| `scripts` | Verification, release, public-package, asset, safety, and deployment checks |
-| `docs` | Product, architecture, development, testing, release, business, and decision documents |
+| `infra` | Dockerfiles, local Compose, and explicit staging/production handoff boundaries; not a production deployment |
+| `scripts` | Verification, release, public-package, asset, safety, and worktree checks |
+| `tests` | Cross-boundary test indexes without duplicating executable owner tests |
+| `tooling` | Formatting, lint, architecture-rule, and code-generation boundaries |
+| `docs` | Public product, architecture, development, testing, release, API, ADR, and operations documentation |
+| `internal` | Ignored/private design, research, audit, operations, and agent context |
 
 ## Quick start
 
@@ -176,7 +181,7 @@ generated output, and private raw media are preserved outside the checkout; UI
 design sources are kept under ignored `internal/design/`. On an older checkout,
 inspect those directories and move them only
 after the external-path verification succeeds. See the
-[development guide](docs/development.md#source-only-workspace) for the safe
+[development guide](docs/development/README.md#source-only-workspace) for the safe
 sequence.
 
 ```bash
@@ -249,7 +254,7 @@ Use this sequence to keep shared code and boundaries consistent:
 
 Primary working documents:
 
-- [Development guide](docs/development.md) — local toolchain and workflow.
+- [Development guide](docs/development/) — local toolchain and workflow.
 - [Testing guide](docs/testing.md) — verification scope and limitations.
 - [Architecture decision](docs/architecture/platform-decision.md) — why KMP,
   Compose, the API, and adapters were selected.
@@ -258,8 +263,8 @@ Primary working documents:
 - [RevenueCat boundary](docs/architecture/revenuecat.md) — entitlement and
   failure behavior.
 - [Product contract](docs/product/m0-product-contract.md) — free-core rules.
-- [Monetization note](docs/business/monetization-and-pricing.md) — reference
-  pricing and package decisions.
+- [Public operations boundary](docs/operations/README.md) — safe local versus
+  owner-managed operational scope.
 
 ## Deployment target
 
@@ -312,21 +317,11 @@ publication has occurred.
 
 ## Status and evidence boundary
 
-The latest recorded repository snapshot is E186:
-
-- Implementation tracker: **85/100 (85%)**. This measures task coverage, not
-  release readiness.
-- Kotlin/JVM: **332/332** tests; Node contracts/migrations: **96/96**.
-- ASP.NET Core API: **172/172** tests; worker: **5/5**.
-- Android release packaging and shared iOS target compilation are available.
-
-The latest local snapshot records Kotlin/JVM 332/332, Node 96/96, API 172/172, and worker 5/5; these are repository evidence only. E186 hardens engine validation, local snapshot preflight, canonical case identity, published-only sync admission, and the database boundary trigger. E185 remains the owner-authorized RevenueCat observation; its approved price migration and transaction matrix remain open. E183 hardens native radio and checkbox semantics; E182 aligns the server sync cursor bound; E181 rejects invalid case-transition contracts; E169 hardens the auth provider boundary; E170 adds explicit regression coverage.
-
-E184 is the latest dated environment verification, not a product increment: a
-checksum-verified Temurin JDK 21 restored the Kotlin/Android release check, but
-Android emulator probes still stop before a usable framework/package service.
-Current Android UI/runtime and G3 evidence therefore remain open; see the
-[E184 probe record](audit/evidence/evidrilo-android-runtime-probe-2026-09-15.md).
+The current structural phase has focused verification for the extracted domain,
+shared JVM consumer, architecture boundaries, public-package checks, and
+worktree ownership. These are repository-only checks. They do not prove device
+runtime, provider transactions, managed deployment, human review, or
+publication.
 
 The main open gates are:
 
@@ -338,12 +333,11 @@ The main open gates are:
 - Reviewer/participant validation, final assets, public repository, store
   release, and submission.
 
-This README intentionally does not duplicate the E-series chronology. Detailed
-evidence, decisions, and task status are maintained in the [local Source of Truth](internal/research/next-gen/SOURCE_OF_TRUTH.md),
-[evidence index](audit/evidence-index.md), [roadmap](docs/roadmap.md), and
-[decisions](docs/decisions.md). A local build or test proves only the boundary
-that was run; it does not prove device runtime, provider transactions, managed
-deployment, human review, or publication.
+This README intentionally does not duplicate private audit chronology. Public
+scope and durable decisions are maintained in the [roadmap](docs/roadmap.md)
+and [decisions](docs/decisions.md). A local build or test proves only the
+boundary that was run; it does not prove device runtime, provider transactions,
+managed deployment, human review, or publication.
 
 ## Contributing
 
