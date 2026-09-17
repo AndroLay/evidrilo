@@ -1,0 +1,10 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)version.props" />
+  <PropertyGroup>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">$(EvidriloReleaseVersion)</VersionPrefix>
+    <Version Condition="'$(Version)' == ''">$(EvidriloReleaseVersion)</Version>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(EvidriloReleaseVersion).0</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(EvidriloReleaseVersion).0</FileVersion>
+    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(EvidriloReleaseVersion)</InformationalVersion>
+  </PropertyGroup>
+</Project>

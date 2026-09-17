@@ -122,6 +122,8 @@ public_paths=(
   CONTRIBUTING.md
   .gitignore
   worktree-ownership.yml
+  version.props
+  Directory.Build.props
   gradlew
   gradle
   gradle.properties

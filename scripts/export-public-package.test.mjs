@@ -25,6 +25,8 @@ function createExporterFixture() {
     'CONTRIBUTING.md',
     '.gitignore',
     'worktree-ownership.yml',
+    'version.props',
+    'Directory.Build.props',
     '.dockerignore',
     'gradlew',
     'settings.gradle.kts',

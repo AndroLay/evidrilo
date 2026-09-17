@@ -24,13 +24,11 @@ val releaseKeystorePath = releaseSetting("androidReleaseKeystore", "EVIDRILO_AND
 val releaseStorePassword = releaseSetting("androidReleaseStorePassword", "EVIDRILO_ANDROID_RELEASE_STORE_PASSWORD")
 val releaseKeyAlias = releaseSetting("androidReleaseKeyAlias", "EVIDRILO_ANDROID_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = releaseSetting("androidReleaseKeyPassword", "EVIDRILO_ANDROID_RELEASE_KEY_PASSWORD")
+val androidVersionName = rootProject.version.toString().removeSuffix("-SNAPSHOT")
 val androidVersionCode = releaseSetting("androidVersionCode", "EVIDRILO_ANDROID_VERSION_CODE")
     .ifBlank { "1" }
     .toIntOrNull()
     ?: error("androidVersionCode must be a positive integer.")
-val androidVersionName = releaseSetting("androidVersionName", "EVIDRILO_ANDROID_VERSION_NAME")
-    .ifBlank { "0.1.0" }
-    .trim()
 check(androidVersionCode > 0) { "androidVersionCode must be positive." }
 check(androidVersionName.matches(Regex("\\d+(?:\\.\\d+){1,2}(?:[-+][0-9A-Za-z.-]+)?"))) {
     "androidVersionName must use a release-compatible semantic version."

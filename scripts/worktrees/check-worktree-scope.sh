@@ -84,7 +84,7 @@ is_owned() {
   case "$lane" in
     integration)
       case "$path" in
-        .github/*|.dockerignore|.gitignore|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|worktree-ownership.yml|docs/architecture/*|scripts/*|tooling/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt|modules/core/*|modules/application/access/*)
+        .github/*|.dockerignore|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|worktree-ownership.yml|docs/architecture/*|scripts/*|tooling/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt|modules/core/*|modules/application/access/*)
           return 0
           ;;
         composeApp/*|apps/mobile-shared/*|apps/ios/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|infra/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)

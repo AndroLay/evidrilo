@@ -745,10 +745,12 @@ Keep the following local:
 - private or production billing configuration
 - Android Gradle properties `revenuecatAndroidApiKey`,
   `revenuecatEntitlementId`, and `revenuecatProductIds`
-- Android release settings `androidVersionCode`, `androidVersionName`,
+- Android release build number `androidVersionCode`,
   `androidReleaseKeystore`, `androidReleaseStorePassword`,
   `androidReleaseKeyAlias`, and `androidReleaseKeyPassword` in ignored local
   properties, or the corresponding `EVIDRILO_ANDROID_*` environment values
+- The canonical marketing version is tracked in the root `version.props`; do
+  not override it in local properties.
 - Android Gradle properties `supabaseUrl`, `supabasePublishableKey`,
   `supabaseAuthRedirectUrl`, and `evidriloApiBaseUrl`
 - iOS `REVENUECAT_PUBLIC_SDK_KEY`, `REVENUECAT_ENTITLEMENT_ID`, and

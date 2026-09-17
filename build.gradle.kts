@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.android.kotlin) apply false
@@ -7,7 +9,17 @@ plugins {
     alias(libs.plugins.compose.compiler) apply false
 }
 
+val releaseVersion = Regex("<EvidriloReleaseVersion>\\s*([^<]+?)\\s*</EvidriloReleaseVersion>")
+    .find(File(rootDir, "version.props").readText())
+    ?.groupValues
+    ?.get(1)
+    ?.trim()
+    ?: error("version.props must define EvidriloReleaseVersion")
+check(releaseVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) {
+    "EvidriloReleaseVersion must use MAJOR.MINOR.PATCH format."
+}
+
 allprojects {
     group = "dev.nextgen.mobile"
-    version = "0.1.0-SNAPSHOT"
+    version = "$releaseVersion-SNAPSHOT"
 }

@@ -14,6 +14,9 @@ RUN dotnet publish platform/worker/Evidrilo.Worker.csproj \
     /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+ARG EVIDRILO_VERSION=dev
+LABEL org.opencontainers.image.title="Evidrilo Worker" \
+      org.opencontainers.image.version="$EVIDRILO_VERSION"
 WORKDIR /app
 USER $APP_UID
 

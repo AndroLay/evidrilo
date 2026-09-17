@@ -14,6 +14,9 @@ RUN dotnet publish platform/api/Evidrilo.Api.csproj \
     /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+ARG EVIDRILO_VERSION=dev
+LABEL org.opencontainers.image.title="Evidrilo API" \
+      org.opencontainers.image.version="$EVIDRILO_VERSION"
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:5080
 EXPOSE 5080

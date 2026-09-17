@@ -60,12 +60,17 @@ external evidence gates.
 
 ## Release versioning and artifact handoff
 
+The canonical marketing version is `EvidriloReleaseVersion` in the root
+`version.props`. Gradle, .NET, and container metadata consume that release
+identity; the checked-in iOS configuration is checked against it. Platform
+build numbers remain separate and monotonic.
+
 Every Android/iOS release must use one release record and one human-readable
 marketing version. The release is not ready for distribution until both
 platform artifacts pass their platform-specific gates.
 
-- Android `versionName` must match iOS `MARKETING_VERSION` (for example,
-  `0.1.0`). Android `versionCode` and iOS `CURRENT_PROJECT_VERSION` are
+- Android `versionName` must match the canonical `version.props` value and iOS
+  `MARKETING_VERSION`. Android `versionCode` and iOS `CURRENT_PROJECT_VERSION` are
   platform-specific positive build numbers and must increase for every new
   upload to that platform; never reuse a published build number.
 - Android direct-download distribution requires a signed release APK. The
@@ -81,16 +86,17 @@ platform artifacts pass their platform-specific gates.
 
 Before handoff, the owner must confirm the following sequence:
 
-1. Set the same marketing version in Android `androidVersionName` and iOS
-   `MARKETING_VERSION`; increment each platform's build number.
-2. Build and verify Android signing, then produce both the signed APK for
+1. Update the canonical marketing version in `version.props`; increment each
+   platform's build number.
+2. Run `bash scripts/check-version-alignment.sh .` and stop if it reports drift.
+3. Build and verify Android signing, then produce both the signed APK for
    direct download and the signed AAB for Play upload.
-3. On macOS, archive/export the iOS `Release` scheme, install the resulting
+4. On macOS, archive/export the iOS `Release` scheme, install the resulting
    build on the target test device, and verify the free flow before any premium
    or provider-dependent flow.
-4. Run `bash scripts/check-mobile-release.sh .` and keep the Android/iOS
+5. Run `bash scripts/check-mobile-release.sh .` and keep the Android/iOS
    artifact paths and checksums in private release evidence.
-5. Publish only after the install, launch, version display, free-flow,
+6. Publish only after the install, launch, version display, free-flow,
    accessibility, and signing checks pass on each claimed platform.
 
 If any version, build number, signing, installation, or runtime check fails,

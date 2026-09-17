@@ -13,6 +13,8 @@ lanes:
       - .gitignore
       - settings.gradle.kts
       - build.gradle.kts
+      - version.props
+      - Directory.Build.props
       - gradle.properties
       - gradle/**
       - README.md

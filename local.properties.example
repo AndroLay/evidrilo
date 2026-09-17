@@ -11,10 +11,9 @@ sdk.dir=/absolute/path/to/Android/sdk
 # Approved target packages are monthly and yearly; lifetime is not offered.
 # revenuecatProductIds=monthly,yearly
 
-# Release version values. Keep these aligned with MARKETING_VERSION and
-# CURRENT_PROJECT_VERSION in the iOS release xcconfig.
+# Platform build numbers are intentionally separate from the canonical
+# marketing version in version.props.
 # androidVersionCode=1
-# androidVersionName=0.1.0
 
 # Optional local-only Android release signing. Never commit a keystore or
 # passwords. The release build stays unsigned unless all four settings exist.

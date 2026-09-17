@@ -1,0 +1,6 @@
+<Project>
+  <!-- Canonical marketing/release version. Platform build numbers stay separate. -->
+  <PropertyGroup>
+    <EvidriloReleaseVersion>0.1.0</EvidriloReleaseVersion>
+  </PropertyGroup>
+</Project>

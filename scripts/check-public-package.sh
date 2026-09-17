@@ -25,6 +25,8 @@ required_paths=(
   CONTRIBUTING.md
   .gitignore
   worktree-ownership.yml
+  version.props
+  Directory.Build.props
   gradlew
   settings.gradle.kts
   apps/mobile-shared

@@ -88,10 +88,10 @@ not itself final submission evidence.
 
 ## Versioning and handoff
 
-Set `MARKETING_VERSION` to the same marketing version used by Android
-`androidVersionName` (for example, `0.1.0`). Increase
-`CURRENT_PROJECT_VERSION` for every new iOS archive or upload; a published
-build number must never be reused.
+Set `MARKETING_VERSION` to the canonical marketing version in the repository
+root `version.props`. Increase `CURRENT_PROJECT_VERSION` for every new iOS
+archive or upload; a published build number must never be reused. The alignment
+checker verifies the checked-in baseline and release template before packaging.
 
 After the free flow and device checks pass on macOS, archive and export the
 `Release` scheme with the owner's Apple distribution identity. Keep the

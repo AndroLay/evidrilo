@@ -1,8 +1,9 @@
 # Evidrilo Android release
 
 The Android app uses `dev.nextgen.mobile` as its current application ID,
-`minSdk 26`, `targetSdk 35`, and version defaults `1` / `0.1.0`. Version values
-can be overridden locally with `androidVersionCode` and `androidVersionName`.
+`minSdk 26`, `targetSdk 35`, and version defaults `1` / the canonical release
+version in the repository root `version.props`. Only the platform build number
+is configured locally with `androidVersionCode`.
 
 ## Local candidate
 
@@ -43,9 +44,10 @@ owner-run release gates.
 
 ## Versioning and handoff
 
-Set `androidVersionName` to the same marketing version used by iOS
-`MARKETING_VERSION` (for example, `0.1.0`). Increase `androidVersionCode` for
-every new Android upload; a published version code must never be reused.
+The Android marketing version is read from the root `version.props` and must
+match iOS `MARKETING_VERSION`. Increase `androidVersionCode` for every new
+Android upload; a published version code must never be reused. Run
+`bash scripts/check-version-alignment.sh .` before packaging.
 
 For a user-downloadable GitHub Release, produce a signed APK with
 `:androidApp:assembleRelease`. For Play Console, produce the signed AAB with

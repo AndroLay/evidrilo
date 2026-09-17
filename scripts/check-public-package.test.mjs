@@ -14,7 +14,7 @@ function createCandidate() {
   for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform', 'infra', 'scripts']) {
     fs.mkdirSync(path.join(candidate, directory), { recursive: true });
   }
-  for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'gradlew', 'settings.gradle.kts']) {
+  for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'version.props', 'Directory.Build.props', 'gradlew', 'settings.gradle.kts']) {
     fs.writeFileSync(path.join(candidate, file), 'synthetic public package fixture\n');
   }
   return candidate;

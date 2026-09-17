@@ -96,6 +96,7 @@ jobs:
           contracts/contracts.test.mjs
           platform/database/migrations/migrations.test.mjs
           scripts/check-public-package.test.mjs
+          scripts/check-version-alignment.test.mjs
           scripts/check-github-safety.test.mjs
           scripts/check-mobile-platform.test.mjs
           scripts/check-deployment.test.mjs
