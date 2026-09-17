@@ -13,8 +13,9 @@ conclusion changes when one observation is no longer available.
 > Device runtime, provider, deployment, human review, store, and submission
 > gates remain separate and are not implied by source changes.
 
-Current structural increment: `c82abbf` — extracted the framework-independent
-domain module while keeping the existing app task names and public behavior.
+Current structural baseline: `c96d36b` — the repository shell, contracts,
+domain module, and categorized verification lanes are aligned with the source-
+first layout while keeping the existing app task names and public behavior.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)

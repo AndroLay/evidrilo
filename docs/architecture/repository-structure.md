@@ -1,5 +1,11 @@
 # Repository Structure — Evidrilo
 
+This document describes the source-first organization currently implemented in
+the repository. The larger tree in the migration master prompt is a target
+model, not permission to create empty packages. A boundary becomes a real
+module only when it owns code, has an enforceable dependency direction, and
+passes its focused verification.
+
 Latest increment: E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED / E176 / REQUEST_LIFECYCLE_AND_INPUT_BOUNDARIES_HARDENED / E175 / SYNC_PULL_CURSOR_LOWER_BOUND_GUARDED / E174 / FAIL_CLOSED_RESPONSE_REFRESH_BOUNDARIES / E173 / ASYNC_STATE_BOUNDARIES_HARDENED / E172 / LOCAL_SESSION_BOUNDARIES_HARDENED / E171 / OFFLINE_AUDIO_REPOSITORY_IMPLEMENTATION / E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED.
 
 Status: E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED / E176 / REQUEST_LIFECYCLE_AND_INPUT_BOUNDARIES_HARDENED / E175 / SYNC_PULL_CURSOR_LOWER_BOUND_GUARDED / E174 / FAIL_CLOSED_RESPONSE_REFRESH_BOUNDARIES / E173 / ASYNC_STATE_BOUNDARIES_HARDENED / E172 / LOCAL_SESSION_BOUNDARIES_HARDENED / E171 / OFFLINE_AUDIO_REPOSITORY_IMPLEMENTATION / E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED / RUNTIME_GATES_OPEN / EXTERNAL_GATES_OPEN
@@ -162,6 +168,34 @@ separate deliberate milestone.
 - Make the public repository understandable and runnable from a clean clone.
 - Keep the submission lane local-first while building the optional platform lane
   behind explicit milestones and independent verification.
+
+## Current source-first baseline
+
+```text
+evidrilo/
+├── apps/                 # Android, iOS host, and shared mobile application
+├── modules/
+│   ├── domain/           # real framework-independent KMP module
+│   ├── application/      # documented boundary; extraction deferred
+│   ├── data/             # documented boundary; extraction deferred
+│   ├── features/         # documented boundary; extraction deferred
+│   └── design-system/    # documented boundary; extraction deferred
+├── contracts/            # schemas, fixtures, OpenAPI/events documentation
+├── platform/             # API, worker, database, integration, solution
+├── infra/                # local containers and public-safe deployment notes
+├── scripts/              # bootstrap, CI, GitHub, release, security, worktrees,
+│                         # and verification lanes
+├── tests/                # architecture, contract, E2E, resilience, performance
+├── tooling/              # lint, formatting, architecture, codegen boundaries
+├── docs/                 # public architecture, API, development, operations
+└── internal/             # ignored owner material: masters, design, research
+```
+
+The API remains a verified modular monolith under `platform/api`; the separate
+`Evidrilo.Application`, `Evidrilo.Domain`, and `Evidrilo.Infrastructure`
+projects are intentionally not fabricated until a dependency-preserving split
+can be verified with the available .NET toolchain. Likewise, the existing
+mobile package layout remains stable while the domain module is extracted.
 
 ## Historical mobile baseline tree
 

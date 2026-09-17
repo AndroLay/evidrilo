@@ -10,6 +10,9 @@ version is defined in [`version.props`](version.props).
 - Extracted the framework-independent learning domain into
   `modules/domain` while retaining stable Kotlin package names and the
   compatibility tasks `:composeApp` and `:androidApp`.
+- Separated versioned contract schemas from fixtures under `contracts/schemas`,
+  and organized verification, security, release, CI, GitHub, and worktree
+  scripts under explicit ownership lanes.
 - Added repository governance, source-only hygiene, and public-package safety
   documents for the next structural migration phase.
 
