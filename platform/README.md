@@ -8,6 +8,11 @@ proves a safe move.
 
 Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED / E188 / RELEASE_VERSION_SOURCE_ALIGNED / E187 / REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED / E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED. The extracted Kotlin module boundaries and the local release-version regression are now verified alongside the backend engine, sync, API, and database checks; external runtime, provider, managed, staging, and human gates remain open.
 
+The latest post-E189 repository verification on 18 September 2026 passes Node
+`109/109`, API `172/172`, and worker `5/5`. This refresh is repository-only and
+does not imply managed database replay, deployment, provider delivery, or
+runtime evidence.
+
 The platform lane is optional infrastructure for accounts, cloud sync,
 analytics, authoring, recommendations, AI assistance, teacher workflows, and
 production operations. It must never make the bundled free mobile case require
@@ -362,8 +367,8 @@ billing callback guard; E128 records the Auth
 account-profile provisioning boundary; E125 records the latest
 mobile host/network verification; E124 records the authenticated transport
 verification; E123 records the billing presentation boundary and E122 records
-the API configuration correction. The
-latest local API/worker harness has API `172/172`, Node `96/96`, worker `5/5`,
+the API configuration correction. The E186 local API/worker harness recorded API `172/172`,
+Node `96/96`, worker `5/5`,
 deployment checks, and a fresh PostgreSQL/worker smoke with the Auth
 compatibility shim and checksum ledger through migration 030. Non-root image
 builds and Compose

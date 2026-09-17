@@ -17,6 +17,11 @@ Settings, History, About, practice, and Packs unavailable states. Current
 Android UI runtime, iOS host runtime, and full assistive-technology/visual
 accessibility checks still need verification.
 
+The latest post-E189 repository verification on 18 September 2026 passes Node
+`109/109`, API `172/172`, and worker `5/5`. Generated build output is not part
+of the source-only checkout; platform build results remain tied to their dated
+verification records.
+
 The shared Home surface also includes the E146 recommendation boundary. It is
 enabled only for a verified, live, consented session and launches only the
 exact bundled `M0_T2:1` mapping; recommendation failure never disables local
@@ -68,11 +73,10 @@ cd .worktrees/frontend
 cp local.properties.example local.properties
 ```
 
-`main` is the integration and release lane. `frontend` owns `apps/` plus the
-mobile feature and design-system modules. `backend` owns the core, domain,
-application, data, contracts, platform, and infrastructure modules. Shared
-root files, documentation, scripts, tooling, and test harnesses are maintained
-on `main`. The ownership rules are enforced by:
+`main` is the integration and release lane. `frontend` owns `apps/` and all
+Kotlin `modules/`. `backend` owns `contracts/`, `platform/`, and `infra/`.
+Shared root files, documentation, scripts, tooling, and test harnesses are
+maintained on `main`. The ownership rules are enforced by:
 
 ```bash
 bash scripts/worktrees/check-worktree-scope.sh frontend
@@ -312,18 +316,19 @@ Home regression, public-package boundary checker, read-only CI workflow,
 stale-Gradle-cache protection, and fresh local verification are recorded in
 [the E115 closure record](../../audit/evidence/evidrilo-open-gates-closure-2026-09-12.md).
 
-E116 records the RevenueCat follow-up: the owner-authorized Test Store catalog
-is configured with the `evidrilo_pro` entitlement and monthly/yearly/lifetime
-packages, the KMP adapters synchronize verified account UUIDs with RevenueCat
-customer identity, and the API accepts the official signed webhook shape with
-idempotent projection. The current app-side allowlist and fixtures accept only
-monthly/yearly; the dashboard lifetime package still requires owner migration.
-Test Store transactions, production store connectors, webhook delivery, and
-iOS host runtime remain external gates.
+E116 records the RevenueCat follow-up observed on 12 September: the
+owner-authorized Test Store catalog then contained the `evidrilo_pro`
+entitlement and monthly/yearly/lifetime packages, the KMP adapters synchronized
+verified account UUIDs with RevenueCat customer identity, and the API accepted
+the official signed webhook shape with idempotent projection. E185 later
+observed the active offering with monthly/yearly packages only, and the owner
+reported lifetime removed on 18 September 2026. Price migration, Test Store
+transactions, production store connectors, webhook delivery, and iOS host
+runtime remain external gates.
 
 The current planning direction excludes lifetime and targets only monthly and
 yearly subscriptions, anchored at USD 1.00/month and USD 10.00/year. This is a
-pricing hypothesis recorded in [the monetization note](business/monetization-and-pricing.md);
+pricing hypothesis recorded in [the monetization note](../business/monetization-and-pricing.md);
 the app-side implementation is verified, while catalog migration and
 transaction validation remain pending.
 

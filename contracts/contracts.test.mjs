@@ -296,7 +296,7 @@ test('the repository verification harness is documented and non-secret', () => {
   );
   assert.match(
     roadmap,
-    /\[E176\]\(\.\.\/\.\.\/audit\/evidence\/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14\.md\)/,
+    /\[E176\]\(\.\.\/audit\/evidence\/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14\.md\)/,
   );
 });
 
@@ -431,7 +431,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(platformReadme, /full API suite passes `145\/145`/);
   assert.match(platformReadme, /E150 synchronizes[\s\S]*Node `77\/77`[\s\S]*API `140\/140`/);
   assert.match(platformReadme, /local contract passes `22\/22`/);
-  assert.match(platformReadme, /latest local API\/worker harness has API `172\/172`/);
+  assert.match(platformReadme, /E186 local API\/worker harness recorded API `172\/172`/);
   assert.match(platformReadme, /E164 hardens the cohort aggregate boundary/);
   assert.match(platformReadme, /E165 hardens the role boundary/);
   assert.match(platformReadme, /E166 closes the membership role-change owner invariant/);

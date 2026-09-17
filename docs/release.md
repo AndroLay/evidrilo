@@ -7,6 +7,11 @@ The local verifier now covers release-version alignment together with the
 extracted Kotlin modules. This remains repository-only evidence; signing,
 Xcode/archive, store upload, hosted CI, and publication are still owner gates.
 
+The latest post-E189 repository verification on 18 September 2026 passes Node
+`109/109`, API `172/172`, and worker `5/5`. The source checkout remains free of
+generated build output after verification; Android release and shared iOS
+target results remain tied to their dated E189 capture.
+
 This checklist is a gate, not a prediction of contest results. Every checked
 item should have a reproducible command, a reviewer note, or a captured runtime
 observation with its environment and date.
@@ -157,9 +162,10 @@ the release remains `NOT READY` and no download link should be announced.
 - [x] The owner-authorized RevenueCat Test Store catalog is recorded in
       [E116](../audit/evidence/evidrilo-revenuecat-dashboard-audit-2026-09-12.md).
       E116 historically observed `evidrilo_pro` and `monthly`, `yearly`, and
-      `lifetime`; the app-side allowlist now rejects `lifetime`, while package
-      removal/disablement in the dashboard remains an open G4 migration before
-      transaction validation.
+      `lifetime`; E185 later observed the active offering with monthly/yearly
+      only, and the owner reported lifetime removed on 18 September 2026. The
+      app-side allowlist remains fail-closed; price replacement and transaction
+      validation are the open G4 gates.
 - [x] Repository-owned deployment preparation is guarded by
       `bash scripts/verification/check-deployment.sh .`: non-root API/worker images,
       checksum-ledger Compose ordering, local Auth compatibility bootstrap,

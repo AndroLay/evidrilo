@@ -69,7 +69,7 @@ is_public_path() {
     README.md|LICENSE|CONTRIBUTING.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
       return 0
       ;;
-    .github/*|apps/*|androidApp/*|composeApp/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)
+    .github/*|apps/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)
       return 0
       ;;
     docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/licenses/SourceSans3-OFL-1.1.md|docs/licenses/audio-assets.md|docs/product/m0-product-contract.md|docs/operations/README.md|docs/api/*|docs/adr/*)

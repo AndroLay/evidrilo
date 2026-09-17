@@ -11,6 +11,12 @@ Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOUR
 This document only orders implementation and verification work; it does not
 create a second product scope or evidence status.
 
+The latest post-E189 repository verification on 18 September 2026 passes Node
+`109/109`, API `172/172`, and worker `5/5`. This is a repository-only refresh;
+the E189 build capture remains the historical source for its Kotlin, Android
+release, and shared iOS-target results. Device runtime, provider, managed,
+human, and submission gates remain separate.
+
 ## Outcome
 
 Deliver one reproducible Android/iOS Evidrilo experience for Shipaton Next Gen:
@@ -449,7 +455,8 @@ from the approved commercial direction. The initial global reference anchors
 are USD 1.00/month and USD 10.00/year; see the [monetization and pricing
 note](business/monetization-and-pricing.md). Keep all SDK calls behind the
 billing interface. The app-side allowlist rejects legacy lifetime identifiers;
-the dashboard migration remains a G4 gate.
+the active offering has no lifetime package, and dashboard price migration plus
+the transaction matrix remain G4 gates.
 
 Close G4 only after an owner-authorized Test Store run records:
 
@@ -495,7 +502,7 @@ The local boundary passes Kotlin/JVM `317/317`, Node `87/87`, API `153/153`,
 worker `5/5`, with Android/shared-iOS compilation, deployment, and audio checks
 passing. Runtime, provider, managed, staging, human, publication, and
 submission gates remain open. See
-[E176](../../audit/evidence/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md).
+[E176](../audit/evidence/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md).
 
 E177 hardens sync pull pagination: the client validates each response against
 the requested `limit`, accepts valid smaller pages with `hasMore=true`, and
@@ -503,21 +510,21 @@ rejects oversized responses. The latest local boundary passes Kotlin/JVM
 `319/319`, Node `87/87`, API `153/153`, worker `5/5`, Android/shared-iOS
 compilation, deployment, and audio checks. External runtime, provider,
 managed, staging, human, publication, and submission gates remain open. See
-[E177](../../audit/evidence/evidrilo-sync-page-size-boundary-2026-09-14.md).
+[E177](../audit/evidence/evidrilo-sync-page-size-boundary-2026-09-14.md).
 
 E178 hardens API full-match validation and staging environment normalization.
 Identifiers, digests, actions, reason codes, case-version IDs, and request IDs
 reject trailing-newline boundary bypasses; conventional `Staging` is accepted
 as canonical `staging`. API `158/158` passes. Managed staging, provider,
 runtime, human, publication, and submission gates remain open. See
-[E178](../../audit/evidence/evidrilo-api-input-and-staging-boundary-2026-09-14.md).
+[E178](../audit/evidence/evidrilo-api-input-and-staging-boundary-2026-09-14.md).
 
 E179 hardens consent-bound sync orchestration. A failed or invalidated pull
 cannot start a push, account/consent changes cancel the active sync job, and
 failed queue clears preserve truthful pending-count state. Kotlin/JVM
 `321/321` passes. Provider, runtime, managed, staging, human, publication, and
 submission gates remain open. See
-[E179](../../audit/evidence/evidrilo-sync-consent-cancellation-boundary-2026-09-14.md).
+[E179](../audit/evidence/evidrilo-sync-consent-cancellation-boundary-2026-09-14.md).
 
 E180 prepares the repository-owned Android/iOS release boundary: optimized
 Android release packaging and fail-closed signing, plus an iOS distribution
@@ -526,14 +533,14 @@ Node `93/93`, API `161/161`, worker `5/5`, Android release packaging, shared
 iOS target compilation, and release checks pass. Native runtime, archive,
 signing, store, provider, managed, human, publication, and submission gates
 remain open. See
-[E180](../../audit/evidence/evidrilo-mobile-release-candidate-preparation-2026-09-14.md).
+[E180](../audit/evidence/evidrilo-mobile-release-candidate-preparation-2026-09-14.md).
 
 E181 hardens the case-authoring transition boundary. Invalid schema, version,
 and target-state values are rejected before storage; focused transition
 coverage passes `2/2`. The full local verifier passes the current
 Kotlin/Android build boundary, Node `93/93`, API `162/162`, worker `5/5`,
 deployment, and asset checks. Runtime, provider, managed, staging, human,
-publication, and submission gates remain open. See [E181](../../audit/evidence/evidrilo-case-transition-contract-boundary-2026-09-15.md).
+publication, and submission gates remain open. See [E181](../audit/evidence/evidrilo-case-transition-contract-boundary-2026-09-15.md).
 
 E183 hardens the shared Compose choice control with native selectable radio and
 toggleable checkbox semantics, plus merged label/state information. Direct
@@ -541,7 +548,7 @@ contracts pass `25/25`; the full local verifier passes Node `95/95`, API
 `163/163`, worker `5/5`, the current Kotlin/Android build boundary, Android
 release packaging, deployment, and asset checks. Runtime, provider, managed,
 staging, human, publication, and submission evidence remain open. See
-[E183](../../audit/evidence/evidrilo-choice-accessibility-semantics-2026-09-15.md).
+[E183](../audit/evidence/evidrilo-choice-accessibility-semantics-2026-09-15.md).
 
 E182 aligns the server sync-pull cursor boundary with the mobile parser. Cursors
 outside `0..1_000_000_000_000_000` are rejected before storage; the focused
@@ -549,7 +556,7 @@ regression passes `1/1`. The full local verifier passes the current
 Kotlin/Android build boundary, Node `93/93`, API `163/163`, worker `5/5`,
 deployment, and asset checks. Runtime, provider, managed, staging, human,
 publication, and submission gates remain open. See
-[E182](../../audit/evidence/evidrilo-sync-cursor-contract-boundary-2026-09-15.md).
+[E182](../audit/evidence/evidrilo-sync-cursor-contract-boundary-2026-09-15.md).
 
 E184 is the latest dated environment verification, not a product increment. A
 checksum-verified Temurin JDK 21 restored the full Kotlin/Android release
@@ -658,7 +665,7 @@ account-lifecycle work and its external provider/runtime gates.
 
 ## Useful public documents
 
-- [Development guide](development.md)
+- [Development guide](development/README.md)
 - [M0 product contract](product/m0-product-contract.md)
 - [Platform decision](architecture/platform-decision.md)
 - [RevenueCat boundary](architecture/revenuecat.md)

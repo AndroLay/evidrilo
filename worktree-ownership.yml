@@ -41,15 +41,10 @@ lanes:
   frontend:
     owns:
       - apps/**
-      - modules/features/**
-      - modules/design-system/**
+      - modules/**
 
   backend:
     owns:
-      - modules/core/**
-      - modules/domain/**
-      - modules/application/**
-      - modules/data/**
       - contracts/**
       - platform/**
       - infra/**

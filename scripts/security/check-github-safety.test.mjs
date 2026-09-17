@@ -96,6 +96,13 @@ function runChecker(root) {
   return spawnSync('bash', [checker, root], { encoding: 'utf8' });
 }
 
+test('public allowlist follows the migrated repository roots', () => {
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /\.github\/\*\|apps\/\*\|modules\/\*\|contracts\/\*/);
+  assert.doesNotMatch(source, /androidApp\/\*|composeApp\/\*/);
+  assert.doesNotMatch(source, /platform\/contracts\/|deploy\/\*/);
+});
+
 test('accepts a clean public Git index and ignored private probes', () => {
   const root = createFixture();
   try {

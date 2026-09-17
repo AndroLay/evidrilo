@@ -6,7 +6,7 @@ import kotlin.test.assertIs
 
 class BillingContractTest {
     @Test
-    fun activeEntitlementUnlocksGuidedRehearsal() {
+    fun activeEntitlementUnlocksPremiumAccess() {
         assertEquals(
             PremiumAccess.UNLOCKED,
             premiumAccessFromEntitlement(isActive = true),

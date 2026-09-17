@@ -73,6 +73,21 @@ test('mobile release configuration checker passes without exposing signing mater
 test('mobile release checker accepts Android artifact and iOS archive together', () => {
   const checker = path.join(repositoryRoot, 'scripts', 'release', 'check-mobile-release.sh');
   const archive = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-archive-'));
+  const androidArtifact = path.join(
+    repositoryRoot,
+    'apps',
+    'android',
+    'build',
+    'outputs',
+    'bundle',
+    'release',
+    'androidApp-release.aab',
+  );
+  const hadAndroidArtifact = fs.existsSync(androidArtifact);
+  if (!hadAndroidArtifact) {
+    fs.mkdirSync(path.dirname(androidArtifact), { recursive: true });
+    fs.writeFileSync(androidArtifact, 'synthetic release artifact fixture\n');
+  }
   fs.writeFileSync(path.join(archive, 'Info.plist'), 'synthetic archive metadata');
   try {
     const result = spawnSync(
@@ -85,6 +100,21 @@ test('mobile release checker accepts Android artifact and iOS archive together',
     assert.match(result.stdout, /IOS_RELEASE_ARCHIVE: PASS/);
   } finally {
     fs.rmSync(archive, { recursive: true, force: true });
+    if (!hadAndroidArtifact) {
+      fs.rmSync(androidArtifact, { force: true });
+      for (const directory of [
+        path.dirname(androidArtifact),
+        path.dirname(path.dirname(androidArtifact)),
+        path.dirname(path.dirname(path.dirname(androidArtifact))),
+        path.dirname(path.dirname(path.dirname(path.dirname(androidArtifact)))),
+      ]) {
+        try {
+          fs.rmdirSync(directory);
+        } catch (error) {
+          if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY') throw error;
+        }
+      }
+    }
   }
 });
 

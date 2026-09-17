@@ -162,3 +162,210 @@ and database migration 030 enforce the same boundary.
 
 This preserves offline independence while preventing local identifiers from
 silently crossing the API/database foreign-key boundary.
+
+## D-090 — Adopt the Evidence Graph full vision while preserving the current Verify Engine
+
+Decision: Evidrilo's durable product model is the Evidence Graph connecting:
+
+```text
+Requirement
+Evidence
+Claim
+Gap / Conflict
+Action
+Revision
+Verification
+```
+
+The current deterministic `ConclusionCase` / evaluator / reducer system is the
+first Verify Engine implementation and must be adapted rather than discarded.
+
+The first bridge uses supplied/bounded content:
+
+```text
+Case → Workspace
+Aim → Requirement
+Observation → Evidence
+Conclusion → Claim
+Evaluator issue → Gap
+Next action → Action
+Evaluation → Verification
+```
+
+Broad arbitrary-document ingestion and provider-backed AI are not prerequisites
+for this bridge.
+
+## D-091 — Finish one clean repository baseline before resuming broad feature expansion
+
+Decision: complete repository baseline finalization before new full-vision
+breadth.
+
+The baseline-finalization task includes:
+
+- preserve current semantic dirty work;
+- complete remaining cleanup;
+- fix two-lane ownership;
+- fix migration-caused/non-hermetic repository tests;
+- synchronize current authority;
+- resolve current public-export policy blocker;
+- run the strongest practical verification;
+- merge to clean `main`;
+- record the exact baseline SHA.
+
+After that SHA is recorded, broad structural migration is frozen unless a real
+dependency, ownership, or runtime problem justifies reopening it.
+
+## D-092 — Use only two permanent development lanes
+
+Decision: after baseline finalization, the active development model is:
+
+```text
+main
+frontend
+backend
+```
+
+Ownership:
+
+```text
+frontend
+→ apps/**
+→ modules/**
+
+backend
+→ platform/**
+→ contracts/**
+→ infra/**
+
+main
+→ integration/release/root governance
+```
+
+QA is enforced through tests, CI, and release gates rather than a permanent QA
+worktree. Integration occurs through PR/CI/main rather than a permanent
+integration worktree. Historical/legacy worktrees may be retained only for
+preservation until safely reconciled.
+
+## D-093 — Use a DEMO-first managed deployment stack
+
+Decision: the Shipaton managed DEMO target is:
+
+```text
+Render Free
+→ ASP.NET Core API
+
+Supabase Free
+→ PostgreSQL
+→ Auth
+
+RevenueCat
+→ mobile subscription/entitlement
+→ webhook/projection
+
+Netlify Free
+→ optional landing/docs/legal
+```
+
+Google Cloud Run is not the current target because the required GCP billing
+setup is unavailable. The ASP.NET backend must not be rewritten merely to fit
+Netlify. Managed worker deployment is deferred until a real workload requires
+it. Production remains future/not claimed.
+
+## D-094 — Make Claim Boundary and traceability the signature UX
+
+Decision: the core UX must expose why a result exists.
+
+Canonical interaction surfaces include:
+
+```text
+Requirement Trace
+Verify Claim / Claim Boundary
+Evidence Lens
+Conflict Detail
+Evidence Delta / What Changed?
+Why this action?
+Contextual Paywall
+```
+
+Root navigation is:
+
+```text
+Home
+Sources
+Evidence
+Action
+Profile
+```
+
+Verify remains contextual. The old visual label `Claim Trace` is treated as
+`Requirement Trace` when the screen describes requirement provenance rather
+than evaluating a learner claim. Evidence coverage, evidence quality, source
+state, and claim status must not be conflated.
+
+## D-095 — Separate the locked Shipaton floor from podium-target differentiators
+
+Decision: the locked floor is:
+
+```text
+bounded supplied case/workspace
+→ Requirement projection
+→ supplied evidence relationships
+→ Gap / Action
+→ learner Claim
+→ deterministic verification / Claim Boundary
+→ exactly one revision
+→ before/after
+→ evidence-change challenge
+→ local history
+→ RevenueCat monthly/yearly premium boundary
+```
+
+Podium-target differentiators are prioritized immediately after the floor is
+stable:
+
+```text
+Evidence Lens
+Requirement Trace
+Conflict Detail
+What Changed / Evidence Delta
+Why this action?
+polished contextual paywall and state quality
+```
+
+Broad ingestion, OCR, arbitrary documents, multi-workspace depth,
+collaboration, and broad AI are later scope and must not block the competition
+proof.
+
+## D-096 — Keep the backend as a capability-organized modular monolith
+
+Decision: the current server shape remains the default:
+
+```text
+platform/api
+platform/api.Tests
+platform/worker
+platform/worker.Tests
+platform/database
+platform/integration
+```
+
+Capability folders inside the API are acceptable. Do not require separate .NET
+projects for Domain/Application/Infrastructure merely to match a textbook Clean
+Architecture diagram. Extract a new project or service only when there is a
+measured dependency, runtime, scaling, reliability, packaging, or ownership
+reason. The worker remains a bounded separate process but is not required to be
+managed-deployed for Shipaton.
+
+## Open decision — narration requirement
+
+The current exporter requires at least one reviewed narration asset. This is
+intentionally unresolved. The owner must choose one of the following before
+the validator or exporter is changed:
+
+```text
+A. keep narration as a submission/public-package requirement
+or
+B. retire that requirement and explicitly supersede the relevant part of D-077
+```
+
+No validator weakening or silent policy change is allowed before that decision.

@@ -103,11 +103,11 @@ RevenueCat's customer identity with a provider-verified Evidrilo account.
 The remaining dashboard price migration and purchase/restore/revoke matrix remain
 owner gates, so M3 remains open. The legacy lifetime package is no longer
 eligible in app configuration, fixtures, or presentation even if a provider
-returns it. The owner-authorized dashboard still needs the package removed or
-disabled before the approved product model is transaction-tested. The server
-webhook now applies the same monthly/yearly grant allowlist independently of
+returns it. E185 directly observed the owner-authorized dashboard without a
+lifetime package, and the owner reported the product removed again on
+18 September 2026; no newer assistant-side dashboard observation is recorded.
+The server webhook now applies the same monthly/yearly grant allowlist independently of
 the app, so a provider payload cannot bypass the product policy. Legacy
-AskReady identifiers are not valid Evidrilo configuration.
 E153 additionally makes client entitlement access product-aware, rejects
 unverified stored sessions before authenticated billing-adjacent reads, and
 keeps the unresolved/legacy product path fail-closed. This still does not

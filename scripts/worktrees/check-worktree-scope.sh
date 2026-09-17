@@ -95,14 +95,14 @@ is_owned() {
       ;;
     frontend)
       case "$path" in
-        apps/*|modules/features/*|modules/design-system/*)
+        apps/*|modules/*)
           return 0
           ;;
       esac
       ;;
     backend)
       case "$path" in
-        modules/core/*|modules/domain/*|modules/application/*|modules/data/*|contracts/*|platform/*|infra/*)
+        contracts/*|platform/*|infra/*)
           return 0
           ;;
       esac
@@ -129,8 +129,8 @@ for path in "${changed_paths[@]}"; do
   elif ! is_owned "$path"; then
     owner='unknown'
     case "$path" in
-      apps/*|modules/features/*|modules/design-system/*) owner=frontend ;;
-      modules/core/*|modules/domain/*|modules/application/*|modules/data/*|contracts/*|platform/*|infra/*) owner=backend ;;
+      apps/*|modules/*) owner=frontend ;;
+      contracts/*|platform/*|infra/*) owner=backend ;;
       .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/*|scripts/*|tooling/*|tests/*) owner=main ;;
     esac
     printf 'WORKTREE_SCOPE_VIOLATION lane=%s path=%s owner=%s\n' "$lane" "$path" "$owner" >&2

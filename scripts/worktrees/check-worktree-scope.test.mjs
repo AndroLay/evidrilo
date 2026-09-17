@@ -17,6 +17,12 @@ test('allows a frontend-owned path in the frontend lane', () => {
   assert.match(result.stdout, /WORKTREE_SCOPE_PASS/);
 });
 
+test('allows every current Kotlin module path in the frontend lane', () => {
+  const result = run('frontend', '--paths', 'modules/domain/src/commonMain/kotlin/dev/nextgen/mobile/domain/conclusion/ConclusionEvaluator.kt');
+  assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+  assert.match(result.stdout, /WORKTREE_SCOPE_PASS/);
+});
+
 test('rejects a backend path from the frontend lane and names the owner', () => {
   const result = run('frontend', '--paths', 'platform/api/Program.cs');
   assert.notEqual(result.status, 0);
@@ -32,6 +38,13 @@ test('allows a backend-owned path in the backend lane', () => {
 
 test('rejects a frontend path from the backend lane and names the owner', () => {
   const result = run('backend', '--paths', 'apps/android/src/main/AndroidManifest.xml');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /WORKTREE_SCOPE_VIOLATION/);
+  assert.match(result.stderr, /owner=frontend/);
+});
+
+test('rejects a Kotlin module path from the backend lane and names the owner', () => {
+  const result = run('backend', '--paths', 'modules/application/src/commonMain/kotlin/dev/nextgen/mobile/sync/SyncQueue.kt');
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /WORKTREE_SCOPE_VIOLATION/);
   assert.match(result.stderr, /owner=frontend/);

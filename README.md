@@ -18,7 +18,9 @@ Current structural baseline: `13af4ec` — the approved source-first tree,
 extracted Kotlin boundaries, categorized verification lanes, and the migrated
 contract-schema test path are aligned while keeping the existing app task names
 and public behavior. E189 also adds release-version regression coverage to the
-local verifier.
+local verifier. The latest post-E189 repository verification passes Node
+`109/109`, API `172/172`, and worker `5/5`; this does not imply device,
+provider, managed, human, store, or submission evidence.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)

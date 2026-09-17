@@ -155,10 +155,9 @@ remain open. The optional sync/analytics/content-reader boundaries are now
 implemented behind explicit account, consent, HTTPS, and version checks; their
 managed and runtime observations remain separate gates.
 
-The retained `askready`, `feedback`, `model`, and `practice` packages are legacy
-foundation material. They are not part of the active Evidrilo user flow and
-must not be shown as submission evidence. Cleanup or namespace renaming is a
-separate deliberate milestone.
+Former non-Evidrilo product-specific packages were removed from the active
+source tree. The conclusion domain is the only product domain exposed by the
+current mobile application.
 
 ## Goals
 
@@ -203,9 +202,8 @@ KMP modules provide the verified lower-level boundaries.
 
 The active development topology is intentionally small: `main` is the
 integration/release checkout, while `frontend` and `backend` are the only
-active feature worktrees. Frontend owns `apps/**`, `modules/features/**`, and
-`modules/design-system/**`; backend owns the core/domain/application/data
-modules, `contracts/**`, `platform/**`, and `infra/**`. Root configuration,
+active feature worktrees. Frontend owns `apps/**` and all `modules/**`; backend
+owns `contracts/**`, `platform/**`, and `infra/**`. Root configuration,
 documentation, scripts, tooling, tests, and structural moves remain owned by
 `main`. The enforceable source for this split is
 [`worktree-ownership.yml`](../../worktree-ownership.yml), checked by
@@ -253,10 +251,6 @@ evidrilo/
 │   │       │       │   ├── BillingModels.kt
 │   │       │       │   └── PlatformBillingGateway.kt
 │   │       │       └── domain/
-│   │       │           ├── askready/
-│   │       │           ├── feedback/
-│   │       │           ├── model/
-│   │       │           └── practice/
 │   │       │
 │   │       ├── commonTest/
 │   │       │   └── kotlin/dev/nextgen/mobile/

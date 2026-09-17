@@ -60,10 +60,12 @@ current app-side tests reject lifetime even if a provider returns it, and use
 monthly/yearly reference prices. The Test Store transaction matrix and iOS
 host/runtime remain unrun.
 
-The current planning direction intentionally removes lifetime from the future
-offer and uses monthly/yearly reference anchors of USD 1.00/month and USD
-10.00/year. E116 remains historical dashboard evidence; catalog migration and
-the monthly/yearly transaction matrix are still open.
+The current planning direction excludes lifetime from the active offer and uses
+monthly/yearly reference anchors of USD 1.00/month and USD 10.00/year. E185
+records the latest provider observation with no lifetime package; the owner
+also reported lifetime removed on 18 September 2026, without creating a new
+assistant-side dashboard observation. Price migration and the monthly/yearly
+transaction matrix are still open.
 
 The current mobile contract suite additionally covers consent-gated metadata
 sync, queue/cursor recovery, exact response cursors, published content version
@@ -683,9 +685,11 @@ production source and focused tests. The local verifier and GitHub workflow
 execute those module lanes in addition to the existing domain, data,
 design-system, host, cross-target, Android release, API, worker, contract,
 architecture, safety, and asset checks. The release-version regression is also
-part of the local contract harness. The current observed Node boundary is
-`106/106`, API `172/172`, worker `5/5`, and the shared iOS targets compile.
-This remains repository-only/pure-Kotlin evidence; Android/iOS host runtime,
+part of the local contract harness. The E189 capture recorded Node boundary
+`106/106`, API `172/172`, worker `5/5`, and shared iOS-target compilation. A
+later full local verifier on 18 September 2026 recorded Node `109/109`, API
+`172/172`, and worker `5/5`; this refresh does not change E189's historical
+evidence record. This remains repository-only/pure-Kotlin evidence; Android/iOS host runtime,
 accessibility services, RevenueCat/Test Store, managed deployment, human
 validation, publication, and submission remain open. See the [E189 evidence
 record](../audit/evidence/evidrilo-kotlin-module-boundaries-2026-09-18.md).
