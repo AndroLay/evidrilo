@@ -11,7 +11,7 @@ const checker = path.join(scriptsDirectory, 'check-public-package.sh');
 
 function createCandidate() {
   const candidate = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-package-'));
-  for (const directory of ['composeApp', 'androidApp', 'iosApp', 'platform', 'scripts']) {
+  for (const directory of ['composeApp', 'androidApp', 'iosApp', 'contracts', 'platform', 'scripts']) {
     fs.mkdirSync(path.join(candidate, directory));
   }
   for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'gradlew', 'settings.gradle.kts']) {

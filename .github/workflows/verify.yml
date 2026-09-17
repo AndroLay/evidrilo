@@ -93,7 +93,7 @@ jobs:
       - name: Run deterministic contract checks
         run: >-
           node --test
-          platform/contracts/contracts.test.mjs
+          contracts/contracts.test.mjs
           platform/database/migrations/migrations.test.mjs
           scripts/check-public-package.test.mjs
           scripts/check-github-safety.test.mjs

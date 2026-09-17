@@ -52,5 +52,5 @@ response.
 Run the dependency-free contract checks from the repository root:
 
 ```bash
-node --test platform/contracts/contracts.test.mjs
+node --test contracts/contracts.test.mjs
 ```

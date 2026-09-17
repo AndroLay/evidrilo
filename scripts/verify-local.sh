@@ -77,7 +77,7 @@ fi
 
 printf '%s\n' '2/4 Contracts, repository-boundary, and asset checks'
 node --test \
-    platform/contracts/contracts.test.mjs \
+    contracts/contracts.test.mjs \
     platform/database/migrations/migrations.test.mjs \
     scripts/check-public-package.test.mjs \
     scripts/check-github-safety.test.mjs \

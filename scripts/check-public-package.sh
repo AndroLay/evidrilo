@@ -30,6 +30,7 @@ required_paths=(
   composeApp
   androidApp
   iosApp
+  contracts
   platform
   scripts
 )

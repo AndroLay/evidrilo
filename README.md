@@ -130,7 +130,7 @@ flowchart TD
 | `androidApp` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
 | `iosApp` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |
 | `platform/api` | ASP.NET Core modular monolith API and storage adapters |
-| `platform/contracts` | Versioned JSON contracts, schemas, and fixtures |
+| `contracts` | Versioned JSON contracts, schemas, and fixtures |
 | `platform/database` | PostgreSQL/Supabase migrations, ledger, RLS, and integration smoke tests |
 | `platform/worker` | Projection worker plus lease/retry handling |
 | `deploy` | Dockerfiles and local Compose; not a production deployment |
@@ -205,7 +205,7 @@ merely because compilation succeeds.
 ```bash
 dotnet test platform/api.Tests/Evidrilo.Api.Tests.csproj
 dotnet test platform/worker.Tests/Evidrilo.Worker.Tests.csproj --configuration Release
-node --test platform/contracts/contracts.test.mjs
+node --test contracts/contracts.test.mjs
 node --test platform/database/migrations/migrations.test.mjs
 ```
 

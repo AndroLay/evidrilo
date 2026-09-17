@@ -33,7 +33,10 @@ lanes:
       - androidApp/**
       - iosApp/**
       - platform/contracts/**
+      - contracts/**
       - deploy/**
+      - docs/**
+      - platform/README.md
 
   domain:
     owns:

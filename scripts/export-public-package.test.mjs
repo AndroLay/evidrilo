@@ -31,7 +31,7 @@ function createExporterFixture() {
   ]) {
     fs.copyFileSync(path.join(repositoryRoot, file), path.join(root, file));
   }
-  for (const directory of ['composeApp', 'androidApp', 'iosApp', 'platform']) {
+  for (const directory of ['composeApp', 'androidApp', 'iosApp', 'contracts', 'platform']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'deploy'), path.join(root, 'deploy'), { recursive: true });

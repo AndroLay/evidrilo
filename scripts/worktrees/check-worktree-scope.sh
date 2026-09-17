@@ -87,7 +87,7 @@ is_owned() {
         .github/*|.dockerignore|.gitignore|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|worktree-ownership.yml|docs/architecture/*|scripts/*|tooling/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt|modules/core/*|modules/application/access/*|apps/*)
           return 0
           ;;
-        composeApp/*|androidApp/*|iosApp/*|platform/contracts/*|deploy/*)
+        composeApp/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|docs/*|platform/README.md)
           [[ "$allow_structural" -eq 1 ]]
           return
           ;;

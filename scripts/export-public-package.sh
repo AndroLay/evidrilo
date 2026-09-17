@@ -133,6 +133,7 @@ public_paths=(
   composeApp
   androidApp
   iosApp
+  contracts
   platform
   deploy
   scripts

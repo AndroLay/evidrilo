@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.resolve(root, '..', '..');
+const repositoryRoot = path.resolve(root, '..');
 const schemaFiles = [
   'health.v1.json',
   'http-errors.v1.json',
@@ -122,7 +122,6 @@ test('Android draft persistence does not synchronously commit on the UI event pa
     path.join(
       root,
       '..',
-      '..',
       'composeApp',
       'src',
       'androidMain',
@@ -221,7 +220,7 @@ test('analytics schema covers funnel, premium conversion, and safe client errors
 });
 
 test('analytics idempotency normalizes nullable properties across app versions', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const store = fs.readFileSync(
     path.join(repositoryRoot, 'platform', 'api', 'Analytics', 'AnalyticsStore.cs'),
     'utf8',
@@ -231,12 +230,12 @@ test('analytics idempotency normalizes nullable properties across app versions',
 });
 
 test('the repository verification harness is documented and non-secret', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const harnessPath = path.join(repositoryRoot, 'scripts', 'verify-local.sh');
   assert.equal(fs.existsSync(harnessPath), true, 'scripts/verify-local.sh must exist');
   const harness = fs.readFileSync(harnessPath, 'utf8');
   assert.match(harness, /:composeApp:jvmTest/);
-  assert.match(harness, /platform\/contracts\/contracts\.test\.mjs/);
+  assert.match(harness, /contracts\/contracts\.test\.mjs/);
   assert.match(harness, /platform\/database\/migrations\/migrations\.test\.mjs/);
   assert.match(harness, /toolchain-paths\.sh/);
   assert.match(harness, /evidrilo_dotnet_root/);
@@ -261,7 +260,7 @@ test('the repository verification harness is documented and non-secret', () => {
 });
 
 test('billing webhook and forwarded headers have explicit boundaries', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const billingEndpoints = fs.readFileSync(
     path.join(repositoryRoot, 'platform', 'api', 'Billing', 'BillingEndpoints.cs'),
     'utf8',
@@ -283,7 +282,7 @@ test('billing webhook and forwarded headers have explicit boundaries', () => {
 });
 
 test('Android local billing configuration uses the documented ignored properties', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const composeBuild = fs.readFileSync(
     path.join(repositoryRoot, 'composeApp', 'build.gradle.kts'),
     'utf8',
@@ -300,7 +299,7 @@ test('Android local billing configuration uses the documented ignored properties
 test('RevenueCat Test Store runbook keeps the approved monthly/yearly catalog', {
   skip: !hasRepositoryPaths('docs/operations/revenuecat-test-store-runbook.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const runbook = fs.readFileSync(
     path.join(repositoryRoot, 'docs', 'operations', 'revenuecat-test-store-runbook.md'),
     'utf8',
@@ -315,7 +314,7 @@ test('RevenueCat Test Store runbook keeps the approved monthly/yearly catalog', 
 test('RevenueCat Test Store runbook does not overclaim dashboard configuration', {
   skip: !hasRepositoryPaths('docs/operations/revenuecat-test-store-runbook.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const runbook = fs.readFileSync(
     path.join(repositoryRoot, 'docs', 'operations', 'revenuecat-test-store-runbook.md'),
     'utf8',
@@ -333,7 +332,7 @@ test('current operational snapshots point to the latest local evidence', {
     'audit/evidence/evidrilo-all-areas-audit-2026-09-13.md',
   ),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const revenueCatRunbook = fs.readFileSync(
     path.join(repositoryRoot, 'docs', 'operations', 'revenuecat-test-store-runbook.md'),
     'utf8',
@@ -406,7 +405,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(rootReadme, /E170 adds explicit regression coverage/);
   assert.doesNotMatch(rootReadme, /231\/231 JVM tests, 74\/74 Node checks, API 139\/139/);
   assert.match(databaseReadiness, /CurrentMigrationVersion = "030_sync_published_case_boundary"/);
-  assert.match(completionPlan, /Tracker snapshot after E186 backend engine and sync boundary hardening:\s+`85\/100`/);
+  assert.match(completionPlan, /Tracker snapshot after E187 backend persistence and sync boundary hardening:\s+`85\/100`/);
   assert.match(completionPlan, /\| Public boundary \|[\s\S]*?\| `96\/96` checks across 9 files pass/);
   assert.match(completionPlan, /\| Kotlin \|[\s\S]*?\| `332\/332` JVM tests/);
   assert.match(completionPlan, /\| Database\/worker integration \|[\s\S]*?migration 030/);
@@ -432,7 +431,7 @@ test('current operational snapshots point to the latest local evidence', {
 test('current status page points to the latest evidence record', {
   skip: !hasRepositoryPaths('research/next-gen/STATUS.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const status = fs.readFileSync(
     path.join(repositoryRoot, 'research', 'next-gen', 'STATUS.md'),
     'utf8',
@@ -445,7 +444,7 @@ test('current status page points to the latest evidence record', {
 test('runtime matrix separates the current boundary from historical Android evidence', {
   skip: !hasRepositoryPaths('audit/runtime-matrix.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const runtimeMatrix = fs.readFileSync(
     path.join(repositoryRoot, 'audit', 'runtime-matrix.md'),
     'utf8',
@@ -459,7 +458,7 @@ test('runtime matrix separates the current boundary from historical Android evid
 });
 
 test('conclusion choices use native radio and checkbox semantics', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const source = fs.readFileSync(
     path.join(repositoryRoot, 'composeApp', 'src', 'commonMain', 'kotlin', 'dev', 'nextgen', 'mobile', 'EvidriloApp.kt'),
     'utf8',
@@ -478,7 +477,7 @@ test('conclusion choices use native radio and checkbox semantics', () => {
 test('current all-area audit records the latest local verification boundary', {
   skip: !hasRepositoryPaths('audit/evidence/evidrilo-all-areas-audit-2026-09-13.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const audit = fs.readFileSync(
     path.join(repositoryRoot, 'audit', 'evidence', 'evidrilo-all-areas-audit-2026-09-13.md'),
     'utf8',
@@ -504,7 +503,7 @@ test('current all-area audit records the latest local verification boundary', {
 test('active backend execution register points to the current verification boundary', {
   skip: !hasRepositoryPaths('docs/operations/evidrilo-backend-execution.md'),
 }, () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const register = fs.readFileSync(
     path.join(repositoryRoot, 'docs', 'operations', 'evidrilo-backend-execution.md'),
     'utf8',
@@ -549,7 +548,7 @@ test('active backend execution register points to the current verification bound
 });
 
 test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const catalog = fs.readFileSync(
     path.join(repositoryRoot, 'gradle', 'libs.versions.toml'),
     'utf8',
@@ -720,7 +719,7 @@ test('case lifecycle audit contract is closed, bounded, and deletion-safe', () =
 });
 
 test('RevenueCat architecture documentation does not overclaim dashboard state', () => {
-  const repositoryRoot = path.resolve(root, '..', '..');
+  const repositoryRoot = path.resolve(root, '..');
   const architecture = fs.readFileSync(
     path.join(repositoryRoot, 'docs', 'architecture', 'revenuecat.md'),
     'utf8',

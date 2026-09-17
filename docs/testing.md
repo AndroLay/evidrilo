@@ -599,7 +599,7 @@ The optional ASP.NET Core foundation has a separate boundary suite:
 ```bash
 dotnet test platform/api.Tests/Evidrilo.Api.Tests.csproj
 dotnet build platform/api.Tests/Evidrilo.Api.Tests.csproj --configuration Release
-node --test platform/contracts/contracts.test.mjs
+node --test contracts/contracts.test.mjs
 node --test platform/database/migrations/migrations.test.mjs
 bash platform/database/integration/run-local-postgres-smoke.sh
 dotnet build platform/worker/Evidrilo.Worker.csproj --configuration Release
