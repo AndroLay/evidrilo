@@ -8,7 +8,7 @@ public sealed class ContractBoundaryTests
     public void Public_fixtures_do_not_contain_credential_shaped_fields()
     {
         var root = FindRepositoryRoot();
-        var fixtureDirectory = Path.Combine(root, "platform", "contracts", "fixtures");
+        var fixtureDirectory = Path.Combine(root, "contracts", "fixtures");
         var forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "password", "access_token", "accessToken", "refresh_token", "refreshToken",
@@ -27,7 +27,7 @@ public sealed class ContractBoundaryTests
     public void Versioned_schemas_are_closed_at_the_response_root()
     {
         var root = FindRepositoryRoot();
-        var schemaDirectory = Path.Combine(root, "platform", "contracts");
+        var schemaDirectory = Path.Combine(root, "contracts");
 
         foreach (var file in new[] { "health.v1.json", "http-errors.v1.json", "account-summary.v1.json" })
         {
