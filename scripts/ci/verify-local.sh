@@ -106,6 +106,7 @@ node --test \
     scripts/verification/check-deployment.test.mjs \
     scripts/verification/check-architecture-boundaries.test.mjs \
     scripts/worktrees/check-worktree-scope.test.mjs \
+    scripts/release/check-version-alignment.test.mjs \
     scripts/release/validate-submission-assets.test.mjs \
     scripts/verification/validate-audio-assets.test.mjs \
     scripts/github/export-public-package.test.mjs

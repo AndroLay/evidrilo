@@ -277,6 +277,7 @@ test('the repository verification harness is documented and non-secret', () => {
   }
   assert.match(harness, /contracts\/contracts\.test\.mjs/);
   assert.match(harness, /platform\/database\/migrations\/migrations\.test\.mjs/);
+  assert.match(harness, /scripts\/release\/check-version-alignment\.test\.mjs/);
   assert.match(harness, /toolchain-paths\.sh/);
   assert.match(harness, /evidrilo_dotnet_root/);
   assert.match(harness, /platform\/api\.Tests\/Evidrilo\.Api\.Tests\.csproj/);
