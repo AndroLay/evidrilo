@@ -31,3 +31,12 @@ test('requires an explicit structural override for integration moves', () => {
   const allowed = run('integration', '--allow-structural', '--paths', structuralPath);
   assert.equal(allowed.status, 0, `${allowed.stdout}${allowed.stderr}`);
 });
+
+test('allows a moved-contract consumer only with the structural override', () => {
+  const consumerPath = 'platform/api.Tests/ContractBoundaryTests.cs';
+  const blocked = run('integration', '--paths', consumerPath);
+  assert.notEqual(blocked.status, 0);
+  assert.match(blocked.stderr, /owner=platform/);
+  const allowed = run('integration', '--allow-structural', '--paths', consumerPath);
+  assert.equal(allowed.status, 0, `${allowed.stdout}${allowed.stderr}`);
+});

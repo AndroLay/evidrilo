@@ -37,6 +37,7 @@ lanes:
       - deploy/**
       - docs/**
       - platform/README.md
+      - platform/api.Tests/ContractBoundaryTests.cs
 
   domain:
     owns:
