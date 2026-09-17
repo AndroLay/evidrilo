@@ -20,7 +20,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ../platform/database/integration/auth-shim.sql:/auth-shim.sql:ro
+      - ../../../platform/database/integration/auth-shim.sql:/auth-shim.sql:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
@@ -37,7 +37,7 @@ services:
       auth-shim:
         condition: service_completed_successfully
     volumes:
-      - ../platform/database/migrations:/migrations:ro
+      - ../../../platform/database/migrations:/migrations:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
@@ -48,8 +48,8 @@ services:
 
   api:
     build:
-      context: ..
-      dockerfile: deploy/docker/api.Dockerfile
+      context: ../../../
+      dockerfile: infra/docker/api.Dockerfile
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -65,8 +65,8 @@ services:
 
   worker:
     build:
-      context: ..
-      dockerfile: deploy/docker/worker.Dockerfile
+      context: ../../../
+      dockerfile: infra/docker/worker.Dockerfile
     depends_on:
       migrations:
         condition: service_completed_successfully

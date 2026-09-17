@@ -34,7 +34,7 @@ function createExporterFixture() {
   for (const directory of ['apps/mobile-shared', 'apps/android', 'apps/ios', 'contracts', 'platform']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
-  fs.cpSync(path.join(repositoryRoot, 'deploy'), path.join(root, 'deploy'), { recursive: true });
+  fs.cpSync(path.join(repositoryRoot, 'infra'), path.join(root, 'infra'), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   for (const file of ['check-public-package.sh', 'check-deployment.sh', 'export-public-package.sh', 'sanitize-public-markdown-links.mjs', 'validate-audio-assets.mjs']) {
     fs.copyFileSync(path.join(repositoryRoot, 'scripts', file), path.join(root, 'scripts', file));

@@ -36,6 +36,7 @@ lanes:
       - platform/contracts/**
       - contracts/**
       - deploy/**
+      - infra/**
       - docs/**
       - platform/README.md
       - platform/api.Tests/ContractBoundaryTests.cs

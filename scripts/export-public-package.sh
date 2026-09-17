@@ -135,7 +135,7 @@ public_paths=(
   apps/ios
   contracts
   platform
-  deploy
+  infra
   scripts
   docs/README.md
   docs/development.md

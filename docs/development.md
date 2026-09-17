@@ -196,8 +196,8 @@ The optional API and projection worker have a local container preparation:
 
 ```bash
 bash scripts/check-deployment.sh .
-docker compose -f deploy/docker-compose.local.yml config --quiet
-docker compose -f deploy/docker-compose.local.yml up --build
+docker compose -f infra/environments/local/docker-compose.yml config --quiet
+docker compose -f infra/environments/local/docker-compose.yml up --build
 curl --fail http://127.0.0.1:5080/health/live
 ```
 
@@ -205,7 +205,7 @@ The local Compose database uses trust authentication only inside its isolated
 development network. Use a managed secret store, a protected PostgreSQL
 connection, explicit origins/proxies, and the migration ledger before any
 staging or production deployment. The full handoff and rollback boundaries are
-in [`../deploy/README.md`](../deploy/README.md).
+in [`../infra/README.md`](../infra/README.md).
 
 These checks use synthetic local authentication and do not contact Supabase.
 The local PostgreSQL harness applies migrations

@@ -133,7 +133,7 @@ flowchart TD
 | `contracts` | Versioned JSON contracts, schemas, and fixtures |
 | `platform/database` | PostgreSQL/Supabase migrations, ledger, RLS, and integration smoke tests |
 | `platform/worker` | Projection worker plus lease/retry handling |
-| `deploy` | Dockerfiles and local Compose; not a production deployment |
+| `infra` | Dockerfiles and local Compose; not a production deployment |
 | `scripts` | Verification, release, public-package, asset, safety, and deployment checks |
 | `docs` | Product, architecture, development, testing, release, business, and decision documents |
 
@@ -213,9 +213,9 @@ Start the local API, worker, migration, and PostgreSQL stack:
 
 ```bash
 bash scripts/check-deployment.sh .
-docker compose -f deploy/docker-compose.local.yml up --build -d
+docker compose -f infra/environments/local/docker-compose.yml up --build -d
 curl --fail http://127.0.0.1:5080/health/live
-docker compose -f deploy/docker-compose.local.yml down
+docker compose -f infra/environments/local/docker-compose.yml down
 ```
 
 This Compose stack is development-only. Its PostgreSQL trust mode is limited to
@@ -268,8 +268,8 @@ production is:
 
 | Component | Recommended target | Notes |
 | --- | --- | --- |
-| API | Render Web Service from `deploy/docker/api.Dockerfile` | HTTPS, `/health/live`, environment secrets, and explicit CORS |
-| Worker | Render Background Worker from `deploy/docker/worker.Dockerfile` | No public traffic; runs projection jobs |
+| API | Render Web Service from `infra/docker/api.Dockerfile` | HTTPS, `/health/live`, environment secrets, and explicit CORS |
+| Worker | Render Background Worker from `infra/docker/worker.Dockerfile` | No public traffic; runs projection jobs |
 | Database + Auth | Separate Supabase managed projects for staging and production | PostgreSQL, Auth/JWKS, RLS, migration ledger, and backup/recovery plan |
 | Billing callback | RevenueCat webhook to the HTTPS API | Secret/auth header remains in the secret store; server entitlement stays fail-closed |
 | Local development | Docker Compose | Not a production security profile |

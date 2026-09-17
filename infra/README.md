@@ -23,14 +23,14 @@ postgres (healthcheck)
 Run it from the repository root:
 
 ```bash
-docker compose -f deploy/docker-compose.local.yml up --build
+docker compose -f infra/environments/local/docker-compose.yml up --build
 curl --fail http://127.0.0.1:5080/health/live
 ```
 
 Stop the stack when finished:
 
 ```bash
-docker compose -f deploy/docker-compose.local.yml down
+docker compose -f infra/environments/local/docker-compose.yml down
 ```
 
 ## Local backup/restore rehearsal
@@ -59,15 +59,15 @@ If host port 5080 is already occupied, choose another host port without
 changing the API's internal port:
 
 ```bash
-EVIDRILO_API_PORT=15080 docker compose -f deploy/docker-compose.local.yml up --build
+EVIDRILO_API_PORT=15080 docker compose -f infra/environments/local/docker-compose.yml up --build
 curl --fail http://127.0.0.1:15080/health/live
 ```
 
 ## Image boundaries
 
-- `deploy/docker/api.Dockerfile` builds only `platform/api` and runs the
+- `infra/docker/api.Dockerfile` builds only `platform/api` and runs the
   published API as the non-root image user.
-- `deploy/docker/worker.Dockerfile` builds only `platform/worker` and runs the
+- `infra/docker/worker.Dockerfile` builds only `platform/worker` and runs the
   published worker as the non-root image user.
 - `.dockerignore` excludes local properties, credentials, private research,
   audit records, media, generated output, and machine caches from the build

@@ -43,10 +43,10 @@ require_text() {
 
 for relative_path in \
   .dockerignore \
-  deploy/README.md \
-  deploy/docker/api.Dockerfile \
-  deploy/docker/worker.Dockerfile \
-  deploy/docker-compose.local.yml
+  infra/README.md \
+  infra/docker/api.Dockerfile \
+  infra/docker/worker.Dockerfile \
+  infra/environments/local/docker-compose.yml
 do
   require_path "$relative_path"
 done
@@ -57,25 +57,25 @@ require_text .dockerignore private-research research/
 require_text .dockerignore private-internal internal/
 require_text .dockerignore private-media Gurwi/
 require_text .dockerignore generated-temp '.tmp'
-require_text deploy/docker/api.Dockerfile api-build-image 'mcr.microsoft.com/dotnet/sdk:10.0'
-require_text deploy/docker/api.Dockerfile api-runtime-image 'mcr.microsoft.com/dotnet/aspnet:10.0'
-require_text deploy/docker/api.Dockerfile non-root-runtime 'USER $APP_UID'
-require_text deploy/docker/worker.Dockerfile worker-build-image 'mcr.microsoft.com/dotnet/sdk:10.0'
-require_text deploy/docker/worker.Dockerfile worker-runtime-image 'mcr.microsoft.com/dotnet/runtime:10.0'
-require_text deploy/docker/worker.Dockerfile non-root-runtime 'USER $APP_UID'
-require_text deploy/docker-compose.local.yml postgres-service '  postgres:'
-require_text deploy/docker-compose.local.yml auth-bootstrap-service '  auth-shim:'
-require_text deploy/docker-compose.local.yml auth-bootstrap-script 'platform/database/integration/auth-shim.sql'
-require_text deploy/docker-compose.local.yml migration-service '  migrations:'
-require_text deploy/docker-compose.local.yml api-service '  api:'
-require_text deploy/docker-compose.local.yml worker-service '  worker:'
-require_text deploy/docker-compose.local.yml database-healthcheck '    healthcheck:'
-require_text deploy/docker-compose.local.yml healthy-dependency 'condition: service_healthy'
-require_text deploy/docker-compose.local.yml auth-bootstrap-order '      auth-shim:'
-require_text deploy/docker-compose.local.yml migration-order 'condition: service_completed_successfully'
-require_text deploy/docker-compose.local.yml api-port-override '${EVIDRILO_API_PORT:-5080}:5080'
+require_text infra/docker/api.Dockerfile api-build-image 'mcr.microsoft.com/dotnet/sdk:10.0'
+require_text infra/docker/api.Dockerfile api-runtime-image 'mcr.microsoft.com/dotnet/aspnet:10.0'
+require_text infra/docker/api.Dockerfile non-root-runtime 'USER $APP_UID'
+require_text infra/docker/worker.Dockerfile worker-build-image 'mcr.microsoft.com/dotnet/sdk:10.0'
+require_text infra/docker/worker.Dockerfile worker-runtime-image 'mcr.microsoft.com/dotnet/runtime:10.0'
+require_text infra/docker/worker.Dockerfile non-root-runtime 'USER $APP_UID'
+require_text infra/environments/local/docker-compose.yml postgres-service '  postgres:'
+require_text infra/environments/local/docker-compose.yml auth-bootstrap-service '  auth-shim:'
+require_text infra/environments/local/docker-compose.yml auth-bootstrap-script 'platform/database/integration/auth-shim.sql'
+require_text infra/environments/local/docker-compose.yml migration-service '  migrations:'
+require_text infra/environments/local/docker-compose.yml api-service '  api:'
+require_text infra/environments/local/docker-compose.yml worker-service '  worker:'
+require_text infra/environments/local/docker-compose.yml database-healthcheck '    healthcheck:'
+require_text infra/environments/local/docker-compose.yml healthy-dependency 'condition: service_healthy'
+require_text infra/environments/local/docker-compose.yml auth-bootstrap-order '      auth-shim:'
+require_text infra/environments/local/docker-compose.yml migration-order 'condition: service_completed_successfully'
+require_text infra/environments/local/docker-compose.yml api-port-override '${EVIDRILO_API_PORT:-5080}:5080'
 
-deployment_root="$repository_root/deploy"
+deployment_root="$repository_root/infra"
 if [[ -d "$deployment_root" ]]; then
   if rg -n -i --hidden --glob '!README.md' '(^|:)latest([[:space:]]|$)' "$deployment_root" >/dev/null 2>&1; then
     printf 'floating latest image tag is not allowed in deployment artifacts\n' >&2
@@ -96,7 +96,7 @@ if [[ -d "$deployment_root" ]]; then
   fi
 
   if find "$deployment_root" -type f \( -name '*.env' -o -name '*.pem' -o -name '*.p12' -o -name '*.jks' -o -name '*.keystore' \) -print -quit | grep -q .; then
-    printf 'credential-bearing file extension detected under deploy/\n' >&2
+    printf 'credential-bearing file extension detected under infra/\n' >&2
     failed=1
   fi
 fi

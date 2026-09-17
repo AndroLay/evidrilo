@@ -27,7 +27,7 @@ Managed Supabase grants,
 pooling, deployment, recovery, and load behavior remain external gates.
 
 The reproducible local API/worker container preparation is documented in
-[`../../deploy/README.md`](../../deploy/README.md). It starts the worker only
+[`../../infra/README.md`](../../infra/README.md). It starts the worker only
 after the checksum-guarded migration service completes. The Compose database
 and trust authentication are local-only and must not be reused for a managed
 deployment.

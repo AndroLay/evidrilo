@@ -93,7 +93,7 @@ bash scripts/check-architecture-boundaries.sh "$repo_root"
 bash -n scripts/check-public-package.sh scripts/check-deployment.sh scripts/validate-submission-assets.sh scripts/export-public-package.sh scripts/check-github-safety.sh platform/database/integration/run-local-postgres-backup-restore-smoke.sh
 bash scripts/check-deployment.sh "$repo_root"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    docker compose -f deploy/docker-compose.local.yml config --quiet
+    docker compose -f infra/environments/local/docker-compose.yml config --quiet
 else
     printf '%s\n' 'Docker Compose config check: UNAVAILABLE (Docker Compose is not installed)'
 fi

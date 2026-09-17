@@ -226,12 +226,18 @@ evidrilo/
 │
 ├── apps/ios/                # committed Xcode host; runtime sign-off remains open
 │
+├── contracts/               # versioned public REST/JSON contracts and fixtures
+│
 ├── platform/                # optional post-gate platform lane
 │   ├── api/                 # ASP.NET Core API
-│   ├── contracts/           # versioned REST/JSON contracts
 │   ├── database/            # migrations, local PostgreSQL/RLS harness
 │   ├── worker/              # bounded .NET worker process boundary
 │   └── api.Tests/           # API/unit/integration tests
+│
+├── infra/                   # repository-owned local container preparation
+│   ├── docker/              # API and worker Dockerfiles
+│   ├── environments/local/  # local Compose only
+│   └── README.md            # handoff and non-production boundary
 │
 ├── docs/
 │   ├── README.md

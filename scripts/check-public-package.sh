@@ -32,6 +32,7 @@ required_paths=(
   apps/ios
   contracts
   platform
+  infra
   scripts
 )
 
