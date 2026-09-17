@@ -410,7 +410,7 @@ responses when the database is not configured; it never returns fake sync,
   cloud, authoring, projection, audit, or entitlement success.
 
 Container preparation for the API and worker is in [`../infra/`](../infra/).
-Run `bash scripts/check-deployment.sh .` and
+Run `bash scripts/verification/check-deployment.sh .` and
 `docker compose -f infra/environments/local/docker-compose.yml config --quiet` before a
 local stack run. The local Compose database is development-only; managed
 secrets, TLS, backups, alerts, rollback, and load verification remain external

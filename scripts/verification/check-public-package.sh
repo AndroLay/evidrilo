@@ -110,8 +110,8 @@ done < <(find "$candidate_root" -type f \( -name 'local.properties' -o -name '*.
 # Report only the fact that a match exists. Never print a credential-shaped value.
 if rg -l -i --hidden \
   --glob '!**/.git/**' \
-  --glob '!scripts/check-public-package.sh' \
-  --glob '!scripts/check-public-package.test.mjs' \
+  --glob '!scripts/verification/check-public-package.sh' \
+  --glob '!scripts/verification/check-public-package.test.mjs' \
   '(sk_(live|test)_[A-Za-z0-9]{20,}|sb_(secret|publishable)_[A-Za-z0-9_-]{20,}|service_role\s*[:=]\s*[A-Za-z0-9._-]{20,}|client_secret\s*[:=]\s*[A-Za-z0-9._-]{20,})' \
   "$candidate_root" >/dev/null 2>&1; then
   printf 'credential-shaped value detected in candidate package\n' >&2

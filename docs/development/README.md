@@ -169,7 +169,7 @@ repeatable on pushes and pull requests. Before creating a public repository
 snapshot, check the exact candidate tree with:
 
 ```bash
-bash scripts/check-public-package.sh <candidate-directory>
+bash scripts/verification/check-public-package.sh <candidate-directory>
 ```
 
 The package check rejects private working material and credential-shaped
@@ -181,14 +181,14 @@ To prepare a public candidate from this mixed private workspace, use an empty
 destination outside the repository:
 
 ```bash
-bash scripts/export-public-package.sh . /path/to/empty-candidate
+bash scripts/github/export-public-package.sh . /path/to/empty-candidate
 ```
 
 The exporter copies only the explicit public allowlist and runs the package and
 deployment checks on the result. It never overwrites a non-empty destination.
 
 After cloning the public repository, stage only the intended public files and
-run `bash scripts/check-github-safety.sh .` before committing or pushing. The
+run `bash scripts/security/check-github-safety.sh .` before committing or pushing. The
 check verifies the actual Git index and working tree, rejects untracked
 non-ignored files and private/generated/credential-bearing paths, and enforces
 the same public allowlist. It requires usable Git metadata and therefore is
@@ -197,7 +197,7 @@ intentionally unavailable in this mixed workspace.
 The optional API and projection worker have a local container preparation:
 
 ```bash
-bash scripts/check-deployment.sh .
+bash scripts/verification/check-deployment.sh .
 docker compose -f infra/environments/local/docker-compose.yml config --quiet
 docker compose -f infra/environments/local/docker-compose.yml up --build
 curl --fail http://127.0.0.1:5080/health/live

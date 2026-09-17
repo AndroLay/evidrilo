@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.dirname(scriptsDirectory);
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const checker = path.join(scriptsDirectory, 'check-github-safety.sh');
 
 function runGit(root, args) {
@@ -62,7 +62,7 @@ function createFixture() {
     'gradle/libs.versions.toml',
     'apps/ios/README.md',
     'platform/README.md',
-    'scripts/check-github-safety.sh',
+    'scripts/security/check-github-safety.sh',
     'modules/domain/README.md',
     'tests/architecture/README.md',
     'tooling/lint/README.md',

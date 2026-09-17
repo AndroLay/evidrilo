@@ -10,7 +10,7 @@ valuable, but it is not evidence for claims outside its boundary.
 Run the repository-owned baseline with:
 
 ```bash
-bash scripts/verify-local.sh
+bash scripts/ci/verify-local.sh
 ```
 
 The harness uses a repository-local Gradle cache, runs the Kotlin/JVM/Android

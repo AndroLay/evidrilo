@@ -52,11 +52,11 @@ if ! command -v node >/dev/null 2>&1; then
   exit 2
 fi
 
-if [[ ! -f "$source_root/scripts/validate-audio-assets.mjs" ]]; then
+if [[ ! -f "$source_root/scripts/verification/validate-audio-assets.mjs" ]]; then
   printf '%s\n' 'public package export unavailable: audio validator is missing from the source repository' >&2
   exit 2
 fi
-node "$source_root/scripts/validate-audio-assets.mjs" "$source_root"
+node "$source_root/scripts/verification/validate-audio-assets.mjs" "$source_root"
 
 if [[ ! -e "$destination" ]]; then
   mkdir -- "$destination"
@@ -178,9 +178,9 @@ for relative_path in "${public_paths[@]}"; do
   fi
 done
 
-node "$destination/scripts/validate-audio-assets.mjs" "$destination"
-node "$source_root/scripts/sanitize-public-markdown-links.mjs" "$destination"
+node "$destination/scripts/verification/validate-audio-assets.mjs" "$destination"
+node "$source_root/scripts/github/sanitize-public-markdown-links.mjs" "$destination"
 
-bash "$source_root/scripts/check-public-package.sh" "$destination"
-bash "$source_root/scripts/check-deployment.sh" "$destination"
+bash "$source_root/scripts/verification/check-public-package.sh" "$destination"
+bash "$source_root/scripts/verification/check-deployment.sh" "$destination"
 printf '%s\n' 'PUBLIC_PACKAGE_EXPORT_PASS'

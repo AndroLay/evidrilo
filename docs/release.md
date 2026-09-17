@@ -35,7 +35,7 @@ The repository-owned release configuration is now explicit for both platforms:
   takes `TEAM_ID` from an ignored local xcconfig. The template is
   `apps/ios/Configuration/Release.xcconfig.example`.
 - The release configuration contract is checked by
-  `bash scripts/check-mobile-release.sh .`.
+  `bash scripts/release/check-mobile-release.sh .`.
 
 An unsigned Android AAB can be built locally for packaging verification:
 
@@ -49,7 +49,7 @@ variables, then run:
 
 ```bash
 ./gradlew :androidApp:verifyReleaseSigning :androidApp:bundleRelease
-bash scripts/check-mobile-release.sh . --require-android-artifact
+bash scripts/release/check-mobile-release.sh . --require-android-artifact
 ```
 
 The Linux workspace has no Xcode toolchain. On macOS, use the checked-in
@@ -88,13 +88,13 @@ Before handoff, the owner must confirm the following sequence:
 
 1. Update the canonical marketing version in `version.props`; increment each
    platform's build number.
-2. Run `bash scripts/check-version-alignment.sh .` and stop if it reports drift.
+2. Run `bash scripts/release/check-version-alignment.sh .` and stop if it reports drift.
 3. Build and verify Android signing, then produce both the signed APK for
    direct download and the signed AAB for Play upload.
 4. On macOS, archive/export the iOS `Release` scheme, install the resulting
    build on the target test device, and verify the free flow before any premium
    or provider-dependent flow.
-5. Run `bash scripts/check-mobile-release.sh .` and keep the Android/iOS
+5. Run `bash scripts/release/check-mobile-release.sh .` and keep the Android/iOS
    artifact paths and checksums in private release evidence.
 6. Publish only after the install, launch, version display, free-flow,
    accessibility, and signing checks pass on each claimed platform.
@@ -122,7 +122,7 @@ the release remains `NOT READY` and no download link should be announced.
 ## Engineering
 
 - [ ] A clean clone can run the documented Gradle checks. The repository now
-      provides `bash scripts/verify-local.sh`; the current workspace run uses
+      provides `bash scripts/ci/verify-local.sh`; the current workspace run uses
       a temporary JDK 21 and local Gradle cache, so clean-clone evidence remains
       open. Android builds additionally require a locally configured SDK via
       `local.properties` or `ANDROID_HOME`; the ignored file is never exported.
@@ -156,7 +156,7 @@ the release remains `NOT READY` and no download link should be announced.
       removal/disablement in the dashboard remains an open G4 migration before
       transaction validation.
 - [x] Repository-owned deployment preparation is guarded by
-      `bash scripts/check-deployment.sh .`: non-root API/worker images,
+      `bash scripts/verification/check-deployment.sh .`: non-root API/worker images,
       checksum-ledger Compose ordering, local Auth compatibility bootstrap,
       health checks, and an overridable host port were built and smoke-tested.
       This is local preparation only; production HTTPS, secrets, backups,

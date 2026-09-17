@@ -48,7 +48,7 @@ free rehearsal usable and the premium offer unavailable.
 The repository contract can be checked before opening Xcode with:
 
 ```bash
-bash scripts/check-mobile-release.sh .
+bash scripts/release/check-mobile-release.sh .
 ```
 
 ## Maintainer verification matrix

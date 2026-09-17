@@ -22,7 +22,7 @@ const REQUIRED_FIELDS = [
 
 function usage() {
   process.stderr.write(
-    'usage: node scripts/validate-audio-assets.mjs <repository-root> [--allow-empty]\n',
+    'usage: node scripts/verification/validate-audio-assets.mjs <repository-root> [--allow-empty]\n',
   );
 }
 

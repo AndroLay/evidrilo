@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.dirname(scriptsDirectory);
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const checker = path.join(scriptsDirectory, 'check-deployment.sh');
 
 function runChecker(root) {

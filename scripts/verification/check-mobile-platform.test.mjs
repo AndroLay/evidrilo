@@ -7,7 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.dirname(scriptsDirectory);
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
@@ -61,7 +61,7 @@ test('iOS Release uses distribution signing with an owner-supplied team', () => 
 });
 
 test('mobile release configuration checker passes without exposing signing material', () => {
-  const checker = path.join(scriptsDirectory, 'check-mobile-release.sh');
+  const checker = path.join(repositoryRoot, 'scripts', 'release', 'check-mobile-release.sh');
   const result = spawnSync('bash', [checker, repositoryRoot], { encoding: 'utf8' });
   assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
   assert.match(result.stdout, /MOBILE_RELEASE_CONFIG_PASS/);
@@ -71,7 +71,7 @@ test('mobile release configuration checker passes without exposing signing mater
 });
 
 test('mobile release checker accepts Android artifact and iOS archive together', () => {
-  const checker = path.join(scriptsDirectory, 'check-mobile-release.sh');
+  const checker = path.join(repositoryRoot, 'scripts', 'release', 'check-mobile-release.sh');
   const archive = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-archive-'));
   fs.writeFileSync(path.join(archive, 'Info.plist'), 'synthetic archive metadata');
   try {

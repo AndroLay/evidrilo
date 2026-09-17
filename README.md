@@ -197,7 +197,7 @@ cp local.properties.example local.properties
 For the broader repository verification pass:
 
 ```bash
-bash scripts/verify-local.sh
+bash scripts/ci/verify-local.sh
 ```
 
 The script runs the available Kotlin, Android, contract, migration, repository
@@ -217,7 +217,7 @@ node --test platform/database/migrations/migrations.test.mjs
 Start the local API, worker, migration, and PostgreSQL stack:
 
 ```bash
-bash scripts/check-deployment.sh .
+bash scripts/verification/check-deployment.sh .
 docker compose -f infra/environments/local/docker-compose.yml up --build -d
 curl --fail http://127.0.0.1:5080/health/live
 docker compose -f infra/environments/local/docker-compose.yml down
@@ -248,7 +248,7 @@ Use this sequence to keep shared code and boundaries consistent:
 5. For RevenueCat changes, preserve the monthly/yearly allowlist and cover
    active, pending, cancelled, failed, restored, revoked, unknown, and
    no-network states.
-6. Run focused tests after a change and `scripts/verify-local.sh` at the end of
+6. Run focused tests after a change and `scripts/ci/verify-local.sh` at the end of
    a batch. Document decisions and evidence only from results that were
    actually observed.
 
@@ -306,12 +306,12 @@ called verified until they are run in the owner's environment.
 - Before creating a public package, run:
 
 ```bash
-bash scripts/export-public-package.sh . /path/to/empty-candidate
-bash scripts/check-public-package.sh /path/to/empty-candidate
+bash scripts/github/export-public-package.sh . /path/to/empty-candidate
+bash scripts/verification/check-public-package.sh /path/to/empty-candidate
 ```
 
 In a checkout with valid Git metadata, also run
-`bash scripts/check-github-safety.sh .` before committing or pushing. The
+`bash scripts/security/check-github-safety.sh .` before committing or pushing. The
 preparation workspace must not be treated as evidence that a push or public
 publication has occurred.
 

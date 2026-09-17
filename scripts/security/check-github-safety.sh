@@ -152,7 +152,7 @@ check_secret_content() {
   local pattern
   pattern='(-----BEGIN[^[:cntrl:]]*PRIVATE KEY-----|sk_(live|test)_[A-Za-z0-9]{20,}|sb_secret_[A-Za-z0-9_-]{20,}|service_role[[:space:]]*[:=][[:space:]]*[A-Za-z0-9._-]{20,}|client_secret[[:space:]]*[:=][[:space:]]*[A-Za-z0-9._-]{20,}|(DATABASE_PASSWORD|POSTGRES_PASSWORD|REVENUECAT_WEBHOOK_SECRET|REVENUECAT_WEBHOOK_AUTHORIZATION|PRIVATE_KEY)[[:space:]]*[:=][[:space:]]*[^[:space:]#<][^[:space:]#]{7,})'
 
-  if git -C "$git_root" grep --cached -I -l -E "$pattern" -- . ':(exclude)scripts/check-github-safety.sh' ':(exclude)scripts/check-github-safety.test.mjs' >/dev/null 2>&1; then
+  if git -C "$git_root" grep --cached -I -l -E "$pattern" -- . ':(exclude)scripts/security/check-github-safety.sh' ':(exclude)scripts/security/check-github-safety.test.mjs' >/dev/null 2>&1; then
     reject 'credential-shaped content detected in the Git index'
   else
     local rc=$?
@@ -161,7 +161,7 @@ check_secret_content() {
     fi
   fi
 
-  if git -C "$git_root" grep -I -l -E "$pattern" -- . ':(exclude)scripts/check-github-safety.sh' ':(exclude)scripts/check-github-safety.test.mjs' >/dev/null 2>&1; then
+  if git -C "$git_root" grep -I -l -E "$pattern" -- . ':(exclude)scripts/security/check-github-safety.sh' ':(exclude)scripts/security/check-github-safety.test.mjs' >/dev/null 2>&1; then
     reject 'credential-shaped content detected in the working tree'
   else
     local rc=$?

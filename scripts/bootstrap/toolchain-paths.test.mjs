@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.resolve(scriptsDirectory, '..');
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const resolverPath = path.join(scriptsDirectory, 'toolchain-paths.sh');
 const bashPath = process.env.BASH ?? '/bin/bash';
 
@@ -102,7 +102,7 @@ test('repository-local dotnet fallback requires an explicit opt-in', () => {
 });
 
 test('repository verifier consumes the resolver instead of forcing its old cache', () => {
-  const harness = fs.readFileSync(path.join(repositoryRoot, 'scripts', 'verify-local.sh'), 'utf8');
+  const harness = fs.readFileSync(path.join(repositoryRoot, 'scripts', 'ci', 'verify-local.sh'), 'utf8');
   assert.match(harness, /source .*toolchain-paths\.sh/);
   assert.match(harness, /evidrilo_gradle_user_home/);
   assert.match(harness, /export GRADLE_USER_HOME="\$gradle_user_home"/);

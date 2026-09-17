@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.dirname(scriptsDirectory);
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const exporter = path.join(scriptsDirectory, 'export-public-package.sh');
 
 function writeFixtureFile(root, relativePath, contents = 'synthetic public package fixture\n') {
@@ -59,9 +59,17 @@ function createExporterFixture() {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'infra'), path.join(root, 'infra'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
-  for (const file of ['check-public-package.sh', 'check-deployment.sh', 'export-public-package.sh', 'sanitize-public-markdown-links.mjs', 'validate-audio-assets.mjs']) {
-    fs.copyFileSync(path.join(repositoryRoot, 'scripts', file), path.join(root, 'scripts', file));
+  for (const directory of ['scripts/github', 'scripts/verification']) {
+    fs.mkdirSync(path.join(root, directory), { recursive: true });
+  }
+  for (const [sourcePath, destinationPath] of [
+    ['scripts/verification/check-public-package.sh', 'scripts/verification/check-public-package.sh'],
+    ['scripts/verification/check-deployment.sh', 'scripts/verification/check-deployment.sh'],
+    ['scripts/github/export-public-package.sh', 'scripts/github/export-public-package.sh'],
+    ['scripts/github/sanitize-public-markdown-links.mjs', 'scripts/github/sanitize-public-markdown-links.mjs'],
+    ['scripts/verification/validate-audio-assets.mjs', 'scripts/verification/validate-audio-assets.mjs'],
+  ]) {
+    fs.copyFileSync(path.join(repositoryRoot, sourcePath), path.join(root, destinationPath));
   }
   writeFixtureFile(root, 'modules/domain/README.md');
   writeFixtureFile(root, 'tests/architecture/README.md');

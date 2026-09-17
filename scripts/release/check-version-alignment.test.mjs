@@ -7,7 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.dirname(scriptsDirectory);
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const checker = path.join(scriptsDirectory, 'check-version-alignment.sh');
 
 function runChecker(root) {

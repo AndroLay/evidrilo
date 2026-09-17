@@ -2,11 +2,11 @@
 
 set -Eeuo pipefail
 
-repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$repo_root"
 
-# shellcheck source=scripts/toolchain-paths.sh
-source "$repo_root/scripts/toolchain-paths.sh"
+# shellcheck source=scripts/bootstrap/toolchain-paths.sh
+source "$repo_root/scripts/bootstrap/toolchain-paths.sh"
 gradle_user_home=$(evidrilo_gradle_user_home)
 # Gradle Wrapper uses this variable to locate its distribution before it can
 # process the --gradle-user-home command-line option.
@@ -69,29 +69,29 @@ if [ "$gradle_available" -eq 1 ]; then
         --no-configuration-cache \
         :composeApp:jvmTest :composeApp:compileKotlinJvm :composeApp:compileDebugKotlinAndroid \
         :androidApp:bundleRelease
-    bash scripts/check-mobile-release.sh "$repo_root" --require-android-artifact
+    bash scripts/release/check-mobile-release.sh "$repo_root" --require-android-artifact
 else
     printf '%s\n' '1/4 Kotlin JVM tests, JVM compilation, Android compilation, and Android release bundle: UNAVAILABLE (JDK 21 with java and javac is not installed)' >&2
-    bash scripts/check-mobile-release.sh "$repo_root"
+    bash scripts/release/check-mobile-release.sh "$repo_root"
 fi
 
 printf '%s\n' '2/4 Contracts, repository-boundary, and asset checks'
 node --test \
     contracts/contracts.test.mjs \
     platform/database/migrations/migrations.test.mjs \
-    scripts/check-public-package.test.mjs \
-    scripts/check-github-safety.test.mjs \
-    scripts/check-mobile-platform.test.mjs \
-    scripts/check-deployment.test.mjs \
-    scripts/check-architecture-boundaries.test.mjs \
+    scripts/verification/check-public-package.test.mjs \
+    scripts/security/check-github-safety.test.mjs \
+    scripts/verification/check-mobile-platform.test.mjs \
+    scripts/verification/check-deployment.test.mjs \
+    scripts/verification/check-architecture-boundaries.test.mjs \
     scripts/worktrees/check-worktree-scope.test.mjs \
-    scripts/validate-submission-assets.test.mjs \
-    scripts/validate-audio-assets.test.mjs \
-    scripts/export-public-package.test.mjs
-node scripts/validate-audio-assets.mjs "$repo_root" --allow-empty
-bash scripts/check-architecture-boundaries.sh "$repo_root"
-bash -n scripts/check-public-package.sh scripts/check-deployment.sh scripts/validate-submission-assets.sh scripts/export-public-package.sh scripts/check-github-safety.sh platform/database/integration/run-local-postgres-backup-restore-smoke.sh
-bash scripts/check-deployment.sh "$repo_root"
+    scripts/release/validate-submission-assets.test.mjs \
+    scripts/verification/validate-audio-assets.test.mjs \
+    scripts/github/export-public-package.test.mjs
+node scripts/verification/validate-audio-assets.mjs "$repo_root" --allow-empty
+bash scripts/verification/check-architecture-boundaries.sh "$repo_root"
+bash -n scripts/verification/check-public-package.sh scripts/verification/check-deployment.sh scripts/release/validate-submission-assets.sh scripts/github/export-public-package.sh scripts/security/check-github-safety.sh platform/database/integration/run-local-postgres-backup-restore-smoke.sh
+bash scripts/verification/check-deployment.sh "$repo_root"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     docker compose -f infra/environments/local/docker-compose.yml config --quiet
 else

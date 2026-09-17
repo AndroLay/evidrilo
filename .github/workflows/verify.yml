@@ -39,7 +39,7 @@ jobs:
           :composeApp:compileDebugKotlinAndroid
 
       - name: Validate mobile release configuration
-        run: bash scripts/check-mobile-release.sh "$GITHUB_WORKSPACE"
+        run: bash scripts/release/check-mobile-release.sh "$GITHUB_WORKSPACE"
 
       - name: Build unsigned Android release bundle
         run: >-
@@ -47,7 +47,7 @@ jobs:
           :androidApp:bundleRelease
 
       - name: Verify Android release artifact
-        run: bash scripts/check-mobile-release.sh "$GITHUB_WORKSPACE" --require-android-artifact
+        run: bash scripts/release/check-mobile-release.sh "$GITHUB_WORKSPACE" --require-android-artifact
 
   ios-host:
     name: iOS Release host compile
@@ -96,19 +96,19 @@ jobs:
           node --test
           contracts/contracts.test.mjs
           platform/database/migrations/migrations.test.mjs
-          scripts/check-public-package.test.mjs
-          scripts/check-version-alignment.test.mjs
-          scripts/check-github-safety.test.mjs
-          scripts/check-mobile-platform.test.mjs
-          scripts/check-deployment.test.mjs
-          scripts/check-architecture-boundaries.test.mjs
+          scripts/verification/check-public-package.test.mjs
+          scripts/release/check-version-alignment.test.mjs
+          scripts/security/check-github-safety.test.mjs
+          scripts/verification/check-mobile-platform.test.mjs
+          scripts/verification/check-deployment.test.mjs
+          scripts/verification/check-architecture-boundaries.test.mjs
           scripts/worktrees/check-worktree-scope.test.mjs
-          scripts/validate-audio-assets.test.mjs
-          scripts/validate-submission-assets.test.mjs
-          scripts/export-public-package.test.mjs
+          scripts/verification/validate-audio-assets.test.mjs
+          scripts/release/validate-submission-assets.test.mjs
+          scripts/github/export-public-package.test.mjs
 
       - name: Enforce architecture boundaries
-        run: bash scripts/check-architecture-boundaries.sh "$GITHUB_WORKSPACE"
+        run: bash scripts/verification/check-architecture-boundaries.sh "$GITHUB_WORKSPACE"
 
   platform:
     name: ASP.NET Core and worker tests
@@ -138,10 +138,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check public package
-        run: bash scripts/check-public-package.sh "$GITHUB_WORKSPACE"
+        run: bash scripts/verification/check-public-package.sh "$GITHUB_WORKSPACE"
 
       - name: Check deployment preparation
-        run: bash scripts/check-deployment.sh "$GITHUB_WORKSPACE"
+        run: bash scripts/verification/check-deployment.sh "$GITHUB_WORKSPACE"
 
       - name: Check GitHub safety boundary
-        run: bash scripts/check-github-safety.sh "$GITHUB_WORKSPACE"
+        run: bash scripts/security/check-github-safety.sh "$GITHUB_WORKSPACE"

@@ -37,14 +37,14 @@ files and before opening a review, run:
 ```bash
 ./gradlew :composeApp:jvmTest :composeApp:compileKotlinJvm
 ./gradlew :androidApp:assembleDebug
-bash scripts/check-github-safety.sh .
+bash scripts/security/check-github-safety.sh .
 ```
 
 The Git safety check must pass before committing or pushing. It is designed to
 fail when a non-ignored untracked file, private/generated path, credential file,
 secret-shaped value, or non-allowlisted tracked path could enter the public
 repository. In a mixed workspace without usable Git metadata, export a fresh
-candidate with `bash scripts/export-public-package.sh` and validate that
+candidate with `bash scripts/github/export-public-package.sh` and validate that
 candidate instead.
 
 If a platform or environment cannot be tested, report it as `NOT_RUN` or

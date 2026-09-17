@@ -4,8 +4,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$repo_root"
-# shellcheck source=../../scripts/toolchain-paths.sh
-source "$repo_root/scripts/toolchain-paths.sh"
+# shellcheck source=../../scripts/bootstrap/toolchain-paths.sh
+source "$repo_root/scripts/bootstrap/toolchain-paths.sh"
 container_name="evidrilo-api-worker-e2e-$$"
 image="${EVIDRILO_POSTGRES_IMAGE:-postgres:16-alpine}"
 db_port="${EVIDRILO_API_WORKER_E2E_DB_PORT:-55435}"

@@ -11,7 +11,7 @@ From the repository root:
 
 ```bash
 ./gradlew --no-configuration-cache :androidApp:bundleRelease
-bash scripts/check-mobile-release.sh . --require-android-artifact
+bash scripts/release/check-mobile-release.sh . --require-android-artifact
 ```
 
 This produces an unsigned candidate at
@@ -47,7 +47,7 @@ owner-run release gates.
 The Android marketing version is read from the root `version.props` and must
 match iOS `MARKETING_VERSION`. Increase `androidVersionCode` for every new
 Android upload; a published version code must never be reused. Run
-`bash scripts/check-version-alignment.sh .` before packaging.
+`bash scripts/release/check-version-alignment.sh .` before packaging.
 
 For a user-downloadable GitHub Release, produce a signed APK with
 `:androidApp:assembleRelease`. For Play Console, produce the signed AAB with

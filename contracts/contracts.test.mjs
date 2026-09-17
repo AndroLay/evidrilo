@@ -238,8 +238,8 @@ test('analytics idempotency normalizes nullable properties across app versions',
 
 test('the repository verification harness is documented and non-secret', () => {
   const repositoryRoot = path.resolve(root, '..');
-  const harnessPath = path.join(repositoryRoot, 'scripts', 'verify-local.sh');
-  assert.equal(fs.existsSync(harnessPath), true, 'scripts/verify-local.sh must exist');
+  const harnessPath = path.join(repositoryRoot, 'scripts', 'ci', 'verify-local.sh');
+  assert.equal(fs.existsSync(harnessPath), true, 'scripts/ci/verify-local.sh must exist');
   const harness = fs.readFileSync(harnessPath, 'utf8');
   assert.match(harness, /:composeApp:jvmTest/);
   assert.match(harness, /contracts\/contracts\.test\.mjs/);

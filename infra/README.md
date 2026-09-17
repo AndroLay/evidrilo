@@ -98,9 +98,9 @@ configured separately through ignored local platform settings.
 ## Safe rollout sequence
 
 1. Build and scan the exact candidate with
-   `bash scripts/check-deployment.sh .`,
-   `bash scripts/check-public-package.sh <public-candidate>`, and (from a real
-   Git checkout) `bash scripts/check-github-safety.sh .`.
+   `bash scripts/verification/check-deployment.sh .`,
+   `bash scripts/verification/check-public-package.sh <public-candidate>`, and (from a real
+   Git checkout) `bash scripts/security/check-github-safety.sh .`.
 2. Provision a disposable staging database and apply migrations only through
    `platform/database/migrations/apply-migrations.sh`; never replay raw SQL by
    hand.

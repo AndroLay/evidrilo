@@ -4,8 +4,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const checker = path.join(repositoryRoot, 'scripts', 'check-architecture-boundaries.sh');
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const checker = path.join(repositoryRoot, 'scripts', 'verification', 'check-architecture-boundaries.sh');
 
 test('current staged architecture satisfies the domain and feature dependency guard', () => {
   const result = spawnSync('bash', [checker, repositoryRoot], { encoding: 'utf8' });
