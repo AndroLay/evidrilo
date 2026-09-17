@@ -41,6 +41,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":modules:domain"))
             api(project(":modules:design-system"))
+            api(project(":modules:data"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)

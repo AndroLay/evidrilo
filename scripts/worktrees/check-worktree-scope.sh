@@ -109,7 +109,7 @@ is_owned() {
       ;;
     ingestion)
       case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*|modules/application/ingestion/*|modules/data/documents/*|modules/data/ai/*)
+        composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*|modules/application/ingestion/*|modules/data/documents/*|modules/data/ai/*|modules/data/src/*)
           return 0
           ;;
       esac

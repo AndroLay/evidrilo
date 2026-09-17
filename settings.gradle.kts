@@ -22,6 +22,9 @@ project(":modules:domain").projectDir = file("modules/domain")
 include(":modules:design-system")
 project(":modules:design-system").projectDir = file("modules/design-system")
 
+include(":modules:data")
+project(":modules:data").projectDir = file("modules/data")
+
 include(":composeApp")
 project(":composeApp").projectDir = file("apps/mobile-shared")
 include(":androidApp")

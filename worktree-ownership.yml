@@ -97,6 +97,7 @@ lanes:
       - modules/application/ingestion/**
       - modules/data/documents/**
       - modules/data/ai/**
+      - modules/data/src/**
 
   platform:
     owns:

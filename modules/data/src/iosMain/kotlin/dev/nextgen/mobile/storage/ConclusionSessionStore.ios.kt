@@ -2,16 +2,16 @@ package dev.nextgen.mobile.storage
 
 import platform.Foundation.NSUserDefaults
 
-private const val HISTORY_KEY = "evidrilo.conclusion.history.v1"
+private const val SNAPSHOT_KEY = "evidrilo.conclusion.snapshot.v1"
 
-internal actual fun createConclusionHistoryStore(): ConclusionHistoryStore =
-    IosConclusionHistoryStore()
+actual fun createConclusionSessionStore(): ConclusionSessionStore =
+    IosConclusionSessionStore()
 
-private class IosConclusionHistoryStore : ConclusionHistoryStore {
+private class IosConclusionSessionStore : ConclusionSessionStore {
     private val defaults = NSUserDefaults.standardUserDefaults
 
     override fun load(): LocalStorageReadResult<ConclusionSessionSnapshot> = runCatching {
-        val encoded = defaults.stringForKey(HISTORY_KEY)
+        val encoded = defaults.stringForKey(SNAPSHOT_KEY)
         when {
             encoded == null -> LocalStorageReadResult.Success(null)
             else -> ConclusionSessionCodec.decode(encoded)?.let { snapshot ->
@@ -24,8 +24,8 @@ private class IosConclusionHistoryStore : ConclusionHistoryStore {
     override fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult = runCatching {
         val encoded = ConclusionSessionCodec.encodeForStorage(snapshot)
             ?: return@runCatching LocalStorageWriteResult.FAILED
-        defaults.setObject(encoded, forKey = HISTORY_KEY)
-        if (defaults.stringForKey(HISTORY_KEY) == encoded) {
+        defaults.setObject(encoded, forKey = SNAPSHOT_KEY)
+        if (defaults.stringForKey(SNAPSHOT_KEY) == encoded) {
             LocalStorageWriteResult.SAVED
         } else {
             LocalStorageWriteResult.FAILED
@@ -33,8 +33,8 @@ private class IosConclusionHistoryStore : ConclusionHistoryStore {
     }.getOrElse { LocalStorageWriteResult.FAILED }
 
     override fun clear(): LocalStorageWriteResult = runCatching {
-        defaults.removeObjectForKey(HISTORY_KEY)
-        if (defaults.stringForKey(HISTORY_KEY) == null) {
+        defaults.removeObjectForKey(SNAPSHOT_KEY)
+        if (defaults.stringForKey(SNAPSHOT_KEY) == null) {
             LocalStorageWriteResult.CLEARED
         } else {
             LocalStorageWriteResult.FAILED

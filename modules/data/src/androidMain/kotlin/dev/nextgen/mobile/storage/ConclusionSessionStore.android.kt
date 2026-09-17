@@ -2,29 +2,30 @@ package dev.nextgen.mobile.storage
 
 import android.content.Context
 
-private const val HISTORY_KEY = "latest_comparison"
+private const val PREFERENCES_NAME = "evidrilo_session_v1"
+private const val SNAPSHOT_KEY = "conclusion_snapshot"
 
-internal actual fun createConclusionHistoryStore(): ConclusionHistoryStore =
-    AndroidConclusionHistoryStorage.createStore()
-
-object AndroidConclusionHistoryStorage {
+object AndroidConclusionStorage {
     private var applicationContext: Context? = null
 
     fun initialize(context: Context) {
         applicationContext = context.applicationContext
     }
 
-    internal fun createStore(): ConclusionHistoryStore =
-        applicationContext?.let(::AndroidConclusionHistoryStore) ?: NoopConclusionHistoryStore()
+    fun createStore(): ConclusionSessionStore =
+        applicationContext?.let(::AndroidConclusionSessionStore) ?: NoopConclusionSessionStore()
 }
 
-private class AndroidConclusionHistoryStore(
+actual fun createConclusionSessionStore(): ConclusionSessionStore =
+    AndroidConclusionStorage.createStore()
+
+private class AndroidConclusionSessionStore(
     context: Context,
-) : ConclusionHistoryStore {
-    private val preferences = context.getSharedPreferences("evidrilo_history_v1", Context.MODE_PRIVATE)
+) : ConclusionSessionStore {
+    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     override fun load(): LocalStorageReadResult<ConclusionSessionSnapshot> = runCatching {
-        val encoded = preferences.getString(HISTORY_KEY, null)
+        val encoded = preferences.getString(SNAPSHOT_KEY, null)
         when {
             encoded == null -> LocalStorageReadResult.Success(null)
             else -> ConclusionSessionCodec.decode(encoded)?.let { snapshot ->
@@ -37,14 +38,17 @@ private class AndroidConclusionHistoryStore(
     override fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult = runCatching {
         val encoded = ConclusionSessionCodec.encodeForStorage(snapshot)
             ?: return@runCatching LocalStorageWriteResult.FAILED
-        if (preferences.edit()
-            .putString(HISTORY_KEY, encoded)
-            .commit()
-        ) LocalStorageWriteResult.SAVED else LocalStorageWriteResult.FAILED
+        // Drafts are persisted from Compose field events. Apply updates memory
+        // immediately and moves the disk write off the UI thread; clear()
+        // intentionally keeps commit() because reset must report durable success.
+        preferences.edit()
+            .putString(SNAPSHOT_KEY, encoded)
+            .apply()
+        LocalStorageWriteResult.SAVED
     }.getOrElse { LocalStorageWriteResult.FAILED }
 
     override fun clear(): LocalStorageWriteResult = runCatching {
-        if (preferences.edit().remove(HISTORY_KEY).commit()) {
+        if (preferences.edit().remove(SNAPSHOT_KEY).commit()) {
             LocalStorageWriteResult.CLEARED
         } else {
             LocalStorageWriteResult.FAILED

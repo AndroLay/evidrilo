@@ -12,11 +12,11 @@ object AndroidOnboardingStorage {
         applicationContext = context.applicationContext
     }
 
-    internal fun createStore(): OnboardingStore =
+    fun createStore(): OnboardingStore =
         applicationContext?.let(::AndroidOnboardingStore) ?: NoopOnboardingStore()
 }
 
-internal actual fun createOnboardingStore(): OnboardingStore =
+actual fun createOnboardingStore(): OnboardingStore =
     AndroidOnboardingStorage.createStore()
 
 private class AndroidOnboardingStore(

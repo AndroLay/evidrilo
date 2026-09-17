@@ -6,7 +6,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 
-internal enum class ConclusionSessionPhase {
+enum class ConclusionSessionPhase {
     DRAFTING,
     FEEDBACK,
     REVISION,
@@ -16,13 +16,13 @@ internal enum class ConclusionSessionPhase {
     EVIDENCE_CHANGE_SUMMARY,
 }
 
-internal data class ConclusionSessionSnapshot(
+data class ConclusionSessionSnapshot(
     val phase: ConclusionSessionPhase,
     val initialDraft: ConclusionDraft,
     val currentDraft: ConclusionDraft,
 )
 
-internal interface ConclusionSessionStore {
+interface ConclusionSessionStore {
     fun load(): LocalStorageReadResult<ConclusionSessionSnapshot>
 
     fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult
@@ -30,7 +30,7 @@ internal interface ConclusionSessionStore {
     fun clear(): LocalStorageWriteResult
 }
 
-internal class NoopConclusionSessionStore : ConclusionSessionStore {
+class NoopConclusionSessionStore : ConclusionSessionStore {
     override fun load(): LocalStorageReadResult<ConclusionSessionSnapshot> = LocalStorageReadResult.Unavailable
 
     override fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult =
@@ -39,7 +39,7 @@ internal class NoopConclusionSessionStore : ConclusionSessionStore {
     override fun clear(): LocalStorageWriteResult = LocalStorageWriteResult.UNAVAILABLE
 }
 
-internal object ConclusionSessionCodec {
+object ConclusionSessionCodec {
     fun encode(snapshot: ConclusionSessionSnapshot): String = listOf(
         snapshot.phase.name,
         escape(encodeDraft(snapshot.initialDraft)),

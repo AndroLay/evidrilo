@@ -177,7 +177,7 @@ evidrilo/
 ├── modules/
 │   ├── domain/           # real framework-independent KMP module
 │   ├── application/      # documented boundary; extraction deferred
-│   ├── data/             # documented boundary; extraction deferred
+│   ├── data/             # real KMP local-persistence module
 │   ├── features/         # documented boundary; extraction deferred
 │   └── design-system/    # real Compose visual module
 ├── contracts/            # schemas, fixtures, OpenAPI/events documentation

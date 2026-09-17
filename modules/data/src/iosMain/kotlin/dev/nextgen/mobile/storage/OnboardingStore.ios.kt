@@ -4,7 +4,7 @@ import platform.Foundation.NSUserDefaults
 
 private const val COMPLETED_KEY = "evidrilo.onboarding.completed.v1"
 
-internal actual fun createOnboardingStore(): OnboardingStore = IosOnboardingStore()
+actual fun createOnboardingStore(): OnboardingStore = IosOnboardingStore()
 
 private class IosOnboardingStore : OnboardingStore {
     private val defaults = NSUserDefaults.standardUserDefaults

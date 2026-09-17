@@ -1,6 +1,6 @@
 package dev.nextgen.mobile.storage
 
-internal enum class LocalStorageStatus {
+enum class LocalStorageStatus {
     AVAILABLE,
     SAVED,
     RECOVERED,
@@ -10,13 +10,13 @@ internal enum class LocalStorageStatus {
     FAILED,
 }
 
-internal data class LocalStorageNotice(
+data class LocalStorageNotice(
     val title: String,
     val body: String,
     val isError: Boolean,
 )
 
-internal fun LocalStorageStatus.notice(): LocalStorageNotice? = when (this) {
+fun LocalStorageStatus.notice(): LocalStorageNotice? = when (this) {
     LocalStorageStatus.AVAILABLE -> null
     LocalStorageStatus.SAVED -> LocalStorageNotice(
         title = "Saved on this device",
@@ -50,9 +50,9 @@ internal fun LocalStorageStatus.notice(): LocalStorageNotice? = when (this) {
     )
 }
 
-internal fun LocalStorageStatus.userMessage(): String? = notice()?.body
+fun LocalStorageStatus.userMessage(): String? = notice()?.body
 
-internal fun storageNoticeFor(vararg statuses: LocalStorageStatus): LocalStorageNotice? {
+fun storageNoticeFor(vararg statuses: LocalStorageStatus): LocalStorageNotice? {
     val status = statuses.firstOrNull { current ->
         current == LocalStorageStatus.UNAVAILABLE ||
             current == LocalStorageStatus.CORRUPT ||
@@ -64,7 +64,7 @@ internal fun storageNoticeFor(vararg statuses: LocalStorageStatus): LocalStorage
     return status?.notice()
 }
 
-internal data class LocalStorageStartup<out T>(
+data class LocalStorageStartup<out T>(
     val value: T?,
     val status: LocalStorageStatus,
 )
@@ -74,7 +74,7 @@ internal data class LocalStorageStartup<out T>(
  * failed clear keeps the CORRUPT status so the UI does not imply that data was
  * discarded when the platform could not complete the repair.
  */
-internal fun <T> recoverCorruptLocalStorage(
+fun <T> recoverCorruptLocalStorage(
     result: LocalStorageReadResult<T>,
     clear: () -> LocalStorageWriteResult,
 ): LocalStorageStartup<T> = if (result.status == LocalStorageStatus.CORRUPT) {
@@ -90,7 +90,7 @@ internal fun <T> recoverCorruptLocalStorage(
     LocalStorageStartup(result.value, result.status)
 }
 
-internal sealed interface LocalStorageReadResult<out T> {
+sealed interface LocalStorageReadResult<out T> {
     val status: LocalStorageStatus
     val value: T?
 
@@ -118,7 +118,7 @@ internal sealed interface LocalStorageReadResult<out T> {
     }
 }
 
-internal enum class LocalStorageWriteResult(
+enum class LocalStorageWriteResult(
     val status: LocalStorageStatus,
 ) {
     SAVED(LocalStorageStatus.SAVED),

@@ -1,6 +1,6 @@
 package dev.nextgen.mobile.storage
 
-internal interface ConclusionHistoryStore {
+interface ConclusionHistoryStore {
     fun load(): LocalStorageReadResult<ConclusionSessionSnapshot>
 
     fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult
@@ -8,7 +8,7 @@ internal interface ConclusionHistoryStore {
     fun clear(): LocalStorageWriteResult
 }
 
-internal class NoopConclusionHistoryStore : ConclusionHistoryStore {
+class NoopConclusionHistoryStore : ConclusionHistoryStore {
     override fun load(): LocalStorageReadResult<ConclusionSessionSnapshot> = LocalStorageReadResult.Unavailable
 
     override fun save(snapshot: ConclusionSessionSnapshot): LocalStorageWriteResult =
