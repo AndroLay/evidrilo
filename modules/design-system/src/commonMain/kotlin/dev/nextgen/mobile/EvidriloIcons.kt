@@ -18,7 +18,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-internal enum class EvidriloIconName {
+public enum class EvidriloIconName {
     ARROW_BACK,
     ARROW_FORWARD,
     CHEVRON_RIGHT,
@@ -39,7 +39,7 @@ internal enum class EvidriloIconName {
 }
 
 @Composable
-internal fun EvidriloIcon(
+public fun EvidriloIcon(
     name: EvidriloIconName,
     tint: Color = EvidriloColors.Ink,
     modifier: Modifier = Modifier.size(24.dp),

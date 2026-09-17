@@ -31,7 +31,7 @@ import dev.nextgen.mobile.audio.AudioPlaybackState
 import dev.nextgen.mobile.audio.EvidriloAudioListenControl
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
-import dev.nextgen.mobile.resources.evidriloCaseFolioDrawable
+import dev.nextgen.mobile.design.resources.evidriloCaseFolioDrawable
 import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 import dev.nextgen.mobile.storage.LocalStorageNotice
 import dev.nextgen.mobile.recommendation.RecommendationUiState

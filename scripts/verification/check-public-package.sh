@@ -41,13 +41,45 @@ required_paths=(
   apps/mobile-shared
   apps/android
   apps/ios
+  modules/core
   modules/domain
+  modules/application
+  modules/data
+  modules/features
+  modules/design-system
   contracts
+  contracts/openapi
+  contracts/schemas
+  contracts/events
+  contracts/fixtures
   platform
+  platform/Evidrilo.sln
   infra
+  infra/docker
+  infra/environments/local
+  infra/environments/staging
+  infra/environments/production
+  infra/monitoring
+  infra/deployment
   scripts
+  scripts/bootstrap
+  scripts/ci
+  scripts/github
+  scripts/release
+  scripts/security
+  scripts/worktrees
+  scripts/verification
   tests
+  tests/architecture
+  tests/contracts
+  tests/e2e
+  tests/resilience
+  tests/performance
   tooling
+  tooling/lint
+  tooling/formatting
+  tooling/architecture-rules
+  tooling/codegen
   examples
   .github
 )

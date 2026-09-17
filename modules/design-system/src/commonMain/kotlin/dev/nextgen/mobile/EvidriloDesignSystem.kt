@@ -52,14 +52,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.nextgen.mobile.resources.evidriloPrismDrawable
-import dev.nextgen.mobile.resources.evidriloSourceSansBoldFont
-import dev.nextgen.mobile.resources.evidriloSourceSansRegularFont
-import dev.nextgen.mobile.resources.evidriloSourceSansSemiboldFont
+import dev.nextgen.mobile.design.resources.evidriloPrismDrawable
+import dev.nextgen.mobile.design.resources.evidriloSourceSansBoldFont
+import dev.nextgen.mobile.design.resources.evidriloSourceSansRegularFont
+import dev.nextgen.mobile.design.resources.evidriloSourceSansSemiboldFont
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
 
-internal object EvidriloColors {
+public object EvidriloColors {
     val Cobalt = Color(0xFF294BC6)
     val CobaltPressed = Color(0xFF203BA0)
     val White = Color(0xFFFFFFFF)
@@ -75,7 +75,7 @@ internal object EvidriloColors {
     val SuccessSurface = Color(0xFFE7F5EC)
 }
 
-internal fun evidriloPrimaryButtonContentColor(enabled: Boolean): Color =
+public fun evidriloPrimaryButtonContentColor(enabled: Boolean): Color =
     if (enabled) EvidriloColors.White else EvidriloColors.Slate
 
 @Composable
@@ -191,7 +191,7 @@ private fun evidriloTypography(): Typography {
 }
 
 @Composable
-internal fun EvidriloTheme(content: @Composable () -> Unit) {
+public fun EvidriloTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = EvidriloColors.Cobalt,
@@ -220,7 +220,7 @@ internal fun EvidriloTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun EvidriloContentColumn(
+public fun EvidriloContentColumn(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -241,7 +241,7 @@ internal fun EvidriloContentColumn(
 }
 
 @Composable
-internal fun EvidriloRootSurface(
+public fun EvidriloRootSurface(
     selected: EvidriloRootDestination,
     onPractice: () -> Unit,
     onPacks: () -> Unit,
@@ -269,7 +269,7 @@ internal fun EvidriloRootSurface(
     }
 }
 
-internal enum class EvidriloRootDestination {
+public enum class EvidriloRootDestination {
     PRACTICE,
     PACKS,
     HISTORY,
@@ -355,7 +355,7 @@ private fun RowScope.EvidriloBottomNavigationItem(
 }
 
 @Composable
-internal fun EvidriloBrandHeader(onSettings: () -> Unit) {
+public fun EvidriloBrandHeader(onSettings: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -381,7 +381,7 @@ internal fun EvidriloBrandHeader(onSettings: () -> Unit) {
 }
 
 @Composable
-internal fun EvidriloLogoMark(
+public fun EvidriloLogoMark(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
@@ -395,7 +395,7 @@ internal fun EvidriloLogoMark(
 }
 
 @Composable
-internal fun EvidriloBackButton(
+public fun EvidriloBackButton(
     label: String,
     onClick: () -> Unit,
 ) {
@@ -418,7 +418,7 @@ internal fun EvidriloBackButton(
 }
 
 @Composable
-internal fun EvidriloIconButton(
+public fun EvidriloIconButton(
     icon: EvidriloIconName,
     contentDescription: String,
     onClick: () -> Unit,
@@ -443,7 +443,7 @@ internal fun EvidriloIconButton(
 }
 
 @Composable
-internal fun EvidriloPrimaryButton(
+public fun EvidriloPrimaryButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -476,7 +476,7 @@ internal fun EvidriloPrimaryButton(
 }
 
 @Composable
-internal fun EvidriloSecondaryButton(
+public fun EvidriloSecondaryButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -499,7 +499,7 @@ internal fun EvidriloSecondaryButton(
 }
 
 @Composable
-internal fun EvidriloTintPanel(
+public fun EvidriloTintPanel(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -519,7 +519,7 @@ internal fun EvidriloTintPanel(
 }
 
 @Composable
-internal fun EvidriloSettingsRow(
+public fun EvidriloSettingsRow(
     icon: EvidriloIconName,
     title: String,
     subtitle: String? = null,
@@ -561,7 +561,7 @@ internal fun EvidriloSettingsRow(
 }
 
 @Composable
-internal fun EvidriloSettingsGroup(
+public fun EvidriloSettingsGroup(
     rows: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
@@ -577,7 +577,7 @@ internal fun EvidriloSettingsGroup(
 }
 
 @Composable
-internal fun EvidriloSectionHeading(text: String) {
+public fun EvidriloSectionHeading(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleLarge,
@@ -586,7 +586,7 @@ internal fun EvidriloSectionHeading(text: String) {
 }
 
 @Composable
-internal fun EvidriloDivider() {
+public fun EvidriloDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
         color = EvidriloColors.Separator,

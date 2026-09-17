@@ -1,5 +1,15 @@
-# Design system boundary
+# Design system module
 
-Reserved for shared visual tokens, components, icons, motion, and previews.
-Private design source files remain under ignored `internal/design/` and are not
-part of the public build or package.
+This Compose Multiplatform module owns the shared visual tokens, components,
+icons, typography, fonts, and the reviewed visual assets consumed by the
+mobile app. It has no domain, account, network, billing, or platform-provider
+dependency.
+
+The source-of-truth design files remain under ignored `internal/design/`; only
+the selected runtime assets required by the app are kept in this public module.
+
+Run the focused checks with:
+
+```bash
+./gradlew :modules:design-system:jvmTest :modules:design-system:compileKotlinJvm
+```

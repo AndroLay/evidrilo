@@ -179,7 +179,7 @@ evidrilo/
 │   ├── application/      # documented boundary; extraction deferred
 │   ├── data/             # documented boundary; extraction deferred
 │   ├── features/         # documented boundary; extraction deferred
-│   └── design-system/    # documented boundary; extraction deferred
+│   └── design-system/    # real Compose visual module
 ├── contracts/            # schemas, fixtures, OpenAPI/events documentation
 ├── platform/             # API, worker, database, integration, solution
 ├── infra/                # local containers and public-safe deployment notes
