@@ -5,6 +5,15 @@ optional Evidrilo platform lane. The files are public-source-safe: schemas and
 fixtures use synthetic identities and contain no credentials, provider payloads,
 participant data, or production URLs.
 
+The contract tree is split by artifact responsibility:
+
+- `schemas/` contains versioned JSON Schema documents;
+- `fixtures/` contains synthetic, non-secret examples used by deterministic
+  checks;
+- `openapi/` is reserved for a generated or reviewed HTTP description;
+- `events/` is reserved for event envelopes once a public event contract is
+  approved.
+
 ## Version 1 boundaries
 
 - `GET /health/live` returns a dependency-free process liveness response.

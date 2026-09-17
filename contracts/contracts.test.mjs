@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(root, '..');
+const schemaRoot = path.join(root, 'schemas');
 const schemaFiles = [
   'health.v1.json',
   'http-errors.v1.json',
@@ -51,6 +52,11 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
+function readSchema(relativePath) {
+  const filePath = path.join(schemaRoot, relativePath);
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
 function hasRepositoryPaths(...relativePaths) {
   return relativePaths.every((relativePath) =>
     fs.existsSync(path.join(repositoryRoot, relativePath)),
@@ -78,7 +84,7 @@ function assertNoCredentialShapedFields(value, location = '$') {
 
 test('all versioned response schemas are present and closed at the root', () => {
   for (const file of schemaFiles) {
-    const schema = readJson(file);
+    const schema = readSchema(file);
     assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
     assert.match(schema.$id, /^https:\/\/evidrilo\.dev\/contracts\/[a-z-]+\.v1\.json$/);
     assert.equal(schema.type, 'object');
@@ -201,7 +207,7 @@ test('analytics contracts are consented, typed, and free of raw learner text', (
 });
 
 test('analytics schema covers funnel, premium conversion, and safe client errors', () => {
-  const schema = readJson('analytics-event.v1.json');
+  const schema = readSchema('analytics-event.v1.json');
   const eventNames = schema.properties.eventName.enum;
   for (const name of [
     'practice_started',
@@ -400,10 +406,10 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(platformReadme, /E170 adds explicit regression coverage/);
   assert.match(backendRegister, /E169 hardens the auth provider type boundary/);
   assert.match(backendRegister, /E170 adds explicit regression coverage/);
-  assert.match(rootReadme, /Current repository increment: E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED \/ E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED \/ E183 \/ NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED \/ E182 \/ SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED \/ E181 \/ CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED \/ E180 \/ MOBILE_RELEASE_CANDIDATE_PREPARATION \/ E179 \/ SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED \/ E178 \/ API_INPUT_AND_STAGING_BOUNDARY_HARDENED \/ E177 \/ SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED/);
-  assert.match(rootReadme, /Kotlin\/JVM 332\/332, Node 96\/96, API 172\/172, and worker 5\/5/);
-  assert.match(rootReadme, /E169 hardens the auth provider boundary/);
-  assert.match(rootReadme, /E170 adds explicit regression coverage/);
+  assert.match(rootReadme, /Current structural increment: `c82abbf`/);
+  assert.match(rootReadme, /`modules\/domain`/);
+  assert.doesNotMatch(rootReadme, /Current repository increment: E186/);
+  assert.doesNotMatch(rootReadme, /Kotlin\/JVM 332\/332, Node 96\/96/);
   assert.doesNotMatch(rootReadme, /231\/231 JVM tests, 74\/74 Node checks, API 139\/139/);
   assert.match(databaseReadiness, /CurrentMigrationVersion = "030_sync_published_case_boundary"/);
   assert.match(completionPlan, /Tracker snapshot after E187 backend persistence and sync boundary hardening:\s+`85\/100`/);
@@ -635,7 +641,7 @@ test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', (
 });
 
 test('published case contract carries canonical learning content', () => {
-  const schema = readJson('case-summary.v1.json');
+  const schema = readSchema('case-summary.v1.json');
   const properties = schema.properties;
 
   for (const name of ['objective', 'difficulty', 'evidenceReferences', 'facts', 'rules', 'variants']) {
@@ -676,7 +682,7 @@ test('published case contract carries canonical learning content', () => {
 });
 
 test('recommendation contract preserves status-specific response invariants', () => {
-  const schema = readJson('recommendation.v1.json');
+  const schema = readSchema('recommendation.v1.json');
 
   assert.deepEqual(schema.required, [
     'schema',
@@ -702,7 +708,7 @@ test('recommendation contract preserves status-specific response invariants', ()
 });
 
 test('case lifecycle audit contract is closed, bounded, and deletion-safe', () => {
-  const schema = readJson('case-lifecycle-audit.v1.json');
+  const schema = readSchema('case-lifecycle-audit.v1.json');
   const fixture = readJson(path.join('fixtures', 'case-lifecycle-audit.json'));
 
   assert.equal(schema.additionalProperties, false);
