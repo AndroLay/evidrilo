@@ -1,6 +1,6 @@
 package dev.nextgen.mobile.domain.askready
 
-import dev.nextgen.mobile.billing.DEFAULT_EVIDRILO_ENTITLEMENT_ID
+import dev.nextgen.mobile.domain.access.EVIDRILO_PRO_ENTITLEMENT_ID
 
 sealed interface AskReadyPracticeState {
     data object Start : AskReadyPracticeState
@@ -123,7 +123,7 @@ class AskReadyPracticeReducer(
         AskReadyPracticeEvent.RequirePracticePack ->
             if (state is AskReadyPracticeState.Feedback) {
                 AskReadyPracticeState.PremiumLocked(
-                    entitlement = DEFAULT_EVIDRILO_ENTITLEMENT_ID,
+                    entitlement = EVIDRILO_PRO_ENTITLEMENT_ID,
                     returnTo = state,
                 )
             } else {

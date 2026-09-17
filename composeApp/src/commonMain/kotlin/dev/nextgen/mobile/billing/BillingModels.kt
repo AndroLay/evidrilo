@@ -1,11 +1,13 @@
 package dev.nextgen.mobile.billing
 
+import dev.nextgen.mobile.domain.access.EVIDRILO_PRO_ENTITLEMENT_ID
+
 /**
  * Provisional default used only by the legacy reducer until dashboard
  * configuration is supplied. It is not evidence that this identifier exists
  * in the owner's RevenueCat project.
  */
-const val DEFAULT_EVIDRILO_ENTITLEMENT_ID = "evidrilo_pro"
+const val DEFAULT_EVIDRILO_ENTITLEMENT_ID = EVIDRILO_PRO_ENTITLEMENT_ID
 
 enum class PremiumAccess {
     LOCKED,
