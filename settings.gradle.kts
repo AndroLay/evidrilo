@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "next-gen-app"
 include(":composeApp")
 include(":androidApp")
+project(":androidApp").projectDir = file("apps/android")

@@ -54,14 +54,14 @@ require_text() {
   fi
 }
 
-android_gradle='androidApp/build.gradle.kts'
-android_manifest='androidApp/src/main/AndroidManifest.xml'
+android_gradle='apps/android/build.gradle.kts'
+android_manifest='apps/android/src/main/AndroidManifest.xml'
 ios_project='iosApp/iosApp.xcodeproj/project.pbxproj'
 
 for relative_path in \
   "$android_gradle" \
   "$android_manifest" \
-  androidApp/proguard-rules.pro \
+  apps/android/proguard-rules.pro \
   "$ios_project" \
   iosApp/iosApp/Info.plist \
   iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png \
@@ -103,7 +103,7 @@ fi
 require_text iosApp/Configuration/Release.xcconfig.example apple-team-placeholder 'TEAM_ID[[:space:]]*='
 require_text iosApp/Configuration/Release.xcconfig.example release-identity 'CODE_SIGN_IDENTITY[[:space:]]*=[[:space:]]*Apple Distribution'
 
-android_artifact="$repository_root/androidApp/build/outputs/bundle/release/androidApp-release.aab"
+android_artifact="$repository_root/apps/android/build/outputs/bundle/release/androidApp-release.aab"
 if [[ "$require_android_artifact" -eq 1 ]]; then
   if [[ -s "$android_artifact" ]]; then
     printf '%s\n' 'ANDROID_RELEASE_ARTIFACT: PASS (AAB exists; signing still must be verified separately)'

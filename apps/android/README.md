@@ -14,7 +14,7 @@ bash scripts/check-mobile-release.sh . --require-android-artifact
 ```
 
 This produces an unsigned candidate at
-`androidApp/build/outputs/bundle/release/androidApp-release.aab`. It is not a
+`apps/android/build/outputs/bundle/release/androidApp-release.aab`. It is not a
 Play-upload artifact until it is signed with the owner's upload key.
 
 ## Signed upload candidate

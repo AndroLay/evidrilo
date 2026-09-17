@@ -131,7 +131,7 @@ public_paths=(
   .dockerignore
   .github
   composeApp
-  androidApp
+  apps/android
   iosApp
   contracts
   platform

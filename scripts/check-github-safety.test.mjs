@@ -21,7 +21,7 @@ function createFixture() {
   fs.copyFileSync(path.join(repositoryRoot, '.gitignore'), path.join(root, '.gitignore'));
   for (const directory of [
     '.github',
-    'androidApp',
+    'apps/android',
     'composeApp',
     'deploy',
     'gradle',
@@ -45,7 +45,7 @@ function createFixture() {
     'settings.gradle.kts',
     'local.properties.example',
     '.github/workflows/verify.yml',
-    'androidApp/src.txt',
+    'apps/android/src.txt',
     'composeApp/src.txt',
     'deploy/README.md',
     'gradle/libs.versions.toml',

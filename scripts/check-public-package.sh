@@ -28,7 +28,7 @@ required_paths=(
   gradlew
   settings.gradle.kts
   composeApp
-  androidApp
+  apps/android
   iosApp
   contracts
   platform

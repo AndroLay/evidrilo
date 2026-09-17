@@ -122,7 +122,7 @@ dependency.
 
 Build Evidrilo with **Kotlin Multiplatform and Compose
 Multiplatform**, targeting Android and iOS from a shared `composeApp` module.
-Keep `androidApp` and `iosApp` as separate platform entry points.
+Keep `apps/android` and `iosApp` as separate platform entry points.
 
 The approved product name is **Evidrilo**. The current technical namespace is
 still `dev.nextgen.mobile` and remains temporary until a deliberate package

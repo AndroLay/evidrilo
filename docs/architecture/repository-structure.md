@@ -219,7 +219,8 @@ evidrilo/
 │
 │       └── jvmMain/           # no-op store for JVM/Desktop checks
 │
-├── androidApp/
+├── apps/
+│   └── android/
 │   └── src/main/
 │
 ├── iosApp/                  # committed Xcode host; runtime sign-off remains open
@@ -255,7 +256,7 @@ The shared Kotlin Multiplatform module. It owns the shared Compose UI, domain
 logic, scenario data, local session snapshot contract, and the RevenueCat KMP
 adapter. The M2 free core is local-first and does not initialize billing.
 
-### `androidApp`
+### `apps/android`
 
 The Android application entry point, Android manifest, Android-specific
 configuration, and Android RevenueCat public API key configuration.
@@ -317,7 +318,7 @@ billing adapter ───┘
 
 ui ───> billing interface
 RevenueCat adapter ───> RevenueCat KMP SDK
-androidApp / iosApp ───> composeApp
+apps/android / iosApp ───> composeApp
 ```
 
 The `core` directory must remain small. It is not a general-purpose dumping
@@ -341,7 +342,7 @@ cross-cutting role is clear.
 
 | Concern | Assessment | Decision |
 |---|---|---|
-| Android and iOS support | Required by the chosen direction | Use KMP with separate `androidApp` and `iosApp` entry points |
+| Android and iOS support | Required by the chosen direction | Use KMP with separate `apps/android` and `iosApp` entry points |
 | Shared UI | Appropriate for a small demo and consistent experience | Use Compose Multiplatform in `commonMain` |
 | Shared business logic | Essential for consistent scoring and feedback | Keep it in pure Kotlin `domain` |
 | RevenueCat | Required by Shipaton and available for KMP | Isolate it in `billing`; validate the current SDK version during scaffold |

@@ -31,7 +31,7 @@ function createExporterFixture() {
   ]) {
     fs.copyFileSync(path.join(repositoryRoot, file), path.join(root, file));
   }
-  for (const directory of ['composeApp', 'androidApp', 'iosApp', 'contracts', 'platform']) {
+  for (const directory of ['composeApp', 'apps/android', 'iosApp', 'contracts', 'platform']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
   fs.cpSync(path.join(repositoryRoot, 'deploy'), path.join(root, 'deploy'), { recursive: true });
@@ -43,7 +43,7 @@ function createExporterFixture() {
   writeFixtureFile(root, 'iosApp/Configuration/Debug.xcconfig.example', '// safe example\n');
   writeFixtureFile(root, 'iosApp/Configuration/Local.xcconfig', 'SUPABASE_URL=local-only\n');
   writeFixtureFile(root, 'iosApp/Configuration/Debug.xcconfig', 'SUPABASE_URL=local-only\n');
-  writeFixtureFile(root, 'androidApp/google-services.json', '{}\n');
+    writeFixtureFile(root, 'apps/android/google-services.json', '{}\n');
   const databasePasswordName = ['DATABASE', 'PASSWORD'].join('_');
   writeFixtureFile(root, 'platform/api/.env.local', `${databasePasswordName}=local-only\n`);
 
@@ -153,7 +153,7 @@ test('does not export local Apple or provider configuration files', () => {
     for (const forbiddenPath of [
       'iosApp/Configuration/Local.xcconfig',
       'iosApp/Configuration/Debug.xcconfig',
-      'androidApp/google-services.json',
+      'apps/android/google-services.json',
       'platform/api/.env.local',
       'internal/design/mockup.png',
     ]) {

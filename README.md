@@ -127,7 +127,7 @@ flowchart TD
 | --- | --- |
 | `composeApp/src/commonMain` | Shared domain, evaluator, reducer, persistence contract, feature state, and Compose UI |
 | `composeApp/src/commonTest` | Cross-platform deterministic tests and regression boundaries |
-| `androidApp` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
+| `apps/android` | Android host, manifest, secure storage, audio, HTTP, and release configuration |
 | `iosApp` | Xcode host, Info.plist, iOS configuration, and SwiftUI entry point |
 | `platform/api` | ASP.NET Core modular monolith API and storage adapters |
 | `contracts` | Versioned JSON contracts, schemas, and fixtures |

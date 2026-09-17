@@ -55,6 +55,8 @@ lanes:
       - composeApp/src/**/composeResources/**
       - androidApp/src/main/AndroidManifest.xml
       - androidApp/src/main/res/**
+      - apps/android/src/main/AndroidManifest.xml
+      - apps/android/src/main/res/**
       - iosApp/iosApp/Assets.xcassets/**
       - iosApp/README.md
       - modules/features/**

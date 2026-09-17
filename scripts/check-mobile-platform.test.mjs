@@ -14,7 +14,7 @@ function read(relativePath) {
 }
 
 test('Android host declares network access for authenticated app services', () => {
-  const manifest = read('androidApp/src/main/AndroidManifest.xml');
+  const manifest = read('apps/android/src/main/AndroidManifest.xml');
   assert.match(
     manifest,
     /<uses-permission\s+android:name="android\.permission\.INTERNET"\s*\/>/,
@@ -22,7 +22,7 @@ test('Android host declares network access for authenticated app services', () =
 });
 
 test('Android host registers only the Evidrilo auth callback route', () => {
-  const manifest = read('androidApp/src/main/AndroidManifest.xml');
+  const manifest = read('apps/android/src/main/AndroidManifest.xml');
   assert.match(manifest, /android:scheme="evidrilo"/);
   assert.match(manifest, /android:host="auth"/);
   assert.match(manifest, /android:path="\/callback"/);
@@ -36,7 +36,7 @@ test('iOS host registers the same auth callback scheme', () => {
 });
 
 test('Android release configuration is optimized and signing-safe', () => {
-  const gradle = read('androidApp/build.gradle.kts');
+  const gradle = read('apps/android/build.gradle.kts');
   assert.match(gradle, /buildTypes\s*\{[\s\S]*release\s*\{[\s\S]*isMinifyEnabled\s*=\s*true/);
   assert.match(gradle, /release\s*\{[\s\S]*isShrinkResources\s*=\s*true/);
   assert.match(gradle, /proguard-android-optimize\.txt/);
@@ -45,7 +45,7 @@ test('Android release configuration is optimized and signing-safe', () => {
 });
 
 test('Android release disables backup and cleartext transport', () => {
-  const manifest = read('androidApp/src/main/AndroidManifest.xml');
+  const manifest = read('apps/android/src/main/AndroidManifest.xml');
   assert.match(manifest, /android:allowBackup="false"/);
   assert.match(manifest, /android:usesCleartextTraffic="false"/);
 });
