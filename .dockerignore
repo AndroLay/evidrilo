@@ -29,6 +29,7 @@ local.properties
 *.cer
 audit/
 research/
+internal/
 next-gen/
 video-notes/
 Gurwi/
