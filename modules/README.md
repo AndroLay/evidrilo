@@ -1,5 +1,10 @@
 # Kotlin module map
 
+Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
+The extraction and verification changes are repository-only evidence; target
+runtime, provider, managed deployment, accessibility, human, and submission
+gates remain open.
+
 The `modules/` tree contains reusable Kotlin boundaries. A directory becomes a
 production module only when it owns code, tests, and an enforceable dependency
 direction; directories are not created as decorative placeholders.

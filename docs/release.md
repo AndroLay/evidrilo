@@ -2,6 +2,11 @@
 
 Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
 
+Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
+The local verifier now covers release-version alignment together with the
+extracted Kotlin modules. This remains repository-only evidence; signing,
+Xcode/archive, store upload, hosted CI, and publication are still owner gates.
+
 This checklist is a gate, not a prediction of contest results. Every checked
 item should have a reproducible command, a reviewer note, or a captured runtime
 observation with its environment and date.

@@ -16,6 +16,12 @@ version is defined in [`version.props`](version.props).
 - Extracted local draft, history, onboarding, codec, and corruption-recovery
   persistence into `modules/data` with unchanged package names and storage
   formats across Android, iOS, and JVM verification targets.
+- Extracted `modules/core`, `modules/application`, and `modules/features` from
+  the shared host without changing package names or product behavior.
+- Extended the local and CI verification lanes to run every extracted module and
+  added a regression check for release-version alignment.
+- Fixed API contract-boundary tests to read the canonical root
+  `contracts/schemas/` layout.
 - Separated versioned contract schemas from fixtures under `contracts/schemas`,
   and organized verification, security, release, CI, GitHub, and worktree
   scripts under explicit ownership lanes.

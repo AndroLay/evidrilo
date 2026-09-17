@@ -677,6 +677,19 @@ passed in the authorized host execution. No runtime, provider, managed,
 human, or submission evidence is inferred from these results. See the
 [E186 evidence record](../audit/evidence/evidrilo-backend-engine-sync-boundary-2026-09-16.md).
 
+E189 records the Kotlin module-boundary extraction and verification alignment.
+`modules/core`, `modules/application`, and `modules/features` now contain
+production source and focused tests. The local verifier and GitHub workflow
+execute those module lanes in addition to the existing domain, data,
+design-system, host, cross-target, Android release, API, worker, contract,
+architecture, safety, and asset checks. The release-version regression is also
+part of the local contract harness. The current observed Node boundary is
+`106/106`, API `172/172`, worker `5/5`, and the shared iOS targets compile.
+This remains repository-only/pure-Kotlin evidence; Android/iOS host runtime,
+accessibility services, RevenueCat/Test Store, managed deployment, human
+validation, publication, and submission remain open. See the [E189 evidence
+record](../audit/evidence/evidrilo-kotlin-module-boundaries-2026-09-18.md).
+
 ## Evidence language
 
 Use precise labels such as `PASS`, `FAIL`, `NOT_RUN`, `UNKNOWN`, and

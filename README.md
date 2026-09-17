@@ -8,16 +8,17 @@ A learner reads a case, selects relevant evidence, writes a conclusion,
 receives explainable feedback, makes one revision, and then tests how the
 conclusion changes when one observation is no longer available.
 
-> Status: **Structural migration in progress**. The reusable Kotlin boundaries
-> for core, domain, application, data, features, and design-system are now in
-> place alongside the public repository shell.
+> Status: **Source-first architecture verified locally through E189**. The
+> reusable Kotlin boundaries for core, domain, application, data, features, and
+> design-system are in place alongside the public repository shell.
 > Device runtime, provider, deployment, human review, store, and submission
 > gates remain separate and are not implied by source changes.
 
-Current structural baseline: `f2d532e` — the repository shell, contracts,
-Kotlin module boundaries, and categorized verification lanes are aligned with
-the source-first layout while keeping the existing app task names and public
-behavior.
+Current structural baseline: `13af4ec` — the approved source-first tree,
+extracted Kotlin boundaries, categorized verification lanes, and the migrated
+contract-schema test path are aligned while keeping the existing app task names
+and public behavior. E189 also adds release-version regression coverage to the
+local verifier.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
@@ -324,6 +325,12 @@ preparation workspace must not be treated as evidence that a push or public
 publication has occurred.
 
 ## Status and evidence boundary
+
+The current E189 repository phase has focused verification for the extracted
+core, domain, application, data, features, and design-system boundaries,
+release-version alignment, the public package, and worktree ownership. These
+are repository-only checks. They do not prove device runtime, provider,
+managed deployment, accessibility-service, human, or submission evidence.
 
 The current structural phase has focused verification for the extracted domain,
 shared JVM consumer, architecture boundaries, public-package checks, and

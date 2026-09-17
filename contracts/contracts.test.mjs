@@ -418,8 +418,8 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(revenueCatRunbook, /E152 account-deletion owner guard/);
   assert.match(revenueCatRunbook, /E153 client\/request boundary hardening/);
   assert.match(revenueCatRunbook, /E154 auth callback boundary|E154/);
-  assert.match(backendRegister, /^Last synchronized: 2026-09-16 \(E186\)$/m);
-  assert.match(backendRegister, /Node boundary `93\/93`/);
+  assert.match(backendRegister, /^Last synchronized: 2026-09-18 \(E189\)$/m);
+  assert.match(backendRegister, /Node (?:boundary )?`106\/106`/);
   assert.match(backendRegister, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
   assert.match(backendRegister, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
   assert.match(backendRegister, /E174 rejects inconsistent sync cursors[\s\S]*?API `151\/151`/);
@@ -440,7 +440,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(platformReadme, /E170 adds explicit regression coverage/);
   assert.match(backendRegister, /E169 hardens the auth provider type boundary/);
   assert.match(backendRegister, /E170 adds explicit regression coverage/);
-  assert.match(rootReadme, /Current structural baseline: `f2d532e`/);
+  assert.match(rootReadme, /Current structural baseline: `13af4ec`/);
   assert.match(rootReadme, /`modules\/domain`/);
   assert.doesNotMatch(rootReadme, /Current repository increment: E186/);
   assert.doesNotMatch(rootReadme, /Kotlin\/JVM 332\/332, Node 96\/96/);
@@ -451,9 +451,9 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(completionPlan, /\| Kotlin \|[\s\S]*?\| `332\/332` JVM tests/);
   assert.match(completionPlan, /\| Database\/worker integration \|[\s\S]*?migration 030/);
   assert.match(completionPlan, /Preserve the 30-migration order\/checksum ledger/);
-  assert.match(researchIndex, /^Latest increment: E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED \/ E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED \/ E183 \/ NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED \/ E182 \/ SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED \/ E181 \/ CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED \/ E180 \/ MOBILE_RELEASE_CANDIDATE_PREPARATION \/ E179 \/ SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED \/ E178 \/ API_INPUT_AND_STAGING_BOUNDARY_HARDENED \/ E177 \/ SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED(?: \/|\.)/m);
-  assert.match(researchIndex, /^Status: CURRENT \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED \/ E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED /m);
-  assert.match(researchIndex, /latest repository-owned increment is \[E186\]/);
+  assert.match(researchIndex, /^Latest increment: E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|\.)/m);
+  assert.match(researchIndex, /^Status: CURRENT \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
+  assert.match(researchIndex, /latest repository-owned increment is \[E189\]/);
   assert.match(researchIndex, /strict API input matching/);
   assert.match(researchIndex, /requested page size/);
   assert.match(researchIndex, /focused audio tests pass `28\/28`/);
@@ -465,7 +465,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.doesNotMatch(contentAuthoringRunbook, /^Status: `E144 \//m);
   for (const snapshotPath of currentSnapshotPaths) {
     const snapshot = fs.readFileSync(snapshotPath, 'utf8');
-    assert.match(snapshot, /^Status: `?E186(?:\s|\/)/m, snapshotPath);
+    assert.match(snapshot, /^Status: `?E189(?:\s|\/)/m, snapshotPath);
   }
 });
 
@@ -478,7 +478,7 @@ test('current status page points to the latest evidence record', {
     'utf8',
   );
 
-  assert.match(status, /recorded through\s+E188/i);
+  assert.match(status, /recorded through\s+E189/i);
   assert.doesNotMatch(status, /recorded through E151/i);
 });
 
@@ -525,8 +525,8 @@ test('current all-area audit records the latest local verification boundary', {
   );
 
   assert.match(audit, /^# Evidrilo All-Area Capability Audit$/m);
-  assert.match(audit, /^Latest increment: E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED \/ E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED \/ E183 \/ NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED \/ E182 \/ SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED \/ E181 \/ CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED \/ E180 \/ MOBILE_RELEASE_CANDIDATE_PREPARATION \/ E179 \/ SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED \/ E178 \/ API_INPUT_AND_STAGING_BOUNDARY_HARDENED \/ E177 \/ SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED(?: \/|$)/m);
-  assert.match(audit, /Node contract,[\s\S]*?`96\/96`/);
+  assert.match(audit, /^Latest increment: E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|$)/m);
+  assert.match(audit, /E189[\s\S]*?Node contract,[\s\S]*?`106\/106`/);
   assert.match(audit, /API[\s\S]*?`172\/172`/);
   assert.match(audit, /E186 hardens the backend-first engine[\s\S]*?Kotlin\/JVM `332\/332`/);
   assert.match(audit, /E176 records request lifecycle and input-boundary hardening/);
@@ -550,10 +550,11 @@ test('active backend execution register points to the current verification bound
     'utf8',
   );
 
-  assert.match(register, /Last synchronized: 2026-09-16 \(E186\)/);
+  assert.match(register, /Last synchronized: 2026-09-18 \(E189\)/);
   assert.match(register, /E178 replaces helper-level/);
   assert.match(register, /E179 prevents a deferred or invalidated pull/);
-  assert.match(register, /Node boundary `93\/93`/);
+  assert.match(register, /Node (?:boundary )?`106\/106`/);
+  assert.match(register, /E189 Kotlin module boundaries and verification alignment[\s\S]*?Node boundary `106\/106`/);
   assert.match(register, /E186 backend engine and sync boundary hardening[\s\S]*?Node `96\/96`/);
   assert.match(register, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
   assert.match(register, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
