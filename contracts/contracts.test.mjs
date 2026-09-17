@@ -328,7 +328,7 @@ test('current operational snapshots point to the latest local evidence', {
   skip: !hasRepositoryPaths(
     'docs/operations/revenuecat-test-store-runbook.md',
     'docs/operations/evidrilo-backend-execution.md',
-    'research/next-gen/STATUS.md',
+    'internal/research/next-gen/STATUS.md',
     'audit/evidence/evidrilo-all-areas-audit-2026-09-13.md',
   ),
 }, () => {
@@ -351,7 +351,7 @@ test('current operational snapshots point to the latest local evidence', {
     'utf8',
   );
   const researchIndex = fs.readFileSync(
-    path.join(repositoryRoot, 'research', 'next-gen', 'README.md'),
+    path.join(repositoryRoot, 'internal', 'research', 'next-gen', 'README.md'),
     'utf8',
   );
   const databaseReadiness = fs.readFileSync(
@@ -429,11 +429,11 @@ test('current operational snapshots point to the latest local evidence', {
 });
 
 test('current status page points to the latest evidence record', {
-  skip: !hasRepositoryPaths('research/next-gen/STATUS.md'),
+  skip: !hasRepositoryPaths('internal/research/next-gen/STATUS.md'),
 }, () => {
   const repositoryRoot = path.resolve(root, '..');
   const status = fs.readFileSync(
-    path.join(repositoryRoot, 'research', 'next-gen', 'STATUS.md'),
+    path.join(repositoryRoot, 'internal', 'research', 'next-gen', 'STATUS.md'),
     'utf8',
   );
 

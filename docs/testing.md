@@ -1,6 +1,6 @@
 # Testing and Evidence
 
-Current authority: [Evidrilo Source of Truth](../research/next-gen/SOURCE_OF_TRUTH.md).
+Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
 
 Testing is organized by what a check can actually prove. A green build is
 valuable, but it is not evidence for claims outside its boundary.

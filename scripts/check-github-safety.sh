@@ -119,6 +119,7 @@ check_ignored_probes() {
     docs/licenses/audio-narration-source-inventory.md
     audit/private-note.md
     research/next-gen/private-note.md
+    internal/research/next-gen/private-note.md
     Gurwi/private-image.jpeg
     docs/business/private-plan.md
     .superpowers/local-state.json

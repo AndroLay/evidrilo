@@ -1,6 +1,6 @@
 # Release Readiness
 
-Current authority: [Evidrilo Source of Truth](../research/next-gen/SOURCE_OF_TRUTH.md).
+Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
 
 This checklist is a gate, not a prediction of contest results. Every checked
 item should have a reproducible command, a reviewer note, or a captured runtime

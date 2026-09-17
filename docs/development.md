@@ -2,7 +2,7 @@
 
 ## Status
 
-Current authority: [Evidrilo Source of Truth](../research/next-gen/SOURCE_OF_TRUTH.md).
+Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
 
 The repository contains a reusable Kotlin Multiplatform foundation and the M2
 free-core Evidrilo loop, including the evidence-change challenge and local

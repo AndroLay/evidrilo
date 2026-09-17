@@ -339,7 +339,7 @@ The main open gates are:
   release, and submission.
 
 This README intentionally does not duplicate the E-series chronology. Detailed
-evidence, decisions, and task status are maintained in the [Source of Truth](research/next-gen/SOURCE_OF_TRUTH.md),
+evidence, decisions, and task status are maintained in the [local Source of Truth](internal/research/next-gen/SOURCE_OF_TRUTH.md),
 [evidence index](audit/evidence-index.md), [roadmap](docs/roadmap.md), and
 [decisions](docs/decisions.md). A local build or test proves only the boundary
 that was run; it does not prove device runtime, provider transactions, managed

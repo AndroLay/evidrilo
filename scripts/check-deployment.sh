@@ -54,6 +54,7 @@ done
 require_text .dockerignore local.properties local.properties
 require_text .dockerignore environment-files '*.env'
 require_text .dockerignore private-research research/
+require_text .dockerignore private-internal internal/
 require_text .dockerignore private-media Gurwi/
 require_text .dockerignore generated-temp '.tmp'
 require_text deploy/docker/api.Dockerfile api-build-image 'mcr.microsoft.com/dotnet/sdk:10.0'
