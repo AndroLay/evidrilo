@@ -83,10 +83,13 @@ node --test \
     scripts/check-github-safety.test.mjs \
     scripts/check-mobile-platform.test.mjs \
     scripts/check-deployment.test.mjs \
+    scripts/check-architecture-boundaries.test.mjs \
+    scripts/worktrees/check-worktree-scope.test.mjs \
     scripts/validate-submission-assets.test.mjs \
     scripts/validate-audio-assets.test.mjs \
     scripts/export-public-package.test.mjs
 node scripts/validate-audio-assets.mjs "$repo_root" --allow-empty
+bash scripts/check-architecture-boundaries.sh "$repo_root"
 bash -n scripts/check-public-package.sh scripts/check-deployment.sh scripts/validate-submission-assets.sh scripts/export-public-package.sh scripts/check-github-safety.sh platform/database/integration/run-local-postgres-backup-restore-smoke.sh
 bash scripts/check-deployment.sh "$repo_root"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then

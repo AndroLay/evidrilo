@@ -99,9 +99,14 @@ jobs:
           scripts/check-github-safety.test.mjs
           scripts/check-mobile-platform.test.mjs
           scripts/check-deployment.test.mjs
+          scripts/check-architecture-boundaries.test.mjs
+          scripts/worktrees/check-worktree-scope.test.mjs
           scripts/validate-audio-assets.test.mjs
           scripts/validate-submission-assets.test.mjs
           scripts/export-public-package.test.mjs
+
+      - name: Enforce architecture boundaries
+        run: bash scripts/check-architecture-boundaries.sh "$GITHUB_WORKSPACE"
 
   platform:
     name: ASP.NET Core and worker tests

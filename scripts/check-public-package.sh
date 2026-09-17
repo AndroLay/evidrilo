@@ -24,6 +24,7 @@ required_paths=(
   LICENSE
   CONTRIBUTING.md
   .gitignore
+  worktree-ownership.yml
   gradlew
   settings.gradle.kts
   composeApp

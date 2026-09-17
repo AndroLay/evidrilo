@@ -14,7 +14,7 @@ function createCandidate() {
   for (const directory of ['composeApp', 'androidApp', 'iosApp', 'platform', 'scripts']) {
     fs.mkdirSync(path.join(candidate, directory));
   }
-  for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'gradlew', 'settings.gradle.kts']) {
+  for (const file of ['README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore', 'worktree-ownership.yml', 'gradlew', 'settings.gradle.kts']) {
     fs.writeFileSync(path.join(candidate, file), 'synthetic public package fixture\n');
   }
   return candidate;

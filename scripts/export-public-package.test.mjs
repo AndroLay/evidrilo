@@ -24,6 +24,7 @@ function createExporterFixture() {
     'LICENSE',
     'CONTRIBUTING.md',
     '.gitignore',
+    'worktree-ownership.yml',
     '.dockerignore',
     'gradlew',
     'settings.gradle.kts',

@@ -1,0 +1,90 @@
+version: 1
+baseline: integration/full-vision
+structural_migration_owner: integration
+
+# This manifest is the reviewable ownership source for the current tree and the
+# first migration target. The scope checker is intentionally dependency-free and
+# mirrors these ownership classes so a lane cannot silently edit another lane.
+lanes:
+  integration:
+    owns:
+      - .github/**
+      - .dockerignore
+      - .gitignore
+      - settings.gradle.kts
+      - build.gradle.kts
+      - gradle.properties
+      - gradle/**
+      - README.md
+      - CONTRIBUTING.md
+      - LICENSE
+      - worktree-ownership.yml
+      - docs/architecture/**
+      - scripts/**
+      - tooling/**
+      - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt
+      - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt
+      - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt
+      - modules/core/**
+      - modules/application/access/**
+      - apps/**
+    structural:
+      - composeApp/**
+      - androidApp/**
+      - iosApp/**
+      - platform/contracts/**
+      - deploy/**
+
+  domain:
+    owns:
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/domain/**
+      - modules/domain/**
+      - modules/application/evidence-graph/**
+      - modules/application/verification/**
+
+  mobile-ui:
+    owns:
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/surfaces/**
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/navigation/**
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/resources/**
+      - composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt
+      - composeApp/src/**/composeResources/**
+      - androidApp/src/main/AndroidManifest.xml
+      - androidApp/src/main/res/**
+      - iosApp/iosApp/Assets.xcassets/**
+      - iosApp/README.md
+      - modules/features/**
+      - modules/design-system/**
+
+  ingestion:
+    owns:
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/content/**
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/storage/**
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/audio/**
+      - modules/application/ingestion/**
+      - modules/data/documents/**
+      - modules/data/ai/**
+
+  platform:
+    owns:
+      - platform/**
+      - contracts/**
+    excludes:
+      - platform/api/Billing/**
+
+  revenuecat:
+    owns:
+      - composeApp/src/**/kotlin/dev/nextgen/mobile/billing/**
+      - modules/data/billing/**
+      - modules/features/paywall/**
+      - platform/api/Billing/**
+
+  qa:
+    owns:
+      - tests/**
+      - docs/**
+      - audit/**
+      - docs/submission/**
+      - docs/operations/**
+    excludes:
+      - docs/architecture/**
