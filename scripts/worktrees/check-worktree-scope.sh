@@ -9,7 +9,7 @@ usage() {
 [[ "$#" -ge 1 ]] || { usage; exit 2; }
 lane=$1
 shift
-base=${EVIDRILO_SCOPE_BASE:-integration/full-vision}
+base=${EVIDRILO_SCOPE_BASE:-main}
 allow_structural=0
 explicit_paths=()
 
@@ -39,14 +39,14 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 case "$lane" in
-  integration|domain|mobile-ui|ingestion|platform|revenuecat|qa) ;;
+  main|frontend|backend) ;;
   *)
     printf 'unknown lane: %s\n' "$lane" >&2
     exit 2
     ;;
 esac
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+git rev-parse --show-toplevel >/dev/null 2>&1 || {
   printf '%s\n' 'WORKTREE_SCOPE_BLOCKED: a Git worktree is required' >&2
   exit 2
 }
@@ -82,55 +82,29 @@ is_private_or_generated() {
 is_owned() {
   local path=$1
   case "$lane" in
-    integration)
+    main)
       case "$path" in
-        .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/architecture/*|scripts/*|tooling/*|modules/README.md|modules/core/*|modules/application/*|modules/data/*|modules/features/*|modules/design-system/*|modules/domain/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloApp.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/App.kt|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/Main.kt)
+        .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/*|scripts/*|tooling/*|tests/*)
           return 0
           ;;
-        composeApp/*|apps/mobile-shared/*|apps/ios/*|androidApp/*|iosApp/*|platform/contracts/*|contracts/*|deploy/*|infra/*|docs/*|platform/README.md|platform/api.Tests/ContractBoundaryTests.cs)
+        apps/*|modules/*|contracts/*|platform/*|infra/*)
           [[ "$allow_structural" -eq 1 ]]
           return
           ;;
       esac
       ;;
-    domain)
+    frontend)
       case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/domain/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/domain/*|modules/domain/*|modules/application/evidence-graph/*|modules/application/verification/*)
+        apps/*|modules/features/*|modules/design-system/*)
           return 0
           ;;
       esac
       ;;
-    mobile-ui)
+    backend)
       case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/kotlin/dev/nextgen/mobile/resources/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/resources/*|composeApp/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|apps/mobile-shared/src/commonMain/kotlin/dev/nextgen/mobile/EvidriloDesignSystem.kt|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/AndroidManifest.xml|androidApp/src/main/res/*|apps/android/src/main/AndroidManifest.xml|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|iosApp/README.md|apps/ios/iosApp/Assets.xcassets/*|apps/ios/README.md|modules/features/*|modules/design-system/*)
+        modules/core/*|modules/domain/*|modules/application/*|modules/data/*|contracts/*|platform/*|infra/*)
           return 0
           ;;
-      esac
-      ;;
-    ingestion)
-      case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*|modules/application/ingestion/*|modules/data/documents/*|modules/data/ai/*|modules/data/src/*)
-          return 0
-          ;;
-      esac
-      ;;
-    platform)
-      case "$path" in
-        platform/api/Billing/*) return 1 ;;
-        platform/*|contracts/*) return 0 ;;
-      esac
-      ;;
-    revenuecat)
-      case "$path" in
-        composeApp/src/*/kotlin/dev/nextgen/mobile/billing/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/billing/*|modules/data/billing/*|modules/features/paywall/*|platform/api/Billing/*)
-          return 0
-          ;;
-      esac
-      ;;
-    qa)
-      case "$path" in
-        docs/architecture/*) return 1 ;;
-      tests/*|docs/*|audit/*|docs/submission/*|docs/operations/*) return 0 ;;
       esac
       ;;
   esac
@@ -150,18 +124,14 @@ for path in "${changed_paths[@]}"; do
   [[ "$duplicate" -eq 1 ]] && continue
   seen+=("$path")
   if is_private_or_generated "$path"; then
-    printf 'WORKTREE_SCOPE_VIOLATION lane=%s path=%s owner=integration(private-boundary)\n' "$lane" "$path" >&2
+    printf 'WORKTREE_SCOPE_VIOLATION lane=%s path=%s owner=main(private-boundary)\n' "$lane" "$path" >&2
     violations=$((violations + 1))
   elif ! is_owned "$path"; then
     owner='unknown'
     case "$path" in
-      composeApp/src/*/kotlin/dev/nextgen/mobile/domain/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/domain/*) owner=domain ;;
-      composeApp/src/*/kotlin/dev/nextgen/mobile/billing/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/billing/*|platform/api/Billing/*) owner=revenuecat ;;
-      platform/*|contracts/*) owner=platform ;;
-      composeApp/src/*/kotlin/dev/nextgen/mobile/content/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/content/*|composeApp/src/*/kotlin/dev/nextgen/mobile/storage/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/storage/*|composeApp/src/*/kotlin/dev/nextgen/mobile/audio/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/audio/*) owner=ingestion ;;
-      composeApp/src/*/kotlin/dev/nextgen/mobile/surfaces/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/surfaces/*|composeApp/src/*/kotlin/dev/nextgen/mobile/navigation/*|apps/mobile-shared/src/*/kotlin/dev/nextgen/mobile/navigation/*|composeApp/src/*/composeResources/*|apps/mobile-shared/src/*/composeResources/*|androidApp/src/main/res/*|apps/android/src/main/res/*|iosApp/iosApp/Assets.xcassets/*|apps/ios/iosApp/Assets.xcassets/*) owner=mobile-ui ;;
-      tests/*|docs/*|audit/*) owner=qa ;;
-      .github/*|gradle/*|scripts/*|tooling/*|examples/*|modules/*|settings.gradle.kts|build.gradle.kts|worktree-ownership.yml|.editorconfig|.gitattributes|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md) owner=integration ;;
+      apps/*|modules/features/*|modules/design-system/*) owner=frontend ;;
+      modules/core/*|modules/domain/*|modules/application/*|modules/data/*|contracts/*|platform/*|infra/*) owner=backend ;;
+      .github/*|.dockerignore|.editorconfig|.gitattributes|.gitignore|settings.gradle.kts|build.gradle.kts|version.props|Directory.Build.props|gradle.properties|gradle/*|README.md|CONTRIBUTING.md|LICENSE|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|worktree-ownership.yml|examples/*|docs/*|scripts/*|tooling/*|tests/*) owner=main ;;
     esac
     printf 'WORKTREE_SCOPE_VIOLATION lane=%s path=%s owner=%s\n' "$lane" "$path" "$owner" >&2
     violations=$((violations + 1))

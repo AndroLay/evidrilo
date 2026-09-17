@@ -47,33 +47,54 @@ ignored and must never be committed.
 
 ## Git worktrees
 
-Use a linked worktree for an isolated feature lane. The repository convention is
-to keep linked worktrees under the ignored `.worktrees/` directory:
+The repository uses one integration checkout and two active feature lanes. Keep
+linked worktrees under the ignored `.worktrees/` directory:
 
 ```bash
 git worktree list
-git worktree add .worktrees/ui-development -b ui/development main
-cd .worktrees/ui-development
+git worktree add .worktrees/frontend -b feat/frontend main
+git worktree add .worktrees/backend -b feat/backend main
+cd .worktrees/frontend
 cp local.properties.example local.properties
 ```
 
-Ignored files are not copied into a new worktree. If the UI lane needs private
-design material, expose the approved primary-checkout `internal/design/` folder
-through a local symlink or a local copy inside the worktree. Keep the worktree's
-`internal/` directory ignored and never use `git add --force` for it. Configure
-the external SDK and cache variables in the shell before building; do not put
-machine paths or credentials in tracked files.
+`main` is the integration and release lane. `frontend` owns `apps/` plus the
+mobile feature and design-system modules. `backend` owns the core, domain,
+application, data, contracts, platform, and infrastructure modules. Shared
+root files, documentation, scripts, tooling, and test harnesses are maintained
+on `main`. The ownership rules are enforced by:
 
-Inspect and remove a linked worktree only after its changes are integrated:
+```bash
+bash scripts/worktrees/check-worktree-scope.sh frontend
+bash scripts/worktrees/check-worktree-scope.sh backend
+```
+
+Structural moves across the target trees are `main`-only and require an
+explicit `--allow-structural` review decision. A lane must not edit another
+lane's files; use a small interface/request and let the owning lane or `main`
+integrate it. The former domain, ingestion, platform, RevenueCat, QA, and
+integration worktrees are historical and are not active development lanes.
+
+Ignored files are not copied into a new worktree. If the frontend lane needs
+private design material, expose the approved primary-checkout
+`internal/design/` folder through a local symlink or local copy. Keep each
+worktree's private directories ignored and never use `git add --force` for them.
+Configure external SDK and cache variables in the shell before building; do
+not put machine paths or credentials in tracked files.
+
+Inspect and remove a linked worktree only after its changes are integrated and
+its non-ignored status is clean:
 
 ```bash
 git worktree list
-git worktree remove .worktrees/ui-development
-git branch -d ui/development
+git status --short --untracked-files=all
+git worktree remove .worktrees/frontend
+git branch -d feat/frontend
 ```
 
 The remove command affects only the linked checkout. It must not be used on the
-primary checkout or on the external private design directory.
+primary checkout, the private design directory, or a preserved legacy checkout
+that still contains user changes.
 
 ## Source-only workspace
 
