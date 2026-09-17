@@ -128,8 +128,8 @@ test('Android draft persistence does not synchronously commit on the UI event pa
     path.join(
       root,
       '..',
-      'apps',
-      'mobile-shared',
+      'modules',
+      'data',
       'src',
       'androidMain',
       'kotlin',
@@ -406,7 +406,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(platformReadme, /E170 adds explicit regression coverage/);
   assert.match(backendRegister, /E169 hardens the auth provider type boundary/);
   assert.match(backendRegister, /E170 adds explicit regression coverage/);
-  assert.match(rootReadme, /Current structural baseline: `c96d36b`/);
+  assert.match(rootReadme, /Current structural baseline: `d196c6a`/);
   assert.match(rootReadme, /`modules\/domain`/);
   assert.doesNotMatch(rootReadme, /Current repository increment: E186/);
   assert.doesNotMatch(rootReadme, /Kotlin\/JVM 332\/332, Node 96\/96/);
