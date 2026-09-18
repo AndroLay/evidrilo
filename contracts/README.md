@@ -10,6 +10,9 @@ The contract tree is split by artifact responsibility:
 - `schemas/` contains versioned JSON Schema documents;
 - `fixtures/` contains synthetic, non-secret examples used by deterministic
   checks;
+- `routes.v1.json` maps every registered API route to its response schema and
+  backend endpoint test. The contract test compares it with the ASP.NET route
+  registrations so a new handler cannot silently bypass the inventory;
 - `openapi/` is reserved for a generated or reviewed HTTP description;
 - `events/` is reserved for event envelopes once a public event contract is
   approved.

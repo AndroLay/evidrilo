@@ -50,7 +50,8 @@ provides:
   exception and billing-event ordering guard, with account-scoped RLS policies
   and an append-only sync change feed;
 - a local-only PostgreSQL integration harness that applies migrations `001`-
-  `029` to a fresh container and asserts account isolation, sync/projection
+  `030` to a fresh container and asserts published case catalogue/evidence
+  graph reads, account isolation, sync/projection
   triggers, Auth account-profile provisioning, cohort suppression, lifecycle
   guards, and account deletion;
 - a local-only PostgreSQL backup/restore rehearsal that applies the current

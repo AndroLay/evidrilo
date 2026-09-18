@@ -1,0 +1,174 @@
+{
+  "schema": "evidrilo.api-route-manifest",
+  "version": "1",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/health/live",
+      "responseSchema": "health.v1.json",
+      "testFile": "platform/api.Tests/HealthEndpointTests.cs",
+      "testAnchor": "/health/live"
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "responseSchema": "health.v1.json",
+      "testFile": "platform/api.Tests/HealthEndpointTests.cs",
+      "testAnchor": "/health/ready"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/account/me",
+      "responseSchema": "account-summary.v1.json",
+      "testFile": "platform/api.Tests/AuthAndAccountEndpointTests.cs",
+      "testAnchor": "/v1/account/me"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/account/me",
+      "responseSchema": "account-deletion-result.v1.json",
+      "testFile": "platform/api.Tests/AccountLifecycleEndpointTests.cs",
+      "testAnchor": "/v1/account/me"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sync/commands",
+      "responseSchema": "sync-push-result.v1.json",
+      "testFile": "platform/api.Tests/SyncEndpointTests.cs",
+      "testAnchor": "/v1/sync/commands"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sync/pull",
+      "responseSchema": "sync-pull.v1.json",
+      "testFile": "platform/api.Tests/SyncEndpointTests.cs",
+      "testAnchor": "/v1/sync/pull"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/analytics/events",
+      "responseSchema": "analytics-event-result.v1.json",
+      "testFile": "platform/api.Tests/AnalyticsEndpointTests.cs",
+      "testAnchor": "/v1/analytics/events"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/progress/me",
+      "responseSchema": "progress-summary.v1.json",
+      "testFile": "platform/api.Tests/ProgressEndpointTests.cs",
+      "testAnchor": "/v1/progress/me"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/progress/daily",
+      "responseSchema": "progress-daily.v1.json",
+      "testFile": "platform/api.Tests/ProgressEndpointTests.cs",
+      "testAnchor": "/v1/progress/daily"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases",
+      "responseSchema": "case-catalogue.v1.json",
+      "testFile": "platform/api.Tests/CaseEndpointTests.cs",
+      "testAnchor": "/v1/cases"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases/{caseVersionId}",
+      "responseSchema": "case-summary.v1.json",
+      "testFile": "platform/api.Tests/CaseEndpointTests.cs",
+      "testAnchor": "/v1/cases/"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases/{caseVersionId}/evidence-graph",
+      "responseSchema": "evidence-graph.v1.json",
+      "testFile": "platform/api.Tests/EvidenceGraphEndpointTests.cs",
+      "testAnchor": "/v1/cases/"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/authoring/cases",
+      "responseSchema": "case-authoring-result.v1.json",
+      "testFile": "platform/api.Tests/CaseAuthoringEndpointTests.cs",
+      "testAnchor": "/v1/authoring/cases"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/authoring/cases/{caseVersionId}/transition",
+      "responseSchema": "case-authoring-result.v1.json",
+      "testFile": "platform/api.Tests/CaseAuthoringEndpointTests.cs",
+      "testAnchor": "/v1/authoring/cases/"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/authoring/cases/{caseVersionId}/audit",
+      "responseSchema": "case-lifecycle-audit.v1.json",
+      "testFile": "platform/api.Tests/CaseAuthoringEndpointTests.cs",
+      "testAnchor": "/v1/authoring/cases/"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/recommendations/next",
+      "responseSchema": "recommendation.v1.json",
+      "testFile": "platform/api.Tests/RecommendationEndpointTests.cs",
+      "testAnchor": "/v1/recommendations/next"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/recommendations/interactions",
+      "responseSchema": "recommendation-interaction-result.v1.json",
+      "testFile": "platform/api.Tests/RecommendationInteractionEndpointTests.cs",
+      "testAnchor": "/v1/recommendations/interactions"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/teacher/cohorts/{cohortId:guid}/summary",
+      "responseSchema": "cohort-summary.v1.json",
+      "testFile": "platform/api.Tests/CohortEndpointTests.cs",
+      "testAnchor": "/v1/teacher/cohorts/"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/billing/webhook",
+      "responseSchema": "billing-webhook-result.v1.json",
+      "testFile": "platform/api.Tests/BillingEndpointTests.cs",
+      "testAnchor": "/v1/billing/webhook"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/billing/entitlements",
+      "responseSchema": "entitlements.v1.json",
+      "testFile": "platform/api.Tests/EntitlementEndpointTests.cs",
+      "testAnchor": "/v1/billing/entitlements"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/ai/assist",
+      "responseSchema": "ai-assist-result.v1.json",
+      "testFile": "platform/api.Tests/AiEndpointTests.cs",
+      "testAnchor": "/v1/ai/assist"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/organizations/{organizationId:guid}/members",
+      "responseSchema": "membership-operation-result.v1.json",
+      "testFile": "platform/api.Tests/MembershipEndpointTests.cs",
+      "testAnchor": "/v1/organizations/"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/organizations/{organizationId:guid}/members/{targetAccountId:guid}",
+      "responseSchema": "membership-operation-result.v1.json",
+      "testFile": "platform/api.Tests/MembershipEndpointTests.cs",
+      "testAnchor": "/v1/organizations/"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/organizations/{organizationId:guid}/members/me",
+      "responseSchema": "membership-operation-result.v1.json",
+      "testFile": "platform/api.Tests/MembershipEndpointTests.cs",
+      "testAnchor": "/v1/organizations/"
+    }
+  ]
+}

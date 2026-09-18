@@ -67,6 +67,20 @@ function hasRepositoryPaths(...relativePaths) {
   );
 }
 
+function repositoryFiles(relativeDirectory, extension) {
+  const directory = path.join(repositoryRoot, relativeDirectory);
+  const files = [];
+  const visit = (currentDirectory) => {
+    for (const entry of fs.readdirSync(currentDirectory, { withFileTypes: true })) {
+      const entryPath = path.join(currentDirectory, entry.name);
+      if (entry.isDirectory()) visit(entryPath);
+      else if (entry.name.endsWith(extension)) files.push(entryPath);
+    }
+  };
+  visit(directory);
+  return files;
+}
+
 function assertNoCredentialShapedFields(value, location = '$') {
   if (Array.isArray(value)) {
     value.forEach((item, index) => assertNoCredentialShapedFields(item, `${location}[${index}]`));
@@ -94,6 +108,49 @@ test('all versioned response schemas are present and closed at the root', () => 
     assert.equal(schema.type, 'object');
     assert.equal(schema.additionalProperties, false);
     assert.match(schema.title, /Evidrilo/);
+  }
+});
+
+test('registered API routes map to response schemas and endpoint tests', () => {
+  const manifest = readJson('routes.v1.json');
+  assert.deepEqual(
+    Object.keys(manifest).sort(),
+    ['routes', 'schema', 'version'],
+  );
+  assert.equal(manifest.schema, 'evidrilo.api-route-manifest');
+  assert.equal(manifest.version, '1');
+  assert.equal(manifest.routes.length, 24);
+
+  const routeKeys = (routes) => routes
+    .map((route) => `${route.method} ${route.path}`)
+    .sort();
+  const registeredRoutes = [];
+  for (const file of repositoryFiles('platform/api', '.cs')) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/endpoints\.Map(Get|Post|Put|Patch|Delete)\(\s*"([^"]+)"/g)) {
+      registeredRoutes.push({ method: match[1].toUpperCase(), path: match[2] });
+    }
+  }
+
+  assert.deepEqual(routeKeys(registeredRoutes), routeKeys(manifest.routes));
+  const seen = new Set();
+  for (const route of manifest.routes) {
+    assert.match(route.method, /^(GET|POST|PUT|PATCH|DELETE)$/);
+    assert.match(route.path, /^\/(?:health|v1)\/[A-Za-z0-9._:{}-]+(?:\/[A-Za-z0-9._:{}-]+)*$/);
+    assert.ok(!seen.has(`${route.method} ${route.path}`), `duplicate ${route.method} ${route.path}`);
+    seen.add(`${route.method} ${route.path}`);
+
+    const schema = readSchema(route.responseSchema);
+    assert.equal(schema.$id, `https://evidrilo.dev/contracts/${route.responseSchema}`);
+    const testPath = path.join(repositoryRoot, route.testFile);
+    assert.equal(fs.existsSync(testPath), true, `${route.testFile} must exist`);
+    const testSource = fs.readFileSync(testPath, 'utf8');
+    assert.match(testSource, new RegExp(`class ${path.basename(route.testFile, '.cs')}`));
+    assert.equal(
+      testSource.includes(route.testAnchor),
+      true,
+      `${route.testFile} must exercise ${route.testAnchor}`,
+    );
   }
 });
 
