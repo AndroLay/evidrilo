@@ -1,26 +1,48 @@
 # Evidrilo
 
-Evidrilo is a mobile learning app for practising how to turn observations into
-clear, measurable conclusions that respect the limits of the available
-evidence.
+Evidrilo is a local-first evidence workspace for turning bounded observations
+into clear, appropriately scoped conclusions.
 
-A learner reads a case, selects relevant evidence, writes a conclusion,
-receives explainable feedback, makes one revision, and then tests how the
-conclusion changes when one observation is no longer available.
+It is no longer only a generic practice exercise. The product is being shaped
+as an applied reasoning workspace that connects:
 
-> Status: **Target mobile surfaces and case catalogue verified locally through E191**. The
-> reusable Kotlin boundaries for core, domain, application, data, features, and
-> design-system are in place alongside the public repository shell.
-> Device runtime, provider, deployment, human review, store, and submission
-> gates remain separate and are not implied by source changes.
+```text
+Requirement → Evidence → Claim → Gap → Action → Revision → Verification
+```
 
-Current structural baseline: `13af4ec` — the approved source-first tree,
-extracted Kotlin boundaries, categorized verification lanes, and the migrated
-contract-schema test path are aligned while keeping the existing app task names
-and public behavior. E189 also adds release-version regression coverage to the
-local verifier. The E191 increment passes the focused Kotlin/Android target
-tasks, full API `187/187`, and the versioned contract suite; this does not
-imply device, provider, managed, human, store, or submission evidence.
+A learner opens a supplied case, reviews its source facts, maps evidence to a
+claim, checks the claim boundary, chooses a next action, revises once, and
+compares what changed. The system explains feedback from the case facts; it
+does not pretend to be a scientific-truth grader or an automatic answer
+generator.
+
+## Current status
+
+The current main branch contains the new Evidrilo product direction:
+
+- target home, sources, workspace, evidence, claim-trace, verification,
+  action-plan, profile, history, and evidence-change surfaces are routed from
+  the primary mobile entry point;
+- the deterministic conclusion engine, local persistence, one-revision rule,
+  evidence-change challenge, and before/after history remain the product core;
+- the ASP.NET Core API, PostgreSQL migrations, authoring lifecycle, evidence
+  graph, sync, analytics, billing projection, and worker boundaries are
+  implemented;
+- monthly/yearly RevenueCat access, restore, retry, pending, cancellation, and
+  fail-closed states are represented in the mobile boundary;
+- the local Docker/PostgreSQL API-worker end-to-end smoke passes the billing,
+  authoring, published-case, evidence-graph, sync, analytics, progress, and
+  projection flows.
+
+The current mobile experience still starts from the bundled `M0_T2` case so
+the free core remains available offline. The next integration step is to make
+the published-case API the preferred content source while retaining the local
+case as a safe fallback.
+
+The following are deliberately not claimed by this README until they are
+observed: Android/iOS device runtime, TalkBack/VoiceOver review, RevenueCat
+Test Store transactions, managed deployment, human validation, store release,
+or final Shipaton submission evidence.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
@@ -36,35 +58,62 @@ imply device, provider, managed, human, store, or submission evidence.
 
 ```mermaid
 flowchart LR
-    A[Open app] --> B[Read bounded case]
-    B --> C[Connect observations]
-    C --> D[Write conclusion]
-    D --> E[Receive evidence-anchored feedback]
-    E --> F[Revise once]
-    F --> G[Evidence-change challenge]
-    G --> H[Compare before and after]
-    H --> I[Review local history]
+    A[Open app] --> B[Sources]
+    B --> C[Project workspace]
+    C --> D[Evidence map]
+    D --> E[Claim trace]
+    E --> F[Verify claim boundary]
+    F --> G[Action plan]
+    G --> H[One revision]
+    H --> I[Evidence-change challenge]
+    I --> J[Before/after history]
 ```
 
-Evidrilo is intentionally bounded. The evaluator only assesses the
-relationship between the goal, observations, limitations, and conclusion in
-the supplied case. It is not a scientific-truth grader, academic marking
-system, citation manager, safety advisor, or automatic answer generator.
+The new surfaces are views over the same deterministic domain state; they are
+not disconnected mock screens. Evidence selection, claim scope, limitations,
+next action, feedback priority, revision rules, and history are derived from
+the active case and reducer state.
+
+Evidrilo is intentionally bounded. The evaluator assesses only the relationship
+between the requirement, observations, limitations, and conclusion in the
+supplied case. It is not a scientific-truth grader, academic marking system,
+citation manager, safety advisor, or automatic answer generator.
 
 ## Product scope
 
-| Area | Main features | Dependency |
+| Area | Current implementation | Forward direction |
 | --- | --- | --- |
-| Free learning | One synthetic case, fact/relation selection, conclusion, scope, limitation, next action, deterministic feedback, one revision, before/after comparison, evidence-change challenge, history, and reset/replay | Local only; no login, API, network, database, AI, or billing |
-| Offline audio | Lightweight optional interaction sounds, offline TTS through platform adapters, accessible controls, lifecycle handling, and Android audio focus | Device voice/audio capability; never affects evaluation or persistence |
-| Accounts | Email/password, recovery, session refresh, sign-out, account deletion, and Google OAuth authorization-code PKCE | Auth provider and device runtime still require verification |
-| Sync | Progress metadata, cursor, retry, consent, idempotency, and conflict-safe boundaries | Verified login, API, and PostgreSQL; learner drafts remain local |
-| Premium | Two additional cases through the `evidrilo_pro` entitlement, `monthly` and `yearly` packages, Paywall, and Customer Center | RevenueCat; lifetime is rejected fail-closed |
-| Platform | Content reader, authoring/review/publish, analytics, progress, recommendation, AI safety boundary, cohort/membership, audit trail, and worker projections | Optional API and managed infrastructure |
+| Free evidence workspace | Bundled case, source facts, evidence selection, claim/scope/limitation/action inputs, deterministic feedback, one revision, evidence-change challenge, comparison history, reset, and replay | Make the published-case API the preferred source while preserving offline fallback |
+| Visual product shell | Target home, sources, workspace, evidence map, claim trace, verification, action plan, profile, history, and contextual premium surfaces | Complete Android/iOS runtime review and refine against the approved visual direction |
+| Offline audio | Optional interaction sounds, offline TTS adapters, accessible controls, lifecycle handling, and Android audio focus | Verify device behavior, naturalness, and accessibility on supported targets |
+| Accounts | Email/password, recovery, session refresh, sign-out, account deletion, and Google OAuth authorization-code PKCE boundaries | Verify provider-backed auth and native redirect flows |
+| Sync | Consent-gated progress metadata, cursor, retry, idempotency, conflict-safe boundaries, and local draft protection | Connect to managed staging and verify account/session behavior |
+| Premium | Two additional cases through the `evidrilo_pro` entitlement, monthly/yearly packages, restore, retry, pending, cancellation, and fail-closed states | Verify RevenueCat Test Store transactions and localized store behavior |
+| Platform | Published content reader, authoring/review/publish, evidence graph, analytics, progress, recommendation, AI safety boundary, cohort/membership, audit trail, and worker projections | Managed deployment, observability, editorial workflow, and production operations |
 
 The free core remains usable when login, API, RevenueCat, database, audio, or
 network is unavailable. Premium access is never opened by a local flag; it is
 derived from a valid entitlement.
+
+## Development direction
+
+The project is intentionally delivered in layers:
+
+1. **Now — applied local-first product:** finish the target mobile flow around
+   the deterministic evidence graph, bundled content, local history, and
+   transparent feedback.
+2. **Next — connected content:** connect `PublishedCaseGateway` to the mobile
+   entry point, validate the published-case schema, and keep a safe bundled
+   fallback for offline use.
+3. **Then — verified platform services:** complete Android/iOS runtime checks,
+   RevenueCat Test Store evidence, consented sync, and human validation.
+4. **After Shipaton — platform expansion:** add versioned content authoring,
+   analytics-driven recommendations, optional AI explanations, and teacher or
+   cohort workflows only when the underlying user need and privacy boundary
+   are validated.
+
+Cloud sync, AI, teacher dashboards, and production scaling are extensions of
+the product—not substitutes for a reliable evidence workspace.
 
 ## Tech stack
 
@@ -328,33 +377,43 @@ publication has occurred.
 
 ## Status and evidence boundary
 
-The current E189 repository phase has focused verification for the extracted
-core, domain, application, data, features, and design-system boundaries,
-release-version alignment, the public package, and worktree ownership. These
-are repository-only checks. They do not prove device runtime, provider,
-managed deployment, accessibility-service, human, or submission evidence.
+The current repository evidence is split between implementation, integration,
+and external gates. This distinction is intentional.
 
-The current structural phase has focused verification for the extracted domain,
-shared JVM consumer, architecture boundaries, public-package checks, and
-worktree ownership. These are repository-only checks. They do not prove device
-runtime, provider transactions, managed deployment, human review, or
-publication.
+### Verified locally
 
-The main open gates are:
+- API tests: `187/187` passed.
+- Worker tests: `5/5` passed.
+- Billing-focused API tests: `19/19` passed.
+- Versioned contract, migration, deployment, architecture, public-package, and
+  worktree-scope checks passed.
+- Docker/PostgreSQL API-worker E2E passed through invalid billing signature,
+  accepted and replayed billing events, entitlement isolation, authoring
+  lifecycle, published-case reads, evidence graph reads, draft protection,
+  sync, analytics, progress, and worker projection.
+- The primary mobile route points to the new target surfaces, and the old
+  visual route names are no longer used by the runtime source.
 
+### Still open
+
+- Published-case content is not yet the default mobile source; the bundled case
+  remains the offline-first default.
 - Real Android/iOS runtime and TalkBack/VoiceOver accessibility review.
-- RevenueCat Test Store price migration, transaction matrix, and real entitlement
-  behavior.
+- Kotlin/Gradle build verification in the current environment and native
+  device/simulator evidence.
+- RevenueCat Test Store catalog, transaction matrix, restore behavior, and
+  real entitlement behavior.
 - Managed Supabase, Google SSO, email delivery, staging, production API,
   managed backup/restore, monitoring, and load testing.
-- Reviewer/participant validation, final assets, public repository, store
-  release, and submission.
+- Two reviewer preflights, participant validation, final assets, public
+  repository review, and Shipaton submission packaging.
 
 This README intentionally does not duplicate private audit chronology. Public
-scope and durable decisions are maintained in the [roadmap](docs/roadmap.md)
-and [decisions](docs/decisions.md). A local build or test proves only the
-boundary that was run; it does not prove device runtime, provider transactions,
-managed deployment, human review, or publication.
+scope and durable decisions are maintained in the [roadmap](docs/roadmap.md),
+[decisions](docs/decisions.md), and the linked architecture/product guides. A
+local build or test proves only the boundary that was run; it does not prove
+device runtime, provider transactions, managed deployment, human review, or
+publication.
 
 ## Contributing
 
