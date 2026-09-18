@@ -3,9 +3,11 @@ package dev.nextgen.mobile
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
+import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
 import dev.nextgen.mobile.domain.conclusion.ConclusionReducer
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.navigation.EvidriloDestination
 import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 import dev.nextgen.mobile.storage.ConclusionSessionPhase
 
@@ -39,6 +41,37 @@ internal data class TargetWorkspaceMetrics(
     val actionCount: Int,
     val coveragePercent: Int,
 )
+
+/**
+ * The target shell's user-visible journey. Practice remains a reducer-owned
+ * stateful workflow; the surrounding destinations are only navigation
+ * surfaces over the current local projection.
+ */
+internal fun targetJourneyDestinations(): List<EvidriloDestination> = listOf(
+    EvidriloDestination.HOME,
+    EvidriloDestination.SOURCES,
+    EvidriloDestination.WORKSPACE,
+    EvidriloDestination.EVIDENCE,
+    EvidriloDestination.CLAIM_TRACE,
+    EvidriloDestination.ACTION,
+    EvidriloDestination.VERIFY_CLAIM,
+    EvidriloDestination.PRACTICE,
+    EvidriloDestination.EVIDENCE_DELTA,
+    EvidriloDestination.HISTORY,
+)
+
+internal fun targetEvaluationFor(state: ConclusionState): ConclusionEvaluation? = when (state) {
+    ConclusionState.Intro,
+    is ConclusionState.Drafting,
+    is ConclusionState.Revision,
+    -> null
+    is ConclusionState.Incomplete -> null
+    is ConclusionState.Feedback -> state.evaluation
+    is ConclusionState.Summary -> state.finalEvaluation
+    is ConclusionState.EvidenceChangeDrafting -> null
+    is ConclusionState.EvidenceChangeFeedback -> state.evaluation
+    is ConclusionState.EvidenceChangeSummary -> state.challengeEvaluation
+}
 
 internal fun targetWorkspaceMetrics(
     case: ConclusionCase,

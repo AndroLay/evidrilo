@@ -7,12 +7,32 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.navigation.EvidriloDestination
 import dev.nextgen.mobile.storage.ConclusionSessionPhase
 import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class EvidriloTargetSurfaceModelTest {
+    @Test
+    fun target_journey_names_the_complete_offline_evidence_loop() {
+        assertEquals(
+            listOf(
+                EvidriloDestination.HOME,
+                EvidriloDestination.SOURCES,
+                EvidriloDestination.WORKSPACE,
+                EvidriloDestination.EVIDENCE,
+                EvidriloDestination.CLAIM_TRACE,
+                EvidriloDestination.ACTION,
+                EvidriloDestination.VERIFY_CLAIM,
+                EvidriloDestination.PRACTICE,
+                EvidriloDestination.EVIDENCE_DELTA,
+                EvidriloDestination.HISTORY,
+            ),
+            targetJourneyDestinations(),
+        )
+    }
+
     @Test
     fun workspace_metrics_are_derived_from_supplied_case_and_current_draft() {
         val case = ConclusionCases.M0_T2

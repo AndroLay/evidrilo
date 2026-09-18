@@ -979,8 +979,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         EvidriloTargetSourcesScreen(
             case = case,
             onNavigate = openTargetSection,
+            onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
             onStartPractice = startTargetPractice,
-            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.WORKSPACE) {
         EvidriloTargetWorkspaceScreen(
@@ -990,45 +990,86 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
             onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
             onStartPractice = startTargetPractice,
-            onOpenTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
-            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.EVIDENCE) {
         EvidriloTargetEvidenceScreen(
             case = case,
             draft = targetDraft,
             onNavigate = openTargetSection,
+            onOpenClaimTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
             onStartPractice = startTargetPractice,
-            onOpenTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
-            onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
-            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.CLAIM_TRACE) {
         EvidriloTargetClaimTraceScreen(
             case = case,
             draft = targetDraft,
             onNavigate = openTargetSection,
-            onOpenEvidence = { navigationState = navigationState.resetToHome().open(EvidriloDestination.EVIDENCE) },
-            onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
             onBack = { navigationState = navigationState.back() },
+            onOpenAction = { navigationState = navigationState.open(EvidriloDestination.ACTION) },
+            onStartPractice = startTargetPractice,
         )
     } else if (navigationState.current == EvidriloDestination.VERIFY_CLAIM) {
         EvidriloTargetVerifyClaimScreen(
             case = case,
             draft = targetDraft,
+            evaluation = targetEvaluationFor(state),
+            canRevise = state is ConclusionState.Feedback,
             onNavigate = openTargetSection,
-            onStartPractice = startTargetPractice,
             onBack = { navigationState = navigationState.back() },
+            onRevise = {
+                dispatch(ConclusionEvent.BeginRevision)
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
+            },
+            onStartPractice = startTargetPractice,
         )
     } else if (navigationState.current == EvidriloDestination.ACTION) {
         EvidriloTargetActionScreen(
             case = case,
             draft = targetDraft,
             onNavigate = openTargetSection,
-            onStartPractice = startTargetPractice,
             onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
-            onBack = { navigationState = navigationState.back() },
+            onStartPractice = startTargetPractice,
         )
+    } else if (navigationState.current == EvidriloDestination.EVIDENCE_DELTA) {
+        when (val deltaState = state) {
+            is ConclusionState.Summary -> EvidriloTargetEvidenceDeltaScreen(
+                case = case,
+                before = deltaState.initialDraft,
+                after = deltaState.revisedDraft,
+                evaluation = deltaState.finalEvaluation,
+                onNavigate = openTargetSection,
+                onBack = { navigationState = navigationState.back() },
+                onOpenHistory = {
+                    dispatch(ConclusionEvent.Reset)
+                    navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
+                },
+                onStartChallenge = {
+                    dispatch(ConclusionEvent.BeginEvidenceChange)
+                    navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
+                },
+            )
+            else -> historySnapshot?.let { snapshot ->
+                EvidriloTargetEvidenceDeltaScreen(
+                    case = case,
+                    before = snapshot.initialDraft,
+                    after = snapshot.currentDraft,
+                    evaluation = null,
+                    onNavigate = openTargetSection,
+                    onBack = { navigationState = navigationState.back() },
+                    onOpenHistory = { navigationState = navigationState.back() },
+                    onStartChallenge = {
+                        dispatch(ConclusionEvent.BeginEvidenceChange)
+                        navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
+                    },
+                )
+            } ?: EvidriloTargetActionScreen(
+                case = case,
+                draft = targetDraft,
+                onNavigate = openTargetSection,
+                onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
+                onStartPractice = startTargetPractice,
+            )
+        }
     } else if (navigationState.current == EvidriloDestination.PROFILE) {
         EvidriloTargetProfileScreen(
             profileSubtitle = accountSession.toSettingsSubtitle(),
@@ -1038,15 +1079,6 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
-            onBack = { navigationState = navigationState.back() },
-        )
-    } else if (navigationState.current == EvidriloDestination.EVIDENCE_DELTA && historySnapshot != null) {
-        EvidriloTargetEvidenceDeltaScreen(
-            case = case,
-            before = historySnapshot!!.initialDraft,
-            after = historySnapshot!!.currentDraft,
-            onNavigate = openTargetSection,
-            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.ACCOUNT) {
         EvidriloAccountScreen(
@@ -1288,18 +1320,21 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
             )
 
-            is ConclusionState.Summary -> EvidriloSummaryScreen(
+            is ConclusionState.Summary -> EvidriloTargetEvidenceDeltaScreen(
                 case = case,
-                initialDraft = current.initialDraft,
-                revisedDraft = current.revisedDraft,
-                finalEvaluation = current.finalEvaluation,
-                onStartChallenge = { dispatch(ConclusionEvent.BeginEvidenceChange) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
+                before = current.initialDraft,
+                after = current.revisedDraft,
+                evaluation = current.finalEvaluation,
+                onNavigate = openTargetSection,
                 onBack = returnToHome,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.REVISION, AudioNarrationCopy.revision()) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
+                onOpenHistory = {
+                    dispatch(ConclusionEvent.Reset)
+                    navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
+                },
+                onStartChallenge = {
+                    dispatch(ConclusionEvent.BeginEvidenceChange)
+                    navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
+                },
             )
 
             is ConclusionState.EvidenceChangeDrafting -> EvidriloDraftScreen(

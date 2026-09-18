@@ -48,4 +48,21 @@ class EvidriloNavigationStateTest {
         assertEquals(EvidriloDestination.GUIDE, state.current)
         assertEquals(EvidriloDestination.HOME, state.back().current)
     }
+
+    @Test
+    fun evidence_journey_keeps_stacked_trace_and_verification_surfaces_reachable() {
+        val state = EvidriloNavigationState()
+            .open(EvidriloDestination.SOURCES)
+            .open(EvidriloDestination.WORKSPACE)
+            .open(EvidriloDestination.EVIDENCE)
+            .open(EvidriloDestination.CLAIM_TRACE)
+            .open(EvidriloDestination.ACTION)
+            .open(EvidriloDestination.VERIFY_CLAIM)
+            .open(EvidriloDestination.EVIDENCE_DELTA)
+
+        assertEquals(EvidriloDestination.EVIDENCE_DELTA, state.current)
+        assertEquals(EvidriloDestination.VERIFY_CLAIM, state.back().current)
+        assertEquals(EvidriloDestination.ACTION, state.back().back().current)
+        assertEquals(EvidriloDestination.CLAIM_TRACE, state.back().back().back().current)
+    }
 }
