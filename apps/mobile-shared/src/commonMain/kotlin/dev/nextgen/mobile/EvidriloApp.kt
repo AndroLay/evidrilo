@@ -785,14 +785,6 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         closePremium()
         navigationState = navigationState.back()
     }
-    val openRootPracticeFromPremium: () -> Unit = {
-        closePremium()
-        navigationState = navigationState.resetToHome()
-    }
-    val openRootHistoryFromPremium: () -> Unit = {
-        closePremium()
-        navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
-    }
     val returnToPremiumCatalog: () -> Unit = {
         dispatchPremium(PremiumPracticeEvent.Back)
     }
@@ -962,8 +954,10 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onSelectCase = { dispatchPremium(PremiumPracticeEvent.SelectCase(it)) },
             onBeginCase = { dispatchPremium(PremiumPracticeEvent.BeginSelectedCase) },
             onPracticeEvent = { dispatchPremium(PremiumPracticeEvent.PracticeEvent(it)) },
-            onOpenPractice = openRootPracticeFromPremium,
-            onOpenHistory = openRootHistoryFromPremium,
+            onNavigate = { section ->
+                closePremium()
+                openTargetSection(section)
+            },
             onReturnToCatalog = returnToPremiumCatalog,
             backLabel = when (navigationState.stack.dropLast(1).lastOrNull()) {
                 EvidriloDestination.SETTINGS -> "Settings"
@@ -1061,8 +1055,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             },
             onClear = clearHistory,
             onBack = { navigationState = navigationState.back() },
-            onOpenPractice = { navigationState = navigationState.back() },
-            onOpenPacks = openPremium,
+            onNavigate = openTargetSection,
+            selectedSection = if (previousDestination == EvidriloDestination.PROFILE) {
+                EvidriloTargetSection.PROFILE
+            } else {
+                EvidriloTargetSection.HOME
+            },
             backLabel = when (previousDestination) {
                 EvidriloDestination.SETTINGS -> "Settings"
                 EvidriloDestination.PROFILE -> "Profile"
@@ -1145,6 +1143,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             case = case,
             draft = targetDraft,
             history = historySnapshot,
+            storageNotice = storageNotice,
             onNavigate = openTargetSection,
             onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
             onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
@@ -1153,6 +1152,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
             onStartPractice = startTargetPractice,
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
+            onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
             onDismissRecommendation = ::dismissRecommendation,
@@ -1164,20 +1164,20 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         )
     } else {
         when (val current = state) {
-            ConclusionState.Intro -> EvidriloHomeScreen(
-                state = current,
+            ConclusionState.Intro -> EvidriloTargetHomeScreen(
+                case = case,
+                draft = targetDraft,
                 history = historySnapshot,
                 storageNotice = storageNotice,
-                onPrimaryAction = {
-                    if (state is ConclusionState.Intro) {
-                        dispatch(ConclusionEvent.Begin)
-                    }
-                    navigationState = navigationState.open(EvidriloDestination.PRACTICE)
-                },
-                onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
-                onOpenPacks = openPremium,
-                onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
+                onNavigate = openTargetSection,
+                onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
+                onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
+                onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
+                onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
+                onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
+                onStartPractice = startTargetPractice,
                 onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
+                onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
                 recommendation = recommendationState,
                 onAcceptRecommendation = ::acceptRecommendation,
                 onDismissRecommendation = ::dismissRecommendation,
@@ -1327,8 +1327,7 @@ private fun EvidriloPremiumSurface(
     onSelectCase: (String) -> Unit,
     onBeginCase: () -> Unit,
     onPracticeEvent: (ConclusionEvent) -> Unit,
-    onOpenPractice: () -> Unit,
-    onOpenHistory: () -> Unit,
+    onNavigate: (EvidriloTargetSection) -> Unit,
     onReturnToCatalog: () -> Unit,
     backLabel: String,
     onBack: () -> Unit,
@@ -1341,11 +1340,9 @@ private fun EvidriloPremiumSurface(
     when (state) {
         PremiumPracticeState.Hidden -> Unit
 
-        is PremiumPracticeState.Locked -> EvidriloRootSurface(
-            selected = EvidriloRootDestination.PACKS,
-            onPractice = onOpenPractice,
-            onPacks = { },
-            onHistory = onOpenHistory,
+        is PremiumPracticeState.Locked -> EvidriloTargetSurface(
+            selected = EvidriloTargetSection.PROFILE,
+            onNavigate = onNavigate,
         ) {
             EvidriloPremiumLockedScreen(
                 billing = state.billing.copy(isBusy = isBusy),
@@ -1359,11 +1356,9 @@ private fun EvidriloPremiumSurface(
             )
         }
 
-        is PremiumPracticeState.Catalog -> EvidriloRootSurface(
-            selected = EvidriloRootDestination.PACKS,
-            onPractice = onOpenPractice,
-            onPacks = { },
-            onHistory = onOpenHistory,
+        is PremiumPracticeState.Catalog -> EvidriloTargetSurface(
+            selected = EvidriloTargetSection.PROFILE,
+            onNavigate = onNavigate,
         ) {
             EvidriloPremiumCatalogScreen(
                 state = state,
@@ -1375,11 +1370,9 @@ private fun EvidriloPremiumSurface(
         }
 
         is PremiumPracticeState.Practice -> when (val current = state.conclusion) {
-            ConclusionState.Intro -> EvidriloRootSurface(
-                selected = EvidriloRootDestination.PACKS,
-                onPractice = onOpenPractice,
-                onPacks = { },
-                onHistory = onOpenHistory,
+            ConclusionState.Intro -> EvidriloTargetSurface(
+                selected = EvidriloTargetSection.PROFILE,
+                onNavigate = onNavigate,
             ) {
                 EvidriloPremiumCatalogScreen(
                     state = PremiumPracticeState.Catalog(

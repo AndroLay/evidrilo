@@ -80,11 +80,11 @@ compilation results as an iOS runtime observation. Record a real macOS run in
 the release evidence owned by the maintainer before claiming iOS launch
 support; runtime evidence is not stored in this public repository.
 
-The product name Evidrilo is approved. A prism artwork is present in the
-shared/Android resources and the iOS host includes a 1024×1024 AppIcon source;
-final visual approval, provenance/legal clearance, build-matched screenshot,
-and the complete submission asset package remain open. This host scaffold is
-not itself final submission evidence.
+The product name Evidrilo and the owner-supplied cobalt/white logo are approved.
+The shared/Android resources and iOS host include the corresponding in-app and
+1024×1024 launcher assets; final provenance/legal clearance, build-matched
+screenshot, and the complete submission asset package remain open. This host
+scaffold is not itself final submission evidence.
 
 ## Versioning and handoff
 

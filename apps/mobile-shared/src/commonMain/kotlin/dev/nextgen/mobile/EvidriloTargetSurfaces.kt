@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -44,6 +43,7 @@ import dev.nextgen.mobile.audio.AudioPlaybackState
 import dev.nextgen.mobile.audio.EvidriloAudioListenControl
 import dev.nextgen.mobile.recommendation.RecommendationUiState
 import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
+import dev.nextgen.mobile.storage.LocalStorageNotice
 
 internal enum class EvidriloTargetSection {
     HOME,
@@ -166,6 +166,7 @@ internal fun EvidriloTargetHomeScreen(
     case: ConclusionCase,
     draft: ConclusionDraft,
     history: ConclusionSessionSnapshot?,
+    storageNotice: LocalStorageNotice? = null,
     onNavigate: (EvidriloTargetSection) -> Unit,
     onOpenWorkspace: () -> Unit,
     onOpenSources: () -> Unit,
@@ -174,6 +175,7 @@ internal fun EvidriloTargetHomeScreen(
     onOpenHistory: () -> Unit,
     onStartPractice: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenGuide: () -> Unit = {},
     recommendation: RecommendationUiState = RecommendationUiState.Hidden,
     onAcceptRecommendation: () -> Unit = {},
     onDismissRecommendation: () -> Unit = {},
@@ -186,24 +188,7 @@ internal fun EvidriloTargetHomeScreen(
     val metrics = targetWorkspaceMetrics(case, draft)
     EvidriloTargetSurface(EvidriloTargetSection.HOME, onNavigate) {
         EvidriloContentColumn {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    EvidriloLogoMark(contentDescription = "Evidrilo")
-                    Spacer(Modifier.width(10.dp))
-                    Text("Evidrilo", style = MaterialTheme.typography.headlineSmall)
-                }
-                EvidriloIconButton(
-                    icon = EvidriloIconName.SETTINGS,
-                    contentDescription = "Open settings",
-                    onClick = onOpenSettings,
-                )
-            }
+            EvidriloBrandHeader(onSettings = onOpenSettings)
             Text(
                 text = "What are you trying\nto finish?",
                 style = MaterialTheme.typography.displayMedium,
@@ -226,6 +211,7 @@ internal fun EvidriloTargetHomeScreen(
                 onDismiss = onDismissRecommendation,
                 onRetry = onRetryRecommendation,
             )
+            storageNotice?.let { notice -> EvidriloRecoveryNotice(notice = notice) }
             TargetProjectCard(case = case, metrics = metrics, onClick = onOpenWorkspace)
             TargetMetricStrip(metrics = metrics)
             TargetSectionRow(
@@ -251,6 +237,12 @@ internal fun EvidriloTargetHomeScreen(
                 title = "History",
                 subtitle = targetHistorySubtitle(history),
                 onClick = onOpenHistory,
+            )
+            TargetSectionRow(
+                icon = EvidriloIconName.BOOK,
+                title = "Practice guide",
+                subtitle = "Evidence · claim · limits · revision",
+                onClick = onOpenGuide,
             )
             EvidriloPrimaryButton(label = "Start practice", onClick = onStartPractice)
             Text(

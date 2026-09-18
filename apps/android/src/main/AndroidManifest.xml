@@ -4,7 +4,7 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/evidrilo_prism"
+        android:icon="@drawable/evidrilo"
         android:label="Evidrilo"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"

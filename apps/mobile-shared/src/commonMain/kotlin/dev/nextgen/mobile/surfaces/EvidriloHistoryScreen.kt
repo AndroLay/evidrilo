@@ -26,19 +26,17 @@ internal fun EvidriloHistoryScreen(
     onStartPractice: () -> Unit,
     onClear: () -> Unit,
     onBack: () -> Unit,
-    onOpenPractice: () -> Unit,
-    onOpenPacks: () -> Unit,
+    onNavigate: (EvidriloTargetSection) -> Unit,
+    selectedSection: EvidriloTargetSection,
     backLabel: String = "Home",
 ) {
     val availableHistory = history?.takeIf {
         historySurfaceAvailability(it) == HistorySurfaceAvailability.AVAILABLE
     }
 
-    EvidriloRootSurface(
-        selected = EvidriloRootDestination.HISTORY,
-        onPractice = onOpenPractice,
-        onPacks = onOpenPacks,
-        onHistory = { },
+    EvidriloTargetSurface(
+        selected = selectedSection,
+        onNavigate = onNavigate,
     ) {
         EvidriloContentColumn {
             EvidriloBackButton(label = backLabel, onClick = onBack)

@@ -2,16 +2,13 @@ package dev.nextgen.mobile
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,7 +49,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.nextgen.mobile.design.resources.evidriloPrismDrawable
+import dev.nextgen.mobile.design.resources.evidriloLogoDrawable
 import dev.nextgen.mobile.design.resources.evidriloSourceSansBoldFont
 import dev.nextgen.mobile.design.resources.evidriloSourceSansRegularFont
 import dev.nextgen.mobile.design.resources.evidriloSourceSansSemiboldFont
@@ -241,120 +238,6 @@ public fun EvidriloContentColumn(
 }
 
 @Composable
-public fun EvidriloRootSurface(
-    selected: EvidriloRootDestination,
-    onPractice: () -> Unit,
-    onPacks: () -> Unit,
-    onHistory: () -> Unit,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EvidriloColors.White),
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(bottom = 84.dp),
-            content = content,
-        )
-        EvidriloBottomNavigation(
-            selected = selected,
-            onPractice = onPractice,
-            onPacks = onPacks,
-            onHistory = onHistory,
-        )
-    }
-}
-
-public enum class EvidriloRootDestination {
-    PRACTICE,
-    PACKS,
-    HISTORY,
-}
-
-@Composable
-private fun EvidriloBottomNavigation(
-    selected: EvidriloRootDestination,
-    onPractice: () -> Unit,
-    onPacks: () -> Unit,
-    onHistory: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(color = EvidriloColors.Separator)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .safeDrawingPadding()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            EvidriloBottomNavigationItem(
-                label = "Practice",
-                icon = EvidriloIconName.CHECKLIST,
-                selected = selected == EvidriloRootDestination.PRACTICE,
-                onClick = onPractice,
-            )
-            EvidriloBottomNavigationItem(
-                label = "Packs",
-                icon = EvidriloIconName.LAYERS,
-                selected = selected == EvidriloRootDestination.PACKS,
-                onClick = onPacks,
-            )
-            EvidriloBottomNavigationItem(
-                label = "History",
-                icon = EvidriloIconName.HISTORY,
-                selected = selected == EvidriloRootDestination.HISTORY,
-                onClick = onHistory,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RowScope.EvidriloBottomNavigationItem(
-    label: String,
-    icon: EvidriloIconName,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .heightIn(min = 72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .then(
-                if (selected) {
-                    Modifier
-                } else {
-                    Modifier.clickable(onClick = onClick)
-                },
-            )
-            .semantics(mergeDescendants = true) {
-                contentDescription = label
-                role = Role.Button
-                this.selected = selected
-                stateDescription = if (selected) "Selected" else "Not selected"
-            }
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        EvidriloIcon(
-            name = icon,
-            tint = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
-        )
-        Text(
-            label,
-            color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
-            style = MaterialTheme.typography.labelLarge,
-        )
-    }
-}
-
-@Composable
 public fun EvidriloBrandHeader(onSettings: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -366,11 +249,18 @@ public fun EvidriloBrandHeader(onSettings: () -> Unit) {
         ) {
             EvidriloLogoMark()
             Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                "Evidrilo",
-                style = MaterialTheme.typography.headlineSmall,
-                color = EvidriloColors.Ink,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Text(
+                    "Evidrilo",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = EvidriloColors.Ink,
+                )
+                Text(
+                    "From evidence to action.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = EvidriloColors.Cobalt,
+                )
+            }
         }
         EvidriloIconButton(
             icon = EvidriloIconName.SETTINGS,
@@ -386,10 +276,10 @@ public fun EvidriloLogoMark(
     contentDescription: String? = null,
 ) {
     Image(
-        painter = painterResource(evidriloPrismDrawable),
+        painter = painterResource(evidriloLogoDrawable),
         contentDescription = contentDescription,
         modifier = modifier
-            .size(40.dp)
+            .size(44.dp)
             .clip(RoundedCornerShape(12.dp)),
     )
 }
