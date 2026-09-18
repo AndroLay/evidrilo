@@ -21,6 +21,12 @@ public static class EntryPoint
         Guid.Parse("99999999-9999-9999-9999-999999999990");
     private static readonly Guid OtherAccountId =
         Guid.Parse("99999999-9999-9999-9999-999999999991");
+    private static readonly Guid ReviewerAccountId =
+        Guid.Parse("99999999-9999-9999-9999-999999999992");
+    private static readonly Guid MaintainerAccountId =
+        Guid.Parse("99999999-9999-9999-9999-999999999993");
+    private static readonly Guid OrganizationId =
+        Guid.Parse("99999999-9999-4999-8999-999999999990");
     private static readonly Guid AttemptId =
         Guid.Parse("99999999-0000-0000-0000-000000000990");
     private static readonly Guid CommandId =
@@ -75,6 +81,7 @@ public static class EntryPoint
         try
         {
             await AssertReadyAsync(client);
+            await AssertContentLifecycleFlowAsync(client, databaseConnectionString);
             await AssertPublishedCaseEvidenceFlowAsync(client);
             await AssertSyncAndProjectionFlowAsync(client);
             await AssertIsolationAsync(client);
@@ -164,6 +171,256 @@ public static class EntryPoint
             body: null);
         RequireStatus(draftGraph, HttpStatusCode.NotFound, "draft evidence graph protection");
         RequireString(await ReadJsonAsync(draftGraph), "code", "CASE_NOT_FOUND");
+    }
+
+    private static async Task AssertContentLifecycleFlowAsync(
+        HttpClient client,
+        string databaseConnectionString)
+    {
+        var authoringRequest = new
+        {
+            schema = "evidrilo.case-authoring",
+            version = "1",
+            organizationId = OrganizationId,
+            document = new
+            {
+                content = new
+                {
+                    caseId = "case-e2e",
+                    caseVersionId = CaseVersionId,
+                    title = "Evidence graph integration case",
+                    contentHash = CaseContentHash,
+                    evaluatorVersion = "evidrilo.v1",
+                    factAnchors = new[] { "OBS-E2E-01", "LIMIT-E2E-01" },
+                    skillTags = new[] { "evidence" },
+                },
+                objective = "Connect evidence to a bounded claim",
+                difficulty = 2,
+                evidenceReferences = new[] { "OBS-E2E-01", "LIMIT-E2E-01" },
+                facts = new[]
+                {
+                    new { id = "OBS-E2E-01", type = "observation", text = "Warm water reached the mark in 32 seconds." },
+                    new { id = "LIMIT-E2E-01", type = "limitation", text = "Each condition was measured once." },
+                },
+                rules = new[]
+                {
+                    new { id = "RULE-E2E-01", outcome = "PASS", anchorIds = new[] { "OBS-E2E-01", "LIMIT-E2E-01" } },
+                },
+                variants = new[]
+                {
+                    new { id = "CHALLENGE-E2E-01", removedFactIds = new[] { "LIMIT-E2E-01" } },
+                },
+            },
+        };
+
+        using var created = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/v1/authoring/cases",
+            AccountId,
+            authoringRequest);
+        RequireStatus(created, HttpStatusCode.OK, "case draft creation");
+        var createdBody = await ReadJsonAsync(created);
+        RequireString(createdBody, "schema", "evidrilo.case-authoring-result");
+        RequireString(createdBody, "caseVersionId", CaseVersionId);
+        RequireString(createdBody, "state", "draft");
+
+        using var duplicateCreate = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/v1/authoring/cases",
+            AccountId,
+            authoringRequest);
+        RequireStatus(duplicateCreate, HttpStatusCode.Conflict, "duplicate case draft creation");
+        RequireString(await ReadJsonAsync(duplicateCreate), "code", "CASE_VERSION_EXISTS");
+
+        using var hiddenDraft = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/cases/{CaseVersionId}",
+            AccountId,
+            body: null);
+        RequireStatus(hiddenDraft, HttpStatusCode.NotFound, "unpublished case protection");
+        RequireString(await ReadJsonAsync(hiddenDraft), "code", "CASE_NOT_FOUND");
+
+        using var sentToReview = await SendTransitionAsync(
+            client,
+            AccountId,
+            CaseVersionId,
+            "review",
+            "Ready for independent review.");
+        RequireStatus(sentToReview, HttpStatusCode.OK, "draft to review transition");
+        RequireString(await ReadJsonAsync(sentToReview), "state", "review");
+
+        using var selfApproval = await SendTransitionAsync(
+            client,
+            AccountId,
+            CaseVersionId,
+            "approved",
+            "Author cannot approve own case.");
+        RequireStatus(selfApproval, HttpStatusCode.Conflict, "self approval rejection");
+        RequireString(await ReadJsonAsync(selfApproval), "code", "INVALID_CASE_TRANSITION");
+
+        using var approved = await SendTransitionAsync(
+            client,
+            ReviewerAccountId,
+            CaseVersionId,
+            "approved",
+            "Evidence and challenge content reviewed.");
+        RequireStatus(approved, HttpStatusCode.OK, "review approval transition");
+        RequireString(await ReadJsonAsync(approved), "state", "approved");
+
+        using var duplicateApproval = await SendTransitionAsync(
+            client,
+            ReviewerAccountId,
+            CaseVersionId,
+            "approved",
+            "Duplicate review retry.");
+        RequireStatus(duplicateApproval, HttpStatusCode.Conflict, "duplicate review transition");
+        RequireString(await ReadJsonAsync(duplicateApproval), "code", "INVALID_CASE_TRANSITION");
+
+        using var published = await SendTransitionAsync(
+            client,
+            MaintainerAccountId,
+            CaseVersionId,
+            "published",
+            "Approved for the published catalogue.");
+        RequireStatus(published, HttpStatusCode.OK, "approved to published transition");
+        RequireString(await ReadJsonAsync(published), "state", "published");
+
+        using var mutatePublished = await SendTransitionAsync(
+            client,
+            MaintainerAccountId,
+            CaseVersionId,
+            "draft",
+            "Published versions cannot be rewritten.");
+        RequireStatus(mutatePublished, HttpStatusCode.Conflict, "published immutability guard");
+        RequireString(await ReadJsonAsync(mutatePublished), "code", "PUBLISHED_VERSION_IMMUTABLE");
+
+        using var unauthorizedAudit = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/authoring/cases/{CaseVersionId}/audit",
+            OtherAccountId,
+            body: null);
+        RequireStatus(unauthorizedAudit, HttpStatusCode.Forbidden, "cross-account audit protection");
+        RequireString(await ReadJsonAsync(unauthorizedAudit), "code", "MEMBERSHIP_REQUIRED");
+
+        using var audit = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/authoring/cases/{CaseVersionId}/audit",
+            MaintainerAccountId,
+            body: null);
+        RequireStatus(audit, HttpStatusCode.OK, "case lifecycle audit read");
+        var auditBody = await ReadJsonAsync(audit);
+        RequireString(auditBody, "schema", "evidrilo.case-lifecycle-audit");
+        var events = auditBody.GetProperty("events");
+        if (events.GetArrayLength() != 4)
+        {
+            throw new InvalidOperationException("The lifecycle audit did not contain exactly four state events.");
+        }
+
+        RequireString(events[0], "eventType", "created");
+        RequireString(events[0], "toState", "draft");
+        RequireString(events[0], "reason", "draft_created");
+        RequireActor(events[0], AccountId);
+        if (events[0].GetProperty("fromState").ValueKind != JsonValueKind.Null)
+            throw new InvalidOperationException("Draft creation unexpectedly had a previous state.");
+
+        RequireTransitionEvent(events[1], AccountId, "draft", "review", "Ready for independent review.");
+        RequireTransitionEvent(events[2], ReviewerAccountId, "review", "approved", "Evidence and challenge content reviewed.");
+        RequireTransitionEvent(events[3], MaintainerAccountId, "approved", "published", "Approved for the published catalogue.");
+        await AssertLifecycleDatabaseStateAsync(databaseConnectionString);
+    }
+
+    private static async Task<HttpResponseMessage> SendTransitionAsync(
+        HttpClient client,
+        Guid accountId,
+        string caseVersionId,
+        string targetState,
+        string reason) => await SendAsync(
+        client,
+        HttpMethod.Post,
+        $"/v1/authoring/cases/{caseVersionId}/transition",
+        accountId,
+        new
+        {
+            schema = "evidrilo.case-transition",
+            version = "1",
+            targetState,
+            reason,
+        });
+
+    private static void RequireTransitionEvent(
+        JsonElement auditEvent,
+        Guid actorAccountId,
+        string fromState,
+        string toState,
+        string reason)
+    {
+        RequireString(auditEvent, "eventType", "transitioned");
+        RequireString(auditEvent, "fromState", fromState);
+        RequireString(auditEvent, "toState", toState);
+        RequireString(auditEvent, "reason", reason);
+        RequireActor(auditEvent, actorAccountId);
+    }
+
+    private static void RequireActor(JsonElement auditEvent, Guid expected)
+    {
+        if (!auditEvent.TryGetProperty("actorAccountId", out var actor)
+            || actor.GetGuid() != expected)
+        {
+            throw new InvalidOperationException("The lifecycle audit actor did not match the authorized transition actor.");
+        }
+    }
+
+    private static async Task AssertLifecycleDatabaseStateAsync(string databaseConnectionString)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var versionCommand = connection.CreateCommand();
+        versionCommand.CommandText = """
+            select status, author_id, reviewer_id, organization_id,
+                   (select count(*) from public.case_review_decisions
+                    where case_version_id = @case_version_id),
+                   (select count(*) from public.case_lifecycle_audit_events
+                    where case_version_id = @case_version_id)
+            from public.case_versions
+            where case_version_id = @case_version_id;
+            """;
+        versionCommand.Parameters.AddWithValue("case_version_id", CaseVersionId);
+        await using (var reader = await versionCommand.ExecuteReaderAsync())
+        {
+            if (!await reader.ReadAsync()
+                || reader.GetString(0) != "published"
+                || reader.GetGuid(1) != AccountId
+                || reader.GetGuid(2) != ReviewerAccountId
+                || reader.GetGuid(3) != OrganizationId
+                || reader.GetInt64(4) != 1
+                || reader.GetInt64(5) != 4)
+            {
+                throw new InvalidOperationException("The database lifecycle state did not match the server-owned flow.");
+            }
+        }
+
+        await using var decisionCommand = connection.CreateCommand();
+        decisionCommand.CommandText = """
+            select decision, reviewer_id, reason
+            from public.case_review_decisions
+            where case_version_id = @case_version_id
+            order by created_at, decision_id;
+            """;
+        decisionCommand.Parameters.AddWithValue("case_version_id", CaseVersionId);
+        await using var decisionReader = await decisionCommand.ExecuteReaderAsync();
+        if (!await decisionReader.ReadAsync()
+            || decisionReader.GetString(0) != "approved"
+            || decisionReader.GetGuid(1) != ReviewerAccountId
+            || decisionReader.GetString(2) != "Evidence and challenge content reviewed."
+            || await decisionReader.ReadAsync())
+        {
+            throw new InvalidOperationException("The database review decision was missing, duplicated, or misattributed.");
+        }
     }
 
     private static async Task AssertSyncAndProjectionFlowAsync(HttpClient client)
@@ -328,49 +585,29 @@ public static class EntryPoint
         command.CommandText = """
             select set_config('request.jwt.claim.sub', @account_id::text, false);
 
-            delete from auth.users where id in (@account_id, @other_account_id);
+            delete from auth.users
+             where id in (@account_id, @other_account_id, @reviewer_account_id, @maintainer_account_id);
 
-            insert into auth.users (id) values (@account_id), (@other_account_id);
+            insert into auth.users (id) values
+                (@account_id),
+                (@other_account_id),
+                (@reviewer_account_id),
+                (@maintainer_account_id);
 
             select set_config('request.jwt.claim.sub', @account_id::text, false);
 
-            insert into public.case_versions (
-                case_version_id, content_hash, status, published_at,
-                case_id, title, evaluator_version, skill_tags,
-                objective, difficulty, evidence_references, content
-            ) values (
-                'M0_T2:1', @content_hash, 'published', now(),
-                'case-e2e', 'Evidence graph integration case', 'evidrilo.v1',
-                array['evidence'],
-                'Connect evidence to a bounded claim', 2,
-                array['OBS-E2E-01', 'LIMIT-E2E-01'],
-                $case$
-                {
-                  "content": {
-                    "caseId": "case-e2e",
-                    "caseVersionId": "M0_T2:1",
-                    "title": "Evidence graph integration case",
-                    "contentHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                    "evaluatorVersion": "evidrilo.v1",
-                    "factAnchors": ["OBS-E2E-01", "LIMIT-E2E-01"],
-                    "skillTags": ["evidence"]
-                  },
-                  "objective": "Connect evidence to a bounded claim",
-                  "difficulty": 2,
-                  "evidenceReferences": ["OBS-E2E-01", "LIMIT-E2E-01"],
-                  "facts": [
-                    { "id": "OBS-E2E-01", "type": "observation", "text": "Warm water reached the mark in 32 seconds." },
-                    { "id": "LIMIT-E2E-01", "type": "limitation", "text": "Each condition was measured once." }
-                  ],
-                  "rules": [
-                    { "id": "RULE-E2E-01", "outcome": "PASS", "anchorIds": ["OBS-E2E-01", "LIMIT-E2E-01"] }
-                  ],
-                  "variants": [
-                    { "id": "CHALLENGE-E2E-01", "removedFactIds": ["LIMIT-E2E-01"] }
-                  ]
-                }
-                $case$::jsonb
-            ) on conflict (case_version_id) do nothing;
+            insert into public.organizations (organization_id, name)
+            values (@organization_id, 'Evidrilo lifecycle integration organization')
+            on conflict (organization_id) do nothing;
+
+            insert into public.organization_memberships (organization_id, account_id, role, active)
+            values
+                (@organization_id, @account_id, 'author', true),
+                (@organization_id, @reviewer_account_id, 'reviewer', true),
+                (@organization_id, @maintainer_account_id, 'maintainer', true)
+            on conflict (organization_id, account_id) do update
+                set role = excluded.role,
+                    active = excluded.active;
 
             insert into public.case_versions (
                 case_version_id, content_hash, status, published_at,
@@ -383,7 +620,9 @@ public static class EntryPoint
             """;
         command.Parameters.AddWithValue("account_id", AccountId);
         command.Parameters.AddWithValue("other_account_id", OtherAccountId);
-        command.Parameters.AddWithValue("content_hash", CaseContentHash);
+        command.Parameters.AddWithValue("reviewer_account_id", ReviewerAccountId);
+        command.Parameters.AddWithValue("maintainer_account_id", MaintainerAccountId);
+        command.Parameters.AddWithValue("organization_id", OrganizationId);
         command.Parameters.AddWithValue(
             "draft_content_hash",
             "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd");
