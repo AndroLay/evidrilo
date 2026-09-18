@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Evidrilo.Api.Content;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,26 +11,29 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Evidrilo.Api.Tests;
 
-public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
+public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
 {
+    private static readonly Guid UserId = Guid.Parse("123e4567-e89b-42d3-a456-426614174000");
     private readonly HttpClient client;
     private readonly ApiFactory factory;
 
-    public CaseEndpointTests(ApiFactory factory)
+    public EvidenceGraphEndpointTests(ApiFactory factory)
     {
         this.factory = factory;
         client = factory.CreateClient();
     }
 
     [Fact]
-    public void Case_read_uses_the_api_rate_limit_policy()
+    public void Evidence_graph_uses_the_api_rate_limit_policy()
     {
         var dataSource = factory.Services.GetRequiredService<EndpointDataSource>();
         var endpoint = Assert.Single(
             dataSource.Endpoints,
             candidate => candidate.Metadata.GetMetadata<IHttpMethodMetadata>()
                 ?.HttpMethods.Contains("GET") == true
-                && candidate.DisplayName?.EndsWith("/v1/cases/{caseVersionId}", StringComparison.Ordinal) == true);
+                && candidate.DisplayName?.EndsWith(
+                    "/v1/cases/{caseVersionId}/evidence-graph",
+                    StringComparison.Ordinal) == true);
 
         var policy = endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>();
 
@@ -38,9 +42,9 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Case_read_requires_verified_identity()
+    public async Task Evidence_graph_requires_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/cases/M0_T2:1");
+        using var response = await client.GetAsync("/v1/cases/case-1:v1/evidence-graph");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -48,23 +52,12 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Case_read_fails_closed_without_database()
+    public async Task Evidence_graph_requires_verified_identity()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases/M0_T2:1");
-        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|true");
-
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task Case_read_rejects_unverified_identity()
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases/M0_T2:1");
-        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|false");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/v1/cases/case-1:v1/evidence-graph");
+        request.Headers.Add("X-Test-User", $"{UserId}|false");
 
         using var response = await client.SendAsync(request);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -74,7 +67,37 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Case_read_returns_the_canonical_learning_content()
+    public async Task Evidence_graph_rejects_an_invalid_case_version()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/v1/cases/not%20valid/evidence-graph");
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("INVALID_CASE_VERSION", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Evidence_graph_fails_closed_when_database_is_not_configured()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/v1/cases/case-1:v1/evidence-graph");
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Evidence_graph_returns_the_versioned_relationship_contract()
     {
         using var testFactory = new ApiFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -83,18 +106,23 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
                 services.AddSingleton<ICaseStore, PublishedCaseStore>();
             }));
         using var testClient = testFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases/case-1:v1");
-        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|true");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/v1/cases/case-1:v1/evidence-graph");
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
 
         using var response = await testClient.SendAsync(request);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("Connect evidence to a bounded claim", body.GetProperty("objective").GetString());
-        Assert.Equal("observation", body.GetProperty("facts")[0].GetProperty("type").GetString());
-        Assert.Equal("limitation", body.GetProperty("facts")[1].GetProperty("type").GetString());
-        Assert.Equal("PASS", body.GetProperty("rules")[0].GetProperty("outcome").GetString());
-        Assert.Equal("challenge-1", body.GetProperty("variants")[0].GetProperty("id").GetString());
+        Assert.Equal("evidrilo.evidence-graph", body.GetProperty("schema").GetString());
+        Assert.Equal("1", body.GetProperty("version").GetString());
+        Assert.Equal("case-1:v1", body.GetProperty("caseVersionId").GetString());
+        Assert.Equal(5, body.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(5, body.GetProperty("edges").GetArrayLength());
+        Assert.Equal(
+            "verified_by",
+            body.GetProperty("edges")[4].GetProperty("relation").GetString());
     }
 
     private sealed class PublishedCaseStore : ICaseStore

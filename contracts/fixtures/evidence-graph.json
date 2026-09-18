@@ -1,0 +1,43 @@
+{
+  "schema": "evidrilo.evidence-graph",
+  "version": "1",
+  "caseVersionId": "case-1:v1",
+  "contentHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "nodes": [
+    {
+      "id": "requirement:case-1:v1",
+      "kind": "requirement",
+      "label": "objective",
+      "text": "Connect evidence to a bounded claim",
+      "state": "required"
+    },
+    {
+      "id": "evidence:fact-observation",
+      "kind": "evidence",
+      "label": "observation",
+      "text": "The tablet was cold.",
+      "state": "observed"
+    },
+    {
+      "id": "claim:rule-1",
+      "kind": "claim",
+      "label": "rule",
+      "text": "rule-1",
+      "state": "asserted"
+    },
+    {
+      "id": "verification:rule-1",
+      "kind": "verification",
+      "label": "outcome",
+      "text": "PASS",
+      "state": "verified"
+    }
+  ],
+  "edges": [
+    { "from": "requirement:case-1:v1", "to": "evidence:fact-observation", "relation": "requires" },
+    { "from": "requirement:case-1:v1", "to": "claim:rule-1", "relation": "tests" },
+    { "from": "evidence:fact-observation", "to": "claim:rule-1", "relation": "supports" },
+    { "from": "claim:rule-1", "to": "verification:rule-1", "relation": "verified_by" }
+  ],
+  "requestId": "req-evidence01"
+}
