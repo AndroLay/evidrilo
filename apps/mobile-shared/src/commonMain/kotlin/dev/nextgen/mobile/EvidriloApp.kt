@@ -1165,6 +1165,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             )
 
             is ConclusionState.Feedback -> EvidriloFeedbackScreen(
+                case = case,
                 draft = current.draft,
                 evaluation = current.evaluation,
                 onRevise = { dispatch(ConclusionEvent.BeginRevision) },
@@ -1194,6 +1195,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             )
 
             is ConclusionState.Summary -> EvidriloSummaryScreen(
+                case = case,
                 initialDraft = current.initialDraft,
                 revisedDraft = current.revisedDraft,
                 finalEvaluation = current.finalEvaluation,
@@ -1366,6 +1368,7 @@ private fun EvidriloPremiumSurface(
             )
 
             is ConclusionState.Feedback -> EvidriloFeedbackScreen(
+                case = state.case,
                 draft = current.draft,
                 evaluation = current.evaluation,
                 onRevise = { onPracticeEvent(ConclusionEvent.BeginRevision) },
@@ -1637,6 +1640,7 @@ private fun EvidriloDraftScreen(
 
         when (step) {
             EvidriloDraftStep.EVIDENCE -> {
+                EvidriloWorkspaceTraceCard(case = case, draft = draft)
                 EvidriloCaseFactsCard(case)
                 EvidriloSectionTitle("1. What relationship are you making?")
                 ConclusionRelation.entries
@@ -1840,6 +1844,7 @@ private fun EvidriloDraftStepIndicator(current: EvidriloDraftStep) {
 
 @Composable
 private fun EvidriloFeedbackScreen(
+    case: ConclusionCase,
     draft: ConclusionDraft,
     evaluation: ConclusionEvaluation,
     onRevise: () -> Unit,
@@ -1866,6 +1871,7 @@ private fun EvidriloFeedbackScreen(
             onPauseOrResume = onPauseOrResumeAudio,
             onStopAudio = onStopAudio,
         )
+        EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -1885,6 +1891,7 @@ private fun EvidriloFeedbackScreen(
 
 @Composable
 private fun EvidriloSummaryScreen(
+    case: ConclusionCase,
     initialDraft: ConclusionDraft,
     revisedDraft: ConclusionDraft,
     finalEvaluation: ConclusionEvaluation,
@@ -1915,6 +1922,12 @@ private fun EvidriloSummaryScreen(
         EvidriloDraftSnapshot("Before feedback", initialDraft)
         HorizontalDivider()
         EvidriloDraftSnapshot("After one revision", revisedDraft)
+        EvidriloEvidenceDeltaCard(
+            before = initialDraft,
+            after = revisedDraft,
+            title = "Revision evidence and field changes",
+        )
+        EvidriloClaimBoundaryCard(case = case, draft = revisedDraft, evaluation = finalEvaluation)
         finalEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -1960,6 +1973,11 @@ private fun EvidriloEvidenceChangeFeedbackScreen(
             onListen = onListen,
             onPauseOrResume = onPauseOrResumeAudio,
             onStopAudio = onStopAudio,
+        )
+        EvidriloClaimBoundaryCard(
+            case = ConclusionCases.EVIDENCE_CHANGE,
+            draft = draft,
+            evaluation = evaluation,
         )
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
@@ -2015,6 +2033,16 @@ private fun EvidriloEvidenceChangeSummaryScreen(
         EvidriloDraftSnapshot("Base revision", baseDraft)
         HorizontalDivider()
         EvidriloDraftSnapshot("Changed-evidence conclusion", challengeDraft)
+        EvidriloEvidenceDeltaCard(
+            before = baseDraft,
+            after = challengeDraft,
+            title = "Changed-evidence comparison",
+        )
+        EvidriloClaimBoundaryCard(
+            case = ConclusionCases.EVIDENCE_CHANGE,
+            draft = challengeDraft,
+            evaluation = challengeEvaluation,
+        )
         challengeEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
