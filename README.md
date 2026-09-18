@@ -20,6 +20,8 @@ generator.
 
 The current main branch contains the new Evidrilo product direction:
 
+Current structural baseline: `13af4ec`.
+
 - target home, sources, workspace, evidence, claim-trace, verification,
   action-plan, profile, history, and evidence-change surfaces are routed from
   the primary mobile entry point;
