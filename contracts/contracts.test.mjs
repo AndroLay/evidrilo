@@ -21,6 +21,7 @@ const schemaFiles = [
   'progress-summary.v1.json',
   'progress-daily.v1.json',
   'case-summary.v1.json',
+  'evidence-graph.v1.json',
   'recommendation.v1.json',
   'cohort-summary.v1.json',
   'ai-assist-result.v1.json',
@@ -45,6 +46,7 @@ const fixtureFiles = [
   'progress-daily.json',
   'published-case-summary.json',
   'case-lifecycle-audit.json',
+  'evidence-graph.json',
 ];
 
 function readJson(relativePath) {

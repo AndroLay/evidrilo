@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/evidence-graph.v1.json",
+  "title": "Evidrilo evidence graph v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "caseVersionId", "contentHash", "nodes", "edges", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.evidence-graph" },
+    "version": { "const": "1" },
+    "caseVersionId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "label", "text", "state"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,256}$" },
+          "kind": { "enum": ["requirement", "evidence", "claim", "verification"] },
+          "label": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+          "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "state": {
+            "enum": [
+              "required",
+              "observed",
+              "limiting",
+              "boundary",
+              "aim",
+              "context",
+              "unresolved",
+              "asserted",
+              "verified",
+              "action_required",
+              "cannot_assess",
+              "incomplete",
+              "unverified"
+            ]
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "relation"],
+        "properties": {
+          "from": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,256}$" },
+          "to": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,256}$" },
+          "relation": { "enum": ["requires", "tests", "supports", "limits", "verified_by"] }
+        }
+      }
+    },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

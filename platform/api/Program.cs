@@ -175,6 +175,7 @@ app.MapSyncEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapProgressEndpoints();
 app.MapCaseEndpoints();
+app.MapEvidenceGraphEndpoints();
 app.MapCaseAuthoringEndpoints();
 app.MapRecommendationEndpoints();
 app.MapRecommendationInteractionEndpoints();
