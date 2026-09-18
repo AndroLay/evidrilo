@@ -149,5 +149,10 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
                     [new AuthoringRule("rule-1", "PASS", ["fact-observation"])],
                     [new AuthoringVariant("challenge-1", ["fact-observation"])])
             ));
+
+        public Task<IReadOnlyList<PublishedCaseListItem>> ListPublishedAsync(
+            Guid accountId,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PublishedCaseListItem>>(
+            Array.Empty<PublishedCaseListItem>());
     }
 }

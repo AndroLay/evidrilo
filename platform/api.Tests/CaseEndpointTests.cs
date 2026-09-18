@@ -38,6 +38,22 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public void Case_catalogue_uses_the_api_rate_limit_policy()
+    {
+        var dataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+        var endpoint = Assert.Single(
+            dataSource.Endpoints,
+            candidate => candidate.Metadata.GetMetadata<IHttpMethodMetadata>()
+                ?.HttpMethods.Contains("GET") == true
+                && candidate.DisplayName?.EndsWith("/v1/cases", StringComparison.Ordinal) == true);
+
+        var policy = endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>();
+
+        Assert.NotNull(policy);
+        Assert.Equal("api", policy!.PolicyName);
+    }
+
+    [Fact]
     public async Task Case_read_requires_verified_identity()
     {
         using var response = await client.GetAsync("/v1/cases/M0_T2:1");
@@ -71,6 +87,66 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Case_catalogue_requires_verified_identity()
+    {
+        using var response = await client.GetAsync("/v1/cases");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Case_catalogue_rejects_unverified_identity()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases");
+        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|false");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Case_catalogue_fails_closed_without_database()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases");
+        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|true");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Case_catalogue_returns_published_case_metadata()
+    {
+        using var testFactory = new ApiFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ICaseStore>();
+                services.AddSingleton<ICaseStore, PublishedCaseStore>();
+            }));
+        using var testClient = testFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/cases");
+        request.Headers.Add("X-Test-User", "123e4567-e89b-42d3-a456-426614174000|true");
+
+        using var response = await testClient.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("evidrilo.case-catalogue", body.GetProperty("schema").GetString());
+        Assert.Equal(1, body.GetProperty("cases").GetArrayLength());
+        Assert.Equal("case-1:v1", body.GetProperty("cases")[0].GetProperty("caseVersionId").GetString());
+        Assert.Equal("Connect evidence to a bounded claim", body.GetProperty("cases")[0].GetProperty("objective").GetString());
+        Assert.False(body.GetProperty("cases")[0].TryGetProperty("content", out _));
     }
 
     [Fact]
@@ -121,5 +197,18 @@ public sealed class CaseEndpointTests : IClassFixture<ApiFactory>
                     [new AuthoringRule("rule-1", "PASS", ["fact-observation"])],
                     [new AuthoringVariant("challenge-1", ["fact-observation"])])
             ));
+
+        public Task<IReadOnlyList<PublishedCaseListItem>> ListPublishedAsync(
+            Guid accountId,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PublishedCaseListItem>>(
+            [new PublishedCaseListItem(
+                "case-1",
+                "case-1:v1",
+                "A bounded case",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "evaluator.v1",
+                ["evidence"],
+                "Connect evidence to a bounded claim",
+                2)]);
     }
 }

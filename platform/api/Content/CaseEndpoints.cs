@@ -12,6 +12,46 @@ public static class CaseEndpoints
     public static IEndpointRouteBuilder MapCaseEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
+            "/v1/cases",
+            async (HttpContext context, ICaseStore store, CancellationToken cancellationToken) =>
+            {
+                if (!AuthenticatedUser.TryGetAccountId(context.User, out var accountId))
+                {
+                    return Results.Json(
+                        ApiErrors.Create(context, "AUTH_REQUIRED", "Authentication is required."),
+                        statusCode: StatusCodes.Status401Unauthorized);
+                }
+
+                if (!AuthenticatedUser.IsEmailVerified(context.User))
+                {
+                    return Results.Json(
+                        ApiErrors.Create(context, "FORBIDDEN", "You are not allowed to access published cases."),
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                var cases = await store.ListPublishedAsync(accountId, cancellationToken);
+                return Results.Ok(new
+                {
+                    schema = "evidrilo.case-catalogue",
+                    version = "1",
+                    cases = cases.Select(result => new
+                    {
+                        caseId = result.CaseId,
+                        caseVersionId = result.CaseVersionId,
+                        title = result.Title,
+                        contentHash = result.ContentHash,
+                        evaluatorVersion = result.EvaluatorVersion,
+                        skillTags = result.SkillTags,
+                        objective = result.Objective,
+                        difficulty = result.Difficulty,
+                    }),
+                    requestId = RequestIdMiddleware.Get(context),
+                });
+            })
+            .RequireAuthorization()
+            .RequireRateLimiting("api");
+
+        endpoints.MapGet(
             "/v1/cases/{caseVersionId}",
             async (HttpContext context, string caseVersionId, ICaseStore store, CancellationToken cancellationToken) =>
             {

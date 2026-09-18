@@ -14,11 +14,25 @@ public sealed record PublishedCaseSummary(
     IReadOnlyList<string> SkillTags,
     PublishedCaseContent Content);
 
+public sealed record PublishedCaseListItem(
+    string CaseId,
+    string CaseVersionId,
+    string Title,
+    string ContentHash,
+    string EvaluatorVersion,
+    IReadOnlyList<string> SkillTags,
+    string Objective,
+    int Difficulty);
+
 public interface ICaseStore
 {
     Task<PublishedCaseSummary?> GetPublishedAsync(
         Guid accountId,
         string caseVersionId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PublishedCaseListItem>> ListPublishedAsync(
+        Guid accountId,
         CancellationToken cancellationToken);
 }
 
@@ -27,6 +41,13 @@ public sealed class DatabaseUnavailableCaseStore : ICaseStore
     public Task<PublishedCaseSummary?> GetPublishedAsync(
         Guid accountId,
         string caseVersionId,
+        CancellationToken cancellationToken) => throw new ApiException(
+        StatusCodes.Status503ServiceUnavailable,
+        "DATABASE_NOT_CONFIGURED",
+        "Published cases are not configured.");
+
+    public Task<IReadOnlyList<PublishedCaseListItem>> ListPublishedAsync(
+        Guid accountId,
         CancellationToken cancellationToken) => throw new ApiException(
         StatusCodes.Status503ServiceUnavailable,
         "DATABASE_NOT_CONFIGURED",
@@ -123,6 +144,68 @@ public sealed class NpgsqlCaseStore : ICaseStore, IDisposable
         catch (JsonException)
         {
             throw InvalidPublishedContent();
+        }
+        catch (NpgsqlException exception)
+        {
+            throw new ApiException(
+                StatusCodes.Status503ServiceUnavailable,
+                "DATABASE_UNAVAILABLE",
+                "Published cases are temporarily unavailable.",
+                exception);
+        }
+    }
+
+    public async Task<IReadOnlyList<PublishedCaseListItem>> ListPublishedAsync(
+        Guid accountId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await SetRequestAccountAsync(connection, transaction, accountId, cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                select case_id, case_version_id, title, content_hash,
+                       evaluator_version, skill_tags, objective, difficulty
+                from public.case_versions
+                where status = 'published'
+                  and case_id is not null
+                  and case_version_id is not null
+                  and title is not null
+                  and content_hash is not null
+                  and evaluator_version is not null
+                  and skill_tags is not null
+                  and objective is not null
+                  and difficulty between 1 and 5
+                order by case_id, case_version_id
+                limit 128;
+                """;
+
+            var results = new List<PublishedCaseListItem>();
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    results.Add(new PublishedCaseListItem(
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetString(3),
+                        reader.GetString(4),
+                        reader.GetFieldValue<string[]>(5),
+                        reader.GetString(6),
+                        reader.GetInt32(7)));
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return results;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (NpgsqlException exception)
         {

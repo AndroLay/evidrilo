@@ -1,0 +1,17 @@
+{
+  "schema": "evidrilo.case-catalogue",
+  "version": "1",
+  "cases": [
+    {
+      "caseId": "case-it",
+      "caseVersionId": "case-published-it",
+      "title": "Published integration case",
+      "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evaluatorVersion": "evidrilo.v1",
+      "skillTags": ["evidence"],
+      "objective": "Compare supplied observations",
+      "difficulty": 2
+    }
+  ],
+  "requestId": "req-case-cat-004"
+}
