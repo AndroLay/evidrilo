@@ -86,6 +86,31 @@ The evaluator abstains when those relationships cannot be established from the
 active case. It never invents a positive result because a response looks
 plausible.
 
+### End-to-end practice flow
+
+This is the complete path for one practice session, including the boundary
+between the offline learning core and optional connected capabilities.
+
+~~~mermaid
+flowchart TD
+    Start[Select a case] --> Load[Load immutable CaseVersion]
+    Load --> Input[Map evidence and write a scoped conclusion]
+    Input --> Evaluate[Run deterministic evaluation locally]
+    Evaluate --> Decision{Can the active facts and rules support feedback?}
+    Decision -->|No| Abstain[CANNOT_ASSESS with a missing-anchor explanation]
+    Decision -->|Yes| Feedback[Show prioritized fact-anchored feedback]
+    Abstain --> Revise[Make one guided revision]
+    Feedback --> Revise
+    Revise --> Compare[Compare the initial and revised reasoning]
+    Compare --> Save[Save bounded history locally]
+    Save --> Optional{Need an optional connected capability?}
+    Optional -->|No| Done[Continue offline or finish]
+    Optional -->|Premium content| Entitlement[Check active RevenueCat entitlement]
+    Optional -->|Consent to sync| Sync[Send bounded metadata to the ASP.NET Core API]
+    Entitlement --> Done
+    Sync --> Done
+~~~
+
 ## Architecture
 
 Evidrilo uses a local-first, ports-and-adapters architecture. Shared Kotlin
