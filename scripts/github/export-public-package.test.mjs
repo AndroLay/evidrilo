@@ -128,7 +128,7 @@ function createExporterFixture() {
   const sourceText = 'Start with the evidence.';
   fs.mkdirSync(path.join(audioRoot, 'narration'), { recursive: true });
   fs.writeFileSync(path.join(audioRoot, audioFile), audioBytes);
-  writeFixtureFile(root, 'docs/licenses/audio-assets.md', '# Synthetic test fixture license\n');
+  writeFixtureFile(root, 'THIRD_PARTY_NOTICES.md', '# Synthetic test fixture notices\n');
   fs.writeFileSync(
     path.join(audioRoot, 'audio-manifest.json'),
     JSON.stringify(
@@ -146,7 +146,7 @@ function createExporterFixture() {
             byteLength: audioBytes.length,
             format: 'm4a',
             voiceLabel: 'synthetic fixture voice',
-            licenseReference: 'docs/licenses/audio-assets.md',
+            licenseReference: 'THIRD_PARTY_NOTICES.md',
           },
         ],
       },

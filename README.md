@@ -319,7 +319,6 @@ backward-compatible migrations, and tests appropriate to the changed boundary.
 
 Evidrilo source is released under the [MIT License](LICENSE).
 
-Third-party notices are recorded separately in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the linked
-[docs/licenses/](docs/licenses/) files. Those notices do not replace or add a
+Third-party notices are recorded in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). They do not replace or add a
 second root project license.

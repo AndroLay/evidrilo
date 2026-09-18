@@ -72,7 +72,7 @@ is_public_path() {
     .github/*|apps/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)
       return 0
       ;;
-    docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/licenses/SourceSans3-OFL-1.1.md|docs/licenses/audio-assets.md|docs/product/m0-product-contract.md|docs/operations/README.md|docs/api/*|docs/adr/*)
+    docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/product/m0-product-contract.md|docs/operations/README.md|docs/api/*|docs/adr/*)
       return 0
       ;;
   esac

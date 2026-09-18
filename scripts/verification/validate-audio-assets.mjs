@@ -252,7 +252,7 @@ function main() {
     if (
       typeof entry.licenseReference !== 'string' ||
       licensePath === null ||
-      !entry.licenseReference.startsWith('docs/licenses/')
+      entry.licenseReference !== 'THIRD_PARTY_NOTICES.md'
     ) {
       errors.push(`${label} has an unsafe license reference`);
     } else {

@@ -34,7 +34,6 @@ function createFixture() {
     'examples',
     'docs/architecture',
     'docs/product',
-    'docs/licenses',
     'docs/operations',
   ]) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
@@ -77,8 +76,6 @@ function createFixture() {
     'docs/architecture/revenuecat.md',
     'docs/architecture/platform-decision.md',
     'docs/architecture/repository-structure.md',
-    'docs/licenses/SourceSans3-OFL-1.1.md',
-    'docs/licenses/audio-assets.md',
     'docs/product/m0-product-contract.md',
   ]) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });

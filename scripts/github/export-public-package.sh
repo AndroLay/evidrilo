@@ -160,8 +160,6 @@ public_paths=(
   docs/architecture/platform-decision.md
   docs/architecture/repository-structure.md
   docs/architecture/revenuecat.md
-  docs/licenses/SourceSans3-OFL-1.1.md
-  docs/licenses/audio-assets.md
   docs/product/m0-product-contract.md
 )
 

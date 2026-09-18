@@ -33,8 +33,7 @@ function createFixture({ entries = [], files = {}, license = true } = {}) {
     fs.writeFileSync(target, content);
   }
   if (license) {
-    fs.mkdirSync(path.join(root, 'docs', 'licenses'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'docs', 'licenses', 'audio-assets.md'), '# Audio licenses\n');
+    fs.writeFileSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), '# Third-party notices\n');
   }
   const manifestEntries = entries.map(({ bytes: _bytes, ...metadata }) => metadata);
   fs.writeFileSync(
@@ -58,7 +57,7 @@ function entry(overrides = {}) {
     byteLength: overrides.byteLength ?? bytes.length,
     format: overrides.format ?? 'm4a',
     voiceLabel: overrides.voiceLabel ?? 'fixture voice',
-    licenseReference: overrides.licenseReference ?? 'docs/licenses/audio-assets.md',
+    licenseReference: overrides.licenseReference ?? 'THIRD_PARTY_NOTICES.md',
     bytes,
   };
 }

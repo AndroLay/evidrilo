@@ -12,7 +12,7 @@
       "byteLength": 12426,
       "format": "wav",
       "voiceLabel": "Evidrilo in-house sound design",
-      "licenseReference": "docs/licenses/audio-assets.md"
+      "licenseReference": "THIRD_PARTY_NOTICES.md"
     },
     {
       "id": "ERROR",
@@ -24,7 +24,7 @@
       "byteLength": 7134,
       "format": "wav",
       "voiceLabel": "Evidrilo in-house sound design",
-      "licenseReference": "docs/licenses/audio-assets.md"
+      "licenseReference": "THIRD_PARTY_NOTICES.md"
     },
     {
       "id": "PREMIUM_STATE",
@@ -36,7 +36,7 @@
       "byteLength": 10662,
       "format": "wav",
       "voiceLabel": "Evidrilo in-house sound design",
-      "licenseReference": "docs/licenses/audio-assets.md"
+      "licenseReference": "THIRD_PARTY_NOTICES.md"
     },
     {
       "id": "SELECTION",
@@ -48,7 +48,7 @@
       "byteLength": 4048,
       "format": "wav",
       "voiceLabel": "Evidrilo in-house sound design",
-      "licenseReference": "docs/licenses/audio-assets.md"
+      "licenseReference": "THIRD_PARTY_NOTICES.md"
     },
     {
       "id": "SUCCESS",
@@ -60,7 +60,7 @@
       "byteLength": 9780,
       "format": "wav",
       "voiceLabel": "Evidrilo in-house sound design",
-      "licenseReference": "docs/licenses/audio-assets.md"
+      "licenseReference": "THIRD_PARTY_NOTICES.md"
     }
   ]
 }
