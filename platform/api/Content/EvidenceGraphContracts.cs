@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Evidrilo.Api.Content;
@@ -49,6 +51,7 @@ public static class EvidenceGraphProjection
         var edges = new List<EvidenceGraphEdge>();
         var evidenceIdSet = new HashSet<string>(StringComparer.Ordinal);
         var evidenceIds = new List<string>();
+        var evidenceNodeIds = new Dictionary<string, string>(StringComparer.Ordinal);
         var factsById = new Dictionary<string, AuthoringFact>(StringComparer.Ordinal);
 
         foreach (var fact in publishedCase.Content.Facts)
@@ -56,6 +59,7 @@ public static class EvidenceGraphProjection
             if (!evidenceIdSet.Add(fact.Id)) continue;
             factsById.Add(fact.Id, fact);
             evidenceIds.Add(fact.Id);
+            evidenceNodeIds.Add(fact.Id, $"evidence:{fact.Id}");
             nodes.Add(new EvidenceGraphNode(
                 $"evidence:{fact.Id}",
                 "evidence",
@@ -69,6 +73,7 @@ public static class EvidenceGraphProjection
             if (evidenceIdSet.Add(reference))
             {
                 evidenceIds.Add(reference);
+                evidenceNodeIds.Add(reference, $"evidence:{reference}");
                 nodes.Add(new EvidenceGraphNode(
                     $"evidence:{reference}",
                     "evidence",
@@ -104,12 +109,24 @@ public static class EvidenceGraphProjection
 
             foreach (var anchorId in rule.AnchorIds)
             {
+                if (!evidenceNodeIds.TryGetValue(anchorId, out var evidenceNodeId))
+                {
+                    evidenceNodeId = UnresolvedEvidenceNodeId(anchorId);
+                    evidenceNodeIds.Add(anchorId, evidenceNodeId);
+                    nodes.Add(new EvidenceGraphNode(
+                        evidenceNodeId,
+                        "evidence",
+                        "anchor",
+                        "Unresolved evidence anchor",
+                        "unresolved"));
+                }
+
                 var relation = factsById.TryGetValue(anchorId, out var fact)
                     && fact.Type is "limitation" or "boundary"
                     ? "limits"
                     : "supports";
                 edges.Add(new EvidenceGraphEdge(
-                    $"evidence:{anchorId}",
+                    evidenceNodeId,
                     claimId,
                     relation));
             }
@@ -144,4 +161,7 @@ public static class EvidenceGraphProjection
         "INCOMPLETE" => "incomplete",
         _ => "unverified",
     };
+
+    private static string UnresolvedEvidenceNodeId(string anchorId) =>
+        $"evidence:unresolved:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(anchorId))).ToLowerInvariant()}";
 }
