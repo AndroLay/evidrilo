@@ -21,6 +21,7 @@ const schemaFiles = [
   'progress-summary.v1.json',
   'progress-daily.v1.json',
   'case-summary.v1.json',
+  'case-catalogue.v1.json',
   'evidence-graph.v1.json',
   'recommendation.v1.json',
   'cohort-summary.v1.json',
@@ -45,6 +46,7 @@ const fixtureFiles = [
   'progress-summary.json',
   'progress-daily.json',
   'published-case-summary.json',
+  'case-catalogue.json',
   'case-lifecycle-audit.json',
   'evidence-graph.json',
 ];
