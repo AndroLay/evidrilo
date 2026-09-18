@@ -28,6 +28,9 @@ public static class EntryPoint
     private static readonly Guid ClientEventId =
         Guid.Parse("99999999-0000-0000-0000-000000000992");
     private const string CaseVersionId = "M0_T2:1";
+    private const string DraftCaseVersionId = "M0_T2:draft";
+    private const string CaseContentHash =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private const string SnapshotDigest =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -72,14 +75,95 @@ public static class EntryPoint
         try
         {
             await AssertReadyAsync(client);
+            await AssertPublishedCaseEvidenceFlowAsync(client);
             await AssertSyncAndProjectionFlowAsync(client);
             await AssertIsolationAsync(client);
-            Console.WriteLine("EVIDRILO_API_DATABASE_WORKER_SYNC_E2E_PASS");
+            Console.WriteLine("EVIDRILO_API_DATABASE_WORKER_PUBLISHED_CASE_EVIDENCE_GRAPH_E2E_PASS");
         }
         finally
         {
             StopWorker(worker);
         }
+    }
+
+    private static async Task AssertPublishedCaseEvidenceFlowAsync(HttpClient client)
+    {
+        using var catalogue = await SendAsync(
+            client,
+            HttpMethod.Get,
+            "/v1/cases",
+            AccountId,
+            body: null);
+        RequireStatus(catalogue, HttpStatusCode.OK, "published case catalogue");
+        var catalogueBody = await ReadJsonAsync(catalogue);
+        RequireString(catalogueBody, "schema", "evidrilo.case-catalogue");
+        RequireString(catalogueBody, "version", "1");
+        var cases = catalogueBody.GetProperty("cases");
+        if (cases.GetArrayLength() != 1)
+        {
+            throw new InvalidOperationException(
+                "The published case catalogue exposed a draft or omitted the seeded published case.");
+        }
+
+        var publishedSummary = cases[0];
+        RequireString(publishedSummary, "caseVersionId", CaseVersionId);
+        RequireString(publishedSummary, "contentHash", CaseContentHash);
+        RequireString(publishedSummary, "objective", "Connect evidence to a bounded claim");
+        if (publishedSummary.GetProperty("difficulty").GetInt32() != 2)
+        {
+            throw new InvalidOperationException("The published case catalogue returned the wrong difficulty.");
+        }
+
+        using var summary = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/cases/{CaseVersionId}",
+            AccountId,
+            body: null);
+        RequireStatus(summary, HttpStatusCode.OK, "published case summary");
+        var summaryBody = await ReadJsonAsync(summary);
+        RequireString(summaryBody, "schema", "evidrilo.case-summary");
+        RequireString(summaryBody, "caseVersionId", CaseVersionId);
+        if (summaryBody.GetProperty("facts").GetArrayLength() != 2
+            || summaryBody.GetProperty("rules").GetArrayLength() != 1
+            || summaryBody.GetProperty("variants").GetArrayLength() != 1)
+        {
+            throw new InvalidOperationException("The published case summary did not return canonical learning content.");
+        }
+
+        using var graph = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/cases/{CaseVersionId}/evidence-graph",
+            AccountId,
+            body: null);
+        RequireStatus(graph, HttpStatusCode.OK, "published evidence graph");
+        var graphBody = await ReadJsonAsync(graph);
+        RequireString(graphBody, "schema", "evidrilo.evidence-graph");
+        RequireString(graphBody, "caseVersionId", CaseVersionId);
+        if (graphBody.GetProperty("nodes").GetArrayLength() != 5
+            || graphBody.GetProperty("edges").GetArrayLength() != 6)
+        {
+            throw new InvalidOperationException("The published evidence graph did not materialize the seeded relationships.");
+        }
+
+        using var draftSummary = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/cases/{DraftCaseVersionId}",
+            AccountId,
+            body: null);
+        RequireStatus(draftSummary, HttpStatusCode.NotFound, "draft case protection");
+        RequireString(await ReadJsonAsync(draftSummary), "code", "CASE_NOT_FOUND");
+
+        using var draftGraph = await SendAsync(
+            client,
+            HttpMethod.Get,
+            $"/v1/cases/{DraftCaseVersionId}/evidence-graph",
+            AccountId,
+            body: null);
+        RequireStatus(draftGraph, HttpStatusCode.NotFound, "draft evidence graph protection");
+        RequireString(await ReadJsonAsync(draftGraph), "code", "CASE_NOT_FOUND");
     }
 
     private static async Task AssertSyncAndProjectionFlowAsync(HttpClient client)
@@ -251,16 +335,58 @@ public static class EntryPoint
             select set_config('request.jwt.claim.sub', @account_id::text, false);
 
             insert into public.case_versions (
-                case_version_id, content_hash, status, published_at
+                case_version_id, content_hash, status, published_at,
+                case_id, title, evaluator_version, skill_tags,
+                objective, difficulty, evidence_references, content
             ) values (
-                'M0_T2:1', 'local-e2e-content', 'published', now()
-            ) on conflict (case_version_id) do update
-                set content_hash = excluded.content_hash,
-                    status = excluded.status,
-                    published_at = excluded.published_at;
+                'M0_T2:1', @content_hash, 'published', now(),
+                'case-e2e', 'Evidence graph integration case', 'evidrilo.v1',
+                array['evidence'],
+                'Connect evidence to a bounded claim', 2,
+                array['OBS-E2E-01', 'LIMIT-E2E-01'],
+                $case$
+                {
+                  "content": {
+                    "caseId": "case-e2e",
+                    "caseVersionId": "M0_T2:1",
+                    "title": "Evidence graph integration case",
+                    "contentHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    "evaluatorVersion": "evidrilo.v1",
+                    "factAnchors": ["OBS-E2E-01", "LIMIT-E2E-01"],
+                    "skillTags": ["evidence"]
+                  },
+                  "objective": "Connect evidence to a bounded claim",
+                  "difficulty": 2,
+                  "evidenceReferences": ["OBS-E2E-01", "LIMIT-E2E-01"],
+                  "facts": [
+                    { "id": "OBS-E2E-01", "type": "observation", "text": "Warm water reached the mark in 32 seconds." },
+                    { "id": "LIMIT-E2E-01", "type": "limitation", "text": "Each condition was measured once." }
+                  ],
+                  "rules": [
+                    { "id": "RULE-E2E-01", "outcome": "PASS", "anchorIds": ["OBS-E2E-01", "LIMIT-E2E-01"] }
+                  ],
+                  "variants": [
+                    { "id": "CHALLENGE-E2E-01", "removedFactIds": ["LIMIT-E2E-01"] }
+                  ]
+                }
+                $case$::jsonb
+            ) on conflict (case_version_id) do nothing;
+
+            insert into public.case_versions (
+                case_version_id, content_hash, status, published_at,
+                case_id, title, evaluator_version, skill_tags
+            ) values (
+                'M0_T2:draft', @draft_content_hash, 'draft', null,
+                'case-e2e-draft', 'Draft evidence case', 'evidrilo.v1',
+                array['evidence']
+            ) on conflict (case_version_id) do nothing;
             """;
         command.Parameters.AddWithValue("account_id", AccountId);
         command.Parameters.AddWithValue("other_account_id", OtherAccountId);
+        command.Parameters.AddWithValue("content_hash", CaseContentHash);
+        command.Parameters.AddWithValue(
+            "draft_content_hash",
+            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd");
         await command.ExecuteNonQueryAsync();
     }
 
