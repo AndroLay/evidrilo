@@ -17,10 +17,10 @@ Settings, History, About, practice, and Packs unavailable states. Current
 Android UI runtime, iOS host runtime, and full assistive-technology/visual
 accessibility checks still need verification.
 
-The latest post-E189 repository verification on 18 September 2026 passes Node
-`109/109`, API `172/172`, and worker `5/5`. Generated build output is not part
-of the source-only checkout; platform build results remain tied to their dated
-verification records.
+The E191 increment passes the focused Kotlin/Android target tasks, full API
+`187/187`, and the versioned contract suite. Generated build output is not part
+of the source-only checkout; host runtime, provider, managed, accessibility,
+human, and publication results remain separate evidence gates.
 
 The shared Home surface also includes the E146 recommendation boundary. It is
 enabled only for a verified, live, consented session and launches only the

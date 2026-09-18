@@ -2,14 +2,14 @@
 
 Current authority: [Evidrilo Source of Truth](../internal/research/next-gen/SOURCE_OF_TRUTH.md).
 
-Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
+Current repository increment: E191 / TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED / E190 / EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED / E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
 The local verifier now covers release-version alignment together with the
 extracted Kotlin modules. This remains repository-only evidence; signing,
 Xcode/archive, store upload, hosted CI, and publication are still owner gates.
 
-The latest post-E189 repository verification on 18 September 2026 passes Node
-`109/109`, API `172/172`, and worker `5/5`. The source checkout remains free of
-generated build output after verification; Android release and shared iOS
+The E191 increment passes the focused Kotlin/Android target tasks, full API
+`187/187`, and the versioned contract suite. The source checkout remains free
+of generated build output after verification; Android release and shared iOS
 target results remain tied to their dated E189 capture.
 
 This checklist is a gate, not a prediction of contest results. Every checked

@@ -422,7 +422,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(revenueCatRunbook, /E152 account-deletion owner guard/);
   assert.match(revenueCatRunbook, /E153 client\/request boundary hardening/);
   assert.match(revenueCatRunbook, /E154 auth callback boundary|E154/);
-  assert.match(backendRegister, /^Last synchronized: 2026-09-18 \(E189\)$/m);
+  assert.match(backendRegister, /^Last synchronized: 2026-09-18 \(E191\)$/m);
   assert.match(backendRegister, /Node (?:boundary )?`106\/106`/);
   assert.match(backendRegister, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
   assert.match(backendRegister, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
@@ -455,9 +455,9 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(completionPlan, /\| Kotlin \|[\s\S]*?\| `332\/332` JVM tests/);
   assert.match(completionPlan, /\| Database\/worker integration \|[\s\S]*?migration 030/);
   assert.match(completionPlan, /Preserve the 30-migration order\/checksum ledger/);
-  assert.match(researchIndex, /^Latest increment: E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|\.)/m);
-  assert.match(researchIndex, /^Status: CURRENT \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
-  assert.match(researchIndex, /latest repository-owned increment is \[E189\]/);
+  assert.match(researchIndex, /^Latest increment: E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|\.)/m);
+  assert.match(researchIndex, /^Status: CURRENT \/ E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
+  assert.match(researchIndex, /latest repository-owned increment is \[E191\]/);
   assert.match(researchIndex, /strict API input matching/);
   assert.match(researchIndex, /requested page size/);
   assert.match(researchIndex, /focused audio tests pass `28\/28`/);
@@ -469,7 +469,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.doesNotMatch(contentAuthoringRunbook, /^Status: `E144 \//m);
   for (const snapshotPath of currentSnapshotPaths) {
     const snapshot = fs.readFileSync(snapshotPath, 'utf8');
-    assert.match(snapshot, /^Status: `?E189(?:\s|\/)/m, snapshotPath);
+    assert.match(snapshot, /^Status: `?E191(?:\s|\/)/m, snapshotPath);
   }
 });
 
@@ -482,7 +482,7 @@ test('current status page points to the latest evidence record', {
     'utf8',
   );
 
-  assert.match(status, /recorded through\s+E189/i);
+  assert.match(status, /recorded through\s+E191/i);
   assert.doesNotMatch(status, /recorded through E151/i);
 });
 
@@ -529,7 +529,7 @@ test('current all-area audit records the latest local verification boundary', {
   );
 
   assert.match(audit, /^# Evidrilo All-Area Capability Audit$/m);
-  assert.match(audit, /^Latest increment: E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|$)/m);
+  assert.match(audit, /^Latest increment: E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|$)/m);
   assert.match(audit, /E189[\s\S]*?Node contract,[\s\S]*?`106\/106`/);
   assert.match(audit, /API[\s\S]*?`172\/172`/);
   assert.match(audit, /E186 hardens the backend-first engine[\s\S]*?Kotlin\/JVM `332\/332`/);
@@ -554,7 +554,7 @@ test('active backend execution register points to the current verification bound
     'utf8',
   );
 
-  assert.match(register, /Last synchronized: 2026-09-18 \(E189\)/);
+  assert.match(register, /Last synchronized: 2026-09-18 \(E191\)/);
   assert.match(register, /E178 replaces helper-level/);
   assert.match(register, /E179 prevents a deferred or invalidated pull/);
   assert.match(register, /Node (?:boundary )?`106\/106`/);

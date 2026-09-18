@@ -6,12 +6,17 @@ physically grouped by executable responsibility while deeper Application,
 Domain, and Infrastructure extraction is deferred until dependency analysis
 proves a safe move.
 
-Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED / E188 / RELEASE_VERSION_SOURCE_ALIGNED / E187 / REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED / E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED. The extracted Kotlin module boundaries and the local release-version regression are now verified alongside the backend engine, sync, API, and database checks; external runtime, provider, managed, staging, and human gates remain open.
+Current repository increment: E191 / TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED / E190 / EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED / E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED / E188 / RELEASE_VERSION_SOURCE_ALIGNED / E187 / REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED / E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED. The extracted Kotlin module boundaries and the local release-version regression are now verified alongside the backend engine, sync, API, and database checks; external runtime, provider, managed, staging, and human gates remain open.
 
-The latest post-E189 repository verification on 18 September 2026 passes Node
-`109/109`, API `172/172`, and worker `5/5`. This refresh is repository-only and
-does not imply managed database replay, deployment, provider delivery, or
-runtime evidence.
+The E191 increment passes the focused Kotlin/Android target tasks, full API
+`187/187`, and the versioned contract suite. The earlier Node `109/109`, API
+`172/172`, and worker `5/5` capture remains historical repository-only
+evidence; neither implies managed database replay, deployment, provider
+delivery, or runtime evidence.
+
+The published-case catalogue is available at `GET /v1/cases` for authenticated,
+email-verified clients. It returns bounded metadata only and does not make the
+bundled free mobile case depend on the API.
 
 The platform lane is optional infrastructure for accounts, cloud sync,
 analytics, authoring, recommendations, AI assistance, teacher workflows, and

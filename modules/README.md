@@ -1,6 +1,6 @@
 # Kotlin module map
 
-Current repository increment: E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
+Current repository increment: E191 / TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED / E190 / EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED / E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED.
 The extraction and verification changes are repository-only evidence; target
 runtime, provider, managed deployment, accessibility, human, and submission
 gates remain open.
