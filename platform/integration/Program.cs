@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Evidrilo.Api.Billing;
 using Npgsql;
 
 namespace Evidrilo.LocalE2e;
@@ -39,6 +41,8 @@ public static class EntryPoint
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private const string SnapshotDigest =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private const string BillingWebhookSecret = "synthetic-billing-secret";
+    private const string BillingEntitlement = "evidrilo_pro";
 
     public static async Task Main()
     {
@@ -81,6 +85,7 @@ public static class EntryPoint
         try
         {
             await AssertReadyAsync(client);
+            await AssertBillingLifecycleFlowAsync(client, databaseConnectionString);
             await AssertContentLifecycleFlowAsync(client, databaseConnectionString);
             await AssertPublishedCaseEvidenceFlowAsync(client);
             await AssertSyncAndProjectionFlowAsync(client);
@@ -90,6 +95,223 @@ public static class EntryPoint
         finally
         {
             StopWorker(worker);
+        }
+    }
+
+    private static async Task AssertBillingLifecycleFlowAsync(
+        HttpClient client,
+        string databaseConnectionString)
+    {
+        var baseEventTimestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var purchase = CreateRevenueCatEventBody(
+            "rc-e2e-purchase",
+            "INITIAL_PURCHASE",
+            "monthly",
+            AccountId,
+            baseEventTimestampMs);
+
+        using (var invalidSignature = await SendBillingWebhookAsync(client, purchase, "t=0,v1=invalid"))
+        {
+            RequireStatus(invalidSignature, HttpStatusCode.Unauthorized, "invalid billing signature");
+            var body = await ReadJsonAsync(invalidSignature);
+            RequireString(body, "code", "INVALID_BILLING_SIGNATURE");
+        }
+
+        using (var accepted = await SendBillingWebhookAsync(client, purchase))
+        {
+            RequireStatus(accepted, HttpStatusCode.OK, "billing purchase");
+            await RequireBillingOutcomeAsync(accepted, "accepted");
+        }
+
+        using (var duplicate = await SendBillingWebhookAsync(client, purchase))
+        {
+            RequireStatus(duplicate, HttpStatusCode.OK, "billing purchase replay");
+            await RequireBillingOutcomeAsync(duplicate, "duplicate");
+        }
+
+        var unknown = CreateRevenueCatEventBody(
+            "rc-e2e-unknown",
+            "UNSUPPORTED_EVENT",
+            "monthly",
+            AccountId,
+            baseEventTimestampMs + 1_000);
+        using (var ignored = await SendBillingWebhookAsync(client, unknown))
+        {
+            RequireStatus(ignored, HttpStatusCode.OK, "unknown billing event");
+            await RequireBillingOutcomeAsync(ignored, "ignored");
+        }
+
+        var lifetime = CreateRevenueCatEventBody(
+            "rc-e2e-lifetime",
+            "INITIAL_PURCHASE",
+            "lifetime",
+            AccountId,
+            baseEventTimestampMs + 1_500);
+        using (var ignoredLifetime = await SendBillingWebhookAsync(client, lifetime))
+        {
+            RequireStatus(ignoredLifetime, HttpStatusCode.OK, "unapproved billing product");
+            await RequireBillingOutcomeAsync(ignoredLifetime, "ignored");
+        }
+
+        var revoked = CreateRevenueCatEventBody(
+            "rc-e2e-revoked",
+            "CANCELLATION",
+            productId: null,
+            accountId: AccountId,
+            eventTimestampMs: baseEventTimestampMs + 2_000,
+            cancellationReason: "CUSTOMER_SUPPORT");
+        using (var revokedResponse = await SendBillingWebhookAsync(client, revoked))
+        {
+            RequireStatus(revokedResponse, HttpStatusCode.OK, "billing revoke");
+            await RequireBillingOutcomeAsync(revokedResponse, "accepted");
+        }
+
+        var restored = CreateRevenueCatEventBody(
+            "rc-e2e-restored",
+            "UNCANCELLATION",
+            "yearly",
+            AccountId,
+            baseEventTimestampMs + 4_000);
+        using (var restoredResponse = await SendBillingWebhookAsync(client, restored))
+        {
+            RequireStatus(restoredResponse, HttpStatusCode.OK, "billing restore");
+            await RequireBillingOutcomeAsync(restoredResponse, "accepted");
+        }
+
+        var staleExpiration = CreateRevenueCatEventBody(
+            "rc-e2e-stale-expiration",
+            "EXPIRATION",
+            productId: null,
+            accountId: AccountId,
+            eventTimestampMs: baseEventTimestampMs + 3_000);
+        using (var staleResponse = await SendBillingWebhookAsync(client, staleExpiration))
+        {
+            RequireStatus(staleResponse, HttpStatusCode.OK, "stale billing expiration");
+            await RequireBillingOutcomeAsync(staleResponse, "accepted");
+        }
+
+        using (var ownEntitlements = await SendAsync(
+            client,
+            HttpMethod.Get,
+            "/v1/billing/entitlements",
+            AccountId,
+            body: null))
+        {
+            RequireStatus(ownEntitlements, HttpStatusCode.OK, "own entitlement read");
+            var body = await ReadJsonAsync(ownEntitlements);
+            RequireString(body, "schema", "evidrilo.entitlements");
+            var entitlements = body.GetProperty("entitlements");
+            if (entitlements.GetArrayLength() != 1
+                || entitlements[0].GetProperty("entitlement").GetString() != BillingEntitlement
+                || entitlements[0].GetProperty("status").GetString() != "active")
+            {
+                throw new InvalidOperationException(
+                    "Billing restore did not leave the account with the active canonical entitlement.");
+            }
+        }
+
+        using (var otherEntitlements = await SendAsync(
+            client,
+            HttpMethod.Get,
+            "/v1/billing/entitlements",
+            OtherAccountId,
+            body: null))
+        {
+            RequireStatus(otherEntitlements, HttpStatusCode.OK, "cross-account entitlement read");
+            var body = await ReadJsonAsync(otherEntitlements);
+            if (body.GetProperty("entitlements").GetArrayLength() != 0)
+            {
+                throw new InvalidOperationException(
+                    "Cross-account entitlement isolation returned another account's billing state.");
+            }
+        }
+
+        await AssertBillingDatabaseStateAsync(databaseConnectionString);
+    }
+
+    private static async Task<HttpResponseMessage> SendBillingWebhookAsync(
+        HttpClient client,
+        byte[] body,
+        string? signature = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/billing/webhook")
+        {
+            Content = new StringContent(Encoding.UTF8.GetString(body), Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add(
+            "X-RevenueCat-Webhook-Signature",
+            signature ?? BillingSignature.Create(
+                BillingWebhookSecret,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                body));
+        return await client.SendAsync(request);
+    }
+
+    private static byte[] CreateRevenueCatEventBody(
+        string eventId,
+        string eventType,
+        string? productId,
+        Guid accountId,
+        long eventTimestampMs,
+        string? cancellationReason = null)
+    {
+        var providerEvent = new Dictionary<string, object?>
+        {
+            ["id"] = eventId,
+            ["type"] = eventType,
+            ["app_user_id"] = accountId.ToString(),
+            ["entitlement_ids"] = new[] { BillingEntitlement },
+            ["event_timestamp_ms"] = eventTimestampMs,
+        };
+        if (productId is not null) providerEvent["product_id"] = productId;
+        if (cancellationReason is not null) providerEvent["cancel_reason"] = cancellationReason;
+
+        return JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
+        {
+            ["api_version"] = "1.0",
+            ["event"] = providerEvent,
+        });
+    }
+
+    private static async Task RequireBillingOutcomeAsync(
+        HttpResponseMessage response,
+        string expectedOutcome)
+    {
+        var body = await ReadJsonAsync(response);
+        RequireString(body, "schema", "evidrilo.billing-webhook-result");
+        RequireString(body, "version", "1");
+        RequireString(body, "outcome", expectedOutcome);
+    }
+
+    private static async Task AssertBillingDatabaseStateAsync(string databaseConnectionString)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            select
+                (select count(*) from public.entitlement_events
+                  where account_id = @account_id) as event_count,
+                (select status from public.entitlements
+                  where account_id = @account_id and entitlement = @entitlement) as entitlement_status,
+                (select count(*) from public.entitlements
+                  where account_id = @account_id) as entitlement_count,
+                (select count(*) from public.entitlement_events
+                  where account_id = @other_account_id) as other_event_count;
+            """;
+        command.Parameters.AddWithValue("account_id", AccountId);
+        command.Parameters.AddWithValue("entitlement", BillingEntitlement);
+        command.Parameters.AddWithValue("other_account_id", OtherAccountId);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()
+            || reader.GetInt64(0) != 4
+            || reader.IsDBNull(1)
+            || reader.GetString(1) != "active"
+            || reader.GetInt64(2) != 1
+            || reader.GetInt64(3) != 0)
+        {
+            throw new InvalidOperationException(
+                "Billing database state did not preserve replay idempotency, restore ordering, or isolation.");
         }
     }
 
@@ -770,6 +992,8 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
                 ["Platform:SupabasePublishableKey"] = "",
                 ["Platform:DatabaseConnectionString"] = databaseConnectionString,
                 ["Platform:CorsAllowedOrigins"] = "http://localhost:3000",
+                ["Platform:RevenueCatWebhookSecret"] = BillingWebhookSecret,
+                ["Platform:RevenueCatEntitlementId"] = BillingEntitlement,
             });
         });
         builder.ConfigureServices(services =>
