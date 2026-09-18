@@ -62,7 +62,8 @@ docker run -d \
 container_created=1
 
 for attempt in $(seq 1 30); do
-    if docker exec "$container_name" pg_isready -U postgres -d evidrilo_it >/dev/null 2>&1; then
+    if docker exec "$container_name" pg_isready -U postgres -d postgres >/dev/null 2>&1 \
+        && docker exec "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it -c 'select 1' >/dev/null 2>&1; then
         break
     fi
     if [[ "$attempt" == 30 ]]; then
