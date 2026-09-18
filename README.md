@@ -32,7 +32,7 @@ academic marking system, safety advisor, or general-purpose AI answer generator.
 | Connectivity | Offline-first free workflow; connected content and sync are optional |
 | Repository license | MIT; see the single root [LICENSE](LICENSE) file |
 
-Current committed structural baseline: `8463d93`. The semantic-closure
+Current committed structural baseline: `1893471`. The semantic-closure
 increment remains repository-verified only until focused Kotlin verification is
 available.
 
