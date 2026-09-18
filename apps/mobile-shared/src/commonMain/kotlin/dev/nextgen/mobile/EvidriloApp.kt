@@ -409,6 +409,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var state by remember(savedSnapshot) {
         mutableStateOf(savedSnapshot?.restore(reducer) ?: ConclusionState.Intro)
     }
+    val targetDraft = targetDraftFor(state, case)
     LaunchedEffect(navigationState.current, accountSession) {
         audioCoordinator.stop()
     }
@@ -827,6 +828,21 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         // does not reset the persisted/evaluator state.
         navigationState = navigationState.resetToHome()
     }
+    val openTargetSection: (EvidriloTargetSection) -> Unit = { section ->
+        navigationState = when (section) {
+            EvidriloTargetSection.HOME -> navigationState.resetToHome()
+            EvidriloTargetSection.SOURCES -> navigationState.resetToHome().open(EvidriloDestination.SOURCES)
+            EvidriloTargetSection.EVIDENCE -> navigationState.resetToHome().open(EvidriloDestination.EVIDENCE)
+            EvidriloTargetSection.ACTION -> navigationState.resetToHome().open(EvidriloDestination.ACTION)
+            EvidriloTargetSection.PROFILE -> navigationState.resetToHome().open(EvidriloDestination.PROFILE)
+        }
+    }
+    val startTargetPractice: () -> Unit = {
+        if (state is ConclusionState.Intro) {
+            dispatch(ConclusionEvent.Begin)
+        }
+        navigationState = navigationState.open(EvidriloDestination.PRACTICE)
+    }
     val syncStorageAvailable = syncStorageStatus !in setOf(
         LocalStorageStatus.UNAVAILABLE,
         LocalStorageStatus.CORRUPT,
@@ -963,6 +979,43 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onStopAudio = stopAudio,
             onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
         )
+    } else if (navigationState.current == EvidriloDestination.SOURCES) {
+        EvidriloTargetSourcesScreen(
+            case = case,
+            onNavigate = openTargetSection,
+            onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.WORKSPACE) {
+        EvidriloTargetWorkspaceScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
+            onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
+            onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.EVIDENCE) {
+        EvidriloTargetEvidenceScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.ACTION) {
+        EvidriloTargetActionScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.PROFILE) {
+        EvidriloTargetProfileScreen(
+            profileSubtitle = accountSession.toSettingsSubtitle(),
+            onNavigate = openTargetSection,
+            onOpenPremium = openPremium,
+            onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
+            onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
+        )
     } else if (navigationState.current == EvidriloDestination.ACCOUNT) {
         EvidriloAccountScreen(
             session = accountSession,
@@ -1082,19 +1135,16 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             backLabel = "Settings",
         )
     } else if (navigationState.current == EvidriloDestination.HOME) {
-        EvidriloHomeScreen(
-            state = state,
+        EvidriloTargetHomeScreen(
+            case = case,
+            draft = targetDraft,
             history = historySnapshot,
-            storageNotice = storageNotice,
-            onPrimaryAction = {
-                if (state is ConclusionState.Intro) {
-                    dispatch(ConclusionEvent.Begin)
-                }
-                navigationState = navigationState.open(EvidriloDestination.PRACTICE)
-            },
-            onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
-            onOpenPacks = openPremium,
-            onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
+            onNavigate = openTargetSection,
+            onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
+            onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
+            onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
+            onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
+            onStartPractice = startTargetPractice,
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
