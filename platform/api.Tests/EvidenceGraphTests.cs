@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Evidrilo.Api.Content;
 
 namespace Evidrilo.Api.Tests;
@@ -100,6 +101,37 @@ public sealed class EvidenceGraphTests
                 "claim:rule-1",
                 "supports"),
             graph.Edges);
+    }
+
+    [Fact]
+    public void Unresolved_rule_anchors_have_opaque_nodes_for_every_edge_endpoint()
+    {
+        const string unresolvedAnchor = "private-anchor";
+        var publishedCase = ValidCase() with
+        {
+            Content = ValidCase().Content with
+            {
+                Rules = [new AuthoringRule("rule-1", "PASS", [unresolvedAnchor])],
+            },
+        };
+
+        var graph = EvidenceGraphProjection.Build(publishedCase);
+        var nodeIds = graph.Nodes.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
+
+        Assert.All(
+            graph.Edges,
+            edge =>
+            {
+                Assert.Contains(edge.From, nodeIds);
+                Assert.Contains(edge.To, nodeIds);
+            });
+
+        var unresolved = Assert.Single(graph.Nodes, node => node.State == "unresolved");
+        Assert.Equal("evidence:unresolved:18329716184aec4b24a450458dcd32eba3c53be0f69d5789c014991388702797", unresolved.Id);
+        Assert.Equal("evidence", unresolved.Kind);
+        Assert.Equal("anchor", unresolved.Label);
+        Assert.Equal("Unresolved evidence anchor", unresolved.Text);
+        Assert.DoesNotContain(unresolvedAnchor, JsonSerializer.Serialize(graph), StringComparison.Ordinal);
     }
 
     private static PublishedCaseSummary ValidCase() => new(
