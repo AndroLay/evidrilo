@@ -2,6 +2,7 @@ package dev.nextgen.mobile
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -57,19 +59,24 @@ import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
 
 public object EvidriloColors {
-    val Cobalt = Color(0xFF294BC6)
-    val CobaltPressed = Color(0xFF203BA0)
+    val DeepNavy = Color(0xFF0B1056)
+    val Cobalt = Color(0xFF1558E8)
+    val CobaltBright = Color(0xFF2C86FF)
+    val CobaltPressed = Color(0xFF103EB4)
     val White = Color(0xFFFFFFFF)
-    val Surface = Color(0xFFF5F7FB)
-    val Tint = Color(0xFFEAF0FF)
-    val Ink = Color(0xFF202C40)
-    val Slate = Color(0xFF53627A)
+    val Surface = Color(0xFFF8FAFF)
+    val PaleBlue = Color(0xFFEAF3FF)
+    val Tint = Color(0xFFE2EEFF)
+    val Ink = DeepNavy
+    val Slate = Color(0xFF536DA5)
     val Separator = Color(0xFFE1E6EF)
     val Outline = Color(0xFF8190A8)
     val Error = Color(0xFFB42318)
     val ErrorSurface = Color(0xFFFFE9E7)
     val Success = Color(0xFF146C43)
     val SuccessSurface = Color(0xFFE7F5EC)
+    val Warning = Color(0xFFC86D00)
+    val WarningSurface = Color(0xFFFFF2D9)
 }
 
 public fun evidriloPrimaryButtonContentColor(enabled: Boolean): Color =
@@ -406,6 +413,119 @@ public fun EvidriloTintPanel(
             )
         },
     )
+}
+
+public enum class EvidriloStatusTone {
+    NEUTRAL,
+    INFO,
+    SUCCESS,
+    WARNING,
+    ERROR,
+}
+
+@Composable
+public fun EvidriloStatusChip(
+    label: String,
+    tone: EvidriloStatusTone = EvidriloStatusTone.INFO,
+    icon: EvidriloIconName? = null,
+) {
+    val (container, content) = when (tone) {
+        EvidriloStatusTone.NEUTRAL -> EvidriloColors.Surface to EvidriloColors.Slate
+        EvidriloStatusTone.INFO -> EvidriloColors.Tint to EvidriloColors.Cobalt
+        EvidriloStatusTone.SUCCESS -> EvidriloColors.SuccessSurface to EvidriloColors.Success
+        EvidriloStatusTone.WARNING -> EvidriloColors.WarningSurface to EvidriloColors.Warning
+        EvidriloStatusTone.ERROR -> EvidriloColors.ErrorSurface to EvidriloColors.Error
+    }
+    val resolvedIcon = icon ?: when (tone) {
+        EvidriloStatusTone.NEUTRAL -> EvidriloIconName.INFO
+        EvidriloStatusTone.INFO -> EvidriloIconName.INFO
+        EvidriloStatusTone.SUCCESS -> EvidriloIconName.CHECK
+        EvidriloStatusTone.WARNING -> EvidriloIconName.ALERT
+        EvidriloStatusTone.ERROR -> EvidriloIconName.ALERT
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = container,
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = label
+            stateDescription = tone.name.lowercase()
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            EvidriloIcon(resolvedIcon, tint = content, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = content)
+        }
+    }
+}
+
+@Composable
+public fun EvidriloTargetCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+public fun EvidriloCobaltCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(28.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        color = EvidriloColors.Cobalt,
+        contentColor = EvidriloColors.White,
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(EvidriloColors.Cobalt, EvidriloColors.CobaltBright),
+                    ),
+                )
+                .padding(20.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        }
+    }
+}
+
+@Composable
+public fun EvidriloProgressBar(progress: Float) {
+    val safeProgress = progress.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 10.dp)
+            .clip(RoundedCornerShape(50))
+            .background(EvidriloColors.Tint),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(safeProgress)
+                .heightIn(min = 10.dp)
+                .clip(RoundedCornerShape(50))
+                .background(EvidriloColors.Cobalt),
+        )
+    }
 }
 
 @Composable

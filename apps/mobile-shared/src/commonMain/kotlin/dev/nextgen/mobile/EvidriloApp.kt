@@ -978,6 +978,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             case = case,
             onNavigate = openTargetSection,
             onStartPractice = startTargetPractice,
+            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.WORKSPACE) {
         EvidriloTargetWorkspaceScreen(
@@ -987,6 +988,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
             onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
             onStartPractice = startTargetPractice,
+            onOpenTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
+            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.EVIDENCE) {
         EvidriloTargetEvidenceScreen(
@@ -994,6 +997,26 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             draft = targetDraft,
             onNavigate = openTargetSection,
             onStartPractice = startTargetPractice,
+            onOpenTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
+            onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
+            onBack = { navigationState = navigationState.back() },
+        )
+    } else if (navigationState.current == EvidriloDestination.CLAIM_TRACE) {
+        EvidriloTargetClaimTraceScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onOpenEvidence = { navigationState = navigationState.resetToHome().open(EvidriloDestination.EVIDENCE) },
+            onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
+            onBack = { navigationState = navigationState.back() },
+        )
+    } else if (navigationState.current == EvidriloDestination.VERIFY_CLAIM) {
+        EvidriloTargetVerifyClaimScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onStartPractice = startTargetPractice,
+            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.ACTION) {
         EvidriloTargetActionScreen(
@@ -1001,6 +1024,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             draft = targetDraft,
             onNavigate = openTargetSection,
             onStartPractice = startTargetPractice,
+            onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
+            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.PROFILE) {
         EvidriloTargetProfileScreen(
@@ -1011,6 +1036,15 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
+            onBack = { navigationState = navigationState.back() },
+        )
+    } else if (navigationState.current == EvidriloDestination.EVIDENCE_DELTA && historySnapshot != null) {
+        EvidriloTargetEvidenceDeltaScreen(
+            case = case,
+            before = historySnapshot!!.initialDraft,
+            after = historySnapshot!!.currentDraft,
+            onNavigate = openTargetSection,
+            onBack = { navigationState = navigationState.back() },
         )
     } else if (navigationState.current == EvidriloDestination.ACCOUNT) {
         EvidriloAccountScreen(
@@ -1054,6 +1088,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 dispatch(ConclusionEvent.Begin)
             },
             onClear = clearHistory,
+            onOpenDelta = { navigationState = navigationState.open(EvidriloDestination.EVIDENCE_DELTA) },
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
             selectedSection = if (previousDestination == EvidriloDestination.PROFILE) {
@@ -1520,8 +1555,18 @@ private fun EvidriloPremiumLockedScreen(
             "The free tablet case remains complete and usable. Premium adds two distinct practice cases without changing the free flow.",
             style = MaterialTheme.typography.bodyLarge,
         )
+        EvidriloCobaltCard {
+            Text("EVIDRILO PRO", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.White.copy(alpha = 0.8f))
+            Text("Unlock deeper analysis.", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
+            Text(
+                "Monthly and yearly access are checked through the configured billing provider.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = EvidriloColors.White.copy(alpha = 0.9f),
+            )
+        }
         EvidriloTintPanel {
             Text("Access status", style = MaterialTheme.typography.titleMedium)
+            EvidriloStatusChip(label = billing.state.displayLabel())
             Text(billing.state.displayLabel(), style = MaterialTheme.typography.labelLarge)
             Text(billing.message, style = MaterialTheme.typography.bodyMedium)
             if (billing.offers.isNotEmpty()) {

@@ -36,6 +36,18 @@ public enum class EvidriloIconName {
     CHECK,
     ALERT,
     FOLDER,
+    HOME,
+    LINK,
+    CALENDAR,
+    MORE,
+    CROWN,
+    DATABASE,
+    BELL,
+    UPLOAD,
+    LIST,
+    PLUS,
+    LOCK,
+    SPARK,
 }
 
 @Composable
@@ -71,6 +83,18 @@ public fun EvidriloIcon(
                 EvidriloIconName.CHECK -> drawCheck(tint, stroke)
                 EvidriloIconName.ALERT -> drawAlert(tint, stroke)
                 EvidriloIconName.FOLDER -> drawFolder(tint, stroke)
+                EvidriloIconName.HOME -> drawHome(tint, stroke)
+                EvidriloIconName.LINK -> drawLink(tint, stroke)
+                EvidriloIconName.CALENDAR -> drawCalendar(tint, stroke)
+                EvidriloIconName.MORE -> drawMore(tint)
+                EvidriloIconName.CROWN -> drawCrown(tint, stroke)
+                EvidriloIconName.DATABASE -> drawDatabase(tint, stroke)
+                EvidriloIconName.BELL -> drawBell(tint, stroke)
+                EvidriloIconName.UPLOAD -> drawUpload(tint, stroke)
+                EvidriloIconName.LIST -> drawList(tint, stroke)
+                EvidriloIconName.PLUS -> drawPlus(tint, stroke)
+                EvidriloIconName.LOCK -> drawLock(tint, stroke)
+                EvidriloIconName.SPARK -> drawSpark(tint, stroke)
             }
         }
     }
@@ -266,4 +290,106 @@ private fun DrawScope.drawFolder(color: Color, stroke: Stroke) {
         close()
     }
     drawPath(path, color, style = stroke)
+}
+
+private fun DrawScope.drawHome(color: Color, stroke: Stroke) {
+    val path = Path().apply {
+        moveTo(4f, 11f)
+        lineTo(12f, 4f)
+        lineTo(20f, 11f)
+        lineTo(19f, 20f)
+        lineTo(5f, 20f)
+        close()
+    }
+    drawPath(path, color, style = stroke)
+    drawStyledLine(color, Offset(10f, 20f), Offset(10f, 14f), stroke)
+    drawStyledLine(color, Offset(10f, 14f), Offset(14f, 14f), stroke)
+    drawStyledLine(color, Offset(14f, 14f), Offset(14f, 20f), stroke)
+}
+
+private fun DrawScope.drawLink(color: Color, stroke: Stroke) {
+    drawArc(color, 135f, 180f, false, Offset(2f, 8f), Size(10f, 8f), style = stroke)
+    drawArc(color, -45f, 180f, false, Offset(12f, 8f), Size(10f, 8f), style = stroke)
+    drawStyledLine(color, Offset(8f, 16f), Offset(16f, 8f), stroke)
+}
+
+private fun DrawScope.drawCalendar(color: Color, stroke: Stroke) {
+    drawRoundRect(color, Offset(4f, 5f), Size(16f, 15f), 2f, 2f, style = stroke)
+    drawStyledLine(color, Offset(4f, 9f), Offset(20f, 9f), stroke)
+    drawStyledLine(color, Offset(8f, 3f), Offset(8f, 7f), stroke)
+    drawStyledLine(color, Offset(16f, 3f), Offset(16f, 7f), stroke)
+}
+
+private fun DrawScope.drawMore(color: Color) {
+    drawCircle(color, 1.7f, Offset(6f, 12f))
+    drawCircle(color, 1.7f, Offset(12f, 12f))
+    drawCircle(color, 1.7f, Offset(18f, 12f))
+}
+
+private fun DrawScope.drawCrown(color: Color, stroke: Stroke) {
+    val path = Path().apply {
+        moveTo(4f, 7f)
+        lineTo(8f, 11f)
+        lineTo(12f, 5f)
+        lineTo(16f, 11f)
+        lineTo(20f, 7f)
+        lineTo(18f, 18f)
+        lineTo(6f, 18f)
+        close()
+    }
+    drawPath(path, color, style = stroke)
+    drawStyledLine(color, Offset(7f, 21f), Offset(17f, 21f), stroke)
+}
+
+private fun DrawScope.drawDatabase(color: Color, stroke: Stroke) {
+    drawOval(color, Offset(4f, 3f), Size(16f, 6f), style = stroke)
+    drawArc(color, 0f, 180f, false, Offset(4f, 6f), Size(16f, 6f), style = stroke)
+    drawArc(color, 0f, 180f, false, Offset(4f, 12f), Size(16f, 6f), style = stroke)
+    drawStyledLine(color, Offset(4f, 6f), Offset(4f, 18f), stroke)
+    drawStyledLine(color, Offset(20f, 6f), Offset(20f, 18f), stroke)
+}
+
+private fun DrawScope.drawBell(color: Color, stroke: Stroke) {
+    val path = Path().apply {
+        moveTo(5f, 17f)
+        lineTo(7f, 14f)
+        lineTo(7f, 10f)
+        cubicTo(7f, 4f, 17f, 4f, 17f, 10f)
+        lineTo(17f, 14f)
+        lineTo(19f, 17f)
+        close()
+    }
+    drawPath(path, color, style = stroke)
+    drawCircle(color, 1.4f, Offset(12f, 20f))
+}
+
+private fun DrawScope.drawUpload(color: Color, stroke: Stroke) {
+    drawStyledLine(color, Offset(12f, 17f), Offset(12f, 5f), stroke)
+    drawStyledLine(color, Offset(7f, 10f), Offset(12f, 5f), stroke)
+    drawStyledLine(color, Offset(12f, 5f), Offset(17f, 10f), stroke)
+    drawStyledLine(color, Offset(5f, 19f), Offset(19f, 19f), stroke)
+}
+
+private fun DrawScope.drawList(color: Color, stroke: Stroke) {
+    listOf(7f, 12f, 17f).forEach { y ->
+        drawCircle(color, 1f, Offset(5f, y))
+        drawStyledLine(color, Offset(9f, y), Offset(19f, y), stroke)
+    }
+}
+
+private fun DrawScope.drawPlus(color: Color, stroke: Stroke) {
+    drawStyledLine(color, Offset(12f, 5f), Offset(12f, 19f), stroke)
+    drawStyledLine(color, Offset(5f, 12f), Offset(19f, 12f), stroke)
+}
+
+private fun DrawScope.drawLock(color: Color, stroke: Stroke) {
+    drawRoundRect(color, Offset(5f, 10f), Size(14f, 11f), 2f, 2f, style = stroke)
+    drawArc(color, 180f, 180f, false, Offset(8f, 4f), Size(8f, 10f), style = stroke)
+}
+
+private fun DrawScope.drawSpark(color: Color, stroke: Stroke) {
+    drawStyledLine(color, Offset(12f, 3f), Offset(12f, 21f), stroke)
+    drawStyledLine(color, Offset(3f, 12f), Offset(21f, 12f), stroke)
+    drawStyledLine(color, Offset(6f, 6f), Offset(18f, 18f), stroke)
+    drawStyledLine(color, Offset(18f, 6f), Offset(6f, 18f), stroke)
 }

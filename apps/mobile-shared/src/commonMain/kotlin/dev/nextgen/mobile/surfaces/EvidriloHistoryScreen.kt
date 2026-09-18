@@ -25,6 +25,7 @@ internal fun EvidriloHistoryScreen(
     storageNotice: LocalStorageNotice?,
     onStartPractice: () -> Unit,
     onClear: () -> Unit,
+    onOpenDelta: () -> Unit = {},
     onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
     selectedSection: EvidriloTargetSection,
@@ -57,6 +58,10 @@ internal fun EvidriloHistoryScreen(
 
             if (availableHistory != null) {
                 EvidriloHistorySnapshotCard(availableHistory)
+                EvidriloPrimaryButton(
+                    label = "View evidence delta",
+                    onClick = onOpenDelta,
+                )
                 EvidriloSecondaryButton(
                     label = "Clear latest comparison",
                     onClick = onClear,
