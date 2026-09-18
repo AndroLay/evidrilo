@@ -983,6 +983,8 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
         builder.UseContentRoot(repositoryRoot);
         builder.UseEnvironment("Testing");
         builder.UseSetting("Platform:DatabaseConnectionString", databaseConnectionString);
+        builder.UseSetting("Platform:RevenueCatWebhookSecret", EntryPoint.BillingWebhookSecret);
+        builder.UseSetting("Platform:RevenueCatEntitlementId", EntryPoint.BillingEntitlement);
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -992,8 +994,6 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
                 ["Platform:SupabasePublishableKey"] = "",
                 ["Platform:DatabaseConnectionString"] = databaseConnectionString,
                 ["Platform:CorsAllowedOrigins"] = "http://localhost:3000",
-                ["Platform:RevenueCatWebhookSecret"] = EntryPoint.BillingWebhookSecret,
-                ["Platform:RevenueCatEntitlementId"] = EntryPoint.BillingEntitlement,
             });
         });
         builder.ConfigureServices(services =>
