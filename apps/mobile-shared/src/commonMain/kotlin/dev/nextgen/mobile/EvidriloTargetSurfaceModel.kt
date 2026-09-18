@@ -4,6 +4,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 
 internal data class TargetWorkspaceMetrics(
     val requirementCount: Int,
@@ -48,3 +49,10 @@ internal fun targetDraftFor(
     is ConclusionState.EvidenceChangeSummary -> state.challengeDraft
     is ConclusionState.Incomplete -> state.draft
 }
+
+internal fun targetHistorySubtitle(history: ConclusionSessionSnapshot?): String =
+    if (history == null) {
+        "No comparison saved yet"
+    } else {
+        "Review your latest before/after comparison"
+    }

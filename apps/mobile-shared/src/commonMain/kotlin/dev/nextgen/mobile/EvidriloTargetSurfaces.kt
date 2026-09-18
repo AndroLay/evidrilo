@@ -171,6 +171,7 @@ internal fun EvidriloTargetHomeScreen(
     onOpenSources: () -> Unit,
     onOpenEvidence: () -> Unit,
     onOpenAction: () -> Unit,
+    onOpenHistory: () -> Unit,
     onStartPractice: () -> Unit,
     onOpenSettings: () -> Unit,
     recommendation: RecommendationUiState = RecommendationUiState.Hidden,
@@ -245,15 +246,12 @@ internal fun EvidriloTargetHomeScreen(
                 subtitle = if (draft.implication == null) "Choose a next action after the review" else "Your next action is recorded locally",
                 onClick = onOpenAction,
             )
-            history?.let {
-                EvidriloTintPanel {
-                    Text("Local history available", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Your latest comparison stays on this device until you clear it.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
+            TargetSectionRow(
+                icon = EvidriloIconName.HISTORY,
+                title = "History",
+                subtitle = targetHistorySubtitle(history),
+                onClick = onOpenHistory,
+            )
             EvidriloPrimaryButton(label = "Start practice", onClick = onStartPractice)
             Text(
                 text = "No account or network is required for the free core.",
@@ -432,8 +430,10 @@ internal fun EvidriloTargetActionScreen(
 @Composable
 internal fun EvidriloTargetProfileScreen(
     profileSubtitle: String,
+    history: ConclusionSessionSnapshot?,
     onNavigate: (EvidriloTargetSection) -> Unit,
     onOpenPremium: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAccount: () -> Unit,
 ) {
@@ -465,6 +465,12 @@ internal fun EvidriloTargetProfileScreen(
                 title = "Premium cases",
                 subtitle = "Two additional cases · monthly/yearly access",
                 onClick = onOpenPremium,
+            )
+            EvidriloSettingsRow(
+                icon = EvidriloIconName.HISTORY,
+                title = "History",
+                subtitle = targetHistorySubtitle(history),
+                onClick = onOpenHistory,
             )
             EvidriloSettingsRow(
                 icon = EvidriloIconName.ACCOUNT,

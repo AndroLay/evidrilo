@@ -7,6 +7,8 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.storage.ConclusionSessionPhase
+import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -51,6 +53,23 @@ class EvidriloTargetSurfaceModelTest {
 
         assertEquals(draft, resolved)
         assertEquals(case.id, targetDraftFor(ConclusionState.Intro, case).caseId)
+    }
+
+    @Test
+    fun history_summary_distinguishes_empty_from_saved_comparison() {
+        assertEquals("No comparison saved yet", targetHistorySubtitle(null))
+
+        val draft = ConclusionDraft(caseId = ConclusionCases.M0_T2.id)
+        val snapshot = ConclusionSessionSnapshot(
+            phase = ConclusionSessionPhase.SUMMARY,
+            initialDraft = draft,
+            currentDraft = draft,
+        )
+
+        assertEquals(
+            "Review your latest before/after comparison",
+            targetHistorySubtitle(snapshot),
+        )
     }
 
     private fun error(message: String) =

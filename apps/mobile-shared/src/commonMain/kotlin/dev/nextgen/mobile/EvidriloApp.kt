@@ -1011,8 +1011,10 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     } else if (navigationState.current == EvidriloDestination.PROFILE) {
         EvidriloTargetProfileScreen(
             profileSubtitle = accountSession.toSettingsSubtitle(),
+            history = historySnapshot,
             onNavigate = openTargetSection,
             onOpenPremium = openPremium,
+            onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
         )
@@ -1061,7 +1063,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onBack = { navigationState = navigationState.back() },
             onOpenPractice = { navigationState = navigationState.back() },
             onOpenPacks = openPremium,
-            backLabel = if (previousDestination == EvidriloDestination.SETTINGS) "Settings" else "Home",
+            backLabel = when (previousDestination) {
+                EvidriloDestination.SETTINGS -> "Settings"
+                EvidriloDestination.PROFILE -> "Profile"
+                else -> "Home"
+            },
         )
     } else if (navigationState.current == EvidriloDestination.GUIDE) {
         val previousDestination = navigationState.stack.dropLast(1).lastOrNull()
@@ -1144,6 +1150,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
             onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
             onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
+            onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
             onStartPractice = startTargetPractice,
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
             recommendation = recommendationState,
