@@ -67,6 +67,7 @@ import dev.nextgen.mobile.billing.BillingOperation
 import dev.nextgen.mobile.billing.BillingOutcome
 import dev.nextgen.mobile.billing.BillingPresentation
 import dev.nextgen.mobile.billing.BillingRequestGate
+import dev.nextgen.mobile.billing.EvidriloPremiumPaywall
 import dev.nextgen.mobile.billing.PremiumPracticeEvent
 import dev.nextgen.mobile.billing.PremiumPracticeReducer
 import dev.nextgen.mobile.billing.PremiumPracticeState
@@ -950,6 +951,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                     }
                 }
             },
+            onRetry = openPremium,
             onSelectOffer = { dispatchPremium(PremiumPracticeEvent.SelectOffer(it)) },
             onSelectCase = { dispatchPremium(PremiumPracticeEvent.SelectCase(it)) },
             onBeginCase = { dispatchPremium(PremiumPracticeEvent.BeginSelectedCase) },
@@ -1358,6 +1360,7 @@ private fun EvidriloPremiumSurface(
     onOpenManagedPaywall: () -> Unit,
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
+    onRetry: () -> Unit,
     onSelectOffer: (String) -> Unit,
     onSelectCase: (String) -> Unit,
     onBeginCase: () -> Unit,
@@ -1385,6 +1388,7 @@ private fun EvidriloPremiumSurface(
                 onOpenManagedPaywall = onOpenManagedPaywall,
                 onPurchase = onPurchase,
                 onRestore = onRestore,
+                onRetry = onRetry,
                 onSelectOffer = onSelectOffer,
                 onBack = onBack,
                 backLabel = backLabel,
@@ -1543,61 +1547,23 @@ private fun EvidriloPremiumLockedScreen(
     onOpenManagedPaywall: () -> Unit,
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
+    onRetry: () -> Unit,
     onSelectOffer: (String) -> Unit,
     onBack: () -> Unit,
     backLabel: String,
 ) {
-    EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
-        EvidriloEyebrow("EVIDRILO PREMIUM")
-        Text("Practice two more evidence-linked cases", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "The free tablet case remains complete and usable. Premium adds two distinct practice cases without changing the free flow.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        EvidriloCobaltCard {
-            Text("EVIDRILO PRO", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.White.copy(alpha = 0.8f))
-            Text("Unlock deeper analysis.", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
-            Text(
-                "Monthly and yearly access are checked through the configured billing provider.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = EvidriloColors.White.copy(alpha = 0.9f),
-            )
-        }
-        EvidriloTintPanel {
-            Text("Access status", style = MaterialTheme.typography.titleMedium)
-            EvidriloStatusChip(label = billing.state.displayLabel())
-            Text(billing.state.displayLabel(), style = MaterialTheme.typography.labelLarge)
-            Text(billing.message, style = MaterialTheme.typography.bodyMedium)
-            if (billing.offers.isNotEmpty()) {
-                Text("Choose a plan", style = MaterialTheme.typography.titleSmall)
-                billing.offers.forEach { offer ->
-                    EvidriloChoiceButton(
-                        label = "${offer.title}\n${offer.price}",
-                        selected = billing.selectedOffer?.productId == offer.productId,
-                        onClick = { onSelectOffer(offer.productId) },
-                    )
-                }
-            }
-        }
-        EvidriloPrimaryButton(
-            label = if (billing.isBusy) "Checking premium access…" else "Unlock premium practice",
-            onClick = onPurchase,
-            enabled = billing.canPurchase,
-        )
-        EvidriloSecondaryButton(
-            label = "Restore purchase",
-            onClick = onRestore,
-            enabled = billing.canRestore,
-        )
-        if (managedPaywallAvailable) {
-            EvidriloSecondaryButton(
-                label = "Open managed RevenueCat plans",
-                onClick = onOpenManagedPaywall,
-            )
-        }
-        EvidriloSecondaryButton(label = "Keep the free case", onClick = onBack)
-    }
+    EvidriloPremiumPaywall(
+        billing = billing,
+        isBusy = billing.isBusy,
+        managedPaywallAvailable = managedPaywallAvailable,
+        onOpenManagedPaywall = onOpenManagedPaywall,
+        onPurchase = onPurchase,
+        onRestore = onRestore,
+        onRetry = onRetry,
+        onSelectOffer = onSelectOffer,
+        onBack = onBack,
+        backLabel = backLabel,
+    )
 }
 
 @Composable
