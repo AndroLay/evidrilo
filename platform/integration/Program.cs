@@ -41,8 +41,8 @@ public static class EntryPoint
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private const string SnapshotDigest =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    private const string BillingWebhookSecret = "synthetic-billing-secret";
-    private const string BillingEntitlement = "evidrilo_pro";
+    internal const string BillingWebhookSecret = "synthetic-billing-secret";
+    internal const string BillingEntitlement = "evidrilo_pro";
 
     public static async Task Main()
     {
@@ -992,8 +992,8 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
                 ["Platform:SupabasePublishableKey"] = "",
                 ["Platform:DatabaseConnectionString"] = databaseConnectionString,
                 ["Platform:CorsAllowedOrigins"] = "http://localhost:3000",
-                ["Platform:RevenueCatWebhookSecret"] = BillingWebhookSecret,
-                ["Platform:RevenueCatEntitlementId"] = BillingEntitlement,
+                ["Platform:RevenueCatWebhookSecret"] = EntryPoint.BillingWebhookSecret,
+                ["Platform:RevenueCatEntitlementId"] = EntryPoint.BillingEntitlement,
             });
         });
         builder.ConfigureServices(services =>
