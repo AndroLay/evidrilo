@@ -30,7 +30,7 @@ internal fun EvidriloAboutScreen(
             Spacer(modifier = Modifier.width(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("About Evidrilo", style = MaterialTheme.typography.displayMedium)
-                Text("Practice conclusions you can defend", style = MaterialTheme.typography.bodyLarge)
+                Text("Build conclusions you can defend", style = MaterialTheme.typography.bodyLarge)
             }
         }
         Text(
@@ -48,7 +48,7 @@ internal fun EvidriloAboutScreen(
         )
         EvidriloAboutPanel(
             title = "Privacy boundary",
-            body = "Free practice is local-first. The optional account, sync, AI, and billing integrations remain separate boundaries and are not required for the free case.",
+            body = "The free evidence workflow is local-first. Optional account, sync, AI, and billing integrations remain separate boundaries and are not required for the free case.",
         )
         EvidriloAboutPanel(
             title = "Open-source and attribution",

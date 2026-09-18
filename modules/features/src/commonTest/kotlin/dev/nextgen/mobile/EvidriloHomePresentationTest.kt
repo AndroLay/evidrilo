@@ -58,9 +58,9 @@ class EvidriloHomePresentationTest {
             assertEquals(EvidriloRecommendationSurface.NONE, recommendationHomeSurface(state))
         }
 
-        assertEquals("A suggested practice is temporarily unavailable.", recommendationUnavailableCopy())
+        assertEquals("A suggested review is temporarily unavailable.", recommendationUnavailableCopy())
         assertFalse(recommendationUnavailableCopy().contains("OFFLINE"))
-        assertEquals("Start practice", homePrimaryAction(ConclusionState.Intro).label)
+        assertEquals("Start workspace", homePrimaryAction(ConclusionState.Intro).label)
     }
 
     @Test
@@ -131,8 +131,8 @@ class EvidriloHomePresentationTest {
 
     @Test
     fun actionLabelsDescribeTheNextSafeAction() {
-        assertEquals("Start practice", EvidriloHomeAction.START_PRACTICE.label)
-        assertEquals("Continue practice", EvidriloHomeAction.CONTINUE_PRACTICE.label)
+        assertEquals("Start workspace", EvidriloHomeAction.START_PRACTICE.label)
+        assertEquals("Continue workspace", EvidriloHomeAction.CONTINUE_PRACTICE.label)
         assertEquals("Review feedback", EvidriloHomeAction.REVIEW_FEEDBACK.label)
         assertEquals("Continue revision", EvidriloHomeAction.CONTINUE_REVISION.label)
         assertEquals("Review your comparison", EvidriloHomeAction.REVIEW_COMPARISON.label)

@@ -24,15 +24,17 @@ academic marking system, safety advisor, or general-purpose AI answer generator.
 
 | Area | Decision |
 | --- | --- |
-| Product | Evidence-linked conclusion practice with transparent feedback |
+| Product | Evidence-grounded academic execution workspace with transparent feedback |
 | Free core | Bundled case, local persistence, one revision, and evidence-change challenge |
 | Mobile | Kotlin Multiplatform and Compose Multiplatform for Android and iOS |
 | Platform | ASP.NET Core API, PostgreSQL, migrations, and a bounded worker lane |
 | Monetization | RevenueCat evidrilo_pro entitlement with monthly/yearly products |
-| Connectivity | Offline-first free practice; connected content and sync are optional |
+| Connectivity | Offline-first free workflow; connected content and sync are optional |
 | Repository license | MIT; see the single root [LICENSE](LICENSE) file |
 
-Current structural baseline: `13af4ec`.
+Current committed structural baseline: `8463d93`. The semantic-closure
+increment remains repository-verified only until focused Kotlin verification is
+available.
 
 ## Current status
 
@@ -40,6 +42,12 @@ The repository contains the current applied product direction:
 
 - target home, sources, workspace, evidence, claim trace, verification,
   action-plan, profile, history, and evidence-change surfaces;
+- an Evidence Lens that distinguishes learner-selected anchors from other
+  supplied observations without inferring proof;
+- a Conflict Detail projection that exposes every non-passing deterministic
+  check, its anchors, explanation, and next action;
+- an Evidence Delta projection that carries evidence changes through claim
+  assessment, open-gap state, claim-boundary changes, and action staleness;
 - a deterministic conclusion engine with anchored feedback and explicit
   CANNOT_ASSESS behavior;
 - local session persistence, one-revision history, and an evidence-change
@@ -63,17 +71,17 @@ managed deployment, human validation, store release, and final Shipaton assets.
 ~~~mermaid
 flowchart LR
     A[Open case] --> B[Read requirement and facts]
-    B --> C[Map evidence]
+    B --> C[Open Evidence Lens]
     C --> D[Write claim and scope]
     D --> E[State limits and next action]
     E --> F{Deterministic evaluation}
-    F -->|Anchors are sufficient| G[Prioritized feedback]
+    F -->|Anchors are sufficient| G[Prioritized feedback + Conflict Detail]
     F -->|Missing or ambiguous anchor| H[CANNOT_ASSESS]
     G --> I[One guided revision]
     H --> I
     I --> J[Compare before and after]
-    J --> K[Evidence-change challenge]
-    K --> L[Local history and next practice]
+    J --> K[Evidence Delta: support, gap, and action]
+    K --> L[Local history and next review]
 ~~~
 
 Every feedback item should make three things visible:
@@ -86,23 +94,24 @@ The evaluator abstains when those relationships cannot be established from the
 active case. It never invents a positive result because a response looks
 plausible.
 
-### End-to-end practice flow
+### End-to-end evidence-review flow
 
-This is the complete path for one practice session, including the boundary
+This is the complete path for one evidence-review session, including the boundary
 between the offline learning core and optional connected capabilities.
 
 ~~~mermaid
 flowchart TD
     Start[Select a case] --> Load[Load immutable CaseVersion]
-    Load --> Input[Map evidence and write a scoped conclusion]
+    Load --> Input[Review Evidence Lens and write a scoped conclusion]
     Input --> Evaluate[Run deterministic evaluation locally]
     Evaluate --> Decision{Can the active facts and rules support feedback?}
     Decision -->|No| Abstain[CANNOT_ASSESS with a missing-anchor explanation]
-    Decision -->|Yes| Feedback[Show prioritized fact-anchored feedback]
+    Decision -->|Yes| Feedback[Show prioritized feedback and all check details]
     Abstain --> Revise[Make one guided revision]
     Feedback --> Revise
     Revise --> Compare[Compare the initial and revised reasoning]
-    Compare --> Save[Save bounded history locally]
+    Compare --> Propagate[Propagate evidence, claim, gap, and action changes]
+    Propagate --> Save[Save bounded history locally]
     Save --> Optional{Need an optional connected capability?}
     Optional -->|No| Done[Continue offline or finish]
     Optional -->|Premium content| Entitlement[Check active RevenueCat entitlement]

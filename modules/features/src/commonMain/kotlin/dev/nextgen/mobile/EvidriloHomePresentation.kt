@@ -9,8 +9,8 @@ import dev.nextgen.mobile.recommendation.RecommendationUiState
 enum class EvidriloHomeAction(
     val label: String,
 ) {
-    START_PRACTICE("Start practice"),
-    CONTINUE_PRACTICE("Continue practice"),
+    START_PRACTICE("Start workspace"),
+    CONTINUE_PRACTICE("Continue workspace"),
     REVIEW_FEEDBACK("Review feedback"),
     CONTINUE_REVISION("Continue revision"),
     REVIEW_COMPARISON("Review your comparison"),
@@ -104,4 +104,4 @@ fun recommendationHomeSurface(state: RecommendationUiState): EvidriloRecommendat
 }
 
 fun recommendationUnavailableCopy(): String =
-    "A suggested practice is temporarily unavailable."
+    "A suggested review is temporarily unavailable."

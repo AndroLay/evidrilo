@@ -27,7 +27,7 @@ internal fun EvidriloSupportScreen(
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Support and billing", style = MaterialTheme.typography.displayMedium)
             Text(
-                "Find the right next step without losing your local practice.",
+                "Find the right next step without losing your local workflow.",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -72,7 +72,7 @@ internal fun EvidriloSupportScreen(
         EvidriloTintPanel {
             Text("Privacy and deletion", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Free drafts remain local. A signed-in user can request server-account deletion from Account; local practice and history are cleared separately so the action is explicit.",
+                "Free drafts remain local. A signed-in user can request server-account deletion from Account; local workflow and history are cleared separately so the action is explicit.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

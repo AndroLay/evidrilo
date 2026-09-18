@@ -46,17 +46,17 @@ internal fun premiumPaywallModel(
         state = state,
         title = when (state) {
             PremiumPaywallState.LOADING -> "Checking premium access"
-            PremiumPaywallState.LOCKED -> "Unlock the practice pack"
+            PremiumPaywallState.LOCKED -> "Unlock two evidence cases"
             PremiumPaywallState.OFFERS_AVAILABLE -> "Choose monthly or yearly access"
             PremiumPaywallState.EMPTY -> "Premium plans are unavailable"
             PremiumPaywallState.ERROR -> "Purchase needs attention"
             PremiumPaywallState.PENDING -> "Purchase is being reconciled"
             PremiumPaywallState.CANCELLED -> "Purchase cancelled"
             PremiumPaywallState.UNKNOWN -> "Purchase state needs reconciliation"
-            PremiumPaywallState.UNLOCKED -> "Premium practice is unlocked"
+            PremiumPaywallState.UNLOCKED -> "Premium evidence cases are unlocked"
         },
         message = billing.message.ifBlank {
-            "The free practice remains available offline without an account or subscription."
+            "The free evidence workflow remains available offline without an account or subscription."
         },
         offers = offers,
         selectedProductId = selectedProductId,

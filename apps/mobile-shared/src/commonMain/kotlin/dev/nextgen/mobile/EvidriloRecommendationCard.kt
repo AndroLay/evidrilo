@@ -33,13 +33,13 @@ internal fun EvidriloRecommendationCard(
         -> Unit
 
         RecommendationUiState.Loading -> EvidriloRecommendationStatus(
-            message = "Loading suggested practice",
-            description = "Loading a suggested practice. Local practice remains available.",
+            message = "Loading suggested review",
+            description = "Loading a suggested review. The local workflow remains available.",
         )
 
         RecommendationUiState.ActionInProgress -> EvidriloRecommendationStatus(
-            message = "Starting suggested practice",
-            description = "Starting the suggested practice. Local practice remains available.",
+            message = "Starting suggested review",
+            description = "Starting the suggested review. The local workflow remains available.",
         )
 
         is RecommendationUiState.Unavailable -> EvidriloRecommendationUnavailable(onRetry)

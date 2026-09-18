@@ -18,21 +18,21 @@ fun RecommendationPayload.toCardPresentation(): RecommendationCardPresentation? 
         ?.takeIf { it.isNotBlank() }
         ?: return null
     val explanation = when (reason) {
-        RecommendationReason.START_HERE -> "A short evidence exercise is ready to begin."
-        RecommendationReason.PRACTICE_ACTION_REQUIRED -> "A focused practice can help turn your latest feedback into a next step."
-        RecommendationReason.NEXT_PRACTICE -> "A bounded follow-up practice is ready when you are."
+        RecommendationReason.START_HERE -> "A short evidence review is ready to begin."
+        RecommendationReason.PRACTICE_ACTION_REQUIRED -> "A focused review can help turn your latest feedback into a next step."
+        RecommendationReason.NEXT_PRACTICE -> "A bounded follow-up review is ready when you are."
         RecommendationReason.NO_ELIGIBLE_CASE,
         RecommendationReason.INSUFFICIENT_PROJECTION,
         -> return null
     }
     val evidenceSummary = "Evidence anchors: ${evidenceReferences.size.coerceIn(0, 128)}"
-    val title = "Suggested next practice"
+    val title = "Suggested next review"
     return RecommendationCardPresentation(
         title = title,
         objective = safeObjective,
         explanation = explanation,
         evidenceSummary = evidenceSummary,
-        acceptLabel = "Start suggested practice",
+        acceptLabel = "Start suggested review",
         dismissLabel = "Not now",
         contentDescription = "$title. Focus: $safeObjective. $explanation $evidenceSummary.",
     )

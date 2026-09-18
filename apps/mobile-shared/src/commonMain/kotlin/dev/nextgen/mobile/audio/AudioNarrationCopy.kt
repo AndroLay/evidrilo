@@ -18,7 +18,7 @@ internal object AudioNarrationCopy {
     )
 
     fun guide(): String = joinCopy(
-        "Practice guide.",
+        "Evidence guide.",
         "A short way to move from an observation to a claim you can explain.",
         *evidriloGuideTopics.flatMap { topic ->
             val copy = guideTopicCopy(topic)
@@ -58,7 +58,7 @@ internal object AudioNarrationCopy {
         "Restore a purchase from Premium; the store account is the source of truth for a completed transaction.",
         "Manage or cancel a subscription through the relevant app store or Customer Center when available.",
         "Refund requests must be made through the store that processed the purchase.",
-        "Free drafts remain local, and account deletion is separate from clearing local practice history.",
+        "Free drafts remain local, and account deletion is separate from clearing local workflow history.",
     )
 
     private fun joinCopy(vararg sections: String?): String = sections

@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
+import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
@@ -67,6 +68,46 @@ internal fun EvidriloWorkspaceTraceCard(
             )
             trace.boundary?.let { boundary ->
                 TraceFactRow(label = "Claim boundary · ${boundary.factId}", text = boundary.text)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EvidriloEvidenceLensCard(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+) {
+    val lens = evidenceLensFor(case, draft)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Evidence lens for ${lens.workspaceId}"
+            },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("EVIDENCE LENS", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
+            Text(
+                "${lens.selectedCount} of ${lens.observationCount} supplied observations selected",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                "Selection is shown as a learner anchor; it is not a claim of proof by itself.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            lens.entries.forEach { entry ->
+                TraceFactRow(
+                    label = "${entry.selection.evidriloLabel()} · ${entry.factId}",
+                    text = entry.text,
+                )
             }
         }
     }
@@ -126,12 +167,74 @@ internal fun EvidriloClaimBoundaryCard(
 }
 
 @Composable
+internal fun EvidriloConflictDetailCard(
+    evaluation: ConclusionEvaluation,
+) {
+    val details = conflictDetailsFor(evaluation)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Conflict detail for claim verification"
+            },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("CONFLICT DETAIL", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
+            if (details.isEmpty()) {
+                Text("No blocking conflict found in the bounded checks.", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Each deterministic check passed for the supplied claim and anchors.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                details.forEach { detail ->
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            buildString {
+                                append(detail.check.displayLabel())
+                                append(" · ")
+                                append(detail.status.displayLabel())
+                                if (detail.isPrimary && detail.code != null) {
+                                    append(" · ")
+                                    append(detail.code)
+                                }
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(detail.message, style = MaterialTheme.typography.bodyMedium)
+                        Text("Why: ${detail.why}", style = MaterialTheme.typography.bodySmall)
+                        Text("Next: ${detail.nextAction}", style = MaterialTheme.typography.bodySmall)
+                        if (detail.anchorIds.isNotEmpty()) {
+                            Text(
+                                "Anchors: ${detail.anchorIds.joinToString()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EvidriloColors.Slate,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun EvidriloEvidenceDeltaCard(
     before: ConclusionDraft,
     after: ConclusionDraft,
     title: String,
+    case: ConclusionCase = ConclusionCases.M0_T2,
+    beforeCase: ConclusionCase = case,
 ) {
-    val delta = evidenceDeltaFor(before, after)
+    val delta = evidenceDeltaFor(beforeCase, case, before, after)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +274,14 @@ internal fun EvidriloEvidenceDeltaCard(
                 label = "Limitation anchors removed",
                 value = delta.removedLimitationIds.ifEmpty { listOf("None") }.joinToString(),
             )
+            DeltaRow(label = "Limitation note changed", value = delta.limitationNoteChanged.evidriloYesNo())
             DeltaRow(label = "Next action changed", value = delta.implicationChanged.evidriloYesNo())
+            DeltaRow(label = "Evidence assessment before", value = delta.beforeAssessment.displayLabel())
+            DeltaRow(label = "Evidence assessment after", value = delta.afterAssessment.displayLabel())
+            DeltaRow(label = "Evidence relationship changed", value = delta.evidenceRelationshipChanged.evidriloYesNo())
+            DeltaRow(label = "Claim boundary changed", value = delta.claimBoundaryChanged.evidriloYesNo())
+            DeltaRow(label = "Open gap changed", value = delta.gapChanged.evidriloYesNo())
+            DeltaRow(label = "Action trace", value = delta.afterActionState.evidriloLabel())
         }
     }
 }
@@ -215,6 +325,19 @@ private fun ConclusionScope?.evidriloLabel(): String = when (this) {
     ConclusionScope.GENERAL_CAUSAL_CLAIM -> "General causal claim"
     ConclusionScope.UNSUPPORTED -> "Unsupported scope"
     null -> "Not selected"
+}
+
+private fun EvidriloEvidenceLensSelection.evidriloLabel(): String = when (this) {
+    EvidriloEvidenceLensSelection.SELECTED -> "Selected anchor"
+    EvidriloEvidenceLensSelection.AVAILABLE -> "Available observation"
+}
+
+private fun EvidriloActionTraceState.evidriloLabel(): String = when (this) {
+    EvidriloActionTraceState.NOT_SELECTED -> "Not selected"
+    EvidriloActionTraceState.NEW -> "New and anchored"
+    EvidriloActionTraceState.UNCHANGED -> "Unchanged and anchored"
+    EvidriloActionTraceState.CHANGED -> "Changed and anchored"
+    EvidriloActionTraceState.STALE -> "Stale: limitation anchor missing"
 }
 
 private fun Boolean.evidriloYesNo(): String = if (this) "Yes" else "No"

@@ -98,7 +98,7 @@ internal fun EvidriloSettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Settings", style = MaterialTheme.typography.displayMedium)
             Text(
-                "Tune the practice experience and keep local data understandable.",
+                "Tune the evidence workflow and keep local data understandable.",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -107,7 +107,7 @@ internal fun EvidriloSettingsScreen(
             EvidriloRecoveryNotice(notice = notice)
         }
 
-        EvidriloSectionHeading("Practice")
+        EvidriloSectionHeading("Workflow")
         EvidriloSettingsGroup {
             EvidriloSettingsRow(
                 icon = EvidriloIconName.CHECKLIST,
@@ -135,15 +135,15 @@ internal fun EvidriloSettingsScreen(
             EvidriloDivider()
             EvidriloSettingsRow(
                 icon = EvidriloIconName.BOOK,
-                title = "Practice guide",
+                title = "Evidence guide",
                 subtitle = "Evidence · claim · limits · revision",
                 onClick = onOpenGuide,
             )
             EvidriloDivider()
             EvidriloSettingsRow(
                 icon = EvidriloIconName.LAYERS,
-                title = "Practice packs",
-                subtitle = "In development · optional store access",
+                title = "Evidence cases",
+                subtitle = "Two additional cases · optional monthly/yearly access",
                 onClick = onOpenPremium,
             )
             EvidriloDivider()
@@ -245,7 +245,7 @@ internal fun EvidriloSettingsScreen(
                         onClick = { pendingAction = SettingsDestructiveAction.RESET_PRACTICE },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Reset current practice")
+                        Text("Reset current workflow")
                     }
                     OutlinedButton(
                         onClick = { pendingAction = SettingsDestructiveAction.CLEAR_HISTORY },
@@ -395,9 +395,9 @@ private enum class SettingsDestructiveAction(
     val confirmLabel: String,
 ) {
     RESET_PRACTICE(
-        title = "Reset current practice?",
+        title = "Reset current workflow?",
         message = "This removes the saved in-progress draft. Your completed comparison stays in local history.",
-        confirmLabel = "Reset practice",
+        confirmLabel = "Reset workflow",
     ),
     CLEAR_HISTORY(
         title = "Clear latest comparison?",

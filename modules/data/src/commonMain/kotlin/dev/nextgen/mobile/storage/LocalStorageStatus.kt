@@ -24,13 +24,13 @@ fun LocalStorageStatus.notice(): LocalStorageNotice? = when (this) {
         isError = false,
     )
     LocalStorageStatus.RECOVERED -> LocalStorageNotice(
-        title = "Practice restored",
-        body = "Your saved practice was restored on this device.",
+        title = "Workflow restored",
+        body = "Your saved workflow was restored on this device.",
         isError = false,
     )
     LocalStorageStatus.REPAIRED -> LocalStorageNotice(
         title = "Local storage recovered",
-        body = "An unreadable saved record was removed safely. Start a fresh practice; the free core is still available.",
+        body = "An unreadable saved record was removed safely. Start a fresh workflow; the free core is still available.",
         isError = true,
     )
     LocalStorageStatus.UNAVAILABLE -> LocalStorageNotice(
@@ -39,8 +39,8 @@ fun LocalStorageStatus.notice(): LocalStorageNotice? = when (this) {
         isError = true,
     )
     LocalStorageStatus.CORRUPT -> LocalStorageNotice(
-        title = "Saved practice not restored",
-        body = "A saved practice could not be read safely. It was not restored; start a fresh practice.",
+        title = "Saved workflow not restored",
+        body = "A saved workflow could not be read safely. It was not restored; start a fresh workflow.",
         isError = true,
     )
     LocalStorageStatus.FAILED -> LocalStorageNotice(

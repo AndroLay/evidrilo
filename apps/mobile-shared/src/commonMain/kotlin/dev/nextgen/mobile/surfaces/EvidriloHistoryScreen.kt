@@ -80,13 +80,13 @@ internal fun EvidriloHistoryScreen(
                     ) {
                         Text("No comparison saved yet.", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Complete the free practice and the evidence-change round to create one local comparison.",
+                            "Complete the free evidence workflow and the evidence-change round to create one local comparison.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                 }
                 EvidriloPrimaryButton(
-                    label = "Start free practice",
+                    label = "Start evidence review",
                     onClick = onStartPractice,
                 )
             }

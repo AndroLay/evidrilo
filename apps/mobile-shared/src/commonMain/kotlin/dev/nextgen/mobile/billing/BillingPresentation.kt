@@ -73,7 +73,7 @@ data class BillingPresentation(
                         ?: availableOffers.first()
                     BillingPresentation(
                         state = BillingUiState.OFFER_AVAILABLE,
-                        message = "Premium practice pack available.",
+                        message = "Premium evidence cases are available.",
                         offer = selectedOffer,
                         offers = availableOffers,
                         selectedProductId = selectedOffer.productId,
@@ -88,7 +88,7 @@ data class BillingPresentation(
                     BillingUiState.LOCKED
                 },
                 message = if (outcome.value == PremiumAccess.UNLOCKED) {
-                    "Premium practice pack unlocked."
+                    "Premium evidence cases unlocked."
                 } else {
                     "Premium access is not active on this customer."
                 },
@@ -112,7 +112,7 @@ data class BillingPresentation(
 
             BillingOutcome.Cancelled -> BillingPresentation(
                 state = BillingUiState.CANCELLED,
-                message = "Purchase cancelled; the free practice remains available.",
+                message = "Purchase cancelled; the free workflow remains available.",
                 offer = approvedBillingOffers(listOfNotNull(offer)).firstOrNull(),
                 offers = approvedBillingOffers(offers),
                 selectedProductId = selectedProductId?.takeIf(::isApprovedBillingProductId),

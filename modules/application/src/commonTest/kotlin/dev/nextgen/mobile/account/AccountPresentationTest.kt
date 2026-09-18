@@ -12,7 +12,7 @@ class AccountPresentationTest {
         val presentation = AccountSession.SignedOut.toPresentation()
 
         assertEquals("Account is optional", presentation.title)
-        assertTrue(presentation.body.contains("local practice"))
+        assertTrue(presentation.body.contains("local workflow"))
         assertTrue(presentation.body.contains("without an account"))
         assertNull(presentation.actionLabel)
         assertEquals(AccountPresentationAction.NONE, presentation.action)
@@ -32,7 +32,7 @@ class AccountPresentationTest {
         assertEquals("Credentials not verified", invalid.title)
         assertEquals("Session expired", expired.title)
         listOf(offline, invalid, expired).forEach {
-            assertTrue(it.body.contains("local practice"))
+            assertTrue(it.body.contains("local workflow"))
             assertEquals(AccountPresentationAction.NONE, it.action)
         }
     }

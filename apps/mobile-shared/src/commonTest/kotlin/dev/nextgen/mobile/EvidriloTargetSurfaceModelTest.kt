@@ -5,6 +5,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
+import dev.nextgen.mobile.domain.conclusion.ConclusionReducer
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
 import dev.nextgen.mobile.navigation.EvidriloDestination
@@ -44,18 +45,36 @@ class EvidriloTargetSurfaceModelTest {
         assertEquals(1, metrics.requirementCount)
         assertEquals(1, metrics.gapCount)
         assertEquals(1, metrics.actionCount)
-        assertEquals(0, metrics.coveragePercent)
+        assertEquals(0, metrics.draftCompletenessPercent)
+        assertEquals(TargetEvidenceStatus.NOT_ASSESSED, metrics.evidenceStatus)
     }
 
     @Test
-    fun workspace_metrics_report_full_coverage_when_the_draft_is_complete() {
+    fun workspace_metrics_report_full_draft_completeness_when_the_draft_is_complete() {
         val case = ConclusionCases.M0_T2
         val draft = completeTargetDraft(case)
 
         val metrics = targetWorkspaceMetrics(case, draft)
 
         assertEquals(0, metrics.gapCount)
-        assertEquals(100, metrics.coveragePercent)
+        assertEquals(100, metrics.draftCompletenessPercent)
+        assertEquals(TargetEvidenceStatus.SUPPORTED, metrics.evidenceStatus)
+    }
+
+    @Test
+    fun workspace_metrics_keep_an_incomplete_evidence_relationship_as_an_open_gap() {
+        val case = ConclusionCases.M0_T2
+        val draft = ConclusionDraft(
+            caseId = case.id,
+            evidenceRefs = listOf("OBS-WARM-01"),
+            claimText = "The selected observation supports a bounded comparison.",
+        )
+
+        val metrics = targetWorkspaceMetrics(case, draft)
+
+        assertEquals(40, metrics.draftCompletenessPercent)
+        assertEquals(TargetEvidenceStatus.PARTIALLY_SUPPORTED, metrics.evidenceStatus)
+        assertEquals(1, metrics.gapCount)
     }
 
     @Test
@@ -128,6 +147,28 @@ class EvidriloTargetSurfaceModelTest {
 
         assertEquals(draft, resolved)
         assertEquals(case.id, targetDraftFor(ConclusionState.Intro, case).caseId)
+    }
+
+    @Test
+    fun target_case_follows_the_evidence_change_state() {
+        val baseCase = ConclusionCases.M0_T2
+        val challengeCase = ConclusionCases.EVIDENCE_CHANGE
+        val challengeState = ConclusionState.EvidenceChangeDrafting(
+            baseDraft = ConclusionDraft(caseId = baseCase.id),
+            baseEvaluation = ConclusionReducer(case = baseCase).evaluate(
+                ConclusionDraft(caseId = baseCase.id),
+            ),
+            draft = ConclusionDraft(caseId = challengeCase.id),
+        )
+
+        assertEquals(
+            challengeCase.id,
+            targetCaseFor(challengeState, baseCase, challengeCase).id,
+        )
+        assertEquals(
+            baseCase.id,
+            targetCaseFor(ConclusionState.Intro, baseCase, challengeCase).id,
+        )
     }
 
     @Test

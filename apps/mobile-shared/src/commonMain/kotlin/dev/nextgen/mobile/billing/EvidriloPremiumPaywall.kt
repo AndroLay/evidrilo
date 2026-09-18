@@ -60,7 +60,7 @@ internal fun EvidriloPremiumPaywall(
         Text("EVIDRILO PREMIUM", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
         Text(model.title, style = MaterialTheme.typography.displayMedium)
         Text(
-            "Practice two more evidence-linked cases when the free case is not enough. Your free practice remains usable offline.",
+            "Unlock two additional evidence-linked cases when the free case is not enough. The free workflow remains usable offline.",
             style = MaterialTheme.typography.bodyLarge,
         )
 
@@ -134,7 +134,7 @@ internal fun EvidriloPremiumPaywall(
 
         if (model.canPurchase) {
             EvidriloPrimaryButton(
-                label = if (model.isBusy) "Processing purchase…" else "Unlock practice pack",
+                label = if (model.isBusy) "Processing purchase…" else "Unlock evidence cases",
                 onClick = onPurchase,
                 enabled = !model.isBusy,
             )

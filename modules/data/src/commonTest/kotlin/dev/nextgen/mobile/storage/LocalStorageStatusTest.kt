@@ -36,7 +36,7 @@ class LocalStorageStatusTest {
             LocalStorageStatus.FAILED.userMessage(),
         )
         assertEquals("Saved on this device.", LocalStorageStatus.SAVED.userMessage())
-        assertEquals("Your saved practice was restored on this device.", LocalStorageStatus.RECOVERED.userMessage())
+        assertEquals("Your saved workflow was restored on this device.", LocalStorageStatus.RECOVERED.userMessage())
     }
 
     @Test
@@ -46,7 +46,7 @@ class LocalStorageStatusTest {
             LocalStorageStatus.CORRUPT,
         )
 
-        assertEquals("Saved practice not restored", notice?.title)
+        assertEquals("Saved workflow not restored", notice?.title)
         assertTrue(notice?.isError == true)
         assertFalse(requireNotNull(notice).body.contains("redacted snapshot"))
     }

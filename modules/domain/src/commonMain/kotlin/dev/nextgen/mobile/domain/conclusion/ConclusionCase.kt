@@ -66,7 +66,7 @@ object ConclusionCases {
             ConclusionFact(
                 id = "HYP-01",
                 type = ConclusionFactType.CONTEXT,
-                text = "The practice hypothesis expects faster dissolution in warmer water.",
+                text = "The case hypothesis expects faster dissolution in warmer water.",
             ),
             ConclusionFact(
                 id = "OBS-WARM-01",
@@ -127,7 +127,7 @@ object ConclusionCases {
             ConclusionFact(
                 id = "HYP-01",
                 type = ConclusionFactType.CONTEXT,
-                text = "The practice hypothesis expects faster dissolution in warmer water.",
+                text = "The case hypothesis expects faster dissolution in warmer water.",
             ),
             ConclusionFact(
                 id = "OBS-WARM-01",
@@ -180,7 +180,7 @@ object ConclusionCases {
                 ConclusionFact(
                     id = "SURFACE-HYP-01",
                     type = ConclusionFactType.CONTEXT,
-                    text = "The practice hypothesis expects the crushed tablet to dissolve faster.",
+                    text = "The case hypothesis expects the crushed tablet to dissolve faster.",
                 ),
                 ConclusionFact(
                     id = "SURFACE-OBS-WHOLE-01",
@@ -231,7 +231,7 @@ object ConclusionCases {
                 ConclusionFact(
                     id = "VOLUME-HYP-01",
                     type = ConclusionFactType.CONTEXT,
-                    text = "The practice hypothesis expects the water volume to change the observed dissolution time.",
+                    text = "The case hypothesis expects the water volume to change the observed dissolution time.",
                 ),
                 ConclusionFact(
                     id = "VOLUME-OBS-100ML-01",

@@ -1,6 +1,7 @@
 package dev.nextgen.mobile
 
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
+import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluator
@@ -59,6 +60,27 @@ class EvidriloEvidenceGraphPresentationTest {
     }
 
     @Test
+    fun evidence_lens_labels_each_supplied_observation_without_inventing_support() {
+        val lens = evidenceLensFor(case, validDraft())
+
+        assertEquals(case.id, lens.workspaceId)
+        assertEquals(3, lens.selectedCount)
+        assertEquals(3, lens.observationCount)
+        assertEquals(
+            listOf(
+                EvidriloEvidenceLensSelection.SELECTED,
+                EvidriloEvidenceLensSelection.SELECTED,
+                EvidriloEvidenceLensSelection.SELECTED,
+            ),
+            lens.entries.map { it.selection },
+        )
+        assertEquals(
+            listOf("OBS-WARM-01", "OBS-ROOM-01", "OBS-COLD-01"),
+            lens.entries.map { it.factId },
+        )
+    }
+
+    @Test
     fun claim_boundary_reflects_deterministic_status_and_case_boundary() {
         val draft = validDraft()
         val evaluation = evaluator.evaluate(draft)
@@ -86,6 +108,23 @@ class EvidriloEvidenceGraphPresentationTest {
     }
 
     @Test
+    fun conflict_details_expose_all_non_passing_checks_and_primary_feedback() {
+        val draft = validDraft().copy(
+            scope = ConclusionScope.GENERAL_CAUSAL_CLAIM,
+            implication = ConclusionImplication.REPEAT_TRIALS,
+            limitationRefs = listOf("LIMIT-STIR-01"),
+        )
+        val evaluation = evaluator.evaluate(draft)
+
+        val details = conflictDetailsFor(evaluation)
+
+        assertTrue(details.any { it.check == ConclusionCheck.SCOPE_UNCERTAINTY })
+        assertTrue(details.any { it.check == ConclusionCheck.ACTIONABLE_IMPLICATION })
+        assertTrue(details.any { it.isPrimary })
+        assertEquals("OVERCLAIM_SCOPE", details.first { it.isPrimary }.code)
+    }
+
+    @Test
     fun evidence_delta_names_removed_observations_and_changed_learner_fields() {
         val before = validDraft()
         val after = before.copy(
@@ -106,6 +145,38 @@ class EvidriloEvidenceGraphPresentationTest {
         assertEquals(emptyList(), delta.addedLimitationIds)
         assertEquals(listOf("LIMIT-STIR-01"), delta.removedLimitationIds)
         assertTrue(delta.implicationChanged)
+    }
+
+    @Test
+    fun evidence_delta_propagates_assessment_gap_and_action_state() {
+        val before = validDraft()
+        val after = before.copy(
+            evidenceRefs = listOf("OBS-WARM-01"),
+            limitationRefs = listOf("LIMIT-STIR-01"),
+            implication = ConclusionImplication.REPEAT_TRIALS,
+            implicationReason = "Repeat the trials to address the missing comparison.",
+        )
+
+        val delta = evidenceDeltaFor(case, before, after)
+
+        assertEquals(ConclusionStatus.PASS, delta.beforeAssessment)
+        assertEquals(ConclusionStatus.ACTION_REQUIRED, delta.afterAssessment)
+        assertTrue(delta.evidenceRelationshipChanged)
+        assertTrue(delta.gapChanged)
+        assertEquals(EvidriloActionTraceState.STALE, delta.afterActionState)
+    }
+
+    @Test
+    fun evidence_delta_uses_the_case_version_for_each_side_of_a_challenge() {
+        val delta = evidenceDeltaFor(
+            beforeCase = ConclusionCases.M0_T2,
+            afterCase = ConclusionCases.EVIDENCE_CHANGE,
+            before = validDraft(),
+            after = validChallengeDraft(),
+        )
+
+        assertEquals(ConclusionStatus.PASS, delta.beforeAssessment)
+        assertEquals(ConclusionStatus.PASS, delta.afterAssessment)
     }
 
     private fun validDraft() = ConclusionDraft(

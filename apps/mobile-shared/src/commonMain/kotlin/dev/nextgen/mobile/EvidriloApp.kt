@@ -131,7 +131,11 @@ import kotlin.coroutines.cancellation.CancellationException
 
 @Composable
 internal fun EvidriloApp(billingGateway: BillingGateway) {
-    val reducer = remember { ConclusionReducer() }
+    val baseCase = ConclusionCases.M0_T2
+    val evidenceChangeCase = ConclusionCases.EVIDENCE_CHANGE
+    val reducer = remember(baseCase.id, evidenceChangeCase.id) {
+        ConclusionReducer(case = baseCase, evidenceChangeCase = evidenceChangeCase)
+    }
     val premiumReducer = remember { PremiumPracticeReducer() }
     val sessionStore = remember { createConclusionSessionStore() }
     val historyStore = remember { createConclusionHistoryStore() }
@@ -315,7 +319,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             SyncQueueMutation.CONFLICT ->
                 syncStatusMessage = "A conflicting local progress event was kept for review."
             SyncQueueMutation.QUEUE_FULL ->
-                syncStatusMessage = "The local sync queue is full; local practice remains available."
+                syncStatusMessage = "The local sync queue is full; the local workflow remains available."
             SyncQueueMutation.ACCOUNT_MISMATCH ->
                 syncStatusMessage = "The queued progress belongs to another account and was not sent."
             SyncQueueMutation.INVALID,
@@ -400,8 +404,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             }
         }
     }
-    val case = ConclusionCases.M0_T2
-    val backendCaseVersionId = requireNotNull(case.remoteCaseVersionId)
+    val case = targetCaseFor(state, baseCase, evidenceChangeCase)
+    val backendCaseVersionId = requireNotNull(baseCase.remoteCaseVersionId)
     val initialHistoryLoad = remember {
         recoverCorruptLocalStorage(historyStore.load()) { historyStore.clear() }
     }
@@ -816,7 +820,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         }
     }
     val returnToHome: () -> Unit = {
-        // Practice is a root workflow. Returning from any utility surface
+        // Evidence review is a root workflow. Returning from any utility surface
         // must not strand the user in that surface's stack entry, and this
         // does not reset the persisted/evaluator state.
         navigationState = navigationState.resetToHome()
@@ -965,7 +969,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 EvidriloDestination.SETTINGS -> "Settings"
                 EvidriloDestination.HISTORY -> "History"
                 EvidriloDestination.GUIDE -> "Guide"
-                EvidriloDestination.PRACTICE -> "Practice"
+                EvidriloDestination.PRACTICE -> "Review"
                 else -> "Home"
             },
             onBack = leavePremium,
@@ -1141,7 +1145,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         EvidriloGuideScreen(
             backLabel = when (previousDestination) {
                 EvidriloDestination.SETTINGS -> "Settings"
-                EvidriloDestination.PRACTICE -> "Practice"
+                EvidriloDestination.PRACTICE -> "Review"
                 else -> "Home"
             },
             onBack = { navigationState = navigationState.back() },
@@ -1463,7 +1467,7 @@ private fun EvidriloPremiumSurface(
 
             is ConclusionState.Drafting -> EvidriloDraftScreen(
                 case = state.case,
-                title = "Premium practice · ${state.case.title}",
+                title = "Premium evidence case · ${state.case.title}",
                 draft = current.draft,
                 validationMessage = current.validationMessage,
                 onDraftChange = { onPracticeEvent(ConclusionEvent.UpdateDraft(it)) },
@@ -1629,7 +1633,7 @@ private fun EvidriloPremiumCatalogScreen(
             onClick = onBeginCase,
             enabled = state.selectedCase != null,
         )
-        EvidriloSecondaryButton(label = "Return to free practice", onClick = onBack)
+        EvidriloSecondaryButton(label = "Return to free workflow", onClick = onBack)
     }
 }
 
@@ -1647,7 +1651,7 @@ private fun EvidriloPremiumSummaryScreen(
     EvidriloContentColumn {
         EvidriloBackButton(label = "Packs", onClick = onBack)
         EvidriloEyebrow("EVIDRILO PREMIUM · REVISION COMPLETE")
-        Text("Compare the premium practice", style = MaterialTheme.typography.headlineMedium)
+        Text("Compare the premium evidence case", style = MaterialTheme.typography.headlineMedium)
         Text(
             "The initial draft and one revision remain learner-authored. This premium session is not added to free-core local comparison history.",
             style = MaterialTheme.typography.bodyMedium,
@@ -1773,7 +1777,7 @@ private fun EvidriloDraftScreen(
                     label = "Continue to claim",
                     onClick = { step = EvidriloDraftStep.CLAIM },
                 )
-                EvidriloSecondaryButton(label = "Reset this practice", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
             }
 
             EvidriloDraftStep.CLAIM -> {
@@ -1816,7 +1820,7 @@ private fun EvidriloDraftScreen(
                     label = "Continue to limits",
                     onClick = { step = EvidriloDraftStep.LIMITS },
                 )
-                EvidriloSecondaryButton(label = "Reset this practice", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
             }
 
             EvidriloDraftStep.LIMITS -> {
@@ -1880,7 +1884,7 @@ private fun EvidriloDraftScreen(
                     label = "Review my conclusion",
                     onClick = onSubmit,
                 )
-                EvidriloSecondaryButton(label = "Reset this practice", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
             }
         }
     }
@@ -1968,6 +1972,7 @@ private fun EvidriloFeedbackScreen(
             onStopAudio = onStopAudio,
         )
         EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
+        EvidriloConflictDetailCard(evaluation = evaluation)
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2022,8 +2027,10 @@ private fun EvidriloSummaryScreen(
             before = initialDraft,
             after = revisedDraft,
             title = "Revision evidence and field changes",
+            case = case,
         )
         EvidriloClaimBoundaryCard(case = case, draft = revisedDraft, evaluation = finalEvaluation)
+        EvidriloConflictDetailCard(evaluation = finalEvaluation)
         finalEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2032,7 +2039,7 @@ private fun EvidriloSummaryScreen(
             body = "You connected the selected evidence, scope, limitations, and next action.",
         )
         EvidriloPrimaryButton(label = "Try the evidence-change challenge", onClick = onStartChallenge)
-        EvidriloSecondaryButton(label = "Start a new practice", onClick = onReset)
+        EvidriloSecondaryButton(label = "Start a new review", onClick = onReset)
     }
 }
 
@@ -2075,6 +2082,7 @@ private fun EvidriloEvidenceChangeFeedbackScreen(
             draft = draft,
             evaluation = evaluation,
         )
+        EvidriloConflictDetailCard(evaluation = evaluation)
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2133,12 +2141,15 @@ private fun EvidriloEvidenceChangeSummaryScreen(
             before = baseDraft,
             after = challengeDraft,
             title = "Changed-evidence comparison",
+            case = ConclusionCases.EVIDENCE_CHANGE,
+            beforeCase = ConclusionCases.M0_T2,
         )
         EvidriloClaimBoundaryCard(
             case = ConclusionCases.EVIDENCE_CHANGE,
             draft = challengeDraft,
             evaluation = challengeEvaluation,
         )
+        EvidriloConflictDetailCard(evaluation = challengeEvaluation)
         challengeEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2146,7 +2157,7 @@ private fun EvidriloEvidenceChangeSummaryScreen(
             title = "The challenge conclusion passes the bounded checks",
             body = "The latest comparison preserves the learner-authored conclusions and active fact anchors.",
         )
-        EvidriloPrimaryButton(label = "Return to local practice", onClick = onReset)
+        EvidriloPrimaryButton(label = "Return to workflow", onClick = onReset)
     }
 }
 

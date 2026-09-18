@@ -56,7 +56,7 @@ internal fun EvidriloGuideScreen(
     EvidriloContentColumn {
         EvidriloBackButton(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Practice guide", style = MaterialTheme.typography.displayMedium)
+            Text("Evidence guide", style = MaterialTheme.typography.displayMedium)
             Text(
                 "A short way to move from an observation to a claim you can explain.",
                 style = MaterialTheme.typography.bodyLarge,
@@ -71,7 +71,7 @@ internal fun EvidriloGuideScreen(
 
         EvidriloGuideProcess()
 
-        EvidriloSectionHeading("Three things to practice")
+        EvidriloSectionHeading("Three evidence habits")
         EvidriloSettingsGroup {
             evidriloGuideTopics.forEachIndexed { index, topic ->
                 val copy = guideTopicCopy(topic)
@@ -125,7 +125,7 @@ internal fun EvidriloGuideScreen(
         }
 
         EvidriloPrimaryButton(
-            label = "Open free practice",
+            label = "Open evidence workflow",
             onClick = onOpenPractice,
         )
         EvidriloSecondaryButton(

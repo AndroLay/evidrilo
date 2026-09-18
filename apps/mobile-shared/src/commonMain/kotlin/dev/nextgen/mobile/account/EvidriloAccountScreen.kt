@@ -161,7 +161,7 @@ internal fun EvidriloAccountScreen(
         }
 
         EvidriloTintPanel {
-            Text("Free practice remains local", style = MaterialTheme.typography.titleMedium)
+            Text("Free workflow remains local", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Account, cloud sync, and future cross-device features are optional. Passwords are sent only to the managed authentication provider and are never stored by Evidrilo.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -175,7 +175,7 @@ internal fun EvidriloAccountScreen(
             title = { Text("Delete account data?") },
             text = {
                 Text(
-                    "This asks the platform to prepare deletion of server-owned Evidrilo data. Local practice stays on this device until you clear it separately.",
+                    "This asks the platform to prepare deletion of server-owned Evidrilo data. The local workflow stays on this device until you clear it separately.",
                 )
             },
             confirmButton = {

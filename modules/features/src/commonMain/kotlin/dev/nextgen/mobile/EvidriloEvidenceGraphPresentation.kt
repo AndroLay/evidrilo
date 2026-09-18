@@ -1,11 +1,15 @@
 package dev.nextgen.mobile
 
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
+import dev.nextgen.mobile.domain.conclusion.ConclusionCases
+import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
+import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluator
 import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionFeedbackItem
+import dev.nextgen.mobile.domain.conclusion.ConclusionField
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
@@ -43,6 +47,32 @@ data class EvidriloEvidenceLink(
     val selected: Boolean,
 )
 
+enum class EvidriloEvidenceLensSelection {
+    SELECTED,
+    AVAILABLE,
+}
+
+data class EvidriloEvidenceLensEntry(
+    val factId: String,
+    val text: String,
+    val displayLabel: String?,
+    val displayValue: String?,
+    val selection: EvidriloEvidenceLensSelection,
+)
+
+/** A read-only lens over supplied observations; it never infers support. */
+data class EvidriloEvidenceLens(
+    val workspaceId: String,
+    val requirementId: String?,
+    val entries: List<EvidriloEvidenceLensEntry>,
+) {
+    val selectedCount: Int
+        get() = entries.count { it.selection == EvidriloEvidenceLensSelection.SELECTED }
+
+    val observationCount: Int
+        get() = entries.size
+}
+
 /** The deterministic Claim Boundary projection shown alongside verification. */
 data class EvidriloClaimBoundary(
     val claimText: String,
@@ -52,6 +82,27 @@ data class EvidriloClaimBoundary(
     val feedback: ConclusionFeedbackItem?,
     val boundary: EvidriloTraceFact?,
 )
+
+/** A deterministic view of every failing check, not only the first feedback item. */
+data class EvidriloConflictDetail(
+    val check: ConclusionCheck,
+    val status: ConclusionStatus,
+    val field: ConclusionField,
+    val code: String?,
+    val anchorIds: List<String>,
+    val message: String,
+    val why: String,
+    val nextAction: String,
+    val isPrimary: Boolean,
+)
+
+enum class EvidriloActionTraceState {
+    NOT_SELECTED,
+    NEW,
+    UNCHANGED,
+    CHANGED,
+    STALE,
+}
 
 /** Field-level changes between two learner-authored drafts. */
 data class EvidriloEvidenceDelta(
@@ -64,7 +115,14 @@ data class EvidriloEvidenceDelta(
     val scopeChanged: Boolean,
     val addedLimitationIds: List<String>,
     val removedLimitationIds: List<String>,
+    val limitationNoteChanged: Boolean,
     val implicationChanged: Boolean,
+    val beforeAssessment: ConclusionStatus,
+    val afterAssessment: ConclusionStatus,
+    val evidenceRelationshipChanged: Boolean,
+    val claimBoundaryChanged: Boolean,
+    val gapChanged: Boolean,
+    val afterActionState: EvidriloActionTraceState,
 )
 
 fun workspaceTraceFor(
@@ -89,6 +147,27 @@ fun workspaceTraceFor(
     boundary = case.facts.firstOrNull { it.type == ConclusionFactType.BOUNDARY }?.toTraceFact(),
 )
 
+fun evidenceLensFor(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+): EvidriloEvidenceLens = EvidriloEvidenceLens(
+    workspaceId = case.id,
+    requirementId = case.facts.firstOrNull { it.type == ConclusionFactType.AIM }?.id,
+    entries = case.factsOfType(ConclusionFactType.OBSERVATION).map { fact ->
+        EvidriloEvidenceLensEntry(
+            factId = fact.id,
+            text = fact.text,
+            displayLabel = fact.displayLabel,
+            displayValue = fact.displayValue,
+            selection = if (fact.id in draft.evidenceRefs) {
+                EvidriloEvidenceLensSelection.SELECTED
+            } else {
+                EvidriloEvidenceLensSelection.AVAILABLE
+            },
+        )
+    },
+)
+
 fun claimBoundaryFor(
     case: ConclusionCase,
     draft: ConclusionDraft,
@@ -102,7 +181,62 @@ fun claimBoundaryFor(
     boundary = case.facts.firstOrNull { it.type == ConclusionFactType.BOUNDARY }?.toTraceFact(),
 )
 
+fun conflictDetailsFor(
+    evaluation: ConclusionEvaluation,
+): List<EvidriloConflictDetail> {
+    val primary = evaluation.primaryFeedback
+    val checkDetails = evaluation.checks
+        .filter { it.status != ConclusionStatus.PASS }
+        .map { check ->
+            val matchingPrimary = primary?.takeIf { feedback ->
+                feedback.field == check.field && feedback.status == check.status
+            }
+            EvidriloConflictDetail(
+                check = check.check,
+                status = check.status,
+                field = check.field,
+                code = matchingPrimary?.code,
+                anchorIds = check.anchorIds,
+                message = matchingPrimary?.message ?: check.reason,
+                why = matchingPrimary?.why ?: check.reason,
+                nextAction = if (matchingPrimary != null) {
+                    matchingPrimary.nextAction
+                } else {
+                    "Review the ${check.field.name.lowercase()} field and submit again."
+                },
+                isPrimary = matchingPrimary != null,
+            )
+        }
+
+    if (primary == null || checkDetails.any { it.isPrimary }) return checkDetails
+
+    return checkDetails + EvidriloConflictDetail(
+        check = primary.field.toCheck(),
+        status = primary.status,
+        field = primary.field,
+        code = primary.code,
+        anchorIds = primary.anchorIds,
+        message = primary.message,
+        why = primary.why,
+        nextAction = primary.nextAction,
+        isPrimary = true,
+    )
+}
+
 fun evidenceDeltaFor(
+    before: ConclusionDraft,
+    after: ConclusionDraft,
+): EvidriloEvidenceDelta = evidenceDeltaFor(ConclusionCases.M0_T2, ConclusionCases.M0_T2, before, after)
+
+fun evidenceDeltaFor(
+    case: ConclusionCase,
+    before: ConclusionDraft,
+    after: ConclusionDraft,
+): EvidriloEvidenceDelta = evidenceDeltaFor(case, case, before, after)
+
+fun evidenceDeltaFor(
+    beforeCase: ConclusionCase,
+    afterCase: ConclusionCase,
     before: ConclusionDraft,
     after: ConclusionDraft,
 ): EvidriloEvidenceDelta {
@@ -110,6 +244,16 @@ fun evidenceDeltaFor(
     val afterEvidence = after.evidenceRefs.distinct()
     val beforeLimitations = before.limitationRefs.distinct()
     val afterLimitations = after.limitationRefs.distinct()
+    val beforeAssessment = assessmentFor(beforeCase, before)
+    val afterAssessment = assessmentFor(afterCase, after)
+    val limitationNoteChanged = before.limitationNote != after.limitationNote
+    val implicationChanged = before.implication != after.implication ||
+        before.implicationReason != after.implicationReason
+    val claimBoundaryChanged = before.claimText != after.claimText ||
+        before.scope != after.scope ||
+        beforeLimitations != afterLimitations ||
+        limitationNoteChanged
+
     return EvidriloEvidenceDelta(
         beforeEvidenceIds = beforeEvidence,
         afterEvidenceIds = afterEvidence,
@@ -120,8 +264,58 @@ fun evidenceDeltaFor(
         scopeChanged = before.scope != after.scope,
         addedLimitationIds = afterLimitations.filter { it !in beforeLimitations },
         removedLimitationIds = beforeLimitations.filter { it !in afterLimitations },
-        implicationChanged = before.implication != after.implication,
+        limitationNoteChanged = limitationNoteChanged,
+        implicationChanged = implicationChanged,
+        beforeAssessment = beforeAssessment,
+        afterAssessment = afterAssessment,
+        evidenceRelationshipChanged = beforeEvidence != afterEvidence || before.relation != after.relation,
+        claimBoundaryChanged = claimBoundaryChanged,
+        gapChanged = (beforeAssessment != ConclusionStatus.PASS) != (afterAssessment != ConclusionStatus.PASS),
+        afterActionState = actionTraceState(afterCase, before, after),
     )
+}
+
+private fun assessmentFor(case: ConclusionCase, draft: ConclusionDraft): ConclusionStatus {
+    val evaluation = ConclusionEvaluator(case).evaluate(draft)
+    return evaluation.primaryFeedback?.status
+        ?: if (evaluation.checks.isNotEmpty() && evaluation.checks.all { it.status == ConclusionStatus.PASS }) {
+            ConclusionStatus.PASS
+        } else {
+            ConclusionStatus.CANNOT_ASSESS
+        }
+}
+
+private fun actionTraceState(
+    case: ConclusionCase,
+    before: ConclusionDraft,
+    after: ConclusionDraft,
+): EvidriloActionTraceState {
+    val implication = after.implication ?: return EvidriloActionTraceState.NOT_SELECTED
+    val requiredLimitation = case.requiredLimitationId(implication)
+    if (requiredLimitation != null && requiredLimitation !in after.limitationRefs) {
+        return EvidriloActionTraceState.STALE
+    }
+    if (before.implication == null) return EvidriloActionTraceState.NEW
+    return if (before.implication != after.implication || before.implicationReason != after.implicationReason) {
+        EvidriloActionTraceState.CHANGED
+    } else {
+        EvidriloActionTraceState.UNCHANGED
+    }
+}
+
+private fun ConclusionField.toCheck(): ConclusionCheck = when (this) {
+    ConclusionField.CASE_ID,
+    ConclusionField.RELATION,
+    ConclusionField.CLAIM_TEXT,
+    -> ConclusionCheck.GOAL_CONNECTEDNESS
+    ConclusionField.EVIDENCE_REFS -> ConclusionCheck.EVIDENCE_ANCHORING
+    ConclusionField.SCOPE,
+    ConclusionField.LIMITATION_REFS,
+    ConclusionField.LIMITATION_NOTE,
+    -> ConclusionCheck.SCOPE_UNCERTAINTY
+    ConclusionField.IMPLICATION,
+    ConclusionField.IMPLICATION_REASON,
+    -> ConclusionCheck.ACTIONABLE_IMPLICATION
 }
 
 private fun ConclusionFact.toTraceFact(): EvidriloTraceFact = EvidriloTraceFact(

@@ -39,11 +39,12 @@ internal data class TargetWorkspaceMetrics(
     val evidenceCount: Int,
     val gapCount: Int,
     val actionCount: Int,
-    val coveragePercent: Int,
+    val draftCompletenessPercent: Int,
+    val evidenceStatus: TargetEvidenceStatus,
 )
 
 /**
- * The target shell's user-visible journey. Practice remains a reducer-owned
+ * The target shell's user-visible journey. Evidence review remains a reducer-owned
  * stateful workflow; the surrounding destinations are only navigation
  * surfaces over the current local projection.
  */
@@ -84,13 +85,15 @@ internal fun targetWorkspaceMetrics(
     val hasLimit = draft.limitationRefs.isNotEmpty() || draft.limitationNote.isNotBlank()
     val hasAction = draft.implication != null && draft.implicationReason.isNotBlank()
     val completedSignals = listOf(hasEvidence, hasClaim, hasScope, hasLimit, hasAction).count { it }
+    val evidenceStatus = targetEvidenceStatus(case, draft)
 
     return TargetWorkspaceMetrics(
         requirementCount = 1,
         evidenceCount = observationIds.size,
-        gapCount = if (completedSignals == 5) 0 else 1,
+        gapCount = if (evidenceStatus == TargetEvidenceStatus.SUPPORTED) 0 else 1,
         actionCount = 1,
-        coveragePercent = completedSignals * 20,
+        draftCompletenessPercent = completedSignals * 20,
+        evidenceStatus = evidenceStatus,
     )
 }
 
@@ -103,7 +106,9 @@ internal fun targetEvidenceStatus(
     val evaluation = ConclusionReducer(case = case).evaluate(draft)
     return when {
         selected.isEmpty() -> TargetEvidenceStatus.NOT_ASSESSED
-        evaluation.primaryFeedback?.status == ConclusionStatus.PASS -> TargetEvidenceStatus.SUPPORTED
+        evaluation.primaryFeedback?.status == ConclusionStatus.CANNOT_ASSESS -> TargetEvidenceStatus.NOT_ASSESSED
+        evaluation.checks.isNotEmpty() && evaluation.checks.all { it.status == ConclusionStatus.PASS } ->
+            TargetEvidenceStatus.SUPPORTED
         else -> TargetEvidenceStatus.PARTIALLY_SUPPORTED
     }
 }
@@ -135,6 +140,18 @@ internal fun targetDraftFor(
     is ConclusionState.EvidenceChangeFeedback -> state.draft
     is ConclusionState.EvidenceChangeSummary -> state.challengeDraft
     is ConclusionState.Incomplete -> state.draft
+}
+
+internal fun targetCaseFor(
+    state: ConclusionState,
+    baseCase: ConclusionCase,
+    evidenceChangeCase: ConclusionCase,
+): ConclusionCase = when (state) {
+    is ConclusionState.EvidenceChangeDrafting,
+    is ConclusionState.EvidenceChangeFeedback,
+    is ConclusionState.EvidenceChangeSummary,
+    -> evidenceChangeCase
+    else -> baseCase
 }
 
 internal fun targetHistorySubtitle(history: ConclusionSessionSnapshot?): String = when {

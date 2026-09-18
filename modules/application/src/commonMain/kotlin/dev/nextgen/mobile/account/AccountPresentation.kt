@@ -16,7 +16,7 @@ data class AccountPresentation(
 fun AccountSession.toPresentation(): AccountPresentation = when (this) {
     AccountSession.SignedOut -> AccountPresentation(
         title = "Account is optional",
-        body = "The local practice works without an account. Sign in when you want a managed account for future cross-device features.",
+        body = "The local workflow works without an account. Sign in when you want a managed account for future cross-device features.",
         actionLabel = null,
         action = AccountPresentationAction.NONE,
         isBusy = false,
@@ -24,7 +24,7 @@ fun AccountSession.toPresentation(): AccountPresentation = when (this) {
 
     AccountSession.SigningIn -> AccountPresentation(
         title = "Preparing account sign-in",
-        body = "The account request is being completed securely. Your local practice remains available while this is in progress.",
+        body = "The account request is being completed securely. Your local workflow remains available while this is in progress.",
         actionLabel = null,
         action = AccountPresentationAction.NONE,
         isBusy = true,
@@ -32,7 +32,7 @@ fun AccountSession.toPresentation(): AccountPresentation = when (this) {
 
     AccountSession.AwaitingOAuthCallback -> AccountPresentation(
         title = "Finish Google sign-in",
-        body = "Complete the sign-in in your browser, then return to Evidrilo. Your local practice remains available.",
+        body = "Complete the sign-in in your browser, then return to Evidrilo. Your local workflow remains available.",
         actionLabel = null,
         action = AccountPresentationAction.NONE,
         isBusy = true,
@@ -40,7 +40,7 @@ fun AccountSession.toPresentation(): AccountPresentation = when (this) {
 
     is AccountSession.SignedIn -> AccountPresentation(
         title = "Account connected",
-        body = "This device has a verified account session. cloud sync is not connected in this build; local practice remains available.",
+        body = "This device has a verified account session. Cloud sync is not connected in this build; the local workflow remains available.",
         actionLabel = "Sign out",
         action = AccountPresentationAction.SIGN_OUT,
         isBusy = false,
@@ -48,7 +48,7 @@ fun AccountSession.toPresentation(): AccountPresentation = when (this) {
 
     AccountSession.Expired -> AccountPresentation(
         title = "Session expired",
-        body = "The stored account session was removed. local practice still works; sign in again when you are ready.",
+        body = "The stored account session was removed. The local workflow still works; sign in again when you are ready.",
         actionLabel = null,
         action = AccountPresentationAction.NONE,
         isBusy = false,
@@ -100,15 +100,15 @@ private fun unavailableTitle(reason: AccountUnavailableReason): String = when (r
 }
 
 private fun unavailableBody(reason: AccountUnavailableReason): String = when (reason) {
-    AccountUnavailableReason.SECURE_STORAGE -> "The account session could not be accessed safely. local practice remains available; no token was shown or copied."
-    AccountUnavailableReason.OFFLINE -> "The account service is unavailable offline. local practice remains available and no cloud sync is claimed."
-    AccountUnavailableReason.INVALID_CREDENTIALS -> "The credentials could not be verified. local practice remains available and no account data was disclosed."
-    AccountUnavailableReason.INVALID_INPUT -> "The account details need attention. local practice remains available and no credentials were stored."
-    AccountUnavailableReason.RATE_LIMITED -> "Please wait before trying again. local practice remains available and no credentials were stored."
-    AccountUnavailableReason.EMAIL_CONFIRMATION_REQUIRED -> "Confirm the email address from the message we sent, then sign in. local practice remains available."
-    AccountUnavailableReason.PASSWORD_RESET_REQUESTED -> "If that address can receive mail, a reset message was requested. local practice remains available."
-    AccountUnavailableReason.OAUTH_CANCELLED -> "Google sign-in was cancelled. local practice remains available."
-    AccountUnavailableReason.INVALID_REDIRECT -> "The sign-in callback could not be verified. local practice remains available and no session was stored."
-    AccountUnavailableReason.NOT_CONFIGURED -> "The managed account adapter is not connected in this build. local practice remains available without an account."
-    AccountUnavailableReason.OWNER_TRANSFER_REQUIRED -> "This account is the only active owner of an organization. Transfer ownership before deleting it; local practice remains available."
+    AccountUnavailableReason.SECURE_STORAGE -> "The account session could not be accessed safely. The local workflow remains available; no token was shown or copied."
+    AccountUnavailableReason.OFFLINE -> "The account service is unavailable offline. The local workflow remains available and no cloud sync is claimed."
+    AccountUnavailableReason.INVALID_CREDENTIALS -> "The credentials could not be verified. The local workflow remains available and no account data was disclosed."
+    AccountUnavailableReason.INVALID_INPUT -> "The account details need attention. The local workflow remains available and no credentials were stored."
+    AccountUnavailableReason.RATE_LIMITED -> "Please wait before trying again. The local workflow remains available and no credentials were stored."
+    AccountUnavailableReason.EMAIL_CONFIRMATION_REQUIRED -> "Confirm the email address from the message we sent, then sign in. The local workflow remains available."
+    AccountUnavailableReason.PASSWORD_RESET_REQUESTED -> "If that address can receive mail, a reset message was requested. The local workflow remains available."
+    AccountUnavailableReason.OAUTH_CANCELLED -> "Google sign-in was cancelled. The local workflow remains available."
+    AccountUnavailableReason.INVALID_REDIRECT -> "The sign-in callback could not be verified. The local workflow remains available and no session was stored."
+    AccountUnavailableReason.NOT_CONFIGURED -> "The managed account adapter is not connected in this build. The local workflow remains available without an account."
+    AccountUnavailableReason.OWNER_TRANSFER_REQUIRED -> "This account is the only active owner of an organization. Transfer ownership before deleting it; the local workflow remains available."
 }

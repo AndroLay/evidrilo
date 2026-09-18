@@ -15,6 +15,15 @@ The E191 increment passes the focused Kotlin/Android target tasks, full API
 `187/187`, and the versioned contract suite. This is repository-only evidence;
 device runtime, provider, managed, human, and submission gates remain separate.
 
+The E192 semantic-closure increment extends that bridge with an Evidence Lens, a
+multi-check Conflict Detail projection, honest draft-completeness versus
+evidence-support metrics, active-case selection for the evidence-change state,
+and Evidence Delta propagation for assessment, gap, claim-boundary, and action
+state. These changes are implemented in the committed repository but remain
+**pending focused Kotlin verification** until the Gradle environment is available;
+they do not close
+the device, provider, managed, human, or submission gates.
+
 ## Outcome
 
 Deliver one reproducible Android/iOS Evidrilo experience for Shipaton Next Gen:

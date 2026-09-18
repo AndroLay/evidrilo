@@ -241,11 +241,11 @@ internal fun EvidriloTargetHomeScreen(
             )
             TargetSectionRow(
                 icon = EvidriloIconName.BOOK,
-                title = "Practice guide",
+                title = "Evidence guide",
                 subtitle = "Evidence · claim · limits · revision",
                 onClick = onOpenGuide,
             )
-            EvidriloPrimaryButton(label = "Start practice", onClick = onStartPractice)
+            EvidriloPrimaryButton(label = "Start workspace", onClick = onStartPractice)
             Text(
                 text = "No account or network is required for the free core.",
                 style = MaterialTheme.typography.bodySmall,
@@ -283,7 +283,7 @@ internal fun EvidriloTargetSourcesScreen(
                 )
             }
             EvidriloPrimaryButton(label = "Review project overview", onClick = onOpenWorkspace)
-            EvidriloSecondaryButton(label = "Practice this case", onClick = onStartPractice)
+            EvidriloSecondaryButton(label = "Review this case", onClick = onStartPractice)
         }
     }
 }
@@ -325,7 +325,7 @@ internal fun EvidriloTargetWorkspaceScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            EvidriloPrimaryButton(label = "Continue practice", onClick = onStartPractice)
+            EvidriloPrimaryButton(label = "Continue workspace", onClick = onStartPractice)
         }
     }
 }
@@ -358,6 +358,7 @@ internal fun EvidriloTargetEvidenceScreen(
                         status = if (fact.id in selectedEvidence) "Selected in draft" else "Available",
                     )
                 }
+            EvidriloEvidenceLensCard(case = case, draft = draft)
             TargetFactCard(
                 fact = case.facts.first { it.type == ConclusionFactType.BOUNDARY },
                 status = "Claim boundary",
@@ -370,7 +371,7 @@ internal fun EvidriloTargetEvidenceScreen(
                 )
             }
             EvidriloPrimaryButton(label = "Open requirement trace", onClick = onOpenClaimTrace)
-            EvidriloSecondaryButton(label = "Open practice", onClick = onStartPractice)
+            EvidriloSecondaryButton(label = "Open claim review", onClick = onStartPractice)
         }
     }
 }
@@ -384,8 +385,9 @@ internal fun EvidriloTargetActionScreen(
     onStartPractice: () -> Unit,
 ) {
     val actionTitle = draft.implication.targetActionLabel()
+    val metrics = targetWorkspaceMetrics(case, draft)
     val actionReason = draft.implicationReason.ifBlank {
-        "Complete the practice flow to connect a next action to the remaining evidence gap."
+        "Complete the evidence workflow to connect a next action to the remaining gap."
     }
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
         EvidriloContentColumn {
@@ -394,6 +396,7 @@ internal fun EvidriloTargetActionScreen(
                 title = "What matters next?",
                 body = "A useful conclusion ends with an action that respects the evidence boundary.",
             )
+            TargetGapStatusCard(metrics = metrics)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
@@ -416,7 +419,7 @@ internal fun EvidriloTargetActionScreen(
             EvidriloTintPanel {
                 Text("Bounded by design", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "The action is a practice decision, not a promise that the case proves more than it contains.",
+                    "The action is a bounded decision, not a promise that the case proves more than it contains.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -452,7 +455,7 @@ internal fun EvidriloTargetClaimTraceScreen(
                 )
             }
             EvidriloPrimaryButton(label = "Continue to action plan", onClick = onOpenAction)
-            EvidriloSecondaryButton(label = "Open practice", onClick = onStartPractice)
+            EvidriloSecondaryButton(label = "Open claim review", onClick = onStartPractice)
         }
     }
 }
@@ -480,17 +483,18 @@ internal fun EvidriloTargetVerifyClaimScreen(
                 EvidriloTintPanel {
                     Text("Not assessed yet", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Complete the local practice draft to see anchored feedback for this claim.",
+                        "Complete the local evidence draft to see anchored feedback for this claim.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-                EvidriloPrimaryButton(label = "Open practice", onClick = onStartPractice)
+                EvidriloPrimaryButton(label = "Open claim review", onClick = onStartPractice)
             } else {
                 EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
+                EvidriloConflictDetailCard(evaluation = evaluation)
                 if (canRevise) {
                     EvidriloPrimaryButton(label = "Revise once", onClick = onRevise)
                 } else {
-                    EvidriloPrimaryButton(label = "Open practice", onClick = onStartPractice)
+                    EvidriloPrimaryButton(label = "Open claim review", onClick = onStartPractice)
                 }
             }
             EvidriloSecondaryButton(label = "Back to action plan", onClick = onBack)
@@ -521,6 +525,7 @@ internal fun EvidriloTargetEvidenceDeltaScreen(
                 before = before,
                 after = after,
                 title = "Before feedback → after one revision",
+                case = case,
             )
             evaluation?.let { finalEvaluation ->
                 EvidriloClaimBoundaryCard(
@@ -555,7 +560,7 @@ internal fun EvidriloTargetProfileScreen(
         EvidriloContentColumn {
             TargetPageIntro(
                 eyebrow = "PROFILE",
-                title = "Keep your practice yours.",
+                title = "Keep your work yours.",
                 body = profileSubtitle,
             )
             Card(
@@ -566,7 +571,7 @@ internal fun EvidriloTargetProfileScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("LOCAL-FIRST PRACTICE", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
+                    Text("LOCAL-FIRST WORKSPACE", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
                     Text("No account required", style = MaterialTheme.typography.titleLarge)
                     Text(
                         "The free core remains available offline. Sign in only when you choose sync or account features.",
@@ -638,7 +643,7 @@ private fun TargetProjectCard(
             Text(case.title, style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
             Text(case.description, style = MaterialTheme.typography.bodyLarge, color = EvidriloColors.White.copy(alpha = 0.9f))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                TargetMetric("${metrics.coveragePercent}%", "covered", EvidriloColors.White)
+                TargetMetric("${metrics.draftCompletenessPercent}%", "complete", EvidriloColors.White)
                 TargetMetric("${metrics.evidenceCount}", "evidence", EvidriloColors.White)
                 TargetMetric("${metrics.gapCount}", "open gap", EvidriloColors.White)
             }
@@ -656,16 +661,36 @@ private fun TargetProgressCard(metrics: TargetWorkspaceMetrics) {
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("WORKSPACE COVERAGE", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.White.copy(alpha = 0.8f))
+                Text("DRAFT COMPLETENESS", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.White.copy(alpha = 0.8f))
                 Spacer(Modifier.weight(1f))
-                Text("${metrics.coveragePercent}%", style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
+                Text("${metrics.draftCompletenessPercent}%", style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
             }
             Text(
-                if (metrics.gapCount == 0) "The current draft connects all required signals." else "One or more signals still need a learner decision.",
+                if (metrics.evidenceStatus == TargetEvidenceStatus.SUPPORTED) {
+                    "The current draft is supported by the supplied evidence."
+                } else {
+                    "The evidence relationship still needs a learner decision."
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = EvidriloColors.White,
             )
         }
+    }
+}
+
+@Composable
+private fun TargetGapStatusCard(metrics: TargetWorkspaceMetrics) {
+    val (title, body) = when (metrics.evidenceStatus) {
+        TargetEvidenceStatus.NOT_ASSESSED ->
+            "Evidence not assessed" to "Complete the claim review before treating the action as evidence-linked."
+        TargetEvidenceStatus.PARTIALLY_SUPPORTED ->
+            "Open evidence gap" to "The current draft still has a bounded support issue that the next action should address."
+        TargetEvidenceStatus.SUPPORTED ->
+            "No open evidence gap" to "The current draft passes the bounded support checks; keep the action within the case boundary."
+    }
+    EvidriloTintPanel {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(body, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
