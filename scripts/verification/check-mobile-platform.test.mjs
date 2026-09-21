@@ -140,7 +140,7 @@ test('CI exposes Android release and a separate unsigned iOS host lane', () => {
   const workflow = read('.github/workflows/verify.yml');
   const iosWorkflow = read('.github/workflows/ios-simulator.yml');
   assert.match(workflow, /:androidApp:bundleRelease/);
-  assert.match(iosWorkflow, /runs-on: macos-14/);
+  assert.match(iosWorkflow, /runs-on: macos-15/);
   assert.match(iosWorkflow, /xcodebuild/);
   assert.match(iosWorkflow, /CODE_SIGNING_ALLOWED=NO/);
   assert.match(iosWorkflow, /-scheme Evidrilo/);
