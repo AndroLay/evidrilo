@@ -101,6 +101,10 @@ class AccountSessionController(
             AccountGatewayResult.OwnerTransferRequired ->
                 AccountSession.Unavailable(AccountUnavailableReason.OWNER_TRANSFER_REQUIRED)
 
+            is AccountGatewayResult.ExportReady,
+            is AccountGatewayResult.ExportFailed,
+            -> state
+
             AccountGatewayResult.OAuthCancelled ->
                 AccountSession.Unavailable(AccountUnavailableReason.OAUTH_CANCELLED)
 

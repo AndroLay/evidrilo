@@ -99,6 +99,13 @@ internal fun EvidriloEvidenceLensCard(
                 "${lens.selectedCount} of ${lens.observationCount} supplied observations selected",
                 style = MaterialTheme.typography.titleLarge,
             )
+            if (lens.unavailableCount > 0) {
+                Text(
+                    "${lens.unavailableCount} selected reference is unavailable in this case version and cannot support the claim.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = EvidriloColors.Error,
+                )
+            }
             Text(
                 "Selection is shown as a learner anchor; it is not a claim of proof by itself.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -167,15 +174,15 @@ internal fun EvidriloClaimBoundaryCard(
 }
 
 @Composable
-internal fun EvidriloConflictDetailCard(
+internal fun EvidriloVerificationDetailCard(
     evaluation: ConclusionEvaluation,
 ) {
-    val details = conflictDetailsFor(evaluation)
+    val details = verificationDetailsFor(evaluation)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "Conflict detail for claim verification"
+                contentDescription = "Verification detail for claim verification"
             },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
@@ -186,9 +193,9 @@ internal fun EvidriloConflictDetailCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("CONFLICT DETAIL", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
+            Text("VERIFICATION DETAIL", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
             if (details.isEmpty()) {
-                Text("No blocking conflict found in the bounded checks.", style = MaterialTheme.typography.bodyLarge)
+                Text("No blocking verification issue found in the bounded checks.", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     "Each deterministic check passed for the supplied claim and anchors.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -330,6 +337,7 @@ private fun ConclusionScope?.evidriloLabel(): String = when (this) {
 private fun EvidriloEvidenceLensSelection.evidriloLabel(): String = when (this) {
     EvidriloEvidenceLensSelection.SELECTED -> "Selected anchor"
     EvidriloEvidenceLensSelection.AVAILABLE -> "Available observation"
+    EvidriloEvidenceLensSelection.UNAVAILABLE -> "Unavailable reference"
 }
 
 private fun EvidriloActionTraceState.evidriloLabel(): String = when (this) {

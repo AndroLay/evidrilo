@@ -24,9 +24,11 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         var dataSource = factory.Services.GetRequiredService<EndpointDataSource>();
         var endpoint = Assert.Single(
             dataSource.Endpoints,
-            candidate => candidate.Metadata.GetMetadata<IHttpMethodMetadata>()
+            candidate => candidate is RouteEndpoint route
+                && route.RoutePattern.RawText == "/v1/account/me"
+                && candidate.Metadata.GetMetadata<IHttpMethodMetadata>()
                 ?.HttpMethods.Contains("GET") == true
-                && candidate.DisplayName?.Contains("/v1/account/me", StringComparison.Ordinal) == true);
+            );
 
         var policy = endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>();
 
@@ -100,5 +102,42 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
         Assert.DoesNotContain(UserId.ToString(), body.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Account_export_requires_verified_identity()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me/export");
+        request.Headers.Add("X-Test-User", $"{UserId}|false");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Account_export_rejects_anonymous_requests_without_account_discovery()
+    {
+        using var response = await client.GetAsync("/v1/account/me/export");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
+        Assert.DoesNotContain(UserId.ToString(), body.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Account_export_fails_closed_without_database_configuration()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me/export");
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
+
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
     }
 }

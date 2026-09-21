@@ -11,6 +11,7 @@ const schemaFiles = [
   'health.v1.json',
   'http-errors.v1.json',
   'account-summary.v1.json',
+  'account-export.v1.json',
   'sync-command.v1.json',
   'sync-push-request.v1.json',
   'sync-push-result.v1.json',
@@ -36,6 +37,7 @@ const schemaFiles = [
 
 const fixtureFiles = [
   'account-summary-authenticated.json',
+  'account-export.json',
   'health-degraded.json',
   'health-live.json',
   'health-ready.json',
@@ -119,7 +121,7 @@ test('registered API routes map to response schemas and endpoint tests', () => {
   );
   assert.equal(manifest.schema, 'evidrilo.api-route-manifest');
   assert.equal(manifest.version, '1');
-  assert.equal(manifest.routes.length, 24);
+  assert.equal(manifest.routes.length, 25);
 
   const routeKeys = (routes) => routes
     .map((route) => `${route.method} ${route.path}`)
@@ -214,6 +216,7 @@ test('Android draft persistence does not synchronously commit on the UI event pa
 test('error and account fixtures expose only safe public fields', () => {
   const error = readJson(path.join('fixtures', 'http-error-unauthorized.json'));
   const account = readJson(path.join('fixtures', 'account-summary-authenticated.json'));
+  const accountExport = readJson(path.join('fixtures', 'account-export.json'));
 
   assert.deepEqual(Object.keys(error).sort(), ['code', 'message', 'requestId', 'schema', 'version']);
   assert.match(error.code, /^[A-Z][A-Z0-9_]{2,63}$/);
@@ -231,6 +234,22 @@ test('error and account fixtures expose only safe public fields', () => {
   assert.match(account.accountId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(account.emailVerified, true);
   assert.match(account.serverTime, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+
+  assert.deepEqual(Object.keys(accountExport).sort(), [
+    'accountId',
+    'data',
+    'generatedAt',
+    'requestId',
+    'schema',
+    'version',
+  ]);
+  assert.equal(accountExport.schema, 'evidrilo.account-export');
+  assert.equal(accountExport.version, '1');
+  assert.match(accountExport.accountId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(accountExport.generatedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.match(accountExport.requestId, /^[A-Za-z0-9_-]{8,128}$/);
+  assert.equal(accountExport.data.localDrafts, 'not_on_server');
+  assertNoCredentialShapedFields(accountExport);
 });
 
 test('sync fixtures preserve idempotency and cursor boundaries', () => {
@@ -355,10 +374,18 @@ test('the repository verification harness is documented and non-secret', () => {
     roadmap,
     /E175 closes the remaining sync pull lower-bound gap:[\s\S]*?E176 hardens request lifecycle and input boundaries\.[\s\S]*?E177 hardens sync pull pagination:/,
   );
-  assert.match(
-    roadmap,
-    /\[E176\]\(\.\.\/audit\/evidence\/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14\.md\)/,
+  const privateEvidencePath = path.join(
+    repositoryRoot,
+    'audit',
+    'evidence',
+    'evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md',
   );
+  if (fs.existsSync(privateEvidencePath)) {
+    assert.match(
+      roadmap,
+      /\[E176\]\(\.\.\/audit\/evidence\/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14\.md\)/,
+    );
+  }
 });
 
 test('billing webhook and forwarded headers have explicit boundaries', () => {
@@ -465,12 +492,10 @@ test('current operational snapshots point to the latest local evidence', {
     'utf8',
   );
   const currentSnapshotPaths = [
-    path.join(repositoryRoot, 'docs', 'operations', 'evidrilo-backend-execution.md'),
     path.join(repositoryRoot, 'docs', 'architecture', 'platform-decision.md'),
     path.join(repositoryRoot, 'docs', 'architecture', 'repository-structure.md'),
     path.join(repositoryRoot, 'docs', 'architecture', 'revenuecat.md'),
     path.join(repositoryRoot, 'platform', 'security-boundaries.md'),
-    path.join(repositoryRoot, 'audit', 'evidence', 'evidrilo-all-areas-audit-2026-09-13.md'),
   ];
 
   assert.match(revenueCatRunbook, /^Status: `E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED \/.*PRICE_MIGRATION_OPEN`$/m);
@@ -479,7 +504,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(revenueCatRunbook, /E152 account-deletion owner guard/);
   assert.match(revenueCatRunbook, /E153 client\/request boundary hardening/);
   assert.match(revenueCatRunbook, /E154 auth callback boundary|E154/);
-  assert.match(backendRegister, /^Last synchronized: 2026-09-18 \(E191\)$/m);
+  assert.match(backendRegister, /^Last synchronized: 2026-09-20 \(E202\)$/m);
   assert.match(backendRegister, /Node (?:boundary )?`106\/106`/);
   assert.match(backendRegister, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
   assert.match(backendRegister, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
@@ -512,9 +537,9 @@ test('current operational snapshots point to the latest local evidence', {
   assert.match(completionPlan, /\| Kotlin \|[\s\S]*?\| `332\/332` JVM tests/);
   assert.match(completionPlan, /\| Database\/worker integration \|[\s\S]*?migration 030/);
   assert.match(completionPlan, /Preserve the 30-migration order\/checksum ledger/);
-  assert.match(researchIndex, /^Latest increment: E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|\.)/m);
-  assert.match(researchIndex, /^Status: CURRENT \/ E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
-  assert.match(researchIndex, /latest repository-owned increment is \[E191\]/);
+  assert.match(researchIndex, /^Latest increment: E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E194 \/ DOTNET_TESTHOST_SOCKET_BLOCKED \/ E193 \/ ANDROID_CHALLENGE_HISTORY_RUNTIME_PARTIAL \/ E192 \/ REPOSITORY_SEMANTIC_CLOSURE_VERIFIED \/ E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
+  assert.match(researchIndex, /^Status: CURRENT \/ E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ RECOVERY_CONTROL_OBSERVED \/ BILLING_FALLBACK_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ PROCESS_RESTART_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E192 \/ REPOSITORY_SEMANTIC_CLOSURE_VERIFIED /m);
+  assert.match(researchIndex, /latest repository-owned increment is \[E202\]/);
   assert.match(researchIndex, /strict API input matching/);
   assert.match(researchIndex, /requested page size/);
   assert.match(researchIndex, /focused audio tests pass `28\/28`/);
@@ -526,7 +551,7 @@ test('current operational snapshots point to the latest local evidence', {
   assert.doesNotMatch(contentAuthoringRunbook, /^Status: `E144 \//m);
   for (const snapshotPath of currentSnapshotPaths) {
     const snapshot = fs.readFileSync(snapshotPath, 'utf8');
-    assert.match(snapshot, /^Status: `?E191(?:\s|\/)/m, snapshotPath);
+    assert.match(snapshot, /^Status: `?E202(?:\s|\/)/m, snapshotPath);
   }
 });
 
@@ -539,8 +564,11 @@ test('current status page points to the latest evidence record', {
     'utf8',
   );
 
-  assert.match(status, /recorded through\s+E191/i);
-  assert.doesNotMatch(status, /recorded through E151/i);
+  assert.match(status, /^Latest increment: E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E194/m);
+  assert.match(status, /current runtime\/repository recheck is \[E193\]/i);
+  assert.match(status, /following the repository boundary in \[E192\]/i);
+  assert.match(status, /\[E194\]\(\.\.\/\.\.\/\.\.\/audit\/evidence\/evidrilo-dotnet-testhost-permission-boundary-2026-09-19\.md\)/i);
+  assert.doesNotMatch(status, /^Latest increment: E151\b/m);
 });
 
 test('runtime matrix separates the current boundary from historical Android evidence', {
@@ -552,11 +580,11 @@ test('runtime matrix separates the current boundary from historical Android evid
     'utf8',
   );
 
-  assert.match(runtimeMatrix, /^Last documentation check: 15 September 2026 \(E184 Android runtime probe\)$/m);
-  assert.match(runtimeMatrix, /^## Current Evidrilo evidence boundary — E183$/m);
+  assert.match(runtimeMatrix, /^Last documentation check: 20 September 2026 \(E202 Android offline\/recovery; E201 Android primary navigation; E200 fresh Android core flow; E199 public-package clean clone; E198 final non-video readiness audit; E197 Android runtime\/screenshot boundary\)$/m);
+  assert.match(runtimeMatrix, /^## Current Evidrilo evidence boundary — E202 \/ E201 \/ E200 \/ E199 \/ E198 \/ E197 \/ E196$/m);
   assert.doesNotMatch(runtimeMatrix, /^## Current Evidrilo status — E107$/m);
-  assert.match(runtimeMatrix, /Android runtime[\s\S]*?package` service[\s\S]*?APK installation failed/i);
-  assert.match(runtimeMatrix, /RevenueCat Test Store.*UNRUN/i);
+  assert.match(runtimeMatrix, /^\| Android runtime \| `ANDROID_RUNTIME \/ CORE_FLOW_PRIMARY_NAVIGATION_OFFLINE_OBSERVED` \| E202, E201, E200, E197 \|.*process restart/m);
+  assert.match(runtimeMatrix, /^\| RevenueCat Test Store \| `PROVIDER_TEST_STORE \/ UNRUN` \| E185 status \|/m);
 });
 
 test('conclusion choices use native radio and checkbox semantics', () => {
@@ -586,7 +614,7 @@ test('current all-area audit records the latest local verification boundary', {
   );
 
   assert.match(audit, /^# Evidrilo All-Area Capability Audit$/m);
-  assert.match(audit, /^Latest increment: E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED \/ E187 \/ REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED \/ E186 \/ BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED(?: \/|$)/m);
+  assert.match(audit, /^Latest increment: E192 \/ REPOSITORY_SEMANTIC_CLOSURE_VERIFIED \/ E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
   assert.match(audit, /E189[\s\S]*?Node contract,[\s\S]*?`106\/106`/);
   assert.match(audit, /API[\s\S]*?`172\/172`/);
   assert.match(audit, /E186 hardens the backend-first engine[\s\S]*?Kotlin\/JVM `332\/332`/);
@@ -611,7 +639,7 @@ test('active backend execution register points to the current verification bound
     'utf8',
   );
 
-  assert.match(register, /Last synchronized: 2026-09-18 \(E191\)/);
+  assert.match(register, /Last synchronized: 2026-09-20 \(E202\)/);
   assert.match(register, /E178 replaces helper-level/);
   assert.match(register, /E179 prevents a deferred or invalidated pull/);
   assert.match(register, /Node (?:boundary )?`106\/106`/);

@@ -135,6 +135,20 @@ class AccountSessionTest {
         )
     }
 
+    @Test
+    fun export_failure_does_not_demote_a_valid_signed_in_session() {
+        val controller = AccountSessionController(MemorySecureSessionStore()) { 100L }
+        val session = sampleStoredSession()
+        controller.acceptVerifiedSession(session)
+
+        assertEquals(
+            AccountSession.SignedIn(session.account),
+            controller.acceptGatewayResult(
+                AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE),
+            ),
+        )
+    }
+
     private fun sampleStoredSession(
         material: SecureSessionMaterial = SecureSessionMaterial("access", 200L),
         expiresAtEpochSeconds: Long = material.expiresAtEpochSeconds,

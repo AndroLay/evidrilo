@@ -128,6 +128,8 @@ if (platformOptions.DatabaseConfigured)
         new NpgsqlEntitlementStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IAccountLifecycleStore>(_ =>
         new NpgsqlAccountLifecycleStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IAccountExportStore>(_ =>
+        new NpgsqlAccountExportStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IMembershipStore>(_ =>
         new NpgsqlMembershipStore(platformOptions.DatabaseConnectionString!));
 }
@@ -146,6 +148,7 @@ else
     builder.Services.AddSingleton<IBillingStore, DatabaseUnavailableBillingStore>();
     builder.Services.AddSingleton<IEntitlementStore, DatabaseUnavailableEntitlementStore>();
     builder.Services.AddSingleton<IAccountLifecycleStore, DatabaseUnavailableAccountLifecycleStore>();
+    builder.Services.AddSingleton<IAccountExportStore, DatabaseUnavailableAccountExportStore>();
     builder.Services.AddSingleton<IMembershipStore, DatabaseUnavailableMembershipStore>();
 }
 builder.Services.AddSingleton<BillingWebhookService>();

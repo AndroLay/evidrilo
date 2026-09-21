@@ -24,6 +24,13 @@
       "testAnchor": "/v1/account/me"
     },
     {
+      "method": "GET",
+      "path": "/v1/account/me/export",
+      "responseSchema": "account-export.v1.json",
+      "testFile": "platform/api.Tests/AuthAndAccountEndpointTests.cs",
+      "testAnchor": "/v1/account/me/export"
+    },
+    {
       "method": "DELETE",
       "path": "/v1/account/me",
       "responseSchema": "account-deletion-result.v1.json",

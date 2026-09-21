@@ -31,6 +31,16 @@ test('reports the existing icon and keeps missing final assets open', () => {
   assert.match(`${result.stdout}${result.stderr}`, /VIDEO: NOT_READY/);
 });
 
+test('non-video scope excludes video but still requires the submission screenshot', () => {
+  const result = runValidator(['--icon', currentIcon, '--non-video-only']);
+  const output = `${result.stdout}${result.stderr}`;
+
+  assert.equal(result.status, 1);
+  assert.match(output, /ICON: PASS.*1024x1024/s);
+  assert.match(output, /SCREENSHOT: NOT_READY/);
+  assert.match(output, /VIDEO: EXCLUDED_BY_SCOPE/);
+});
+
 test('rejects an icon with the wrong dimensions', () => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-assets-'));
   const wrongIcon = path.join(temporaryRoot, 'wrong-icon.png');

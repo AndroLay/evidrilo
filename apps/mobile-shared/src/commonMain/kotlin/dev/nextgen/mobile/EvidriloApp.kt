@@ -14,6 +14,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,10 +37,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.nextgen.mobile.account.AccountGatewayResult
 import dev.nextgen.mobile.account.AccountSession
 import dev.nextgen.mobile.account.AccountSessionController
+import dev.nextgen.mobile.account.AccountUnavailableReason
+import dev.nextgen.mobile.account.EvidriloAccountBenefitPrompt
 import dev.nextgen.mobile.account.EvidriloAccountScreen
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountGateway
 import dev.nextgen.mobile.account.createAccountHttpTransport
+import dev.nextgen.mobile.account.shouldShowAccountBenefitPrompt
 import dev.nextgen.mobile.account.subscribeAccountAuthRedirect
 import dev.nextgen.mobile.account.toSettingsSubtitle
 import dev.nextgen.mobile.analytics.AnalyticsConsent
@@ -97,6 +102,7 @@ import dev.nextgen.mobile.storage.LocalStorageWriteResult
 import dev.nextgen.mobile.storage.LocalStorageStatus
 import dev.nextgen.mobile.storage.createConclusionSessionStore
 import dev.nextgen.mobile.storage.createConclusionHistoryStore
+import dev.nextgen.mobile.storage.createAccountOfferStore
 import dev.nextgen.mobile.storage.createOnboardingStore
 import dev.nextgen.mobile.storage.recoverCorruptLocalStorage
 import dev.nextgen.mobile.storage.storageNoticeFor
@@ -140,6 +146,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     val sessionStore = remember { createConclusionSessionStore() }
     val historyStore = remember { createConclusionHistoryStore() }
     val onboardingStore = remember { createOnboardingStore() }
+    val accountOfferStore = remember { createAccountOfferStore() }
     val audioSettingsStore = remember { createAudioSettingsStore() }
     val initialAudioSettings = remember { audioSettingsStore.load() }
     var audioSettings by remember { mutableStateOf(initialAudioSettings) }
@@ -193,6 +200,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     var onboardingRequested by remember { mutableStateOf(false) }
     var onboardingStorageStatus by remember { mutableStateOf(initialOnboardingLoad.status) }
+    val initialAccountOfferLoad = remember { accountOfferStore.load() }
+    var accountOfferPresented by remember {
+        mutableStateOf(initialAccountOfferLoad.value == true)
+    }
+    var accountOfferVisible by remember { mutableStateOf(false) }
     val initialAnalyticsConsentLoad = remember { analyticsConsentStore.load() }
     var analyticsConsent by remember {
         mutableStateOf(initialAnalyticsConsentLoad.value ?: AnalyticsConsent.NOT_GRANTED)
@@ -213,6 +225,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var accountRestoreComplete by remember { mutableStateOf(false) }
     var lastSyncAccountId by remember { mutableStateOf<String?>(null) }
     var accountBusy by remember { mutableStateOf(false) }
+    var accountExportJson by remember { mutableStateOf<String?>(null) }
+    var accountExportError by remember { mutableStateOf<AccountUnavailableReason?>(null) }
     var recommendationSessionGeneration by remember { mutableStateOf(0L) }
     val currentAccountBusy by rememberUpdatedState(accountBusy)
     fun currentBillingAccountId(): String? =
@@ -328,12 +342,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         }
     }
     var sessionStorageStatus by remember { mutableStateOf(initialSessionLoad.status) }
-    var navigationState by remember(savedSnapshot) {
+    var navigationState by remember {
         mutableStateOf(
             EvidriloNavigationState(
-                stack = listOf(
-                    if (savedSnapshot == null) EvidriloDestination.HOME else EvidriloDestination.PRACTICE,
-                ),
+                // A saved draft is data, not a route. Start in the current
+                // product shell and let the learner choose where to resume.
+                stack = listOf(EvidriloDestination.HOME),
             ),
         )
     }
@@ -383,9 +397,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     fun performAccountOperation(
         showSigningInState: Boolean,
+        onResult: (AccountGatewayResult) -> Unit = {},
         operation: suspend () -> AccountGatewayResult,
     ) {
         if (!accountBusy) {
+            accountExportJson = null
+            accountExportError = null
             accountBusy = true
             if (showSigningInState) accountSession = accountController.beginSignIn()
             accountScope.launch {
@@ -398,10 +415,30 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                         AccountGatewayResult.Offline
                     }
                     accountSession = accountController.acceptGatewayResult(result)
+                    onResult(result)
                 } finally {
                     accountBusy = false
                 }
             }
+        }
+    }
+    var state by remember(savedSnapshot) {
+        mutableStateOf(savedSnapshot?.restore(reducer) ?: ConclusionState.Intro)
+    }
+    val hasMeaningfulAccountValue = state is ConclusionState.Feedback ||
+        state is ConclusionState.Summary ||
+        state is ConclusionState.EvidenceChangeFeedback ||
+        state is ConclusionState.EvidenceChangeSummary
+    LaunchedEffect(hasMeaningfulAccountValue, accountSession, accountOfferPresented, accountRestoreComplete) {
+        if (accountRestoreComplete && shouldShowAccountBenefitPrompt(
+                hasMeaningfulValue = hasMeaningfulAccountValue,
+                session = accountSession,
+                alreadyPresented = accountOfferPresented,
+            )
+        ) {
+            accountOfferPresented = true
+            accountOfferStore.markPresented()
+            accountOfferVisible = true
         }
     }
     val case = targetCaseFor(state, baseCase, evidenceChangeCase)
@@ -411,9 +448,6 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     var historySnapshot by remember { mutableStateOf(initialHistoryLoad.value) }
     var historyStorageStatus by remember { mutableStateOf(initialHistoryLoad.status) }
-    var state by remember(savedSnapshot) {
-        mutableStateOf(savedSnapshot?.restore(reducer) ?: ConclusionState.Intro)
-    }
     val targetDraft = targetDraftFor(state, case)
     LaunchedEffect(navigationState.current, accountSession) {
         audioCoordinator.stop()
@@ -827,11 +861,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     val openTargetSection: (EvidriloTargetSection) -> Unit = { section ->
         navigationState = when (section) {
-            EvidriloTargetSection.HOME -> navigationState.resetToHome()
-            EvidriloTargetSection.SOURCES -> navigationState.resetToHome().open(EvidriloDestination.SOURCES)
-            EvidriloTargetSection.EVIDENCE -> navigationState.resetToHome().open(EvidriloDestination.EVIDENCE)
-            EvidriloTargetSection.ACTION -> navigationState.resetToHome().open(EvidriloDestination.ACTION)
-            EvidriloTargetSection.PROFILE -> navigationState.resetToHome().open(EvidriloDestination.PROFILE)
+            EvidriloTargetSection.HOME -> navigationState.selectRoot(EvidriloDestination.HOME)
+            EvidriloTargetSection.SOURCES -> navigationState.selectRoot(EvidriloDestination.SOURCES)
+            EvidriloTargetSection.EVIDENCE -> navigationState.selectRoot(EvidriloDestination.EVIDENCE)
+            EvidriloTargetSection.ACTION -> navigationState.selectRoot(EvidriloDestination.ACTION)
+            EvidriloTargetSection.PROFILE -> navigationState.selectRoot(EvidriloDestination.PROFILE)
         }
     }
     val startTargetPractice: () -> Unit = {
@@ -895,7 +929,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 if (state is ConclusionState.Intro) {
                     dispatch(ConclusionEvent.Begin)
                 }
-                navigationState = navigationState.open(EvidriloDestination.PRACTICE)
+                navigationState = navigationState.resetToHome()
             },
             onSkip = completeOnboarding,
             audioState = audioState,
@@ -983,7 +1017,10 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         EvidriloTargetSourcesScreen(
             case = case,
             onNavigate = openTargetSection,
-            onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
+            onOpenWorkspace = {
+                navigationState = navigationState.selectRoot(EvidriloDestination.HOME)
+                    .open(EvidriloDestination.WORKSPACE)
+            },
             onStartPractice = startTargetPractice,
         )
     } else if (navigationState.current == EvidriloDestination.WORKSPACE) {
@@ -1000,8 +1037,21 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             case = case,
             draft = targetDraft,
             onNavigate = openTargetSection,
-            onOpenClaimTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
+            onOpenEvidenceLens = {
+                navigationState = navigationState.open(EvidriloDestination.EVIDENCE_LENS)
+            },
+            onOpenClaimTrace = {
+                navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE)
+            },
             onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.EVIDENCE_LENS) {
+        EvidriloTargetEvidenceLensScreen(
+            case = case,
+            draft = targetDraft,
+            onNavigate = openTargetSection,
+            onBack = { navigationState = navigationState.back() },
+            onOpenClaimTrace = { navigationState = navigationState.open(EvidriloDestination.CLAIM_TRACE) },
         )
     } else if (navigationState.current == EvidriloDestination.CLAIM_TRACE) {
         EvidriloTargetClaimTraceScreen(
@@ -1009,7 +1059,25 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             draft = targetDraft,
             onNavigate = openTargetSection,
             onBack = { navigationState = navigationState.back() },
+            onOpenClaimBoundary = {
+                navigationState = navigationState.open(EvidriloDestination.CLAIM_BOUNDARY)
+            },
             onOpenAction = { navigationState = navigationState.open(EvidriloDestination.ACTION) },
+            onStartPractice = startTargetPractice,
+        )
+    } else if (navigationState.current == EvidriloDestination.CLAIM_BOUNDARY) {
+        EvidriloTargetClaimBoundaryScreen(
+            case = case,
+            draft = targetDraft,
+            evaluation = targetEvaluationFor(state),
+            onNavigate = openTargetSection,
+            onBack = { navigationState = navigationState.back() },
+            onOpenVerify = {
+                navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM)
+            },
+            onOpenAction = {
+                navigationState = navigationState.open(EvidriloDestination.ACTION)
+            },
             onStartPractice = startTargetPractice,
         )
     } else if (navigationState.current == EvidriloDestination.VERIFY_CLAIM) {
@@ -1030,6 +1098,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         EvidriloTargetActionScreen(
             case = case,
             draft = targetDraft,
+            evaluation = targetEvaluationFor(state),
             onNavigate = openTargetSection,
             onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
             onStartPractice = startTargetPractice,
@@ -1069,6 +1138,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             } ?: EvidriloTargetActionScreen(
                 case = case,
                 draft = targetDraft,
+                evaluation = targetEvaluationFor(state),
                 onNavigate = openTargetSection,
                 onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
                 onStartPractice = startTargetPractice,
@@ -1089,6 +1159,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             session = accountSession,
             isBusy = accountBusy,
             accountConfigured = accountConfiguration.isConfigured,
+            exportJson = accountExportJson,
+            exportError = accountExportError,
             onBack = { navigationState = navigationState.back() },
             onSignIn = { email, password ->
                 performAccountOperation(true) { accountGateway.signIn(email, password) }
@@ -1114,10 +1186,25 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onDeleteAccount = {
                 performAccountOperation(false) { accountGateway.deleteAccount() }
             },
+            onExportAccount = {
+                accountExportJson = null
+                accountExportError = null
+                performAccountOperation(false, onResult = { result ->
+                    when (result) {
+                        is AccountGatewayResult.ExportReady -> accountExportJson = result.json
+                        is AccountGatewayResult.ExportFailed -> accountExportError = result.reason
+                        else -> Unit
+                    }
+                }) { accountGateway.exportAccount() }
+            },
+            onDismissExport = {
+                accountExportJson = null
+                accountExportError = null
+            },
         )
     } else if (navigationState.current == EvidriloDestination.HISTORY) {
         val previousDestination = navigationState.stack.dropLast(1).lastOrNull()
-        EvidriloHistoryScreen(
+        EvidriloTargetHistoryScreen(
             history = historySnapshot,
             storageNotice = storageNotice,
             onStartPractice = {
@@ -1224,7 +1311,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
             onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
             onStartPractice = startTargetPractice,
-            onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
+            onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
             onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
@@ -1249,7 +1336,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
                 onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
                 onStartPractice = startTargetPractice,
-                onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
+                onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
                 onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
                 recommendation = recommendationState,
                 onAcceptRecommendation = ::acceptRecommendation,
@@ -1316,7 +1403,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onSubmit = { dispatch(ConclusionEvent.Submit) },
                 onReset = { dispatch(ConclusionEvent.Reset) },
                 onBack = returnToHome,
-                initialStep = EvidriloDraftStep.CLAIM,
+                initialStep = initialDraftStepFor(current),
                 audioState = audioState,
                 onListen = { playNarration(AudioNarrationId.REVISION, AudioNarrationCopy.revision()) },
                 onPauseOrResumeAudio = pauseOrResumeAudio,
@@ -1350,7 +1437,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onSubmit = { dispatch(ConclusionEvent.SubmitEvidenceChange) },
                 onReset = { dispatch(ConclusionEvent.Reset) },
                 onBack = returnToHome,
-                initialStep = EvidriloDraftStep.LIMITS,
+                initialStep = initialDraftStepFor(current),
                 audioState = audioState,
                 onListen = {
                     playNarration(
@@ -1388,6 +1475,17 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onStopAudio = stopAudio,
             )
         }
+    }
+
+    if (accountOfferVisible) {
+        EvidriloAccountBenefitPrompt(
+            onSignIn = {
+                accountOfferVisible = false
+                accountExportJson = null
+                navigationState = navigationState.open(EvidriloDestination.ACCOUNT)
+            },
+            onDismiss = { accountOfferVisible = false },
+        )
     }
 }
 
@@ -1520,6 +1618,7 @@ private fun EvidriloPremiumSurface(
                 onPauseOrResumeAudio = onPauseOrResumeAudio,
                 onStopAudio = onStopAudio,
                 onSelectionSound = onSelectionSound,
+                initialStep = initialDraftStepFor(current),
             )
 
             is ConclusionState.Summary -> EvidriloPremiumSummaryScreen(
@@ -1551,6 +1650,7 @@ private fun EvidriloPremiumSurface(
                 onPauseOrResumeAudio = onPauseOrResumeAudio,
                 onStopAudio = onStopAudio,
                 onSelectionSound = onSelectionSound,
+                initialStep = initialDraftStepFor(current),
             )
 
             is ConclusionState.EvidenceChangeFeedback -> EvidriloEvidenceChangeFeedbackScreen(
@@ -1614,9 +1714,9 @@ private fun EvidriloPremiumCatalogScreen(
     backLabel: String,
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = backLabel, onClick = onBack)
-        EvidriloEyebrow("EVIDRILO PREMIUM · UNLOCKED")
-        Text("Choose a focused case", style = MaterialTheme.typography.headlineMedium)
+        Text("Choose a focused case", style = MaterialTheme.typography.displayLarge)
         Text(
             "Each case keeps the same bounded conclusion method: supplied facts, limitations, one revision, and learner-authored text.",
             style = MaterialTheme.typography.bodyMedium,
@@ -1649,9 +1749,9 @@ private fun EvidriloPremiumSummaryScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = "Packs", onClick = onBack)
-        EvidriloEyebrow("EVIDRILO PREMIUM · REVISION COMPLETE")
-        Text("Compare the premium evidence case", style = MaterialTheme.typography.headlineMedium)
+        Text("Compare the premium evidence case", style = MaterialTheme.typography.displayLarge)
         Text(
             "The initial draft and one revision remain learner-authored. This premium session is not added to free-core local comparison history.",
             style = MaterialTheme.typography.bodyMedium,
@@ -1694,19 +1794,20 @@ private fun EvidriloDraftScreen(
     onSelectionSound: () -> Unit = {},
 ) {
     var step by remember(case.id, initialStep) { mutableStateOf(initialStep) }
+    var confirmReset by remember(case.id, initialStep) { mutableStateOf(false) }
 
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         onBack?.let { back ->
             EvidriloBackButton(label = "Home", onClick = back)
         }
-        EvidriloEyebrow(if (case.changeNotice == null) "FREE CASE" else "EVIDENCE CHANGE")
         Text(
             when (step) {
                 EvidriloDraftStep.EVIDENCE -> title
                 EvidriloDraftStep.CLAIM -> "Write a bounded claim"
                 EvidriloDraftStep.LIMITS -> "Name the limits and next action"
             },
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.displayLarge,
         )
         Text(
             when (step) {
@@ -1714,16 +1815,10 @@ private fun EvidriloDraftScreen(
                 EvidriloDraftStep.CLAIM -> "Write what your selected evidence supports, then choose how far the claim can go."
                 EvidriloDraftStep.LIMITS -> "Name the limitations that still matter and one practical next action."
             },
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         EvidriloDraftStepIndicator(current = step)
-        case.changeNotice?.let { notice ->
-            EvidriloNotice(
-                status = ConclusionStatus.ACTION_REQUIRED,
-                title = "The supplied evidence changed",
-                body = notice,
-            )
-        }
+        evidenceChangeContextNote(case)?.let { note -> EvidriloContextCard(note) }
         if (validationMessage != null) {
             EvidriloNotice(
                 status = ConclusionStatus.INCOMPLETE,
@@ -1777,7 +1872,7 @@ private fun EvidriloDraftScreen(
                     label = "Continue to claim",
                     onClick = { step = EvidriloDraftStep.CLAIM },
                 )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
             }
 
             EvidriloDraftStep.CLAIM -> {
@@ -1820,7 +1915,7 @@ private fun EvidriloDraftScreen(
                     label = "Continue to limits",
                     onClick = { step = EvidriloDraftStep.LIMITS },
                 )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
             }
 
             EvidriloDraftStep.LIMITS -> {
@@ -1884,16 +1979,48 @@ private fun EvidriloDraftScreen(
                     label = "Review my conclusion",
                     onClick = onSubmit,
                 )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = onReset)
+                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
             }
         }
     }
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Reset this workflow?") },
+            text = {
+                Text(
+                    "Your current local draft will be discarded and the bundled case will return to its starting state.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmReset = false
+                        onReset()
+                    },
+                ) {
+                    Text("Reset workflow")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmReset = false }) {
+                    Text("Keep editing")
+                }
+            },
+        )
+    }
 }
 
-private enum class EvidriloDraftStep(val label: String) {
+internal enum class EvidriloDraftStep(val label: String) {
     EVIDENCE("Evidence"),
     CLAIM("Claim"),
     LIMITS("Limits"),
+}
+
+internal fun initialDraftStepFor(state: ConclusionState): EvidriloDraftStep = when (state) {
+    is ConclusionState.Revision -> EvidriloDraftStep.CLAIM
+    is ConclusionState.EvidenceChangeDrafting -> EvidriloDraftStep.EVIDENCE
+    else -> error("An initial draft step is defined only for revision and evidence-change drafts.")
 }
 
 private fun ConclusionField.toDraftStep(): EvidriloDraftStep = when (this) {
@@ -1956,14 +2083,14 @@ private fun EvidriloFeedbackScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         onBack?.let { back ->
             EvidriloBackButton(label = "Home", onClick = back)
         }
-        EvidriloEyebrow("FEEDBACK · ONE REVISION AVAILABLE")
-        Text("See what the case supports", style = MaterialTheme.typography.headlineMedium)
+        Text("See what the case supports", style = MaterialTheme.typography.displayLarge)
         Text(
             "These checks are bounded to the supplied facts. They are not a grade or a claim that the real-world experiment is scientifically complete.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         EvidriloAudioListenControl(
             state = audioState,
@@ -1972,7 +2099,7 @@ private fun EvidriloFeedbackScreen(
             onStopAudio = onStopAudio,
         )
         EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
-        EvidriloConflictDetailCard(evaluation = evaluation)
+        EvidriloVerificationDetailCard(evaluation = evaluation)
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2005,14 +2132,14 @@ private fun EvidriloSummaryScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         onBack?.let { back ->
             EvidriloBackButton(label = "Home", onClick = back)
         }
-        EvidriloEyebrow("SUMMARY · REVISION COMPLETE")
-        Text("Compare your reasoning", style = MaterialTheme.typography.headlineMedium)
+        Text("Compare your reasoning", style = MaterialTheme.typography.displayLarge)
         Text(
             "The first draft remains stored beside the single revision. Evidrilo does not replace either draft with a generated answer.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         EvidriloAudioListenControl(
             state = audioState,
@@ -2030,7 +2157,7 @@ private fun EvidriloSummaryScreen(
             case = case,
         )
         EvidriloClaimBoundaryCard(case = case, draft = revisedDraft, evaluation = finalEvaluation)
-        EvidriloConflictDetailCard(evaluation = finalEvaluation)
+        EvidriloVerificationDetailCard(evaluation = finalEvaluation)
         finalEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2057,20 +2184,16 @@ private fun EvidriloEvidenceChangeFeedbackScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         onBack?.let { back ->
             EvidriloBackButton(label = "Home", onClick = back)
         }
-        EvidriloEyebrow("FEEDBACK · EVIDENCE CHANGE")
-        Text("Re-evaluate the changed case", style = MaterialTheme.typography.headlineMedium)
+        Text("Re-evaluate the changed case", style = MaterialTheme.typography.displayLarge)
         Text(
             "This feedback uses only the observations still supplied in the challenge. There is no second revision in this round.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
-        EvidriloNotice(
-            status = ConclusionStatus.ACTION_REQUIRED,
-            title = "The cold-water observation is unavailable",
-            body = ConclusionCases.EVIDENCE_CHANGE.changeNotice.orEmpty(),
-        )
+        evidenceChangeContextNote(ConclusionCases.EVIDENCE_CHANGE)?.let { note -> EvidriloContextCard(note) }
         EvidriloAudioListenControl(
             state = audioState,
             onListen = onListen,
@@ -2082,7 +2205,7 @@ private fun EvidriloEvidenceChangeFeedbackScreen(
             draft = draft,
             evaluation = evaluation,
         )
-        EvidriloConflictDetailCard(evaluation = evaluation)
+        EvidriloVerificationDetailCard(evaluation = evaluation)
         evaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2114,20 +2237,16 @@ private fun EvidriloEvidenceChangeSummaryScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         onBack?.let { back ->
             EvidriloBackButton(label = "Home", onClick = back)
         }
-        EvidriloEyebrow("COMPARISON · LOCAL HISTORY")
-        Text("See what changed with the evidence", style = MaterialTheme.typography.headlineMedium)
+        Text("See what changed with the evidence", style = MaterialTheme.typography.displayLarge)
         Text(
             "The base revision is kept beside the fresh challenge conclusion. The comparison is stored locally as the latest entry and can be cleared from the start screen.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
-        EvidriloNotice(
-            status = ConclusionStatus.ACTION_REQUIRED,
-            title = "Evidence change recorded",
-            body = ConclusionCases.EVIDENCE_CHANGE.changeNotice.orEmpty(),
-        )
+        evidenceChangeContextNote(ConclusionCases.EVIDENCE_CHANGE)?.let { note -> EvidriloContextCard(note) }
         EvidriloAudioListenControl(
             state = audioState,
             onListen = onListen,
@@ -2149,7 +2268,7 @@ private fun EvidriloEvidenceChangeSummaryScreen(
             draft = challengeDraft,
             evaluation = challengeEvaluation,
         )
-        EvidriloConflictDetailCard(evaluation = challengeEvaluation)
+        EvidriloVerificationDetailCard(evaluation = challengeEvaluation)
         challengeEvaluation.primaryFeedback?.let { feedback ->
             EvidriloFeedbackCard(feedback, prominent = true)
         } ?: EvidriloNotice(
@@ -2324,6 +2443,22 @@ private fun EvidriloNotice(
 }
 
 @Composable
+private fun EvidriloContextCard(note: EvidriloContextNote) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(note.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(note.body, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
 internal fun EvidriloDraftSnapshot(
     title: String,
     draft: ConclusionDraft,
@@ -2360,16 +2495,6 @@ internal fun EvidriloSnapshotRow(label: String, value: String) {
 @Composable
 internal fun EvidriloSectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-}
-
-@Composable
-internal fun EvidriloEyebrow(text: String) {
-    Text(
-        text,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-    )
 }
 
 private fun List<String>.toggle(id: String): List<String> =

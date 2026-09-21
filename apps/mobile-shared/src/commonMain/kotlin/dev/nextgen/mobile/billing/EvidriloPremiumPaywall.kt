@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.EvidriloBackButton
+import dev.nextgen.mobile.EvidriloBrandHeader
 import dev.nextgen.mobile.EvidriloCobaltCard
 import dev.nextgen.mobile.EvidriloColors
 import dev.nextgen.mobile.EvidriloContentColumn
@@ -56,9 +57,9 @@ internal fun EvidriloPremiumPaywall(
     val model = premiumPaywallModel(billing.copy(isBusy = isBusy))
 
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = backLabel, onClick = onBack)
-        Text("EVIDRILO PREMIUM", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
-        Text(model.title, style = MaterialTheme.typography.displayMedium)
+        Text(model.title, style = MaterialTheme.typography.displayLarge)
         Text(
             "Unlock two additional evidence-linked cases when the free case is not enough. The free workflow remains usable offline.",
             style = MaterialTheme.typography.bodyLarge,

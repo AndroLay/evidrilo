@@ -1,6 +1,11 @@
 package dev.nextgen.mobile.account
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -19,18 +24,20 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.EvidriloBackButton
+import dev.nextgen.mobile.EvidriloBrandHeader
 import dev.nextgen.mobile.EvidriloColors
 import dev.nextgen.mobile.EvidriloContentColumn
 import dev.nextgen.mobile.EvidriloPrimaryButton
 import dev.nextgen.mobile.EvidriloSecondaryButton
 import dev.nextgen.mobile.EvidriloTintPanel
-import dev.nextgen.mobile.EvidriloEyebrow
 
 @Composable
 internal fun EvidriloAccountScreen(
     session: AccountSession,
     isBusy: Boolean,
     accountConfigured: Boolean,
+    exportJson: String?,
+    exportError: AccountUnavailableReason?,
     onBack: () -> Unit,
     onSignIn: (String, String) -> Unit,
     onSignUp: (String, String) -> Unit,
@@ -40,6 +47,8 @@ internal fun EvidriloAccountScreen(
     onUpdatePassword: (String) -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onExportAccount: () -> Unit,
+    onDismissExport: () -> Unit,
 ) {
     var mode by remember { mutableStateOf(AccountAuthMode.SIGN_IN) }
     var email by remember { mutableStateOf("") }
@@ -58,9 +67,9 @@ internal fun EvidriloAccountScreen(
         session !is AccountSession.SignedIn && session !is AccountSession.PasswordRecovery
 
     EvidriloContentColumn {
+        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = "Settings", onClick = onBack)
-        EvidriloEyebrow("ACCOUNT · OPTIONAL PLATFORM LANE")
-        Text(presentation.title, style = MaterialTheme.typography.headlineMedium)
+        Text(presentation.title, style = MaterialTheme.typography.displayLarge)
         Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
 
         when {
@@ -68,6 +77,9 @@ internal fun EvidriloAccountScreen(
                 SignedInAccountPanel(
                     onSignOut = onSignOut,
                     onDelete = { confirmDeletion = true },
+                    onExport = onExportAccount,
+                    exportError = exportError,
+                    onDismissExportError = onDismissExport,
                     isBusy = isBusy,
                 )
             }
@@ -175,7 +187,7 @@ internal fun EvidriloAccountScreen(
             title = { Text("Delete account data?") },
             text = {
                 Text(
-                    "This asks the platform to prepare deletion of server-owned Evidrilo data. The local workflow stays on this device until you clear it separately.",
+                    "This permanently deletes or anonymizes Evidrilo data owned by the platform and signs this device out. Your local draft and history stay on this device until you clear them separately. The managed sign-in provider identity is a separate provider operation.",
                 )
             },
             confirmButton = {
@@ -189,6 +201,31 @@ internal fun EvidriloAccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmDeletion = false }, enabled = !isBusy) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (exportJson != null) {
+        AlertDialog(
+            onDismissRequest = onDismissExport,
+            title = { Text("Account export") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        "Select and copy this JSON if you need a portable record. Local drafts are not included because they remain on this device.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    SelectionContainer {
+                        Text(exportJson, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissExport) { Text("Close") }
             },
         )
     }
@@ -375,6 +412,9 @@ private fun AccountStatusPanel(session: AccountSession.Unavailable) {
 private fun SignedInAccountPanel(
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
+    exportError: AccountUnavailableReason?,
+    onDismissExportError: () -> Unit,
     isBusy: Boolean,
 ) {
     EvidriloTintPanel {
@@ -384,8 +424,19 @@ private fun SignedInAccountPanel(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
+    EvidriloSecondaryButton(label = "Export account data", onClick = onExport, enabled = !isBusy)
+    exportError?.let { reason ->
+        val exportPresentation = AccountSession.Unavailable(reason).toPresentation()
+        EvidriloTintPanel {
+            Text(exportPresentation.title, style = MaterialTheme.typography.titleMedium)
+            Text(exportPresentation.body, style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = onDismissExportError, enabled = !isBusy) {
+                Text("Dismiss")
+            }
+        }
+    }
     EvidriloSecondaryButton(label = "Sign out", onClick = onSignOut, enabled = !isBusy)
     TextButton(onClick = onDelete, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Prepare account deletion", color = MaterialTheme.colorScheme.error)
+        Text("Delete account data", color = MaterialTheme.colorScheme.error)
     }
 }

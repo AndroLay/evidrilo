@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/account-export.v1.json",
+  "title": "Evidrilo account export response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "accountId", "generatedAt", "data", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.account-export" },
+    "version": { "const": "1" },
+    "accountId": { "type": "string", "format": "uuid" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "data": { "type": "object" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

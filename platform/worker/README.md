@@ -20,10 +20,7 @@ bash platform/worker/integration/run-local-worker-smoke.sh
 The harness uses a fresh synthetic PostgreSQL 16 container, applies migrations
 through the checksum ledger, seeds an expired projection lease, runs the
 Release worker, asserts account/daily projection rebuilds, and removes only
-its temporary container. E125 records the latest local verification, including
-the non-root container image, migration-ordered Compose preparation, the typed
-analytics funnel boundary, and the server-owned recommendation write boundary.
-Managed Supabase grants,
+its temporary container. This is local integration evidence. Managed Supabase grants,
 pooling, deployment, recovery, and load behavior remain external gates.
 
 The reproducible local API/worker container preparation is documented in

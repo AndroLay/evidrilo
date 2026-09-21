@@ -8,6 +8,39 @@ import kotlin.test.assertTrue
 
 class AccountPresentationTest {
     @Test
+    fun account_offer_is_only_available_after_value_for_signed_out_users() {
+        assertTrue(shouldShowAccountBenefitPrompt(
+            hasMeaningfulValue = true,
+            session = AccountSession.SignedOut,
+            alreadyPresented = false,
+        ))
+        assertFalse(shouldShowAccountBenefitPrompt(
+            hasMeaningfulValue = false,
+            session = AccountSession.SignedOut,
+            alreadyPresented = false,
+        ))
+        assertFalse(shouldShowAccountBenefitPrompt(
+            hasMeaningfulValue = true,
+            session = AccountSession.SignedOut,
+            alreadyPresented = true,
+        ))
+    }
+
+    @Test
+    fun account_offer_never_interrupts_a_signed_in_or_transient_session() {
+        assertFalse(shouldShowAccountBenefitPrompt(
+            hasMeaningfulValue = true,
+            session = AccountSession.SignedIn(AccountSummary("account-123", true)),
+            alreadyPresented = false,
+        ))
+        assertFalse(shouldShowAccountBenefitPrompt(
+            hasMeaningfulValue = true,
+            session = AccountSession.SigningIn,
+            alreadyPresented = false,
+        ))
+    }
+
+    @Test
     fun signed_out_keeps_local_core_primary_without_claiming_sync() {
         val presentation = AccountSession.SignedOut.toPresentation()
 
@@ -44,7 +77,7 @@ class AccountPresentationTest {
         ).toPresentation()
 
         assertEquals("Account connected", presentation.title)
-        assertTrue(presentation.body.contains("cloud sync is not connected"))
+        assertTrue(presentation.body.contains("Cloud sync is not connected"))
         assertEquals("Sign out", presentation.actionLabel)
         assertEquals(AccountPresentationAction.SIGN_OUT, presentation.action)
         assertFalse(presentation.isBusy)

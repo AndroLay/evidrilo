@@ -68,9 +68,9 @@ jobs:
         run: bash scripts/release/check-mobile-release.sh "$GITHUB_WORKSPACE" --require-android-artifact
 
   ios-host:
-    name: iOS Release host compile
+    name: iOS Release host and simulator smoke
     runs-on: macos-14
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -95,6 +95,22 @@ jobs:
           CODE_SIGNING_ALLOWED=NO
           CODE_SIGNING_REQUIRED=NO
           build
+
+      - name: Run iOS Simulator launch smoke
+        run: >-
+          bash scripts/ios/smoke-simulator.sh
+          "$RUNNER_TEMP/evidrilo-derived-data/Build/Products/Release-iphonesimulator/Evidrilo.app"
+          dev.nextgen.mobile.ios
+          "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
+
+      - name: Upload iOS simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-evidence
+          path: ${{ runner.temp }}/evidrilo-ios-simulator-evidence
+          if-no-files-found: warn
+          retention-days: 7
 
   contracts:
     name: Contract and migration tests

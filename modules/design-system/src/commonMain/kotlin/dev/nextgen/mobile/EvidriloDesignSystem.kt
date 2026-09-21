@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,8 +65,12 @@ public object EvidriloColors {
     val CobaltBright = Color(0xFF2C86FF)
     val CobaltPressed = Color(0xFF103EB4)
     val White = Color(0xFFFFFFFF)
+    val Canvas = Color(0xFFF5F7FB)
     val Surface = Color(0xFFF8FAFF)
     val PaleBlue = Color(0xFFEAF3FF)
+    val Atmosphere = Color(0xFFEFF6FF)
+    val PatternBlue = Color(0xFFBFD7FF)
+    val PatternCobalt = Color(0xFF2E7BFF)
     val Tint = Color(0xFFE2EEFF)
     val Ink = DeepNavy
     val Slate = Color(0xFF536DA5)
@@ -77,6 +82,18 @@ public object EvidriloColors {
     val SuccessSurface = Color(0xFFE7F5EC)
     val Warning = Color(0xFFC86D00)
     val WarningSurface = Color(0xFFFFF2D9)
+}
+
+/** Shared geometry tokens for the current target shell. */
+public object EvidriloTargetLayout {
+    val ContentTopPadding = 28.dp
+    val BrandLogoSize = 50.dp
+    val SourcesLogoSize = 52.dp
+    // The source artwork is intentionally compact enough to keep all three
+    // input lanes discoverable on a normal phone viewport. The page remains
+    // scrollable, but the primary action should not be hidden below the fold.
+    val SourcesGraphicHeight = 158.dp
+    val NavigationVisualOffset = 4.dp
 }
 
 public fun evidriloPrimaryButtonContentColor(enabled: Boolean): Color =
@@ -226,6 +243,7 @@ public fun EvidriloTheme(content: @Composable () -> Unit) {
 @Composable
 public fun EvidriloContentColumn(
     modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -237,15 +255,19 @@ public fun EvidriloContentColumn(
                 .safeDrawingPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 20.dp)
+                .padding(top = EvidriloTargetLayout.ContentTopPadding, bottom = 16.dp),
+            verticalArrangement = verticalArrangement,
             content = content,
         )
     }
 }
 
 @Composable
-public fun EvidriloBrandHeader(onSettings: () -> Unit) {
+public fun EvidriloBrandHeader(
+    onSettings: (() -> Unit)?,
+    avatarLabel: String = "L",
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -269,11 +291,34 @@ public fun EvidriloBrandHeader(onSettings: () -> Unit) {
                 )
             }
         }
-        EvidriloIconButton(
-            icon = EvidriloIconName.SETTINGS,
-            contentDescription = "Open settings",
-            onClick = onSettings,
-        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(EvidriloColors.CobaltBright)
+                .then(
+                    if (onSettings != null) {
+                        Modifier
+                            .clickable(onClick = onSettings)
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = "Open profile and settings"
+                                role = Role.Button
+                            }
+                    } else {
+                        Modifier.semantics(mergeDescendants = true) {
+                            contentDescription = "Profile and settings unavailable from this surface"
+                            stateDescription = "Unavailable"
+                        }
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = avatarLabel,
+                style = MaterialTheme.typography.titleMedium,
+                color = EvidriloColors.White,
+            )
+        }
     }
 }
 
@@ -286,8 +331,7 @@ public fun EvidriloLogoMark(
         painter = painterResource(evidriloLogoDrawable),
         contentDescription = contentDescription,
         modifier = modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(12.dp)),
+            .size(EvidriloTargetLayout.BrandLogoSize),
     )
 }
 
@@ -364,9 +408,10 @@ public fun EvidriloPrimaryButton(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Center,
         ) {
             Text(label, style = MaterialTheme.typography.titleMedium, color = contentColor)
+            Spacer(modifier = Modifier.width(14.dp))
             EvidriloIcon(EvidriloIconName.ARROW_FORWARD, tint = contentColor)
         }
     }

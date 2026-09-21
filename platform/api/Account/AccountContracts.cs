@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Evidrilo.Api.Auth;
 using Evidrilo.Api.Common;
@@ -17,6 +18,14 @@ public sealed record AccountDeletionResponse(
     [property: JsonPropertyName("schema")] string Schema,
     [property: JsonPropertyName("version")] string Version,
     [property: JsonPropertyName("outcome")] string Outcome,
+    [property: JsonPropertyName("requestId")] string RequestId);
+
+public sealed record AccountExportResponse(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("accountId")] string AccountId,
+    [property: JsonPropertyName("generatedAt")] string GeneratedAt,
+    [property: JsonPropertyName("data")] JsonElement Data,
     [property: JsonPropertyName("requestId")] string RequestId);
 
 public static class AccountEndpoints
@@ -102,6 +111,53 @@ public static class AccountEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("api");
 
+        endpoints.MapGet(
+            "/v1/account/me/export",
+            async (HttpContext context, IAccountExportStore store, CancellationToken cancellationToken) =>
+            {
+                if (!TryGetVerifiedAccount(context, out var accountId, out var failure))
+                    return failure!;
+
+                var data = await store.GetOwnAsync(accountId, cancellationToken);
+                return Results.Ok(new AccountExportResponse(
+                    "evidrilo.account-export",
+                    "1",
+                    accountId.ToString(),
+                    DateTimeOffset.UtcNow.ToString(
+                        "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                        CultureInfo.InvariantCulture),
+                    data,
+                    RequestIdMiddleware.Get(context)));
+            })
+            .RequireAuthorization()
+            .RequireRateLimiting("api");
+
         return endpoints;
+    }
+
+    private static bool TryGetVerifiedAccount(
+        HttpContext context,
+        out Guid accountId,
+        out IResult? failure)
+    {
+        accountId = Guid.Empty;
+        failure = null;
+        if (!AuthenticatedUser.TryGetAccountId(context.User, out accountId))
+        {
+            failure = Results.Json(
+                ApiErrors.Create(context, "AUTH_REQUIRED", "Authentication is required."),
+                statusCode: StatusCodes.Status401Unauthorized);
+            return false;
+        }
+
+        if (!AuthenticatedUser.IsEmailVerified(context.User))
+        {
+            failure = Results.Json(
+                ApiErrors.Create(context, "FORBIDDEN", "You are not allowed to export account data."),
+                statusCode: StatusCodes.Status403Forbidden);
+            return false;
+        }
+
+        return true;
     }
 }

@@ -154,13 +154,12 @@ function main() {
         errors.push(`orphan audio file count is ${files.length}`);
       }
     } else {
-      errors.push('audio manifest is empty; reviewed assets are required');
+      errors.push('audio manifest is empty; bundled audio assets are required');
     }
   }
 
   const ids = new Set();
   const referencedFiles = new Set();
-  let narrationEntries = 0;
   let narrationBytes = 0;
   let effectsBytes = 0;
 
@@ -267,7 +266,6 @@ function main() {
 
     if (actualBytes !== null) {
       if (typeof entry.file === 'string' && entry.file.startsWith('narration/')) {
-        narrationEntries += 1;
         narrationBytes += actualBytes;
       } else if (typeof entry.file === 'string' && entry.file.startsWith('effects/')) {
         effectsBytes += actualBytes;
@@ -280,10 +278,6 @@ function main() {
     if (!referencedFiles.has(assetFile.relativePath)) {
       errors.push(`orphan audio file: ${assetFile.relativePath}`);
     }
-  }
-
-  if (!allowEmpty && narrationEntries === 0) {
-    errors.push('strict asset validation requires at least one reviewed narration asset');
   }
 
   if (narrationBytes > NARRATION_BUDGET_BYTES) {

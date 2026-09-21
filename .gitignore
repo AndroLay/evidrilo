@@ -72,6 +72,9 @@ DerivedData/
 
 # Internal planning and specification material; keep local, never publish
 /docs/superpowers/
+/docs/architecture/ai-assistance.md
+/docs/architecture/mobile-flow-implementation-plan.md
+/docs/architecture/mobile-flow-spec.md
 
 # Machine-specific Apple build settings. Config.xcconfig is the checked-in
 # empty baseline; put local overrides in one of these ignored files.

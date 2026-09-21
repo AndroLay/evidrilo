@@ -1,0 +1,18 @@
+{
+  "schema": "evidrilo.account-export",
+  "version": "1",
+  "accountId": "123e4567-e89b-42d3-a456-426614174000",
+  "generatedAt": "2026-09-21T00:00:00.000Z",
+  "data": {
+    "localDrafts": "not_on_server",
+    "attemptCommands": [],
+    "syncChanges": [],
+    "analyticsEvents": [],
+    "recommendationEvents": [],
+    "aiAuditEvents": [],
+    "entitlementEvents": [],
+    "entitlements": [],
+    "progressDaily": []
+  },
+  "requestId": "acct-export-20260921"
+}

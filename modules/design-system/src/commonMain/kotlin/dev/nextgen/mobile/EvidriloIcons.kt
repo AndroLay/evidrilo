@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -48,6 +49,12 @@ public enum class EvidriloIconName {
     PLUS,
     LOCK,
     SPARK,
+    EVIDENCE_GRAPH,
+    LIGHTNING,
+    CHECK_FILLED,
+    HOME_FILLED,
+    ACCOUNT_FILLED,
+    FOLDER_FILLED,
 }
 
 @Composable
@@ -57,14 +64,18 @@ public fun EvidriloIcon(
     modifier: Modifier = Modifier.size(24.dp),
 ) {
     Canvas(modifier = modifier) {
+        val scaleX = size.width / 24f
+        val scaleY = size.height / 24f
+        val strokeScale = ((scaleX + scaleY) / 2f).coerceAtLeast(0.01f)
         val stroke = Stroke(
-            width = 1.8.dp.toPx(),
+            // The drawing commands use a 24 x 24 coordinate system. Compensate
+            // for the canvas scale so icons keep a consistent visual stroke at
+            // 16, 24, 26, and 48 dp instead of becoming filled blobs.
+            width = 1.8.dp.toPx() / strokeScale,
             cap = StrokeCap.Round,
             join = StrokeJoin.Round,
         )
-        val scaleX = size.width / 24f
-        val scaleY = size.height / 24f
-        scale(scaleX, scaleY) {
+        scale(scaleX, scaleY, pivot = Offset.Zero) {
             when (name) {
                 EvidriloIconName.ARROW_BACK -> drawArrowBack(tint, stroke)
                 EvidriloIconName.ARROW_FORWARD -> drawArrowForward(tint, stroke)
@@ -95,6 +106,12 @@ public fun EvidriloIcon(
                 EvidriloIconName.PLUS -> drawPlus(tint, stroke)
                 EvidriloIconName.LOCK -> drawLock(tint, stroke)
                 EvidriloIconName.SPARK -> drawSpark(tint, stroke)
+                EvidriloIconName.EVIDENCE_GRAPH -> drawEvidenceGraph(tint, stroke)
+                EvidriloIconName.LIGHTNING -> drawLightning(tint)
+                EvidriloIconName.CHECK_FILLED -> drawFilledCheck(tint, stroke)
+                EvidriloIconName.HOME_FILLED -> drawFilledHome(tint)
+                EvidriloIconName.ACCOUNT_FILLED -> drawFilledAccount(tint)
+                EvidriloIconName.FOLDER_FILLED -> drawFilledFolder(tint)
             }
         }
     }
@@ -314,7 +331,7 @@ private fun DrawScope.drawLink(color: Color, stroke: Stroke) {
 }
 
 private fun DrawScope.drawCalendar(color: Color, stroke: Stroke) {
-    drawRoundRect(color, Offset(4f, 5f), Size(16f, 15f), 2f, 2f, style = stroke)
+    drawRoundRect(color, Offset(4f, 5f), Size(16f, 15f), CornerRadius(2f, 2f), style = stroke)
     drawStyledLine(color, Offset(4f, 9f), Offset(20f, 9f), stroke)
     drawStyledLine(color, Offset(8f, 3f), Offset(8f, 7f), stroke)
     drawStyledLine(color, Offset(16f, 3f), Offset(16f, 7f), stroke)
@@ -383,7 +400,7 @@ private fun DrawScope.drawPlus(color: Color, stroke: Stroke) {
 }
 
 private fun DrawScope.drawLock(color: Color, stroke: Stroke) {
-    drawRoundRect(color, Offset(5f, 10f), Size(14f, 11f), 2f, 2f, style = stroke)
+    drawRoundRect(color, Offset(5f, 10f), Size(14f, 11f), CornerRadius(2f, 2f), style = stroke)
     drawArc(color, 180f, 180f, false, Offset(8f, 4f), Size(8f, 10f), style = stroke)
 }
 
@@ -392,4 +409,68 @@ private fun DrawScope.drawSpark(color: Color, stroke: Stroke) {
     drawStyledLine(color, Offset(3f, 12f), Offset(21f, 12f), stroke)
     drawStyledLine(color, Offset(6f, 6f), Offset(18f, 18f), stroke)
     drawStyledLine(color, Offset(18f, 6f), Offset(6f, 18f), stroke)
+}
+
+private fun DrawScope.drawEvidenceGraph(color: Color, stroke: Stroke) {
+    drawStyledLine(color, Offset(12f, 7f), Offset(6f, 17f), stroke)
+    drawStyledLine(color, Offset(12f, 7f), Offset(18f, 17f), stroke)
+    drawCircle(color, radius = 2.8f, center = Offset(12f, 7f), style = stroke)
+    drawCircle(color, radius = 2.8f, center = Offset(6f, 17f), style = stroke)
+    drawCircle(color, radius = 2.8f, center = Offset(18f, 17f), style = stroke)
+}
+
+private fun DrawScope.drawLightning(color: Color) {
+    val path = Path().apply {
+        moveTo(13.7f, 2.5f)
+        lineTo(5.5f, 13f)
+        lineTo(11.2f, 13f)
+        lineTo(10.2f, 21.5f)
+        lineTo(18.5f, 10.2f)
+        lineTo(12.9f, 10.2f)
+        close()
+    }
+    drawPath(path, color)
+}
+
+private fun DrawScope.drawFilledCheck(color: Color, stroke: Stroke) {
+    drawCircle(color, radius = 9f, center = Offset(12f, 12f))
+    drawStyledLine(Color.White, Offset(7f, 12f), Offset(10.5f, 15.5f), stroke)
+    drawStyledLine(Color.White, Offset(10.5f, 15.5f), Offset(17f, 8.5f), stroke)
+}
+
+private fun DrawScope.drawFilledHome(color: Color) {
+    val path = Path().apply {
+        moveTo(3f, 10.5f)
+        lineTo(12f, 3f)
+        lineTo(21f, 10.5f)
+        lineTo(19.5f, 21f)
+        lineTo(4.5f, 21f)
+        close()
+    }
+    drawPath(path, color)
+    drawRoundRect(Color.White, Offset(10f, 14f), Size(4f, 7f), CornerRadius(1f, 1f))
+}
+
+private fun DrawScope.drawFilledAccount(color: Color) {
+    drawCircle(color, radius = 4.2f, center = Offset(12f, 7f))
+    val path = Path().apply {
+        moveTo(3.5f, 21f)
+        cubicTo(3.5f, 15.7f, 7.4f, 13.2f, 12f, 13.2f)
+        cubicTo(16.6f, 13.2f, 20.5f, 15.7f, 20.5f, 21f)
+        close()
+    }
+    drawPath(path, color)
+}
+
+private fun DrawScope.drawFilledFolder(color: Color) {
+    val path = Path().apply {
+        moveTo(2.5f, 7f)
+        lineTo(9f, 7f)
+        lineTo(11.2f, 9.2f)
+        lineTo(21.5f, 9.2f)
+        lineTo(19.5f, 20.5f)
+        lineTo(4f, 20.5f)
+        close()
+    }
+    drawPath(path, color)
 }

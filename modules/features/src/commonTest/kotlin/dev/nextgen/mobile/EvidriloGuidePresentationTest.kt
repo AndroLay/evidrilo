@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 
 class EvidriloGuidePresentationTest {
     @Test
-    fun guideContainsTheThreeV8TopicsInProcessOrder() {
+    fun guideContainsTheThreeCoreTopicsInProcessOrder() {
         assertEquals(
             listOf(
                 EvidriloGuideTopic.SUPPORTING_EVIDENCE,

@@ -55,3 +55,14 @@ test('rejects marketing-version drift without exposing unrelated values', () => 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('Docker build contexts carry canonical .NET version inputs before restore', () => {
+  for (const relativePath of ['infra/docker/api.Dockerfile', 'infra/docker/worker.Dockerfile']) {
+    const dockerfile = fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
+    const canonicalCopy = dockerfile.indexOf('COPY version.props Directory.Build.props ./');
+    const restore = dockerfile.indexOf('RUN dotnet restore');
+    assert.notEqual(canonicalCopy, -1, `${relativePath} does not copy canonical MSBuild inputs`);
+    assert.notEqual(restore, -1, `${relativePath} does not restore a project`);
+    assert.ok(canonicalCopy < restore, `${relativePath} restores before canonical inputs are available`);
+  }
+});

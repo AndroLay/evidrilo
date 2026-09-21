@@ -32,20 +32,17 @@ academic marking system, safety advisor, or general-purpose AI answer generator.
 | Connectivity | Offline-first free workflow; connected content and sync are optional |
 | Repository license | MIT; see the single root [LICENSE](LICENSE) file |
 
-Current committed structural baseline: `1893471`. The semantic-closure
-increment remains repository-verified only until focused Kotlin verification is
-available.
+## What is implemented
 
-## Current status
-
-The repository contains the current applied product direction:
+The repository contains the current product direction:
 
 - target home, sources, workspace, evidence, claim trace, verification,
   action-plan, profile, history, and evidence-change surfaces;
 - an Evidence Lens that distinguishes learner-selected anchors from other
   supplied observations without inferring proof;
-- a Conflict Detail projection that exposes every non-passing deterministic
-  check, its anchors, explanation, and next action;
+- a Verification Detail projection that exposes non-passing deterministic
+  checks, their anchors, explanation, and next action; a true conflict is only
+  shown when supplied evidence materially disagrees;
 - an Evidence Delta projection that carries evidence changes through claim
   assessment, open-gap state, claim-boundary changes, and action staleness;
 - a deterministic conclusion engine with anchored feedback and explicit
@@ -58,13 +55,15 @@ The repository contains the current applied product direction:
 - RevenueCat monthly/yearly access, restore, retry, pending, cancellation, and
   fail-closed states.
 
-The bundled M0_T2 case remains the safe offline default. The published-case API
-is a prepared content boundary and is not yet claimed as the default mobile
-runtime source.
-
-The following still require owner-side or device-side evidence: Android/iOS
-runtime review, TalkBack/VoiceOver review, RevenueCat Test Store transactions,
-managed deployment, human validation, store release, and final Shipaton assets.
+The bundled case is the reliable local-first starting point. The published-case
+API is a separate content boundary; the mobile free core does not require it.
+Repository code and local tests are not proof of a live managed service,
+provider purchase, or runtime on every supported platform. The Next Gen
+submission does not require an App Store or Google Play listing, but it does
+require a public open-source repository with a license and a working-app demo
+video under two minutes. See [Testing](docs/testing.md) and
+[Release readiness](docs/release.md) for reproducible checks and submission
+gates.
 
 ## Core experience
 
@@ -75,7 +74,7 @@ flowchart LR
     C --> D[Write claim and scope]
     D --> E[State limits and next action]
     E --> F{Deterministic evaluation}
-    F -->|Anchors are sufficient| G[Prioritized feedback + Conflict Detail]
+    F -->|Anchors are sufficient| G[Prioritized feedback + Verification Detail]
     F -->|Missing or ambiguous anchor| H[CANNOT_ASSESS]
     G --> I[One guided revision]
     H --> I
@@ -168,7 +167,7 @@ but they must not silently replace that chain.
 | Connected content | Published immutable case after schema, identifier, hash, and evaluator-version checks. Invalid content falls back locally. |
 | Premium | Active evidrilo_pro entitlement from RevenueCat. Only monthly and yearly products are accepted. |
 | Sync | Explicit consent and verified account required. The competition scope syncs bounded progress metadata, not learner-authored draft text. |
-| AI assistance | Optional future capability; non-grading, opt-in, redacted, bounded, and unable to determine truth or premium access. |
+| AI assistance | Planned optional bounded extension; 10 one-time free credits or 100 credits per active entitlement month, opt-in, redacted, non-grading, and unable to determine truth or premium access. |
 
 ### RevenueCat boundary
 
@@ -335,6 +334,7 @@ actually run; **open** means an external gate remains.
 - [Architecture decision](docs/architecture/platform-decision.md)
 - [Repository structure](docs/architecture/repository-structure.md)
 - [RevenueCat architecture](docs/architecture/revenuecat.md)
+- [AI assistance architecture](docs/architecture/ai-assistance.md)
 - [Development guide](docs/development/README.md)
 - [Testing guide](docs/testing.md)
 - [Release guide](docs/release.md)

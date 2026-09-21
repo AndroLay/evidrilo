@@ -3,6 +3,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+COPY version.props Directory.Build.props ./
 COPY platform/worker/Evidrilo.Worker.csproj platform/worker/
 RUN dotnet restore platform/worker/Evidrilo.Worker.csproj
 

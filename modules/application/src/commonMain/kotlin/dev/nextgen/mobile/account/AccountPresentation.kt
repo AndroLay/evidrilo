@@ -5,6 +5,19 @@ enum class AccountPresentationAction {
     SIGN_OUT,
 }
 
+/**
+ * The account offer is a value-gated invitation, never an access gate. It is
+ * intentionally limited to signed-out users and is persisted by the app so a
+ * dismissal cannot become a launch-time interruption.
+ */
+fun shouldShowAccountBenefitPrompt(
+    hasMeaningfulValue: Boolean,
+    session: AccountSession,
+    alreadyPresented: Boolean,
+): Boolean = hasMeaningfulValue &&
+    !alreadyPresented &&
+    session is AccountSession.SignedOut
+
 data class AccountPresentation(
     val title: String,
     val body: String,

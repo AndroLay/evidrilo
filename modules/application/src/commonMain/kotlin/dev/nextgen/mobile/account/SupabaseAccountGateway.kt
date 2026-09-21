@@ -223,6 +223,34 @@ class SupabaseAccountGateway(
         }
     }
 
+    override suspend fun exportAccount(): AccountGatewayResult {
+        if (!configuration.isConfigured || !configuration.apiConfigured || configuration.normalizedApiBaseUrl.isBlank()) {
+            return AccountGatewayResult.ExportFailed(AccountUnavailableReason.NOT_CONFIGURED)
+        }
+        val stored = try {
+            secureSessionStore.read()
+        } catch (_: Exception) {
+            return AccountGatewayResult.ExportFailed(AccountUnavailableReason.SECURE_STORAGE)
+        } ?: return AccountGatewayResult.NoSession
+        if (!stored.account.emailVerified) return AccountGatewayResult.InvalidCredentials
+
+        val response = requestAbsolute(
+            method = "GET",
+            url = "${configuration.normalizedApiBaseUrl}/v1/account/me/export",
+            bearerToken = stored.material.accessToken,
+            includeSupabaseApiKey = false,
+        ) ?: return AccountGatewayResult.Offline
+        return when {
+            response.statusCode == 401 -> AccountGatewayResult.Expired
+            response.statusCode == 403 -> AccountGatewayResult.InvalidCredentials
+            response.statusCode == 429 -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.RATE_LIMITED)
+            response.statusCode in 200..299 && isValidExportPayload(response.body, stored.account.accountId) ->
+                AccountGatewayResult.ExportReady(response.body)
+            response.statusCode in 400..499 -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.INVALID_INPUT)
+            else -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE)
+        }
+    }
+
     private suspend fun completeCodeRedirect(redirect: AuthRedirect.Code): AccountGatewayResult {
         val pkce = pendingPkce ?: return AccountGatewayResult.InvalidRedirect
         if (redirect.state != pkce.state) return AccountGatewayResult.InvalidRedirect
@@ -411,6 +439,16 @@ class SupabaseAccountGateway(
 
     private fun parseObject(body: String): Map<String, JsonElement>? =
         runCatching { authJson.parseToJsonElement(body) as? JsonObject }.getOrNull()
+
+    private fun isValidExportPayload(body: String, expectedAccountId: String): Boolean {
+        val root = parseObject(body) ?: return false
+        return root["schema"]?.asJsonPrimitiveOrNull()?.contentOrNull == "evidrilo.account-export" &&
+            root["version"]?.asJsonPrimitiveOrNull()?.contentOrNull == "1" &&
+            root["accountId"]?.asJsonPrimitiveOrNull()?.contentOrNull == expectedAccountId &&
+            root["generatedAt"]?.asJsonPrimitiveOrNull()?.contentOrNull?.isNotBlank() == true &&
+            root["requestId"]?.asJsonPrimitiveOrNull()?.contentOrNull?.isNotBlank() == true &&
+            root["data"] is JsonObject
+    }
 
     private fun jsonObject(vararg values: Pair<String, Any>): String = buildJsonObject {
         values.forEach { (key, value) ->

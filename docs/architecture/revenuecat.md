@@ -1,212 +1,144 @@
 # RevenueCat Integration Boundary
 
-Latest repository increment: E191 / TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED / E190 / EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED / E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED / E188 / RELEASE_VERSION_SOURCE_ALIGNED / E187 / REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED / E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED / E176 / REQUEST_LIFECYCLE_AND_INPUT_BOUNDARIES_HARDENED / E175 / SYNC_PULL_CURSOR_LOWER_BOUND_GUARDED / E174 / FAIL_CLOSED_RESPONSE_REFRESH_BOUNDARIES / E173 / ASYNC_STATE_BOUNDARIES_HARDENED / E172 / LOCAL_SESSION_BOUNDARIES_HARDENED / E171 / OFFLINE_AUDIO_REPOSITORY_IMPLEMENTATION / E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED.
+This document defines how monetization fits Evidrilo. It records intended
+product and code boundaries, not proof of a live store transaction.
 
-Status: E191 / TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED / E190 / EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED / E189 / KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED / E188 / RELEASE_VERSION_SOURCE_ALIGNED / E187 / REPOSITORY_ARCHITECTURE_MIGRATION_VERIFIED / E186 / BACKEND_ENGINE_SYNC_BOUNDARY_HARDENED / E185 / REVENUECAT_OFFERING_MIGRATION_OBSERVED / E183 / NATIVE_CHOICE_ACCESSIBILITY_SEMANTICS_HARDENED / E182 / SYNC_CURSOR_CONTRACT_BOUNDARY_ALIGNED / E181 / CASE_TRANSITION_CONTRACT_BOUNDARY_HARDENED / E180 / MOBILE_RELEASE_CANDIDATE_PREPARATION / E179 / SYNC_CONSENT_CANCELLATION_BOUNDARY_HARDENED / E178 / API_INPUT_AND_STAGING_BOUNDARY_HARDENED / E177 / SYNC_PULL_PAGE_SIZE_BOUNDARY_HARDENED / E176 / REQUEST_LIFECYCLE_AND_INPUT_BOUNDARIES_HARDENED / E175 / SYNC_PULL_CURSOR_LOWER_BOUND_GUARDED / E174 / FAIL_CLOSED_RESPONSE_REFRESH_BOUNDARIES / E173 / ASYNC_STATE_BOUNDARIES_HARDENED / E172 / LOCAL_SESSION_BOUNDARIES_HARDENED / E171 / OFFLINE_AUDIO_REPOSITORY_IMPLEMENTATION / E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED / RUNTIME_GATES_OPEN / OFFERING_MIGRATION_OBSERVED / PRICE_MIGRATION_OPEN / EXTERNAL_GATES_OPEN
-<!-- Historical status chain retained below for provenance.
-Status: `E170 / MEMBERSHIP_ROLE_ASSIGNMENT_POLICY_COVERAGE / E169 / AUTH_PROVIDER_CONFIRMATION_TYPE_BOUNDED / E168 / CURRENT_STATUS_SNAPSHOTS_SYNCHRONIZED / E167 / BILLING_EMPTY_ACCOUNT_GUARDED / E166 / LAST_OWNER_ROLE_CHANGE_GUARDED / E165 / COHORT_LEARNER_ROLE_BOUNDARY_HARDENED / E164 / COHORT_MEMBERSHIP_BOUNDARY_HARDENED / E163 / LOCAL_SESSION_DECODER_HARDENED / E162 / NODE_VERIFICATION_SNAPSHOT_SYNCHRONIZED / E161 / RECOMMENDATION_SCHEMA_ALIGNMENT / E160 / CONTENT_RUNBOOK_CHALLENGE_REQUIRED / E159 / CASE_SCHEMA_IDENTIFIER_BOUNDS / E158 / CONTRACT_SCHEMA_ALIGNMENT / E157 / MOBILE_CONTENT_CHALLENGE_REQUIRED / E154 / AUTH_CALLBACK_INPUT_BOUNDED / E153 / CLIENT_BILLING_BOUNDARY_HARDENED / E152 / ACCOUNT_DELETION_OWNER_GUARDED / E151 / REVENUECAT_PRODUCT_ALLOWLIST_GUARDED / E150 / RUNBOOK_STATUS_SYNCHRONIZED / E149 / CANONICAL_ENTITLEMENT_GUARDED / E148 / E147 / E146 / E140 / APP_ALLOWLIST_VERIFIED / BILLING_CALLBACK_IDENTITY_GUARDED / BILLING_CONFIG_STATUS_TRUTHFUL / BILLING_UNKNOWN_STATE_ALLOWLISTED / REVENUECAT_UI_BOUNDARY_COMPILED / REVENUECAT_RUNBOOK_ALIGNED / DASHBOARD_LIFETIME_MIGRATION_OPEN / TEST_STORE_TRANSACTION_NOT_RUN / DEPLOYMENT_PREPARATION_PRESENT`
+## Product model
 
--->
-Current authority: [Evidrilo Source of Truth](../../internal/research/next-gen/SOURCE_OF_TRUTH.md),
-[E118 all-area closure](../../audit/evidence/evidrilo-all-areas-closure-2026-09-13.md),
-[E119 analytics boundary](../../audit/evidence/evidrilo-analytics-funnel-closure-2026-09-13.md),
-[E120 server-owned write boundary](../../audit/evidence/evidrilo-server-owned-write-boundary-2026-09-13.md),
-[E121 recommendation write boundary](../../audit/evidence/evidrilo-server-owned-recommendation-boundary-2026-09-13.md),
-[E122 billing configuration boundary](../../audit/evidence/evidrilo-billing-config-readiness-2026-09-13.md),
-[E123 billing offer allowlist boundary](../../audit/evidence/evidrilo-billing-offer-allowlist-2026-09-13.md),
-[E124 authenticated transport boundary](../../audit/evidence/evidrilo-auth-redirect-safety-2026-09-13.md),
-[E125 mobile host boundary](../../audit/evidence/evidrilo-android-network-permission-2026-09-13.md),
-[E126 account-deletion access boundary](../../audit/evidence/evidrilo-account-deletion-access-2026-09-13.md),
-[E129 billing callback identity boundary](../../audit/evidence/evidrilo-billing-callback-identity-2026-09-13.md),
-[E130 trigger privilege hardening](../../audit/evidence/evidrilo-trigger-function-privileges-2026-09-13.md),
-[E132 migration-runner concurrency hardening](../../audit/evidence/evidrilo-migration-runner-concurrency-2026-09-13.md),
-[E133 production CORS boundary](../../audit/evidence/evidrilo-production-cors-boundary-2026-09-13.md),
-[E134 runbook catalog boundary](../../audit/evidence/evidrilo-revenuecat-runbook-catalog-boundary-2026-09-13.md),
-[E136 runbook observation boundary](../../audit/evidence/evidrilo-runbook-observation-boundary-2026-09-13.md),
-[E137 backend register synchronization](../../audit/evidence/evidrilo-backend-register-synchronization-2026-09-13.md),
-[E138 managed RevenueCat UI boundary](../../audit/evidence/evidrilo-revenuecat-managed-ui-2026-09-13.md),
-[E139 canonical content reader](../../audit/evidence/evidrilo-canonical-content-reader-2026-09-13.md),
-[E140 provider-claim documentation boundary](../../audit/evidence/evidrilo-revenuecat-documentation-claim-boundary-2026-09-13.md),
-[E149 canonical entitlement guard](../../audit/evidence/evidrilo-billing-entitlement-allowlist-2026-09-13.md),
-[E150 runbook status synchronization](../../audit/evidence/evidrilo-runbook-status-synchronization-2026-09-13.md),
-[E151 server product allowlist](../../audit/evidence/evidrilo-billing-product-allowlist-2026-09-14.md),
-[E152 account-deletion owner guard](../../audit/evidence/evidrilo-account-deletion-owner-guard-2026-09-14.md),
-[E153 client/request boundary hardening](../../audit/evidence/evidrilo-client-boundary-hardening-2026-09-14.md),
-and [E154 auth callback boundary](../../audit/evidence/evidrilo-auth-callback-boundary-2026-09-14.md),
-and [E155 content challenge boundary](../../audit/evidence/evidrilo-content-challenge-required-2026-09-14.md),
-and [E156 stored content transition guard](../../audit/evidence/evidrilo-stored-content-transition-guard-2026-09-14.md),
-and [E157 mobile content challenge boundary](../../audit/evidence/evidrilo-mobile-content-challenge-required-2026-09-14.md),
-and [E158 published-case schema alignment](../../audit/evidence/evidrilo-case-schema-challenge-boundary-2026-09-14.md),
-and [E159 published-case identifier-boundary alignment](../../audit/evidence/evidrilo-case-schema-identifier-bounds-2026-09-14.md),
-and [E160 content-authoring runbook correction](../../audit/evidence/evidrilo-content-runbook-challenge-required-2026-09-14.md),
-and [E161 recommendation schema alignment](../../audit/evidence/evidrilo-recommendation-schema-alignment-2026-09-14.md),
-and [Evidrilo Test Store runbook](../operations/revenuecat-test-store-runbook.md).
+- Free: one complete local learning loop, including evidence, transparent
+  feedback, one revision, the evidence-change challenge, comparison, and
+  local history.
+- Premium: the canonical entitlement
+`evidrilo_pro` unlocks two additional reviewed cases.
+- Packages: monthly and yearly only. A lifetime package is not in the
+  approved product model.
+- Planning anchors: USD 1.99/month for `monthly` and USD 19.99/year for
+  `yearly`, as recorded in D-100. These are not localized provider prices and
+  must never be hardcoded into the runtime paywall.
+- Paywall: explain the premium case value and preserve access to the free
+  workflow when offers cannot load or a purchase is unavailable.
 
-## Purpose
+The free core must not sell more trustworthy evaluation, factual support, or
+a safer outcome. Pricing and current provider catalog observations belong in
+the private pricing/evidence records; do not copy changing prices into this
+architecture note.
 
-RevenueCat is the monetization boundary required by Shipaton. It must support a
-credible premium path without making the free Evidrilo learning loop depend on
-an account, network connection, or successful purchase.
+RevenueCat also authorizes the optional AI allowance; it does not store or
+directly mutate the AI credit balance. The approved policy is 10 one-time
+credits for a verified free account and 100 credits per active entitlement
+month for both monthly and yearly `evidrilo_pro`. Credits do not roll over, and
+failed AI requests release their reservation. See the [AI assistance and credit
+contract](ai-assistance.md).
 
-## Application boundary
-
-Shared screens depend on an application-facing billing interface. RevenueCat
-SDK types and platform initialization remain inside the adapter layer.
+## Mobile access flow
 
 ```text
-UI -> BillingGateway -> RevenueCat adapter -> RevenueCat SDK
+Premium case request
+  → BillingGateway
+  → platform RevenueCat adapter
+  → CustomerInfo / active evidrilo_pro entitlement
+  → premium case access or a truthful locked/unavailable state
 ```
 
-The domain evaluator does not depend on RevenueCat and must remain fully
-testable without a billing key.
+The domain does not depend on RevenueCat. A local UI success flag is never
+entitlement authority. Loading, empty catalog, pending, cancellation,
+failure, restore, and offline states must be explicit. Restore is initiated
+by the user and access is refreshed from the provider result.
 
-## iOS dependency choice
+## Server projection
 
-Because Evidrilo is a Kotlin Multiplatform app, the current iOS adapter uses
-RevenueCat's `purchases-kmp-core` and `purchases-kmp-ui` dependencies from the
-Gradle shared module. They provide the native RevenueCat bridge and managed
-Compose UI boundary used by the shared app; adding `purchases-ios-spm` to the
-Xcode host as a second SDK would duplicate the dependency and create two
-initialization paths. A direct Swift Package integration is appropriate only
-if the app moves to a separate Swift-native billing/UI boundary.
+The optional ASP.NET Core webhook boundary verifies the provider signature,
+validates event identity and approved product identifiers, applies
+idempotency/ordering rules, and updates server-owned entitlement state.
+Clients cannot grant themselves access by submitting an account or
+entitlement flag. The online API must fail closed when provider/database
+configuration is missing.
 
-## Current product model
+For the current Next Gen submission, this server projection is not the delivery
+path for the two bundled premium cases. The mobile app uses verified
+RevenueCat `CustomerInfo` to unlock those local cases. Server-side entitlement
+authorization becomes mandatory only if a later release serves premium content
+from the API; the current submission must not describe local CustomerInfo as
+server-enforced access.
 
-- Free: one complete educational case, deterministic feedback, one revision,
-  before/after comparison, one evidence-change challenge, one latest local
-  comparison history entry, local reset, and offline use after content is
-  available.
-- Premium access: one entitlement, `evidrilo_pro`, with two approved
-  subscription packages: monthly (`monthly`) and yearly (`yearly`). Both
-  unlock the same two pedagogically distinct practice cases. Lifetime is not
-  part of the approved product plan.
-- Access: derived from the active entitlement returned by the billing adapter,
-  never from a local purchase-success flag. On the server, signed events with
-  a supplied product must name exact `monthly` or `yearly` products; active
-  grants also require that field. `lifetime` and unknown products are ignored
-  fail-closed, while product-less expiration/revocation cleanup is tolerated.
+## AI credit entitlement flow
 
-The initial global pricing hypothesis is USD 1.00/month and USD 10.00/year.
-These are reference anchors, not yet verified store price points; Apple and
-Google may localize them and the final proceeds depend on store fees, taxes,
-refunds, and regional availability. The detailed business decision is in the
-[monetization and pricing note](../business/monetization-and-pricing.md).
+```text
+verified account + explicit AI consent
+        → one-time free grant of 10, or active evidrilo_pro period grant of 100
+        → server credit ledger reservation
+        → bounded server-side AI assist
+        → consume on accepted response / release on failure
+```
 
-Current state: the active Evidrilo UI has a local billing boundary, optional
-RevenueCat-managed Paywall and Customer Center entry points, explicit
-locked/unavailable/pending/unknown states, two premium case slots, request
-generation and account-identity guards, and reducer coverage for late callbacks
-and revoked access.
-The Android and iOS adapters currently load and select the locally configured
-packages, read `evidrilo_pro`, handle purchases/restores, and synchronize
-RevenueCat's customer identity with a provider-verified Evidrilo account.
-The remaining dashboard price migration and purchase/restore/revoke matrix remain
-owner gates, so M3 remains open. The legacy lifetime package is no longer
-eligible in app configuration, fixtures, or presentation even if a provider
-returns it. E185 directly observed the owner-authorized dashboard without a
-lifetime package, and the owner reported the product removed again on
-18 September 2026; no newer assistant-side dashboard observation is recorded.
-The server webhook now applies the same monthly/yearly grant allowlist independently of
-the app, so a provider payload cannot bypass the product policy. Legacy
-E153 additionally makes client entitlement access product-aware, rejects
-unverified stored sessions before authenticated billing-adjacent reads, and
-keeps the unresolved/legacy product path fail-closed. This still does not
-replace dashboard migration or Test Store transaction evidence.
+Monthly and yearly packages use the same 100-credit grant for each active
+entitlement month. A yearly entitlement does not receive a single 1,200-credit
+balance, and unused credits do not roll over. Entitlement-period grants must be
+created from verified provider state or an idempotent server projection; a
+client success flag, webhook replay, restore callback, or duplicate request
+must not create credits twice. The mobile client can display a balance but
+cannot grant, transfer, or edit it.
 
-E167 additionally rejects the all-zero `app_user_id` before a signed billing
-event reaches the entitlement store. This prevents an impossible account from
-becoming a database retry/error path; it does not add provider transaction
-evidence.
+The AI ledger is separate from premium case access. A billing outage or disabled
+AI provider must leave the free case and deterministic verification usable. A
+provider timeout, cancellation, malformed response, policy rejection, or
+unavailable configuration releases the reserved credit and returns a truthful
+fallback.
 
-E168 synchronizes this document's active status header with the current
-repository evidence. The snapshot contract passes `23/23`; provider dashboard,
-transaction, device, and production gates remain open.
+## Thoughtful usage acceptance
 
-E169 hardens the adjacent account-provider boundary: malformed non-string
-confirmation metadata cannot become a verified local session. Focused auth
-coverage passes `13/13` and Kotlin/JVM `271/271`; RevenueCat dashboard,
-transaction, device, and production gates remain open.
+RevenueCat is product-aligned only when it extends repeated Evidrilo use without
+selling evaluator truth. The implementation and final review must cover five
+dimensions:
 
-E170 adds explicit membership role-assignment regression coverage without
-changing billing behavior. Focused access-policy coverage passes `9/9` and the
-full API suite passes `151/151`; RevenueCat dashboard, transaction, device, and
-production gates remain open. See the [E170 membership role-assignment record](../../audit/evidence/evidrilo-membership-role-assignment-coverage-2026-09-14.md).
+| Dimension | Required behavior |
+| --- | --- |
+| Product fit | `evidrilo_pro` adds two reviewed evidence cases and the optional AI allowance; the complete free case remains valuable |
+| Entitlement authority | Active `CustomerInfo`/server projection controls premium access and AI grants; local flags never unlock features |
+| Purchase reliability | Monthly/yearly offering, purchase, pending, cancellation, failure, restore, relaunch, and supported expiry/revocation have explicit states |
+| Paywall care | Paywall appears after free value, shows localized price/period/renewal/manage guidance, and remains accessible and dismissible |
+| Evidence and operations | Provider matrix, webhook signature/idempotency/order, account isolation, cost ceiling, privacy disclosure, and offline fallback are recorded |
 
-Product and entitlement identifiers are supplied through local configuration
-and must match the owner-created dashboard catalog. The historical Test Store
-observation is recorded in [E116](../../audit/evidence/evidrilo-revenuecat-dashboard-audit-2026-09-12.md)
-and included the legacy `lifetime` package. Current provider observation [E185](../../audit/evidence/evidrilo-revenuecat-offering-migration-2026-09-16.md)
-confirms that the active `default` offering now contains only `monthly` and
-`yearly`; the `monthly` product still displays USD 9.99/month and the approved
-replacement prices remain open. They must not be committed together with
-private keys or server secrets.
+The expected judged flow is:
 
-The adjacent E171 audio implementation does not alter RevenueCat entitlement
-rules. Audio remains optional, and the premium boundary continues to accept
-only the canonical `evidrilo_pro` entitlement with monthly/yearly products;
-device transaction evidence remains unobserved.
+```text
+free case value
+  → premium case value explanation
+  → RevenueCat offering
+  → monthly/yearly selection
+  → purchase or truthful failure/unavailable state
+  → evidrilo_pro entitlement
+  → premium case and AI-credit access
+  → restore/relaunch/offline fallback
+```
 
-E172 also leaves the billing boundary unchanged. Restored local sessions must
-pass the common phase/case and safe-account checks before any authenticated
-billing, sync, or request path can consume them.
+Do not add a generic subscription screen, lifetime product, artificial feature
+lock, or AI claim solely to make the integration appear larger. Do not claim
+production revenue from Test Store evidence. The AI credit grant is valid only
+when the server ledger reconciles a verified entitlement period idempotently.
 
-E173 closes a repository-local billing state-loss path: if access and offer
-callbacks arrive separately, the reducer now keeps the complete approved
-monthly/yearly catalog. The async sync guard is independent of entitlement
-truth, and lifetime remains rejected by the existing product allowlist. E185
-now covers the current offering configuration; real RevenueCat transactions
-and approved price presentation remain unobserved.
+## Verification boundary
 
-E174 adds a presentation-layer defense in depth: even a directly constructed
-billing presentation can expose and purchase only approved monthly/yearly
-products. The same increment also hardens adjacent sync response and auth
-refresh boundaries; live RevenueCat transactions, dashboard configuration, and
-native runtime behavior remain unobserved.
+Repository tests can establish reducer, allowlist, webhook, and failure
+behavior under their test fixtures. A provider claim requires an authorized
+Test Store run on the claimed build. The run should cover offering load,
+purchase, cancellation/failure, active entitlement, restore, relaunch, and
+supported expiry/revocation cases. Sandbox results are not production
+revenue or store approval.
 
-## Customer identity and server projection
+Use the [RevenueCat Test Store runbook](../operations/revenuecat-test-store-runbook.md)
+for the controlled procedure. Current provider status is kept in the private
+evidence ledger to avoid stale dashboard claims in public architecture docs.
 
-The free core may still be used anonymously. After the auth adapter produces a
-provider-verified account, the mobile billing adapter calls RevenueCat
-`logIn(account UUID)` so future webhook events can map to the server account;
-sign-out, expiry, and account recovery reset the RevenueCat customer with
-`logOut`. Anonymous or non-UUID provider events are acknowledged but are not
-projected into an account entitlement. This prevents a caller-supplied id from
-becoming billing identity and keeps the server projection authoritative.
+## Configuration and privacy
 
-## Required failure behavior
-
-The free flow remains usable when the SDK is missing, initialization fails, no
-offer is available, a purchase is cancelled, or the network is unavailable.
-Unknown transaction state must not be described as a successful or failed
-purchase until it is reconciled. Restore must refresh entitlement state rather
-than blindly unlock the UI.
-
-The app disables purchase and restore actions while an operation is busy, and
-results from a request whose premium surface has been closed are ignored. An
-active entitlement is the only transition into the premium catalog; a later
-inactive entitlement returns the surface to locked state. These behaviors are
-covered by the common billing race/recovery tests.
-
-The shared app now exposes Customer Center only when the platform adapter is
-configured with a public key and the approved catalog. The same guard exposes
-the managed RevenueCat Paywall from the locked premium surface; the existing
-product-owned premium screen remains the fallback. The repository proves the
-adapter and cross-target compilation, not dashboard configuration, transaction
-behavior, or real-device rendering.
-
-## Test Store boundary
-
-The current Test Store offering was observed in E185 with only the monthly and
-yearly packages. The existing monthly product still shows USD 9.99/month, so
-the approved price migration remains open; no yearly price or transaction
-result is claimed here. Credentials and results are environment-specific. Use
-local configuration and label all observations as sandbox observations. A
-successful sandbox purchase does not prove production revenue, willingness to
-pay, or long-term retention. The current app-side allowlist is already
-fail-closed against lifetime.
-
-## Privacy and configuration
-
-Do not send conclusion drafts, reviewer contacts, participant identity, or
-private research data as customer attributes. Keep local keys, signing files,
-receipts, and production configuration outside source control.
+- Keep RevenueCat public SDK keys in local platform configuration; never
+  commit secret API keys, webhook secrets, receipts, or store credentials.
+- Use only the configured canonical entitlement and approved monthly/yearly
+  product IDs.
+- Do not attach conclusion drafts, reviewer details, or participant
+  information to customer attributes or analytics.
+- Do not send a whole learner draft to an AI provider by default. Require
+  selected context, explicit opt-in, redaction, bounded output, and a
+  metadata-only audit record.
+- Keep a billing outage from blocking the free local workflow.

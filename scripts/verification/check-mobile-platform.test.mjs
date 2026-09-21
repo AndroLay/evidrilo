@@ -35,6 +35,16 @@ test('iOS host registers the same auth callback scheme', () => {
   assert.match(read('apps/ios/iosApp/iosApp.swift'), /submitAccountAuthRedirect/);
 });
 
+test('iOS host build phase invokes the repository Gradle wrapper', () => {
+  const project = read('apps/ios/iosApp.xcodeproj/project.pbxproj');
+  const buildPhaseStart = project.indexOf('name = "Compile Kotlin Framework";');
+  assert.notEqual(buildPhaseStart, -1, 'iOS Kotlin framework build phase is missing');
+  const buildPhase = project.slice(buildPhaseStart, project.indexOf('/* End PBXShellScriptBuildPhase section */', buildPhaseStart));
+  assert.match(buildPhase, /cd \\\"\$SRCROOT\/\.\.\/\.\.\\"/);
+  assert.match(buildPhase, /\.\/gradlew :composeApp:embedAndSignAppleFrameworkForXcode/);
+  assert.equal(fs.existsSync(path.join(repositoryRoot, 'gradlew')), true);
+});
+
 test('Android release configuration is optimized and signing-safe', () => {
   const gradle = read('apps/android/build.gradle.kts');
   assert.match(gradle, /buildTypes\s*\{[\s\S]*release\s*\{[\s\S]*isMinifyEnabled\s*=\s*true/);
@@ -72,49 +82,31 @@ test('mobile release configuration checker passes without exposing signing mater
 
 test('mobile release checker accepts Android artifact and iOS archive together', () => {
   const checker = path.join(repositoryRoot, 'scripts', 'release', 'check-mobile-release.sh');
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-mobile-release-'));
   const archive = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-archive-'));
-  const androidArtifact = path.join(
-    repositoryRoot,
-    'apps',
-    'android',
-    'build',
-    'outputs',
-    'bundle',
-    'release',
-    'androidApp-release.aab',
-  );
-  const hadAndroidArtifact = fs.existsSync(androidArtifact);
-  if (!hadAndroidArtifact) {
-    fs.mkdirSync(path.dirname(androidArtifact), { recursive: true });
-    fs.writeFileSync(androidArtifact, 'synthetic release artifact fixture\n');
-  }
+  const androidArtifact = path.join(fixtureRoot, 'androidApp-release.aab');
+  fs.writeFileSync(androidArtifact, 'synthetic release artifact fixture\n');
   fs.writeFileSync(path.join(archive, 'Info.plist'), 'synthetic archive metadata');
   try {
     const result = spawnSync(
       'bash',
-      [checker, repositoryRoot, '--require-android-artifact', '--require-ios-archive', archive],
+      [
+        checker,
+        repositoryRoot,
+        '--require-android-artifact',
+        '--android-artifact',
+        androidArtifact,
+        '--require-ios-archive',
+        archive,
+      ],
       { encoding: 'utf8' },
     );
     assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
     assert.match(result.stdout, /ANDROID_RELEASE_ARTIFACT: PASS/);
     assert.match(result.stdout, /IOS_RELEASE_ARCHIVE: PASS/);
   } finally {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
     fs.rmSync(archive, { recursive: true, force: true });
-    if (!hadAndroidArtifact) {
-      fs.rmSync(androidArtifact, { force: true });
-      for (const directory of [
-        path.dirname(androidArtifact),
-        path.dirname(path.dirname(androidArtifact)),
-        path.dirname(path.dirname(path.dirname(androidArtifact))),
-        path.dirname(path.dirname(path.dirname(path.dirname(androidArtifact)))),
-      ]) {
-        try {
-          fs.rmdirSync(directory);
-        } catch (error) {
-          if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY') throw error;
-        }
-      }
-    }
   }
 });
 
@@ -125,4 +117,18 @@ test('CI exposes Android release and unsigned iOS host lanes', () => {
   assert.match(workflow, /xcodebuild/);
   assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/);
   assert.match(workflow, /-scheme Evidrilo/);
+});
+
+test('CI runs an iOS simulator smoke test and uploads evidence', () => {
+  const workflow = read('.github/workflows/verify.yml');
+  const smokeScriptPath = path.join(repositoryRoot, 'scripts', 'ios', 'smoke-simulator.sh');
+  assert.equal(fs.existsSync(smokeScriptPath), true, 'iOS simulator smoke script is missing');
+  const smokeScript = fs.readFileSync(smokeScriptPath, 'utf8');
+  assert.match(workflow, /scripts\/ios\/smoke-simulator\.sh/);
+  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /ios-simulator-evidence/);
+  assert.match(smokeScript, /xcrun simctl bootstatus/);
+  assert.match(smokeScript, /xcrun simctl install/);
+  assert.match(smokeScript, /xcrun simctl launch/);
+  assert.match(smokeScript, /xcrun simctl io/);
 });

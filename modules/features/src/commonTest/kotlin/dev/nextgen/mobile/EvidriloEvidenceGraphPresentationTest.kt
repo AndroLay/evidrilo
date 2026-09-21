@@ -81,6 +81,29 @@ class EvidriloEvidenceGraphPresentationTest {
     }
 
     @Test
+    fun evidence_lens_keeps_a_foreign_reference_visible_as_unavailable() {
+        val challenge = ConclusionCases.EVIDENCE_CHANGE
+        val lens = evidenceLensFor(
+            challenge,
+            validChallengeDraft().copy(evidenceRefs = listOf("OBS-WARM-01", "OBS-COLD-01")),
+        )
+
+        assertEquals(2, lens.observationCount)
+        assertEquals(1, lens.selectedCount)
+        assertEquals(1, lens.unavailableCount)
+        assertEquals(
+            listOf(
+                EvidriloEvidenceLensSelection.SELECTED,
+                EvidriloEvidenceLensSelection.AVAILABLE,
+                EvidriloEvidenceLensSelection.UNAVAILABLE,
+            ),
+            lens.entries.map { it.selection },
+        )
+        assertEquals("OBS-COLD-01", lens.entries.last().factId)
+        assertTrue(lens.entries.last().text.contains("unavailable"))
+    }
+
+    @Test
     fun claim_boundary_reflects_deterministic_status_and_case_boundary() {
         val draft = validDraft()
         val evaluation = evaluator.evaluate(draft)
@@ -108,7 +131,7 @@ class EvidriloEvidenceGraphPresentationTest {
     }
 
     @Test
-    fun conflict_details_expose_all_non_passing_checks_and_primary_feedback() {
+    fun verification_details_expose_all_non_passing_checks_and_primary_feedback() {
         val draft = validDraft().copy(
             scope = ConclusionScope.GENERAL_CAUSAL_CLAIM,
             implication = ConclusionImplication.REPEAT_TRIALS,
@@ -116,7 +139,7 @@ class EvidriloEvidenceGraphPresentationTest {
         )
         val evaluation = evaluator.evaluate(draft)
 
-        val details = conflictDetailsFor(evaluation)
+        val details = verificationDetailsFor(evaluation)
 
         assertTrue(details.any { it.check == ConclusionCheck.SCOPE_UNCERTAINTY })
         assertTrue(details.any { it.check == ConclusionCheck.ACTIONABLE_IMPLICATION })
@@ -177,6 +200,52 @@ class EvidriloEvidenceGraphPresentationTest {
 
         assertEquals(ConclusionStatus.PASS, delta.beforeAssessment)
         assertEquals(ConclusionStatus.PASS, delta.afterAssessment)
+    }
+
+    @Test
+    fun action_trace_explains_a_learner_selected_action_with_its_limitation_anchor() {
+        val draft = validDraft()
+        val trace = actionTraceFor(case, draft, evaluator.evaluate(draft))
+
+        assertEquals(EvidriloActionOrigin.LEARNER_SELECTED, trace.origin)
+        assertEquals(ConclusionImplication.CONTROL_STIRRING, trace.implication)
+        assertEquals(EvidriloActionAnchorState.ANCHORED, trace.anchorState)
+        assertEquals("LIMIT-STIR-01", trace.anchor?.factId)
+        assertTrue(trace.reason.contains("Controlling stirring"))
+    }
+
+    @Test
+    fun action_trace_marks_a_selected_action_stale_when_its_limitation_is_not_selected() {
+        val draft = validDraft().copy(limitationRefs = listOf("LIMIT-TRIAL-01"))
+        val trace = actionTraceFor(case, draft, evaluator.evaluate(draft))
+
+        assertEquals(EvidriloActionOrigin.LEARNER_SELECTED, trace.origin)
+        assertEquals(EvidriloActionAnchorState.MISSING, trace.anchorState)
+        assertEquals("LIMIT-STIR-01", trace.anchor?.factId)
+        assertTrue(trace.reason.contains("limitation", ignoreCase = true))
+    }
+
+    @Test
+    fun action_trace_exposes_a_verification_suggestion_when_no_action_is_selected() {
+        val draft = validDraft().copy(implication = null, implicationReason = "")
+        val evaluation = evaluator.evaluate(draft)
+        val trace = actionTraceFor(case, draft, evaluation)
+
+        assertEquals(EvidriloActionOrigin.SUGGESTED_BY_VERIFICATION, trace.origin)
+        assertEquals(null, trace.implication)
+        assertEquals(EvidriloActionAnchorState.NOT_APPLICABLE, trace.anchorState)
+        assertEquals(null, trace.anchor)
+        assertTrue(trace.reason.contains("Choose", ignoreCase = true))
+    }
+
+    @Test
+    fun action_trace_is_explicitly_empty_before_verification() {
+        val draft = ConclusionDraft(caseId = case.id)
+        val trace = actionTraceFor(case, draft, null)
+
+        assertEquals(EvidriloActionOrigin.NONE, trace.origin)
+        assertEquals(EvidriloActionAnchorState.NOT_APPLICABLE, trace.anchorState)
+        assertEquals(null, trace.anchor)
     }
 
     private fun validDraft() = ConclusionDraft(

@@ -301,6 +301,59 @@ class SupabaseAccountGatewayTest {
         assertEquals("access", store.value?.material?.accessToken)
     }
 
+    @Test
+    fun account_export_requires_the_verified_session_and_returns_the_bounded_public_payload() {
+        val store = MemoryAccountSecureStore(
+            StoredAccountSession(
+                AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+                SecureSessionMaterial("access", 200, "refresh"),
+            ),
+        )
+        val transport = FakeAccountHttpTransport(
+            AccountHttpResponse(
+                200,
+                """{"schema":"evidrilo.account-export","version":"1","accountId":"123e4567-e89b-42d3-a456-426614174000","generatedAt":"2026-09-21T00:00:00.000Z","data":{"drafts":"local_only"},"requestId":"acct-export-20260921"}""",
+            ),
+        )
+        val gateway = gateway(transport, store, apiBaseUrl = "https://api.example.test")
+
+        val result = runSuspendTest { gateway.exportAccount() }
+
+        assertIs<AccountGatewayResult.ExportReady>(result)
+        assertTrue(result.json.contains("evidrilo.account-export"))
+        assertEquals("access", transport.requests.single().headers["Authorization"]?.removePrefix("Bearer "))
+        assertEquals("/v1/account/me/export", transport.requests.single().url.removePrefix("https://api.example.test"))
+    }
+
+    @Test
+    fun account_export_does_not_claim_success_when_the_session_is_missing() {
+        val transport = FakeAccountHttpTransport(AccountHttpResponse(200, "{}"))
+        val gateway = gateway(transport, MemoryAccountSecureStore(), apiBaseUrl = "https://api.example.test")
+
+        assertIs<AccountGatewayResult.NoSession>(runSuspendTest { gateway.exportAccount() })
+        assertTrue(transport.requests.isEmpty())
+    }
+
+    @Test
+    fun account_export_failure_does_not_claim_that_the_export_succeeded() {
+        val store = MemoryAccountSecureStore(
+            StoredAccountSession(
+                AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+                SecureSessionMaterial("access", 200, "refresh"),
+            ),
+        )
+        val gateway = gateway(
+            FakeAccountHttpTransport(AccountHttpResponse(503, "{}")),
+            store,
+            apiBaseUrl = "https://api.example.test",
+        )
+
+        assertEquals(
+            AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE),
+            runSuspendTest { gateway.exportAccount() },
+        )
+    }
+
     private fun gateway(
         transport: AccountHttpTransport,
         store: MemoryAccountSecureStore,

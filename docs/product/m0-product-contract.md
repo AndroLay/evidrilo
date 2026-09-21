@@ -1,35 +1,26 @@
 # Evidrilo M0 Product Contract
 
-## Status
+## Scope and authority
 
-`APPROVED_FOR_M1 / CURRENT_M2_OVERLAY` — owner-approved foundation; not
-standalone runtime, billing, or user evidence.
-
-The owner approved the complete M0 contract on 9 September 2026. This approval
-authorizes the pure Kotlin M1 domain slice only. It does not claim a working
-mobile product, iOS runtime support, billing success, reviewer agreement,
-participant results, or submission readiness.
-
-This document defines the first bounded Evidrilo slice. It does not claim an
-implemented product loop, iOS runtime support, billing success, reviewer
-agreement, participant results, or submission readiness.
-
-The current implementation adds one evidence-change challenge that omits
-`OBS-COLD-01` and one latest local comparison-history entry. Those additions are
-specified in [`docs/roadmap.md`](../roadmap.md) and are the active M2 target;
-this M0 document remains the base contract and is not rewritten as a runtime
-record.
+This file is the approved base-case and deterministic-evaluator contract. It
+defines the supplied tablet-dissolution scenario, supported inputs, feedback
+rules, and fairness constraints; it is not a live implementation or milestone
+status report. The broader product story is in the
+[5W+1H narrative](evidrilo-product-narrative-5w1h.md), while release and test
+procedures are in the [roadmap](../roadmap.md), [testing guide](../testing.md),
+and [release checklist](../release.md).
 
 ## Product intent
 
-Evidrilo helps a learner turn supplied observations and limitations into one
-appropriately scoped conclusion, receive feedback that can be traced to those
-facts, and revise the conclusion once.
+Within Evidrilo's academic workspace, this case helps a learner connect supplied
+observations and limitations to a properly scoped claim, an explainable next
+action, and one revision. The case is a bounded first example of the product
+mechanism, not the full product identity. The evaluator is not a grading tool,
+scientific-truth oracle, or answer generator.
 
-The first user is an adult learner who has a practical result set but needs to
-practise connecting evidence, claim scope, limitations, and a next action. The
-experience is a reasoning and revision exercise, not a report editor, grading
-tool, scientific truth oracle, or answer generator.
+The intended learner is a student or other learner working on an evidence-heavy
+academic task. Formative research participation has separate adult-consent
+requirements; it does not limit who the product is designed to serve.
 
 ## M0 case: tablet dissolution
 
@@ -150,17 +141,76 @@ reviewers must review the same frozen protocol before participant sessions begin
 ## Free core and premium boundary
 
 The free case includes the full learning loop and is not crippled to force a
-purchase. The proposed premium pack contains two distinct practice cases:
+purchase. The premium case pack uses two additional bounded cases:
 
-- spring load-extension, focusing on tested range and extrapolation limits;
-- pendulum length-period, focusing on trend interpretation and manual
-  measurement limitations.
+- tablet form — whole versus crushed;
+- water volume — 100 mL versus 200 mL.
 
 Premium content is not evidence of willingness to pay until real usage and
 billing observations are collected. The current subscription direction and
 price hypothesis are recorded in the [monetization and pricing note](../business/monetization-and-pricing.md).
 RevenueCat integration follows the contract in
 [`../architecture/revenuecat.md`](../architecture/revenuecat.md).
+
+## Optional AI assistance contract
+
+AI is an optional assistance layer over the deterministic result. It may explain
+the primary feedback item, ask a reflection question, or offer a
+meaning-preserving language alternative. It may not assess scientific truth,
+invent facts/evidence/sources, accept a requirement, replace learner reasoning,
+or change evaluator status, anchors, priority, or abstention.
+
+The approved allowance is 10 AI credits once for a verified free account after
+explicit consent, and 100 credits per active `evidrilo_pro` entitlement month
+for monthly or yearly subscribers. Credits do not roll over; lifetime
+allowances and top-ups are not initially supported. One accepted standard assist
+costs one credit. Timeout, cancellation, provider failure, malformed output,
+policy rejection, and unavailable-provider results release the reservation.
+
+The server ledger and verified entitlement are authoritative. The learner
+selects the context to share; the client must not silently upload the whole
+draft or send provider secrets. AI output is labelled as assistance and is
+shown alongside the deterministic feedback, never as a replacement for it.
+When AI is disabled or unavailable, the M0 workflow remains complete.
+
+## First launch, optional account, and notifications
+
+The first-launch contract is intentionally local-first:
+
+- show a short guide explaining the evidence workflow, local storage, and the
+  first action;
+- let the learner start the free case or skip the guide;
+- enter the same Home flow in both cases, including when the device is offline;
+- do not require an account, network, API, AI provider, billing key, or
+  notification permission for the free case.
+
+After meaningful free value, the app may show one dismissible account prompt.
+The prompt may explain verified account recovery, RevenueCat identity, consented
+progress metadata sync, and live-AI eligibility only when those capabilities are
+actually configured. It must not imply that learner-authored drafts are backed
+up to the cloud while the sync contract remains metadata-only.
+
+Email sign-up/sign-in/recovery and Google sign-in are supported through the
+provider-neutral account boundary. Google uses the configured Supabase OAuth
+authorization-code flow with PKCE and validated state/callback handling. A
+cancelled, offline, unconfigured, or failed auth attempt returns safely to the
+local workflow.
+
+A verified signed-in account may request a versioned export of server-owned
+metadata through the account surface. The export does not include learner
+drafts because drafts remain local while sync is metadata-only. Server-owned
+deletion requires explicit confirmation and signs the device out; clearing the
+local draft/history and deleting the managed Supabase Auth identity are separate
+operations and must not be implied by one another.
+
+Notifications are optional local reminders for `Continue an unfinished case`
+and learner-enabled `Review a completed case`. Both categories are off by
+default. They require explicit opt-in, a learner-selected daily/weekly cadence
+and local time, are controlled from Settings with a master toggle and category
+controls, and can be disabled without deleting drafts or history. Permission
+denial must provide an OS-settings path and must never block the free workflow.
+Remote push and promotional campaigns are deferred until a separate managed
+notification boundary is approved.
 
 ## Care, privacy, and accessibility
 
@@ -173,15 +223,10 @@ RevenueCat integration follows the contract in
 - Test text scaling, screen readers, focus order, contrast, tap targets, reset,
   back navigation, relaunch, and offline free-core behavior.
 
-## Milestone gates
+## Verification boundary
 
-- **M0:** this contract is reviewed and approved; no product code is implied.
-- **M1:** pure Kotlin domain models, evaluator, fixtures, and common tests.
-- **M2:** free-core Android/iOS UI with offline and accessibility checks.
-- **M3:** RevenueCat Test Store integration and failure matrix.
-- **M4:** frozen protocol, two human reviewer preflights, and participant
-  access authorization.
-- **M5:** reproducible repository, assets, English description, and demo video.
-
-Each milestone requires its own evidence. Passing an earlier milestone does not
-prove a later platform, billing, human-review, or participant result.
+This contract specifies expected content and evaluator behavior only. Tests
+must validate the rules and adversarial cases above; device/runtime,
+accessibility, RevenueCat provider, human-review, publication, and submission
+claims require separate evidence. Check the current project source of truth and
+dated audit records before describing implementation progress.

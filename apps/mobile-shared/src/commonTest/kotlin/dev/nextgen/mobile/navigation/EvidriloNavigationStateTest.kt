@@ -55,7 +55,9 @@ class EvidriloNavigationStateTest {
             .open(EvidriloDestination.SOURCES)
             .open(EvidriloDestination.WORKSPACE)
             .open(EvidriloDestination.EVIDENCE)
+            .open(EvidriloDestination.EVIDENCE_LENS)
             .open(EvidriloDestination.CLAIM_TRACE)
+            .open(EvidriloDestination.CLAIM_BOUNDARY)
             .open(EvidriloDestination.ACTION)
             .open(EvidriloDestination.VERIFY_CLAIM)
             .open(EvidriloDestination.EVIDENCE_DELTA)
@@ -63,6 +65,7 @@ class EvidriloNavigationStateTest {
         assertEquals(EvidriloDestination.EVIDENCE_DELTA, state.current)
         assertEquals(EvidriloDestination.VERIFY_CLAIM, state.back().current)
         assertEquals(EvidriloDestination.ACTION, state.back().back().current)
-        assertEquals(EvidriloDestination.CLAIM_TRACE, state.back().back().back().current)
+        assertEquals(EvidriloDestination.CLAIM_BOUNDARY, state.back().back().back().current)
+        assertEquals(EvidriloDestination.CLAIM_TRACE, state.back().back().back().back().current)
     }
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ "$#" -lt 1 || "$#" -gt 4 ]]; then
-  printf 'usage: %s <repository-root> [--require-android-artifact] [--require-ios-archive PATH]\n' "$0" >&2
+if [[ "$#" -lt 1 ]]; then
+  printf 'usage: %s <repository-root> [--require-android-artifact] [--android-artifact PATH] [--require-ios-archive PATH]\n' "$0" >&2
   exit 2
 fi
 
@@ -15,12 +15,18 @@ fi
 repository_root=$(CDPATH= cd -- "$repository_root" && pwd)
 
 require_android_artifact=0
+android_artifact_path="$repository_root/apps/android/build/outputs/bundle/release/androidApp-release.aab"
 ios_archive_path=''
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --require-android-artifact)
       require_android_artifact=1
       shift
+      ;;
+    --android-artifact)
+      [[ "$#" -ge 2 ]] || { printf '%s\n' '--android-artifact requires a path' >&2; exit 2; }
+      android_artifact_path=$2
+      shift 2
       ;;
     --require-ios-archive)
       [[ "$#" -ge 2 ]] || { printf '%s\n' '--require-ios-archive requires a path' >&2; exit 2; }
@@ -103,9 +109,8 @@ fi
 require_text apps/ios/Configuration/Release.xcconfig.example apple-team-placeholder 'TEAM_ID[[:space:]]*='
 require_text apps/ios/Configuration/Release.xcconfig.example release-identity 'CODE_SIGN_IDENTITY[[:space:]]*=[[:space:]]*Apple Distribution'
 
-android_artifact="$repository_root/apps/android/build/outputs/bundle/release/androidApp-release.aab"
 if [[ "$require_android_artifact" -eq 1 ]]; then
-  if [[ -s "$android_artifact" ]]; then
+  if [[ -s "$android_artifact_path" ]]; then
     printf '%s\n' 'ANDROID_RELEASE_ARTIFACT: PASS (AAB exists; signing still must be verified separately)'
   else
     printf '%s\n' 'ANDROID_RELEASE_ARTIFACT: FAIL (release AAB is missing)' >&2

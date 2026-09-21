@@ -140,11 +140,14 @@ This closes a repository-level semantics defect without claiming TalkBack,
 VoiceOver, or human accessibility validation. Device and assistive-technology
 runtime gates remain separate.
 
-## D-088 — Use the approved global $1/$10 subscription anchors
+## D-088 — Former subscription price anchor decision (superseded)
 
-Decision: the initial Evidrilo subscription reference prices are USD 1.00 per
-month for `monthly` and USD 10.00 per year for `yearly`. The `lifetime` package
-is not part of the approved offering. Store-localized prices, taxes, fees,
+Historical decision: the initial Evidrilo subscription price anchors were
+defined before the bounded AI extension. This decision is superseded by D-100;
+the current price anchors are recorded only in D-100 and the active monetization
+plan.
+
+The `lifetime` package remains excluded. Store-localized prices, taxes, fees,
 refunds, proceeds, and transaction outcomes remain external evidence gates.
 
 The free core remains usable without purchase, and the app-side billing
@@ -215,7 +218,7 @@ The baseline-finalization task includes:
 After that SHA is recorded, broad structural migration is frozen unless a real
 dependency, ownership, or runtime problem justifies reopening it.
 
-## D-092 — Use only two permanent development lanes
+## D-092 — Historical frontend/backend development lanes (superseded)
 
 Decision: after baseline finalization, the active development model is:
 
@@ -245,6 +248,11 @@ QA is enforced through tests, CI, and release gates rather than a permanent QA
 worktree. Integration occurs through PR/CI/main rather than a permanent
 integration worktree. Historical/legacy worktrees may be retained only for
 preservation until safely reconciled.
+
+**Current status:** superseded by the owner's later instruction to remove side
+worktrees and use the existing `main` checkout. E204 observed one local
+checkout on `main`; it did not verify remote branches. This entry remains as
+decision history and is not an instruction to recreate the old lanes.
 
 ## D-093 — Use a DEMO-first managed deployment stack
 
@@ -281,7 +289,7 @@ Canonical interaction surfaces include:
 Requirement Trace
 Verify Claim / Claim Boundary
 Evidence Lens
-Conflict Detail
+Verification Detail (with true Conflict Detail only for materially disagreeing evidence)
 Evidence Delta / What Changed?
 Why this action?
 Contextual Paywall
@@ -326,15 +334,16 @@ stable:
 ```text
 Evidence Lens
 Requirement Trace
-Conflict Detail
+Verification Detail; true Conflict Detail is optional and must not be invented
 What Changed / Evidence Delta
 Why this action?
 polished contextual paywall and state quality
 ```
 
 Broad ingestion, OCR, arbitrary documents, multi-workspace depth,
-collaboration, and broad AI are later scope and must not block the competition
-proof.
+collaboration, and unbounded AI are later scope and must not block the
+competition proof. A bounded, optional AI assistant may be added only under
+D-099, after the deterministic floor and RevenueCat boundary remain reliable.
 
 ## D-096 — Keep the backend as a capability-organized modular monolith
 
@@ -356,16 +365,219 @@ measured dependency, runtime, scaling, reliability, packaging, or ownership
 reason. The worker remains a bounded separate process but is not required to be
 managed-deployed for Shipaton.
 
-## Open decision — narration requirement
+## D-097 — Make action provenance and anchoring explicit
 
-The current exporter requires at least one reviewed narration asset. This is
-intentionally unresolved. The owner must choose one of the following before
-the validator or exporter is changed:
+Decision: an action shown by the mobile Evidence Graph must identify whether it
+was selected by the learner or suggested by a verification issue. When the
+selected action depends on a supplied limitation, the projection must expose
+the limitation anchor and mark the action stale when that limitation is not
+selected in the active case. If no action is selected, the UI may show a
+verification suggestion but must not present it as learner intent.
 
-```text
-A. keep narration as a submission/public-package requirement
-or
-B. retire that requirement and explicitly supersede the relevant part of D-077
-```
+This keeps `Why this action?` explainable from bounded case data and prevents a
+generic evaluator failure from being mistaken for an evidence conflict. The
+focused projection tests do not replace native runtime or human validation.
 
-No validator weakening or silent policy change is allowed before that decision.
+## Resolved narration requirement — D-098
+
+The former open choice about requiring reviewed narration for public export is
+resolved by D-098 below. Narration remains optional; a valid, non-empty
+effects-only catalog is sufficient. Asset integrity, provenance, license,
+orphan-file, and package-size checks remain mandatory.
+
+## D-098 — Keep narration optional for public export
+
+Decision: public-package validation and export must not require recorded
+narration. The existing fixed-copy text path remains visible, and platform
+offline TTS remains a fallback only when an offline voice is available.
+Existing interaction effects remain bundled under their current provenance
+and license. Do not remove them or claim they are speech.
+
+Strict validation still requires a non-empty valid asset catalog and retains
+all schema, path, identifier, checksum, byte-length, format, license,
+orphan-file, and size-budget checks. The explicit `--allow-empty` option remains
+limited to local implementation/test contexts. Any future narration must be
+reviewed for pronunciation, clarity, factual wording, redistribution rights,
+and device playback before inclusion.
+
+Rationale: narration is not required for the current Shipaton submission slice,
+no reviewed production narration is bundled, and visible text plus optional
+offline TTS already preserve access to fixed copy. Public export should not be
+blocked on an optional asset.
+
+## D-099 — Add bounded AI assistance with subscription credits
+
+Decision: add an optional, server-mediated AI assistance extension without
+changing the free local learning loop or the deterministic Verify Engine.
+
+The first supported purposes are:
+
+- explaining an already-produced feedback item;
+- generating a bounded reflection question; and
+- offering a meaning-preserving language alternative.
+
+The assistant must not grade academic truth, invent evidence or sources, accept
+requirements, choose entitlement state, or replace learner-authored reasoning.
+The API keeps the existing `IAiProvider` abstraction. The first provider
+adapter is planned as a server-side OpenAI integration with structured output;
+provider configuration remains replaceable, while a second provider is not an
+initial Shipaton fallback. The safe default remains `DisabledAiProvider`.
+
+Credit policy:
+
+- a verified free account receives 10 AI credits once after explicit consent;
+- an active `evidrilo_pro` entitlement receives 100 credits per entitlement
+  month;
+- yearly subscriptions receive the same 100-credit monthly grant during each
+  active annual month;
+- unused credits do not roll over; lifetime packages and paid top-ups are not
+  part of the initial plan;
+- one accepted standard assist costs one credit;
+- timeout, cancellation, provider failure, malformed output, policy rejection,
+  and unavailable-provider results release the reservation and do not charge;
+- the server ledger is authoritative, idempotent, account-isolated, and linked
+  to verified RevenueCat entitlement periods; the mobile client cannot grant or
+  mutate credits.
+
+AI requires explicit context selection and opt-in. The gateway redacts and
+minimizes input, avoids raw prompt/response logs, validates a bounded response
+schema, applies rate/cost limits, and falls back to deterministic feedback when
+the provider is unavailable. Provider data-use and retention terms require
+owner review before activation.
+
+This is an in-flow assistant, not a generic chat product. The server builds the
+context from the active case, requirement, selected evidence, limitation,
+deterministic rule, claim boundary, and current action/delta. The provider may
+explain that context, ask one bounded reflection question, or suggest wording;
+it may not introduce a new anchor or write claim status. The learner must make
+the edit manually, after which the deterministic evaluator and Evidence Delta
+remain the only sources of truth.
+
+Rationale: ten one-time free credits allow a meaningful trial without creating
+an anonymous abuse surface, while one hundred monthly credits make the premium
+extension legible and predictable. The policy creates a measurable RevenueCat
+value without paywalling evidence provenance or evaluator trust.
+
+Consequences: a PostgreSQL credit ledger, grant reconciliation, consent UI,
+provider matrix, privacy disclosure, and adversarial tests are required before
+AI can be described as live. AI is optional for Next Gen and must be omitted
+from submission claims if those gates are not verified.
+
+## D-100 — Raise the monthly/yearly planning anchors for the bounded AI extension
+
+Decision: the current Evidrilo pricing anchors are USD 1.99 per month for
+`monthly` and USD 19.99 per year for `yearly`. The `lifetime` package remains
+excluded. The increased anchors reflect the approved optional AI allowance and
+the continuing value of reviewed premium evidence cases; they do not paywall
+deterministic evaluator truth or the complete free learning loop.
+
+The values are product-planning anchors only. The implementation must display
+the localized price returned by the configured RevenueCat offering and must not
+hardcode USD values into the paywall. Taxes, regional pricing, store fees,
+refunds, net proceeds, introductory offers, and actual transaction outcomes
+remain owner-authorized provider evidence. No RevenueCat catalog, product,
+price, or offering is changed by this decision alone.
+
+The premium value proposition must remain legible:
+
+- the free core contains one complete evidence-to-claim workflow;
+- `evidrilo_pro` adds two reviewed evidence cases;
+- an active entitlement grants 100 AI credits per entitlement month, including
+  monthly grants during an active yearly term;
+- AI credits are optional assistance, not a paid truth score or a premium
+  evaluator standard; and
+- the paywall must explain the case and AI value without promising grades,
+  scientific truth, or guaranteed outcomes.
+
+RevenueCat acceptance remains provider-gated: offering load, monthly/yearly
+selection, purchase, entitlement activation, restore, pending/cancel/failure,
+relaunch, and supported revocation/expiry must be observed before the new
+anchors or the AI allowance are described as live. The pricing decision changes
+the plan; it does not create transaction evidence.
+
+## D-101 — Lock the current submission boundary and defer full online semantics
+
+Decision: the Next Gen candidate remains local-first and bounded. The complete
+free workflow is authoritative on-device, while the repository API remains an
+optional platform foundation and must not be described as a complete online
+workspace.
+
+For the current submission:
+
+- the two premium cases remain bundled in the mobile application and are not
+  served through the API case catalogue;
+- RevenueCat `CustomerInfo` is the client access authority for the bundled
+  premium cases, while the API does not claim server-side premium enforcement;
+- sync remains consented metadata and snapshot-digest transport, not full draft
+  or workspace restoration;
+- client analytics remain telemetry and cannot be used as teacher grades or
+  authoritative learning outcomes;
+- organization roles remain the product access model; infrastructure operators
+  are not presented as `SystemAdmin` or `SuperAdmin` application actors;
+- `/health/ready` remains a local diagnostic contract for the current scope;
+  hosted readiness semantics belong to a future managed release boundary;
+- server-owned account export is available only to a verified account and
+  explicitly marks local drafts as not on the server; managed retention and
+  Supabase Auth identity deletion remain separate provider/owner operations.
+
+Live AI is a gated premium extension, not a submission dependency. It may appear
+in the candidate only if the D-099 credit ledger, grounded context, provider,
+privacy, runtime, and provider-evidence gates all pass. Otherwise the safe
+provider-disabled state remains in the build and no live-AI or live-credit claim
+appears in the video, Devpost copy, or public README.
+
+This decision removes scope ambiguity without discarding the online platform
+roadmap. Remote premium content, full workspace sync, server-owned assessment,
+teacher workflows, managed readiness, and live AI remain post-submission or
+separately gated capabilities.
+
+## D-102 — Lock first launch, optional account, Google auth, and notification behavior
+
+Decision: Evidrilo always starts with a short, dismissible guide and then opens
+the complete local workflow. Account access and notifications are additive; they
+must never become a prerequisite for the free offline experience.
+
+The frozen behavior is:
+
+- First launch shows a concise guide explaining the evidence-to-claim workflow,
+  local storage, the free case, and the next action. `Try the free case` and
+  `Skip introduction` both enter the same local Home flow. Completion is stored
+  locally and the guide can be replayed from Settings.
+- The learner can use the bundled case offline immediately after the guide. No
+  login, network, API, AI provider, billing key, or notification permission is
+  required to start, continue, revise, or review local history.
+- After the learner reaches a meaningful value point (for example, opening the
+  first feedback result or completing the first comparison), Evidrilo may show
+  one dismissible account-benefit prompt. It must not appear as a launch wall or
+  interrupt an active draft. The prompt may describe only verified benefits:
+  account recovery, entitlement identity, consented progress metadata sync, and
+  account-bound AI eligibility when live AI is actually enabled. It must not
+  promise cloud restoration of learner-authored drafts while sync remains
+  metadata-only.
+- Email sign-up, email sign-in, password recovery, and Google sign-in use the
+  existing provider-neutral account boundary. Google uses the configured
+  Supabase OAuth authorization-code flow with PKCE, state/callback validation,
+  secure session storage, verified provider identity, and a safe return to the
+  local workflow when the provider is unavailable or cancelled.
+- Notifications are local, optional reminders in the current product scope.
+  They do not require an account, network, or remote push service. The initial
+  categories are `Continue an unfinished case` and learner-enabled `Review a
+  completed case`; both categories are off by default and promotional
+  notifications are not enabled.
+- Notification permission is requested only after an explicit learner action or
+  from Settings, never on the first launch before value is shown. Settings must
+  provide a master enable/disable control, category controls, scheduled-reminder
+  cancellation, a learner-selected daily/weekly cadence and local time,
+  next-schedule visibility, permission-denied guidance, and an OS-settings
+  recovery path.
+  Turning notifications off cancels future Evidrilo schedules and does not
+  delete local learning data.
+- Remote push, device-token storage, and server campaigns are deferred until a
+  managed online notification boundary, consent, retention, and operational
+  ownership exist.
+
+This is a product contract, not proof that provider configuration, Google
+redirects, OS notification permissions, or runtime behavior have been verified.
+The implementation may fix bugs and add tests within this contract; changing
+the launch order, account requirement, notification model, or claimed account
+benefits requires an explicit new decision.

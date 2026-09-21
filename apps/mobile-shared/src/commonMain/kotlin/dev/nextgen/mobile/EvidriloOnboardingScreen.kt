@@ -20,9 +20,8 @@ internal fun EvidriloOnboardingScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
-        EvidriloLogoMark(contentDescription = "Evidrilo")
-        EvidriloEyebrow("A SHORT START")
-        Text(presentation.title, style = MaterialTheme.typography.headlineLarge)
+        EvidriloBrandHeader(onSettings = null)
+        Text(presentation.title, style = MaterialTheme.typography.displayLarge)
         Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
         EvidriloAudioListenControl(
             state = audioState,

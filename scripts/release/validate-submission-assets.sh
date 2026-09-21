@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 if [[ "$#" -lt 1 ]]; then
-  printf 'usage: %s <repository-root> [--icon PATH] [--screenshot PATH] [--video PATH]\n' "$0" >&2
+  printf 'usage: %s <repository-root> [--icon PATH] [--screenshot PATH] [--video PATH] [--non-video-only]\n' "$0" >&2
   exit 2
 fi
 
@@ -17,6 +17,7 @@ repository_root=$(CDPATH= cd -- "$repository_root" && pwd)
 icon_path="$repository_root/apps/ios/iosApp/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
 screenshot_path=''
 video_path=''
+non_video_only=0
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -35,8 +36,12 @@ while [[ "$#" -gt 0 ]]; do
       video_path=$2
       shift 2
       ;;
+    --non-video-only)
+      non_video_only=1
+      shift
+      ;;
     --help)
-      printf 'usage: %s <repository-root> [--icon PATH] [--screenshot PATH] [--video PATH]\n' "$0"
+      printf 'usage: %s <repository-root> [--icon PATH] [--screenshot PATH] [--video PATH] [--non-video-only]\n' "$0"
       exit 0
       ;;
     *)
@@ -99,7 +104,9 @@ else
   failed=1
 fi
 
-if [[ -z "$video_path" ]]; then
+if [[ "$non_video_only" -eq 1 ]]; then
+  printf '%s\n' 'VIDEO: EXCLUDED_BY_SCOPE'
+elif [[ -z "$video_path" ]]; then
   printf '%s\n' 'VIDEO: NOT_READY (file not supplied)'
   failed=1
 elif [[ ! -f "$video_path" ]]; then

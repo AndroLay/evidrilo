@@ -23,6 +23,8 @@ review the application.
   Android/iOS platform choice.
 - [`architecture/revenuecat.md`](architecture/revenuecat.md) — billing
   boundary and RevenueCat integration contract.
+- [`architecture/ai-assistance.md`](architecture/ai-assistance.md) — bounded AI
+  purposes, credit policy, privacy boundary, and acceptance gates.
 - [`release.md`](release.md) — release-readiness gates.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contribution and review rules.
 

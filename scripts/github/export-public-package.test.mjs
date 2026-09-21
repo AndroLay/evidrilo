@@ -11,6 +11,16 @@ const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const exporter = path.join(scriptsDirectory, 'export-public-package.sh');
 
+function runExporter(context, source, destination) {
+  const result = spawnSync('bash', [exporter, source, destination], { encoding: 'utf8' });
+  if (result.error?.code === 'EPERM') {
+    context.skip('this runner denies child-process execution; rerun the exporter fixture in CI');
+    return null;
+  }
+  assert.equal(result.error, undefined, 'public-package exporter process did not start');
+  return result;
+}
+
 function writeFixtureFile(root, relativePath, contents = 'synthetic public package fixture\n') {
   const file = path.join(root, relativePath);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -123,10 +133,10 @@ function createExporterFixture() {
   writeFixtureFile(root, 'platform/api/.env.local', `${databasePasswordName}=local-only\n`);
 
   const audioRoot = path.join(root, 'apps', 'mobile-shared', 'src', 'commonMain', 'composeResources', 'files', 'audio');
-  const audioFile = 'narration/onboarding.m4a';
-  const audioBytes = Buffer.from('synthetic-reviewed-audio-fixture\n');
-  const sourceText = 'Start with the evidence.';
-  fs.mkdirSync(path.join(audioRoot, 'narration'), { recursive: true });
+  const audioFile = 'effects/selection.wav';
+  const audioBytes = Buffer.from('synthetic-reviewed-effect-fixture\n');
+  const sourceText = 'Selection feedback cue.';
+  fs.mkdirSync(path.join(audioRoot, 'effects'), { recursive: true });
   fs.writeFileSync(path.join(audioRoot, audioFile), audioBytes);
   writeFixtureFile(root, 'THIRD_PARTY_NOTICES.md', '# Synthetic test fixture notices\n');
   fs.writeFileSync(
@@ -137,15 +147,15 @@ function createExporterFixture() {
         version: '1',
         entries: [
           {
-            id: 'ONBOARDING',
+            id: 'SELECTION',
             locale: 'en-US',
             sourceText,
             sourceTextSha256: crypto.createHash('sha256').update(sourceText, 'utf8').digest('hex'),
             file: audioFile,
             durationMs: 1000,
             byteLength: audioBytes.length,
-            format: 'm4a',
-            voiceLabel: 'synthetic fixture voice',
+            format: 'wav',
+            voiceLabel: 'synthetic fixture tone',
             licenseReference: 'THIRD_PARTY_NOTICES.md',
           },
         ],
@@ -188,26 +198,35 @@ function assertPublicRelativeLinksResolve(root) {
   assert.deepEqual(missing, [], 'public Markdown contains unresolved relative links');
 }
 
-test('keeps public export closed until reviewed audio assets exist', () => {
+test('keeps public export closed when its audio manifest is malformed', (context) => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-export-'));
+  const source = createExporterFixture();
   const destination = path.join(temporaryRoot, 'candidate');
+  const manifestPath = path.join(
+    source,
+    'apps/mobile-shared/src/commonMain/composeResources/files/audio/audio-manifest.json',
+  );
+  fs.writeFileSync(manifestPath, '{ malformed manifest');
   try {
-    const result = spawnSync('bash', [exporter, repositoryRoot, destination], { encoding: 'utf8' });
+    const result = runExporter(context, source, destination);
+    if (result === null) return;
     assert.notEqual(result.status, 0);
-    assert.match(`${result.stdout}${result.stderr}`, /AUDIO_ASSETS_FAIL|reviewed assets/i);
+    assert.match(`${result.stdout}${result.stderr}`, /audio manifest is not valid JSON/i);
     assert.equal(fs.existsSync(destination), false);
   } finally {
+    fs.rmSync(source, { recursive: true, force: true });
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
 });
 
-test('refuses to export over a non-empty destination', () => {
+test('refuses to export over a non-empty destination', (context) => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-export-'));
   const destination = path.join(temporaryRoot, 'candidate');
   fs.mkdirSync(destination);
   fs.writeFileSync(path.join(destination, 'keep.txt'), 'do not overwrite\n');
   try {
-    const result = spawnSync('bash', [exporter, repositoryRoot, destination], { encoding: 'utf8' });
+    const result = runExporter(context, repositoryRoot, destination);
+    if (result === null) return;
     assert.notEqual(result.status, 0);
     assert.match(`${result.stdout}${result.stderr}`, /non-empty|refus/i);
     assert.equal(fs.readFileSync(path.join(destination, 'keep.txt'), 'utf8'), 'do not overwrite\n');
@@ -216,15 +235,26 @@ test('refuses to export over a non-empty destination', () => {
   }
 });
 
-test('does not export local Apple or provider configuration files', () => {
+test('exports a valid effects-only package without local Apple or provider configuration', (context) => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'evidrilo-public-export-'));
   const source = createExporterFixture();
   const destination = path.join(temporaryRoot, 'candidate');
   try {
-    const result = spawnSync('bash', [exporter, source, destination], { encoding: 'utf8' });
+    const result = runExporter(context, source, destination);
+    if (result === null) return;
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Config.xcconfig')), true);
     assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Debug.xcconfig.example')), true);
+    assert.equal(
+      fs.existsSync(
+        path.join(
+          destination,
+          'apps/mobile-shared/src/commonMain/composeResources/files/audio/effects/selection.wav',
+        ),
+      ),
+      true,
+      'effect-only audio catalog should be included',
+    );
     for (const forbiddenPath of [
       'apps/ios/Configuration/Local.xcconfig',
       'apps/ios/Configuration/Debug.xcconfig',

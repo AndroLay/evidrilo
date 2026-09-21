@@ -24,6 +24,10 @@ class AccountGatewayContractTest {
         assertEquals("NO_SESSION", AccountGatewayResult.NoSession.code)
         assertEquals("OAUTH_STARTED", AccountGatewayResult.OAuthStarted.code)
         assertEquals("EMAIL_CONFIRMATION_REQUIRED", AccountGatewayResult.EmailConfirmationRequired.code)
+        assertEquals(
+            "EXPORT_FAILED_OFFLINE",
+            AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE).code,
+        )
         assertIs<AccountGatewayResult.Verified>(
             AccountGatewayResult.Verified(testSession()),
         )
@@ -41,6 +45,7 @@ class AccountGatewayContractTest {
         )
         assertIs<AccountGatewayResult.NotConfigured>(runSuspendTest { gateway.updatePassword("unused") })
         assertIs<AccountGatewayResult.NotConfigured>(runSuspendTest { gateway.deleteAccount() })
+        assertIs<AccountGatewayResult.NotConfigured>(runSuspendTest { gateway.exportAccount() })
     }
 
     @Test

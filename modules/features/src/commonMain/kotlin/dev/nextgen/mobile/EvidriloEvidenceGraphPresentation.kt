@@ -10,6 +10,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionFeedbackItem
 import dev.nextgen.mobile.domain.conclusion.ConclusionField
+import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
@@ -50,6 +51,7 @@ data class EvidriloEvidenceLink(
 enum class EvidriloEvidenceLensSelection {
     SELECTED,
     AVAILABLE,
+    UNAVAILABLE,
 }
 
 data class EvidriloEvidenceLensEntry(
@@ -70,7 +72,10 @@ data class EvidriloEvidenceLens(
         get() = entries.count { it.selection == EvidriloEvidenceLensSelection.SELECTED }
 
     val observationCount: Int
-        get() = entries.size
+        get() = entries.count { it.selection != EvidriloEvidenceLensSelection.UNAVAILABLE }
+
+    val unavailableCount: Int
+        get() = entries.count { it.selection == EvidriloEvidenceLensSelection.UNAVAILABLE }
 }
 
 /** The deterministic Claim Boundary projection shown alongside verification. */
@@ -83,8 +88,8 @@ data class EvidriloClaimBoundary(
     val boundary: EvidriloTraceFact?,
 )
 
-/** A deterministic view of every failing check, not only the first feedback item. */
-data class EvidriloConflictDetail(
+/** A deterministic view of every failing verification check, not only the first feedback item. */
+data class EvidriloVerificationDetail(
     val check: ConclusionCheck,
     val status: ConclusionStatus,
     val field: ConclusionField,
@@ -94,6 +99,27 @@ data class EvidriloConflictDetail(
     val why: String,
     val nextAction: String,
     val isPrimary: Boolean,
+)
+
+enum class EvidriloActionOrigin {
+    NONE,
+    LEARNER_SELECTED,
+    SUGGESTED_BY_VERIFICATION,
+}
+
+enum class EvidriloActionAnchorState {
+    NOT_APPLICABLE,
+    ANCHORED,
+    MISSING,
+}
+
+/** Explains whether the next action is authored, suggested, and still anchored. */
+data class EvidriloActionTrace(
+    val implication: ConclusionImplication?,
+    val origin: EvidriloActionOrigin,
+    val anchor: EvidriloTraceFact?,
+    val anchorState: EvidriloActionAnchorState,
+    val reason: String,
 )
 
 enum class EvidriloActionTraceState {
@@ -150,23 +176,39 @@ fun workspaceTraceFor(
 fun evidenceLensFor(
     case: ConclusionCase,
     draft: ConclusionDraft,
-): EvidriloEvidenceLens = EvidriloEvidenceLens(
-    workspaceId = case.id,
-    requirementId = case.facts.firstOrNull { it.type == ConclusionFactType.AIM }?.id,
-    entries = case.factsOfType(ConclusionFactType.OBSERVATION).map { fact ->
-        EvidriloEvidenceLensEntry(
-            factId = fact.id,
-            text = fact.text,
-            displayLabel = fact.displayLabel,
-            displayValue = fact.displayValue,
-            selection = if (fact.id in draft.evidenceRefs) {
-                EvidriloEvidenceLensSelection.SELECTED
-            } else {
-                EvidriloEvidenceLensSelection.AVAILABLE
-            },
-        )
-    },
-)
+): EvidriloEvidenceLens {
+    val observations = case.factsOfType(ConclusionFactType.OBSERVATION)
+    val suppliedIds = observations.map { it.id }.toSet()
+    val unavailableIds = draft.evidenceRefs
+        .distinct()
+        .filterNot { it in suppliedIds }
+
+    return EvidriloEvidenceLens(
+        workspaceId = case.id,
+        requirementId = case.facts.firstOrNull { it.type == ConclusionFactType.AIM }?.id,
+        entries = observations.map { fact ->
+            EvidriloEvidenceLensEntry(
+                factId = fact.id,
+                text = fact.text,
+                displayLabel = fact.displayLabel,
+                displayValue = fact.displayValue,
+                selection = if (fact.id in draft.evidenceRefs) {
+                    EvidriloEvidenceLensSelection.SELECTED
+                } else {
+                    EvidriloEvidenceLensSelection.AVAILABLE
+                },
+            )
+        } + unavailableIds.map { factId ->
+            EvidriloEvidenceLensEntry(
+                factId = factId,
+                text = "This evidence reference is unavailable in the active case version.",
+                displayLabel = null,
+                displayValue = null,
+                selection = EvidriloEvidenceLensSelection.UNAVAILABLE,
+            )
+        },
+    )
+}
 
 fun claimBoundaryFor(
     case: ConclusionCase,
@@ -181,9 +223,9 @@ fun claimBoundaryFor(
     boundary = case.facts.firstOrNull { it.type == ConclusionFactType.BOUNDARY }?.toTraceFact(),
 )
 
-fun conflictDetailsFor(
+fun verificationDetailsFor(
     evaluation: ConclusionEvaluation,
-): List<EvidriloConflictDetail> {
+): List<EvidriloVerificationDetail> {
     val primary = evaluation.primaryFeedback
     val checkDetails = evaluation.checks
         .filter { it.status != ConclusionStatus.PASS }
@@ -191,7 +233,7 @@ fun conflictDetailsFor(
             val matchingPrimary = primary?.takeIf { feedback ->
                 feedback.field == check.field && feedback.status == check.status
             }
-            EvidriloConflictDetail(
+            EvidriloVerificationDetail(
                 check = check.check,
                 status = check.status,
                 field = check.field,
@@ -210,7 +252,7 @@ fun conflictDetailsFor(
 
     if (primary == null || checkDetails.any { it.isPrimary }) return checkDetails
 
-    return checkDetails + EvidriloConflictDetail(
+    return checkDetails + EvidriloVerificationDetail(
         check = primary.field.toCheck(),
         status = primary.status,
         field = primary.field,
@@ -220,6 +262,52 @@ fun conflictDetailsFor(
         why = primary.why,
         nextAction = primary.nextAction,
         isPrimary = true,
+    )
+}
+
+fun actionTraceFor(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+    evaluation: ConclusionEvaluation?,
+): EvidriloActionTrace {
+    val implication = draft.implication
+    if (implication == null) {
+        val feedback = evaluation?.primaryFeedback?.takeIf {
+            it.field == ConclusionField.IMPLICATION ||
+                it.field == ConclusionField.IMPLICATION_REASON
+        }
+        return EvidriloActionTrace(
+            implication = null,
+            origin = if (feedback == null) {
+                EvidriloActionOrigin.NONE
+            } else {
+                EvidriloActionOrigin.SUGGESTED_BY_VERIFICATION
+            },
+            anchor = null,
+            anchorState = EvidriloActionAnchorState.NOT_APPLICABLE,
+            reason = feedback?.message ?: "No next action has been selected yet.",
+        )
+    }
+
+    val anchorId = case.requiredLimitationId(implication)
+    val anchor = anchorId
+        ?.let(case::fact)
+        ?.takeIf { it.type == ConclusionFactType.LIMITATION }
+        ?.toTraceFact()
+    val anchorState = when {
+        anchorId == null -> EvidriloActionAnchorState.NOT_APPLICABLE
+        anchorId in draft.limitationRefs && anchor != null -> EvidriloActionAnchorState.ANCHORED
+        else -> EvidriloActionAnchorState.MISSING
+    }
+
+    return EvidriloActionTrace(
+        implication = implication,
+        origin = EvidriloActionOrigin.LEARNER_SELECTED,
+        anchor = anchor,
+        anchorState = anchorState,
+        reason = draft.implicationReason.ifBlank {
+            "This action was selected by the learner and is bounded by the current case."
+        },
     )
 }
 

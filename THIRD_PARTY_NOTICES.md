@@ -119,11 +119,12 @@ The exact source descriptors, SHA-256 checksums, and this notice reference are
 in `audio-manifest.json`. The effects are intentionally short and low-volume;
 they are interaction feedback, not narration and not proof of natural speech.
 
-No reviewed production narration is bundled. Fixed copy therefore uses the
-visible text path and platform offline-TTS fallback. Strict public export must
-remain closed until any future narration recording is reviewed for
-pronunciation, clarity, factual wording, redistribution permission, and device
-playback.
+No reviewed production narration is bundled. Fixed copy remains visible, with
+platform offline TTS as an optional fallback when an offline voice is
+available. Public export does not require narration; it still validates every
+bundled asset's manifest, checksum, size, format, and license provenance. Any
+future narration must be reviewed for pronunciation, clarity, factual wording,
+redistribution permission, and device playback before inclusion.
 
 Before another asset is added, record its stable semantic ID, exact source
 copy/descriptor, creator or license, redistribution terms, provenance, format,

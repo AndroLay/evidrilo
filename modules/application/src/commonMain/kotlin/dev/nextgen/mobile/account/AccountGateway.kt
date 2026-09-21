@@ -72,6 +72,15 @@ sealed interface AccountGatewayResult {
         override val code: String = "OWNER_TRANSFER_REQUIRED"
     }
 
+    data class ExportReady(val json: String) : AccountGatewayResult {
+        override val code: String = "EXPORT_READY"
+    }
+
+    /** A read-only export failure must not demote an otherwise valid session. */
+    data class ExportFailed(val reason: AccountUnavailableReason) : AccountGatewayResult {
+        override val code: String = "EXPORT_FAILED_${reason.name}"
+    }
+
     data object Expired : AccountGatewayResult {
         override val code: String = "EXPIRED"
     }
@@ -105,6 +114,8 @@ interface AccountGateway {
     suspend fun signOut(): AccountGatewayResult
 
     suspend fun deleteAccount(): AccountGatewayResult
+
+    suspend fun exportAccount(): AccountGatewayResult
 }
 
 class UnconfiguredAccountGateway : AccountGateway {
@@ -135,4 +146,6 @@ class UnconfiguredAccountGateway : AccountGateway {
     override suspend fun signOut(): AccountGatewayResult = AccountGatewayResult.NotConfigured
 
     override suspend fun deleteAccount(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+
+    override suspend fun exportAccount(): AccountGatewayResult = AccountGatewayResult.NotConfigured
 }
