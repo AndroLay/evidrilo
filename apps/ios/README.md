@@ -22,6 +22,33 @@ The product UI, reducer, feedback engine, and RevenueCat adapter remain in
 The free flow does not require a RevenueCat key. A missing key must leave the
 free rehearsal usable and the premium offer unavailable.
 
+## Run the official simulator lane without a local Mac
+
+The repository also provides `.github/workflows/ios-simulator.yml`. It uses a
+GitHub-hosted macOS runner and runs only when iOS/Kotlin build inputs change or
+when an owner starts it with `workflow_dispatch`.
+
+The lane performs the following steps:
+
+1. Records the Xcode and available simulator inventory.
+2. Builds the unsigned `Release` host for an iOS simulator.
+3. Selects an available iPhone simulator with `simctl`.
+4. Boots the simulator, installs Evidrilo, launches it, and captures a PNG.
+5. Uploads the screenshot, launch output, simulator log, toolchain inventory,
+   and Xcode build log as the `ios-simulator-evidence` artifact.
+
+From Linux, the workflow can be started after the workflow file is pushed:
+
+```bash
+gh workflow run ios-simulator.yml --ref main
+gh run list --workflow ios-simulator.yml --limit 1
+```
+
+The artifact proves a macOS simulator build and launch for that exact commit;
+it is not a physical-iPhone performance or device-feature claim. The Android
+runtime remains the primary local test surface when no Apple hardware is
+available.
+
 ## Release candidate on macOS
 
 1. Copy `Configuration/Release.xcconfig.example` to the ignored

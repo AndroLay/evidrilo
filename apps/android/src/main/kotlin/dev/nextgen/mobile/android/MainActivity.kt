@@ -16,6 +16,8 @@ import dev.nextgen.mobile.sync.AndroidSyncQueueStorage
 import dev.nextgen.mobile.sync.AndroidSyncConsentStorage
 import dev.nextgen.mobile.analytics.AndroidAnalyticsConsentStorage
 import dev.nextgen.mobile.audio.AndroidAudioStorage
+import dev.nextgen.mobile.notifications.AndroidLocalNotificationPlatform
+import dev.nextgen.mobile.notifications.AndroidNotificationPreferencesStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +33,8 @@ class MainActivity : ComponentActivity() {
         AndroidAudioStorage.initialize(applicationContext)
         AndroidSecureSessionStorage.initialize(applicationContext)
         AndroidAccountAuthStorage.initialize(applicationContext)
+        AndroidNotificationPreferencesStorage.initialize(applicationContext)
+        AndroidLocalNotificationPlatform.initialize(this)
         setContent { App() }
         handleAuthIntent(intent)
     }
@@ -46,7 +50,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        AndroidLocalNotificationPlatform.onActivityAvailable(this)
         handleAuthIntent(intent)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        AndroidLocalNotificationPlatform.onRequestPermissionsResult(requestCode, grantResults)
     }
 
     private fun handleAuthIntent(intent: android.content.Intent?) {

@@ -1,0 +1,115 @@
+name: iOS Simulator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ios-simulator.yml'
+      - 'apps/ios/**'
+      - 'apps/mobile-shared/**'
+      - 'modules/**'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'version.props'
+      - 'gradle/libs.versions.toml'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'scripts/ios/**'
+  pull_request:
+    paths:
+      - '.github/workflows/ios-simulator.yml'
+      - 'apps/ios/**'
+      - 'apps/mobile-shared/**'
+      - 'modules/**'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'version.props'
+      - 'gradle/libs.versions.toml'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'scripts/ios/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-host:
+    name: Build and smoke-test iOS Simulator
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Record Apple toolchain and simulator inventory
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$RUNNER_TEMP/evidrilo-ios-build"
+          {
+            echo "runner_os=$(uname -s)"
+            echo "runner_arch=$(uname -m)"
+            echo "xcode_path=$(xcode-select -p)"
+            xcodebuild -version
+            xcodebuild -showsdks
+            xcrun simctl list runtimes
+            xcrun simctl list devices available
+          } 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/toolchain.txt"
+
+      - name: Build unsigned iOS Release host
+        run: |
+          set -Eeuo pipefail
+          set -o pipefail
+          xcodebuild \
+            -project apps/ios/iosApp.xcodeproj \
+            -scheme Evidrilo \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/xcodebuild.log"
+
+      - name: Run iOS Simulator launch smoke
+        run: |
+          set -Eeuo pipefail
+          bash scripts/ios/smoke-simulator.sh \
+            "$RUNNER_TEMP/evidrilo-derived-data/Build/Products/Release-iphonesimulator/Evidrilo.app" \
+            dev.nextgen.mobile.ios \
+            "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
+
+      - name: Collect final simulator diagnostics
+        if: always()
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
+          xcrun simctl list devices > "$RUNNER_TEMP/evidrilo-ios-simulator-evidence/devices-final-ci.txt" 2>&1
+          xcodebuild -version > "$RUNNER_TEMP/evidrilo-ios-simulator-evidence/xcode-final.txt" 2>&1
+          exit 0
+
+      - name: Upload iOS simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-evidence
+          path: |
+            ${{ runner.temp }}/evidrilo-ios-build
+            ${{ runner.temp }}/evidrilo-ios-simulator-evidence
+          if-no-files-found: warn
+          retention-days: 7

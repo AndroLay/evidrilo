@@ -60,6 +60,32 @@ test('Android release disables backup and cleartext transport', () => {
   assert.match(manifest, /android:usesCleartextTraffic="false"/);
 });
 
+test('local reminder platform boundary is wired without remote-push dependencies', () => {
+  const manifest = read('apps/android/src/main/AndroidManifest.xml');
+  assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
+  assert.match(manifest, /EvidriloLocalNotificationReceiver/);
+  const activity = read('apps/android/src/main/kotlin/dev/nextgen/mobile/android/MainActivity.kt');
+  assert.match(activity, /AndroidNotificationPreferencesStorage\.initialize/);
+  assert.match(activity, /AndroidLocalNotificationPlatform\.initialize/);
+  assert.match(activity, /onRequestPermissionsResult/);
+  assert.match(
+    read('modules/application/src/commonMain/kotlin/dev/nextgen/mobile/notifications/NotificationModels.kt'),
+    /expect fun createLocalNotificationScheduler\(\)/,
+  );
+  assert.match(
+    read('modules/application/src/androidMain/kotlin/dev/nextgen/mobile/notifications/LocalNotificationScheduler.android.kt'),
+    /setInexactRepeating/,
+  );
+  assert.match(
+    read('modules/application/src/iosMain/kotlin/dev/nextgen/mobile/notifications/LocalNotificationScheduler.ios.kt'),
+    /UNUserNotificationCenter/,
+  );
+  assert.doesNotMatch(
+    read('modules/application/src/commonMain/kotlin/dev/nextgen/mobile/notifications/NotificationModels.kt'),
+    /OneSignal|FCM|remote push/i,
+  );
+});
+
 test('iOS Release uses distribution signing with an owner-supplied team', () => {
   const project = read('apps/ios/iosApp.xcodeproj/project.pbxproj');
   const releaseTarget = project.slice(project.indexOf('7555FFA7242A565B00829871 /* Release */'));
@@ -110,17 +136,20 @@ test('mobile release checker accepts Android artifact and iOS archive together',
   }
 });
 
-test('CI exposes Android release and unsigned iOS host lanes', () => {
+test('CI exposes Android release and a separate unsigned iOS host lane', () => {
   const workflow = read('.github/workflows/verify.yml');
+  const iosWorkflow = read('.github/workflows/ios-simulator.yml');
   assert.match(workflow, /:androidApp:bundleRelease/);
-  assert.match(workflow, /runs-on: macos-14/);
-  assert.match(workflow, /xcodebuild/);
-  assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/);
-  assert.match(workflow, /-scheme Evidrilo/);
+  assert.match(iosWorkflow, /runs-on: macos-14/);
+  assert.match(iosWorkflow, /xcodebuild/);
+  assert.match(iosWorkflow, /CODE_SIGNING_ALLOWED=NO/);
+  assert.match(iosWorkflow, /-scheme Evidrilo/);
+  assert.match(iosWorkflow, /workflow_dispatch/);
+  assert.match(iosWorkflow, /evidrilo-ios-build/);
 });
 
 test('CI runs an iOS simulator smoke test and uploads evidence', () => {
-  const workflow = read('.github/workflows/verify.yml');
+  const workflow = read('.github/workflows/ios-simulator.yml');
   const smokeScriptPath = path.join(repositoryRoot, 'scripts', 'ios', 'smoke-simulator.sh');
   assert.equal(fs.existsSync(smokeScriptPath), true, 'iOS simulator smoke script is missing');
   const smokeScript = fs.readFileSync(smokeScriptPath, 'utf8');

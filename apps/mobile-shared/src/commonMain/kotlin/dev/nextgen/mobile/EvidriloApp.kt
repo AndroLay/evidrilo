@@ -111,6 +111,10 @@ import dev.nextgen.mobile.audio.createPlatformAudioEngine
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import dev.nextgen.mobile.navigation.EvidriloDestination
 import dev.nextgen.mobile.navigation.EvidriloNavigationState
+import dev.nextgen.mobile.notifications.NotificationPermissionState
+import dev.nextgen.mobile.notifications.NotificationPreferences
+import dev.nextgen.mobile.notifications.createLocalNotificationScheduler
+import dev.nextgen.mobile.notifications.createNotificationPreferencesStore
 import dev.nextgen.mobile.recommendation.RecommendationCaseRegistry
 import dev.nextgen.mobile.recommendation.RecommendationClientConfiguration
 import dev.nextgen.mobile.recommendation.RecommendationController
@@ -174,6 +178,8 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     val secureSessionStore = remember { SecureSessionStoreFactory.create() }
     val analyticsGateway = remember { createPlatformAnalyticsGateway() }
     val accountScope = rememberCoroutineScope()
+    val notificationScheduler = remember { createLocalNotificationScheduler() }
+    val notificationPreferencesStore = remember { createNotificationPreferencesStore() }
     var syncJob by remember { mutableStateOf<Job?>(null) }
     val accountController = remember {
         AccountSessionController(
@@ -221,6 +227,18 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var syncPendingCount by remember { mutableStateOf(initialSyncQueueLoad.value?.pending?.size ?: 0) }
     var syncBusy by remember { mutableStateOf(false) }
     var syncStatusMessage by remember { mutableStateOf<String?>(null) }
+    val initialNotificationPreferencesLoad = remember { notificationPreferencesStore.load() }
+    var notificationPreferences by remember {
+        mutableStateOf(initialNotificationPreferencesLoad.value ?: NotificationPreferences())
+    }
+    var notificationStorageStatus by remember {
+        mutableStateOf(initialNotificationPreferencesLoad.status)
+    }
+    var notificationPermission by remember {
+        mutableStateOf(NotificationPermissionState.UNKNOWN)
+    }
+    var notificationBusy by remember { mutableStateOf(false) }
+    var notificationStatusMessage by remember { mutableStateOf<String?>(null) }
     var accountSession by remember { mutableStateOf<AccountSession>(accountController.state) }
     var accountRestoreComplete by remember { mutableStateOf(false) }
     var lastSyncAccountId by remember { mutableStateOf<String?>(null) }
@@ -448,6 +466,86 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     var historySnapshot by remember { mutableStateOf(initialHistoryLoad.value) }
     var historyStorageStatus by remember { mutableStateOf(initialHistoryLoad.status) }
+    val hasUnfinishedCase = state !is ConclusionState.Intro
+    val hasCompletedCase = historySnapshot != null
+    val notificationScheduleLabel = notificationPreferences.scheduleLabel(
+        notificationPreferences.activeCategories(
+            hasUnfinishedCase = hasUnfinishedCase,
+            hasCompletedCase = hasCompletedCase,
+        ),
+    )
+    LaunchedEffect(notificationScheduler) {
+        notificationPermission = notificationScheduler.permissionState()
+    }
+    LaunchedEffect(
+        notificationPreferences,
+        notificationPermission,
+        hasUnfinishedCase,
+        hasCompletedCase,
+    ) {
+        if (!notificationPreferences.enabled) {
+            notificationScheduler.cancelAll()
+        } else if (notificationPermission == NotificationPermissionState.GRANTED) {
+            when (val result = notificationScheduler.schedule(
+                preferences = notificationPreferences,
+                hasUnfinishedCase = hasUnfinishedCase,
+                hasCompletedCase = hasCompletedCase,
+            )) {
+                is dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.Scheduled -> {
+                    notificationStatusMessage = if (result.categories.size == 0) {
+                        "No eligible reminder is scheduled yet."
+                    } else {
+                        "Reminders are scheduled on this device."
+                    }
+                }
+                dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.PermissionDenied -> {
+                    notificationPermission = NotificationPermissionState.DENIED
+                    notificationStatusMessage =
+                        "System notification permission is off. Open system settings to enable reminders."
+                }
+                dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.Unavailable -> {
+                    notificationStatusMessage =
+                        "Local reminders are unavailable in this build; the free core remains usable."
+                }
+                is dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.Failed -> {
+                    notificationStatusMessage = result.message
+                }
+            }
+        }
+    }
+    fun saveNotificationPreferences(next: NotificationPreferences) {
+        notificationStorageStatus = notificationPreferencesStore.save(next).status
+        notificationPreferences = next
+    }
+    val enableNotifications: () -> Unit = {
+        if (!notificationBusy) {
+            notificationBusy = true
+            accountScope.launch {
+                val permission = notificationScheduler.requestPermission()
+                notificationPermission = permission
+                if (permission == NotificationPermissionState.GRANTED) {
+                    saveNotificationPreferences(notificationPreferences.copy(enabled = true))
+                    notificationStatusMessage = "Local reminders enabled."
+                } else {
+                    notificationStatusMessage = when (permission) {
+                        NotificationPermissionState.DENIED ->
+                            "Permission was not granted. Open system settings if you want reminders."
+                        NotificationPermissionState.UNAVAILABLE ->
+                            "Local reminders are unavailable in this build."
+                        NotificationPermissionState.UNKNOWN ->
+                            "Permission was not completed. You can try again later."
+                        NotificationPermissionState.GRANTED -> "Local reminders enabled."
+                    }
+                }
+                notificationBusy = false
+            }
+        }
+    }
+    val disableNotifications: () -> Unit = {
+        notificationScheduler.cancelAll()
+        saveNotificationPreferences(notificationPreferences.copy(enabled = false))
+        notificationStatusMessage = "Local reminders turned off."
+    }
     val targetDraft = targetDraftFor(state, case)
     LaunchedEffect(navigationState.current, accountSession) {
         audioCoordinator.stop()
@@ -468,6 +566,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         analyticsConsentStorageStatus,
         syncConsentStorageStatus,
         syncStorageStatus,
+        notificationStorageStatus,
     )
     fun emitAnalytics(event: AnalyticsEvent) {
         if (analyticsConsent == AnalyticsConsent.GRANTED) {
@@ -1278,6 +1377,15 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             audioSettings = audioSettings,
             audioStorageStatus = audioStorageStatus,
             onSetAudioSettings = setAudioSettings,
+            notificationPreferences = notificationPreferences,
+            notificationPermission = notificationPermission,
+            notificationScheduleLabel = notificationScheduleLabel,
+            notificationStatusMessage = notificationStatusMessage,
+            notificationBusy = notificationBusy,
+            onEnableNotifications = enableNotifications,
+            onDisableNotifications = disableNotifications,
+            onSetNotificationPreferences = ::saveNotificationPreferences,
+            onOpenNotificationSettings = notificationScheduler::openSystemSettings,
         )
     } else if (navigationState.current == EvidriloDestination.SUPPORT) {
         val previousDestination = navigationState.stack.dropLast(1).lastOrNull()
