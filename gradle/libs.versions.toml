@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.3.20"
+kotlin = "2.4.20"
 compose = "1.11.1"
 agp = "8.13.2"
 revenuecat-kmp = "3.7.0"
