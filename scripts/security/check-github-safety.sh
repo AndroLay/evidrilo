@@ -66,7 +66,7 @@ is_sensitive_path() {
 
 is_public_path() {
   case "$1" in
-    README.md|LICENSE|CONTRIBUTING.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
+    README.md|LICENSE|CONTRIBUTING.md|CODE_OF_CONDUCT.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
       return 0
       ;;
     .github/*|apps/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)

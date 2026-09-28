@@ -6,6 +6,11 @@ Contributions should improve the current milestone without silently expanding
 the product boundary. Read the relevant documents in `docs/` before changing
 domain rules, billing, persistence, or platform behavior.
 
+## Community standards
+
+Participation in Evidrilo project spaces is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md). Please read it before contributing.
+
 ## Branches and commits
 
 - Use a focused branch for a coherent change.

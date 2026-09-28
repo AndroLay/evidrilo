@@ -18,7 +18,8 @@ a student's research.
 
 [Features](#features) · [Landing page](apps/landing/README.md) · [Quick start](#quick-start) ·
 [Architecture](docs/architecture/repository-structure.md) · [System flows](docs/architecture/system-execution-flows.md) ·
-[Workflows](docs/product/workflows.md) · [Documentation](docs/README.md)
+[Workflows](docs/product/workflows.md) · [Documentation](docs/README.md) ·
+[Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Why Evidrilo
 

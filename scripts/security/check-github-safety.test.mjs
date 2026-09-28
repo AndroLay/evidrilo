@@ -42,6 +42,7 @@ function createFixture() {
     'README.md',
     'LICENSE',
     'CONTRIBUTING.md',
+    'CODE_OF_CONDUCT.md',
     'SECURITY.md',
     'CHANGELOG.md',
     'THIRD_PARTY_NOTICES.md',
@@ -98,6 +99,7 @@ function runChecker(root) {
 test('public allowlist follows the migrated repository roots', () => {
   const source = fs.readFileSync(checker, 'utf8');
   assert.match(source, /\.github\/\*\|apps\/\*\|modules\/\*\|contracts\/\*/);
+  assert.match(source, /CODE_OF_CONDUCT\.md/);
   assert.doesNotMatch(source, /androidApp\/\*|composeApp\/\*/);
   assert.doesNotMatch(source, /platform\/contracts\/|deploy\/\*/);
 });
