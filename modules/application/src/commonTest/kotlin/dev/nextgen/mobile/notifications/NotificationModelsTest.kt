@@ -7,6 +7,40 @@ import kotlin.test.assertTrue
 
 class NotificationModelsTest {
     @Test
+    fun permission_refresh_clears_stale_denial_notice_after_system_grant() {
+        val denied = NotificationPermissionUiState(
+            permission = NotificationPermissionState.DENIED,
+            statusMessage = "System notification permission is off. Open system settings to enable reminders.",
+        )
+
+        val refreshed = denied.withPermission(NotificationPermissionState.GRANTED)
+
+        assertEquals(NotificationPermissionState.GRANTED, refreshed.permission)
+        assertEquals(null, refreshed.statusMessage)
+
+        val requestDenied = NotificationPermissionUiState(
+            permission = NotificationPermissionState.DENIED,
+            statusMessage = "Permission was not granted. Open system settings if you want reminders.",
+        )
+        assertEquals(null, requestDenied.withPermission(NotificationPermissionState.GRANTED).statusMessage)
+    }
+
+    @Test
+    fun permission_refresh_keeps_unrelated_status_and_denial_notice_while_still_denied() {
+        val saved = NotificationPermissionUiState(
+            permission = NotificationPermissionState.DENIED,
+            statusMessage = "Reminder preferences saved on this device.",
+        )
+        val denied = NotificationPermissionUiState(
+            permission = NotificationPermissionState.DENIED,
+            statusMessage = "Permission was not granted. Open system settings if you want reminders.",
+        )
+
+        assertEquals(saved.statusMessage, saved.withPermission(NotificationPermissionState.GRANTED).statusMessage)
+        assertEquals(denied.statusMessage, denied.withPermission(NotificationPermissionState.DENIED).statusMessage)
+    }
+
+    @Test
     fun defaults_keep_local_notifications_off() {
         val preferences = NotificationPreferences()
 

@@ -2,6 +2,9 @@ package dev.nextgen.mobile.navigation
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class EvidriloNavigationStateTest {
     @Test
@@ -33,6 +36,20 @@ class EvidriloNavigationStateTest {
     }
 
     @Test
+    fun systemBackIsEnabledOnlyWhileThereIsAPreviousDestination() {
+        val home = EvidriloNavigationState()
+        val catalog = home.open(EvidriloDestination.PROJECT_CATALOG)
+        val detail = catalog.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
+
+        assertFalse(home.canHandleSystemBack)
+        assertTrue(catalog.canHandleSystemBack)
+        assertTrue(detail.canHandleSystemBack)
+        assertEquals(catalog, detail.back())
+        assertEquals(home, detail.back().back())
+        assertFalse(detail.back().back().canHandleSystemBack)
+    }
+
+    @Test
     fun resetToHomeDiscardsTransientSurfaceHistory() {
         val state = EvidriloNavigationState()
             .open(EvidriloDestination.PREMIUM)
@@ -42,11 +59,127 @@ class EvidriloNavigationStateTest {
     }
 
     @Test
+    fun accountGateReturnsToTheSafePublicOriginWithoutRetainingProtectedRoutes() {
+        val fromGuide = EvidriloNavigationState()
+            .open(EvidriloDestination.GUIDE)
+            .openAccountGate()
+
+        assertEquals(
+            listOf(EvidriloDestination.HOME, EvidriloDestination.GUIDE, EvidriloDestination.ACCOUNT),
+            fromGuide.stack,
+        )
+        assertEquals(EvidriloDestination.GUIDE, fromGuide.back().current)
+
+        val fromProtectedLearning = EvidriloNavigationState()
+            .open(EvidriloDestination.PREMIUM)
+            .openAccountGate()
+
+        assertEquals(
+            listOf(EvidriloDestination.GUIDE, EvidriloDestination.ACCOUNT),
+            fromProtectedLearning.stack,
+        )
+        assertFalse(fromProtectedLearning.back().current.requiresAuthenticatedFreeAccess())
+    }
+
+    @Test
+    fun accountGatePreservesThePublicPartOfAnInformationalRouteStack() {
+        val state = EvidriloNavigationState()
+            .open(EvidriloDestination.GUIDE)
+            .open(EvidriloDestination.SUPPORT)
+            .openAccountGate()
+
+        assertEquals(
+            listOf(
+                EvidriloDestination.HOME,
+                EvidriloDestination.GUIDE,
+                EvidriloDestination.SUPPORT,
+                EvidriloDestination.ACCOUNT,
+            ),
+            state.stack,
+        )
+        assertEquals(EvidriloDestination.SUPPORT, state.back().current)
+    }
+
+    @Test
+    fun profileSignInGateKeepsProfileAsTheRequestedReturnDestination() {
+        val state = EvidriloNavigationState()
+            .selectRoot(EvidriloDestination.PROFILE)
+            .openAccountGate()
+
+        assertEquals(
+            listOf(EvidriloDestination.HOME, EvidriloDestination.PROFILE, EvidriloDestination.ACCOUNT),
+            state.stack,
+        )
+        assertEquals(EvidriloDestination.PROFILE, state.back().current)
+
+        val afterSuccessfulSignIn = EvidriloNavigationState.afterSuccessfulAccountGate(EvidriloDestination.PROFILE)
+        assertEquals(listOf(EvidriloDestination.HOME, EvidriloDestination.PROFILE), afterSuccessfulSignIn.stack)
+    }
+
+    @Test
+    fun profileProjectSettingsAndSupportShortcutsReturnToProfile() {
+        val profile = EvidriloNavigationState().selectRoot(EvidriloDestination.PROFILE)
+
+        listOf(
+            EvidriloDestination.PROJECTS,
+            EvidriloDestination.SETTINGS,
+            EvidriloDestination.SUPPORT,
+        ).forEach { destination ->
+            val opened = profile.open(destination)
+            assertEquals(destination, opened.current)
+            assertEquals(EvidriloDestination.PROFILE, opened.back().current)
+        }
+    }
+
+    @Test
     fun guideIsAReachableUtilitySurface() {
         val state = EvidriloNavigationState().open(EvidriloDestination.GUIDE)
 
         assertEquals(EvidriloDestination.GUIDE, state.current)
         assertEquals(EvidriloDestination.HOME, state.back().current)
+    }
+
+    @Test
+    fun projectCatalogFamilyAndTemplateDetailsAreStackedRoutesWithWorkingBackNavigation() {
+        val catalog = EvidriloDestination.values()
+            .singleOrNull { it.name == "PROJECT_CATALOG" }
+        assertNotNull(catalog, "Home must be able to open the project catalog.")
+
+        val familyDetail = EvidriloDestination.values()
+            .singleOrNull { it.name == "PROJECT_FAMILY_DETAIL" }
+        assertNotNull(familyDetail, "A catalog family card must open its detail page.")
+        val templateDetail = EvidriloDestination.PROJECT_TEMPLATE_DETAIL
+
+        val detailState = EvidriloNavigationState()
+            .open(catalog)
+            .open(familyDetail)
+            .open(templateDetail)
+
+        assertEquals(templateDetail, detailState.current)
+        assertEquals(familyDetail, detailState.back().current)
+        assertEquals(catalog, detailState.back().back().current)
+        assertEquals(EvidriloDestination.HOME, detailState.back().back().back().current)
+    }
+
+    @Test
+    fun localProjectListAndEditorAreReachableAndReturnToTheirOrigin() {
+        val projectList = EvidriloDestination.PROJECTS
+        val projectEditor = EvidriloDestination.PROJECT_EDITOR
+        val fromCatalog = EvidriloNavigationState()
+            .open(EvidriloDestination.PROJECT_CATALOG)
+            .open(projectList)
+            .open(projectEditor)
+
+        assertEquals(projectEditor, fromCatalog.current)
+        assertEquals(projectList, fromCatalog.back().current)
+        assertEquals(EvidriloDestination.PROJECT_CATALOG, fromCatalog.back().back().current)
+
+        val fromTemplate = EvidriloNavigationState()
+            .open(EvidriloDestination.PROJECT_CATALOG)
+            .open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
+            .open(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
+            .open(projectEditor)
+        assertEquals(EvidriloDestination.PROJECT_TEMPLATE_DETAIL, fromTemplate.back().current)
     }
 
     @Test

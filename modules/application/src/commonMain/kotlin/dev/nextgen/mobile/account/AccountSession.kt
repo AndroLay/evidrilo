@@ -6,9 +6,13 @@ import dev.nextgen.mobile.security.StoredAccountSession
 enum class AccountUnavailableReason {
     SECURE_STORAGE,
     OFFLINE,
+    SERVICE_UNAVAILABLE,
+    INVALID_RESPONSE,
+    OPERATION_OUTCOME_UNKNOWN,
     INVALID_CREDENTIALS,
     INVALID_INPUT,
     RATE_LIMITED,
+    EXPORT_TOO_LARGE,
     EMAIL_CONFIRMATION_REQUIRED,
     PASSWORD_RESET_REQUESTED,
     OAUTH_CANCELLED,
@@ -24,16 +28,24 @@ sealed interface AccountSession {
 
     data object AwaitingOAuthCallback : AccountSession
 
-    data class SignedIn(val account: AccountSummary) : AccountSession
+    data class SignedIn(
+        val account: AccountSummary,
+        val googleLinkOutcome: GoogleIdentityLinkOutcome? = null,
+        val pendingOperationOutcome: AccountMutationOperation? = null,
+    ) : AccountSession
 
     data object Expired : AccountSession
 
     data class PasswordRecovery(
         val account: AccountSummary,
         val errorReason: AccountUnavailableReason? = null,
+        val pendingOperationOutcome: AccountMutationOperation? = null,
     ) : AccountSession
 
-    data class Unavailable(val reason: AccountUnavailableReason) : AccountSession
+    data class Unavailable(
+        val reason: AccountUnavailableReason,
+        val pendingOperationOutcome: AccountMutationOperation? = null,
+    ) : AccountSession
 }
 
 class AccountSessionController(
@@ -82,6 +94,13 @@ class AccountSessionController(
 
             AccountGatewayResult.Offline -> recoveryFailure(AccountUnavailableReason.OFFLINE)
 
+            AccountGatewayResult.ServiceUnavailable -> recoveryFailure(AccountUnavailableReason.SERVICE_UNAVAILABLE)
+
+            AccountGatewayResult.InvalidResponse -> recoveryFailure(AccountUnavailableReason.INVALID_RESPONSE)
+
+            is AccountGatewayResult.OperationOutcomeUnknown ->
+                unknownOperationOutcome(result.operation)
+
             AccountGatewayResult.InvalidCredentials ->
                 AccountSession.Unavailable(AccountUnavailableReason.INVALID_CREDENTIALS)
 
@@ -106,12 +125,14 @@ class AccountSessionController(
             -> state
 
             AccountGatewayResult.OAuthCancelled ->
-                AccountSession.Unavailable(AccountUnavailableReason.OAUTH_CANCELLED)
+                preserveSignedInOrUnavailable(AccountUnavailableReason.OAUTH_CANCELLED)
 
             AccountGatewayResult.InvalidRedirect ->
-                AccountSession.Unavailable(AccountUnavailableReason.INVALID_REDIRECT)
+                preserveSignedInOrUnavailable(AccountUnavailableReason.INVALID_REDIRECT)
 
             AccountGatewayResult.OAuthStarted -> AccountSession.AwaitingOAuthCallback
+
+            is AccountGatewayResult.GoogleIdentityLink -> acceptGoogleIdentityLink(result)
 
             AccountGatewayResult.Expired -> markExpired()
 
@@ -166,5 +187,51 @@ class AccountSessionController(
 
     private fun recoveryFailure(reason: AccountUnavailableReason): AccountSession =
         (state as? AccountSession.PasswordRecovery)?.copy(errorReason = reason)
+            ?: (state as? AccountSession.SignedIn)
             ?: AccountSession.Unavailable(reason)
+
+    private fun unknownOperationOutcome(operation: AccountMutationOperation): AccountSession = when (val current = state) {
+        is AccountSession.SignedIn -> current.copy(pendingOperationOutcome = operation)
+        is AccountSession.PasswordRecovery -> current.copy(
+            errorReason = AccountUnavailableReason.OPERATION_OUTCOME_UNKNOWN,
+            pendingOperationOutcome = operation,
+        )
+        else -> AccountSession.Unavailable(
+            reason = AccountUnavailableReason.OPERATION_OUTCOME_UNKNOWN,
+            pendingOperationOutcome = operation,
+        )
+    }
+
+    private fun acceptGoogleIdentityLink(result: AccountGatewayResult.GoogleIdentityLink): AccountSession {
+        if (result.outcome == GoogleIdentityLinkOutcome.LINKED ||
+            result.outcome == GoogleIdentityLinkOutcome.ALREADY_LINKED
+        ) {
+            val session = result.session
+            val currentAccount = state as? AccountSession.SignedIn
+            if (session != null &&
+                currentAccount != null &&
+                session.account.accountId == currentAccount.account.accountId &&
+                session.account.emailVerified &&
+                session.account.googleLinked == true
+            ) {
+                val accepted = acceptVerifiedSession(session)
+                if (accepted is AccountSession.SignedIn) {
+                    state = accepted.copy(googleLinkOutcome = result.outcome)
+                    return state
+                }
+            }
+            return preserveSignedInGoogleLinkOutcome(GoogleIdentityLinkOutcome.FAILED)
+        }
+        return preserveSignedInGoogleLinkOutcome(result.outcome)
+    }
+
+    private fun preserveSignedInGoogleLinkOutcome(outcome: GoogleIdentityLinkOutcome): AccountSession {
+        val signedIn = state as? AccountSession.SignedIn
+            ?: return AccountSession.Unavailable(AccountUnavailableReason.INVALID_CREDENTIALS)
+        state = signedIn.copy(googleLinkOutcome = outcome)
+        return state
+    }
+
+    private fun preserveSignedInOrUnavailable(reason: AccountUnavailableReason): AccountSession =
+        (state as? AccountSession.SignedIn) ?: AccountSession.Unavailable(reason)
 }

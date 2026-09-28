@@ -164,7 +164,7 @@ internal fun EvidriloPremiumPaywall(
         EvidriloSecondaryButton(label = "Keep the free case", onClick = onBack)
         Spacer(modifier = Modifier.size(4.dp))
         Text(
-            "No account, network, database, AI, or subscription is required for the free core.",
+            "The signed-in Free core does not require a subscription, AI, or a network connection for its bundled case.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

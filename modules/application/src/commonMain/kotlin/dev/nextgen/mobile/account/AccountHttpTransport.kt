@@ -1,6 +1,7 @@
 package dev.nextgen.mobile.account
 
 import kotlinx.coroutines.suspendCancellableCoroutine
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -17,6 +18,13 @@ data class AccountHttpResponse(
 
 /** Small, bounded transport boundary; implementations must not log headers or bodies. */
 interface AccountHttpTransport {
+    /**
+     * Latest device-network observation; it does not prove that an API or
+     * provider is reachable. Implementations without an OS signal stay UNKNOWN.
+     */
+    val deviceConnectivity: DeviceConnectivity
+        get() = DeviceConnectivity.UNKNOWN
+
     suspend fun request(
         method: String,
         url: String,
@@ -56,8 +64,8 @@ suspend fun <T> awaitCancellableRequest(
 }
 
 fun validateAccountHttpRequest(url: String, body: String) {
-    require(url.startsWith("https://", ignoreCase = true)) {
-        "Auth transport requires HTTPS."
+    require(isAllowedApiBaseUrl(url)) {
+        "Authenticated transport requires HTTPS or an explicit local development host."
     }
     require(body.encodeToByteArray().size <= MAX_ACCOUNT_HTTP_BODY_BYTES) {
         "Auth request exceeded the bounded body limit."

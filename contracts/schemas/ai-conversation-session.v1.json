@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/ai-conversation-session.v1.json",
+  "title": "Evidrilo AI conversation session response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "sessionId", "caseVersionId", "contextFingerprint", "turnLimit", "turnsUsed", "expiresAt", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.ai-conversation-session" },
+    "version": { "const": "1" },
+    "status": { "const": "active" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "caseVersionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "contextFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "turnLimit": { "const": 5 },
+    "turnsUsed": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

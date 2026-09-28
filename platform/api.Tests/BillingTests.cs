@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Evidrilo.Api.Billing;
 using Evidrilo.Api.Common;
 using Evidrilo.Api.Configuration;
@@ -106,6 +107,107 @@ public sealed class BillingTests
         Assert.Equal(Guid.Parse("123e4567-e89b-42d3-a456-426614174000"), store.LastEnvelope?.AccountId);
         Assert.Equal("evidrilo_pro", store.LastEnvelope?.Entitlement);
         Assert.Equal("active", store.LastEnvelope?.Status);
+    }
+
+    [Fact]
+    public async Task Billing_service_accepts_only_the_configured_provider_product_id()
+    {
+        var options = PlatformOptions.From(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Platform:Environment"] = "Testing",
+                ["Platform:RevenueCatWebhookSecret"] = "synthetic-secret",
+                ["Platform:RevenueCatEntitlementId"] = "evidrilo_pro",
+                ["Platform:RevenueCatMonthlyProductId"] = "rc_monthly_real",
+                ["Platform:RevenueCatYearlyProductId"] = "rc_yearly_real",
+            })
+            .Build(), "Testing");
+        var acceptedStore = new RecordingBillingStore();
+        var acceptedService = new BillingWebhookService(options, acceptedStore);
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var acceptedBody = Encoding.UTF8.GetBytes(
+            "{\"api_version\":\"1.0\",\"event\":{\"id\":\"rc-configured-1\",\"type\":\"INITIAL_PURCHASE\",\"product_id\":\"rc_monthly_real\",\"app_user_id\":\"123e4567-e89b-42d3-a456-426614174000\",\"entitlement_ids\":[\"evidrilo_pro\"],\"event_timestamp_ms\":"
+            + (timestamp * 1000)
+            + "}}");
+
+        var accepted = await acceptedService.ProcessAsync(
+            CreateRevenueCatSignature("synthetic-secret", timestamp, acceptedBody),
+            acceptedBody,
+            CancellationToken.None);
+
+        Assert.Equal("accepted", accepted);
+        Assert.True(acceptedStore.Called);
+
+        var rejectedStore = new RecordingBillingStore();
+        var rejectedService = new BillingWebhookService(options, rejectedStore);
+        var rejectedBody = Encoding.UTF8.GetBytes(
+            "{\"api_version\":\"1.0\",\"event\":{\"id\":\"rc-unconfigured-1\",\"type\":\"INITIAL_PURCHASE\",\"product_id\":\"monthly\",\"app_user_id\":\"123e4567-e89b-42d3-a456-426614174000\",\"entitlement_ids\":[\"evidrilo_pro\"],\"event_timestamp_ms\":"
+            + ((timestamp + 1) * 1000)
+            + "}}");
+
+        var rejected = await rejectedService.ProcessAsync(
+            CreateRevenueCatSignature("synthetic-secret", timestamp + 1, rejectedBody),
+            rejectedBody,
+            CancellationToken.None);
+
+        Assert.Equal("ignored", rejected);
+        Assert.False(rejectedStore.Called);
+    }
+
+    [Fact]
+    public async Task Billing_service_ignores_revenuecat_dashboard_test_events()
+    {
+        var options = CreateOptions();
+        var store = new RecordingBillingStore();
+        var service = new BillingWebhookService(options, store);
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var body = Encoding.UTF8.GetBytes(
+            "{\"api_version\":\"1.0\",\"event\":{\"id\":\"rc-dashboard-test-1\",\"type\":\"TEST\",\"product_id\":\"monthly\",\"app_user_id\":\"123e4567-e89b-42d3-a456-426614174000\",\"entitlement_ids\":[\"evidrilo_pro\"],\"event_timestamp_ms\":"
+            + (timestamp * 1000)
+            + "}}");
+
+        var result = await service.ProcessAsync(
+            CreateRevenueCatSignature("synthetic-secret", timestamp, body),
+            body,
+            CancellationToken.None);
+
+        Assert.Equal("ignored", result);
+        Assert.False(store.Called);
+    }
+
+    [Fact]
+    public async Task Billing_service_preserves_provider_entitlement_period_boundaries()
+    {
+        var options = CreateOptions();
+        var store = new RecordingBillingStore();
+        var service = new BillingWebhookService(options, store);
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        var eventTimestamp = now.ToUnixTimeMilliseconds();
+        var periodStart = now.AddDays(-15);
+        var periodEnd = periodStart.AddMonths(1);
+        var body = Encoding.UTF8.GetBytes(
+            "{\"api_version\":\"1.0\",\"event\":{\"id\":\"rc-period-1\",\"type\":\"RENEWAL\",\"product_id\":\"monthly\",\"app_user_id\":\"123e4567-e89b-42d3-a456-426614174000\",\"entitlement_ids\":[\"evidrilo_pro\"],\"event_timestamp_ms\":"
+            + eventTimestamp
+            + ",\"purchased_at_ms\":"
+            + periodStart.ToUnixTimeMilliseconds()
+            + ",\"expiration_at_ms\":"
+            + periodEnd.ToUnixTimeMilliseconds()
+            + "}}");
+
+        var result = await service.ProcessAsync(
+            CreateRevenueCatSignature("synthetic-secret", now.ToUnixTimeSeconds(), body),
+            body,
+            CancellationToken.None);
+
+        Assert.Equal("accepted", result);
+        Assert.NotNull(store.LastEnvelope);
+        var serialized = JsonSerializer.SerializeToDocument(
+            store.LastEnvelope,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.True(serialized.RootElement.TryGetProperty("periodStartedAt", out var start));
+        Assert.True(serialized.RootElement.TryGetProperty("periodExpiresAt", out var end));
+        Assert.Equal(periodStart, start.GetDateTimeOffset());
+        Assert.Equal(periodEnd, end.GetDateTimeOffset());
     }
 
     [Fact]

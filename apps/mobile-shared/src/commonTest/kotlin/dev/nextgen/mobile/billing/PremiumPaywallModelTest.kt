@@ -6,8 +6,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PremiumPaywallModelTest {
-    private val monthly = BillingOffer("monthly", "Monthly", "$1.00")
-    private val yearly = BillingOffer("yearly", "Yearly", "$10.00")
+    private val monthly = BillingOffer("monthly", "Monthly", "$1.99")
+    private val yearly = BillingOffer("yearly", "Yearly", "$19.99")
     private val lifetime = BillingOffer("lifetime", "Lifetime", "$99.00")
 
     @Test

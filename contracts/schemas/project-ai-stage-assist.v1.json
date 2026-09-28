@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist.v1.json",
+  "title": "Evidrilo stage-bound Project AI preview response v1",
+  "description": "A non-mutating proposal bound to one server-owned project revision and one declared template operation. The client must review and apply through its project workflow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "mode", "projectId", "baseProjectRevision", "stageId", "operationId", "scaffold", "requestId", "creditCost"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-stage-assist" },
+    "version": { "const": "1" },
+    "status": { "const": "preview" },
+    "mode": { "const": "PROJECT" },
+    "projectId": { "type": "string", "format": "uuid" },
+    "baseProjectRevision": { "type": "integer", "minimum": 1 },
+    "stageId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
+    "operationId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
+    "scaffold": { "$ref": "project-ai-scaffold.v1.json#/$defs/scaffold" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+    "creditCost": { "const": 1 }
+  }
+}

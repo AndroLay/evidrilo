@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-consent-grant.v1.json",
+  "title": "Evidrilo project AI consent grant request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "policyVersion"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-consent" },
+    "version": { "const": "1" },
+    "policyVersion": { "const": "project-ai-data.v1" }
+  }
+}

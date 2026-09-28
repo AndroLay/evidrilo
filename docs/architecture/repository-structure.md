@@ -1,9 +1,12 @@
 # Repository Structure
 
 Evidrilo is a Kotlin Multiplatform mobile application with a small
-capability-organized ASP.NET Core platform. The repository keeps the bundled
-learning loop local-first; online services are optional and must not become a
-dependency for the free core.
+capability-organized ASP.NET Core platform. The local project workspace and
+read-only catalog are available without an account. The bundled M0 case is
+free of charge but requires a signed-in account; its evaluator and case-session
+storage remain local, and it does not depend on an AI provider or purchase.
+Optional online services must not become a dependency for local project work or
+deterministic case evaluation after the account gate is satisfied.
 
 ## Source tree
 
@@ -51,17 +54,26 @@ Compose Multiplatform app
   ├── BillingGateway
   │      └── RevenueCat adapter → active entitlement → premium cases
   └── Optional authenticated online capabilities
-         └── ASP.NET Core API → PostgreSQL
-                                └── bounded .NET worker
-                                └── optional AI gateway → provider
+         ├── ASP.NET Core API → PostgreSQL
+         │                      └── bounded .NET worker
+         ├── published M0 content bridge → strict local evaluator adapter
+         ├── progress/entitlement projections → profile transparency only
+         ├── optional student-project API → private versioned records (not yet mobile-wired)
+         └── bounded AI assist → server credit ledger → optional provider
 ```
 
-The local evaluator does not call the API or an AI provider. The API and
-database support optional authenticated capabilities such as account, sync,
-published content, analytics, billing projection, and a server-owned AI credit
-ledger. Those server features must preserve consent, authorization, and the
-local-first free path. The AI gateway is optional, redacted, schema-checked,
-and never authoritative for evaluator truth.
+The local evaluator remains the authority for claim status and does not accept
+AI output as a grade. A verified account may refresh published M0 display
+content, progress, entitlement projections, and bounded AI explanations. Every
+online result is validated and can be deferred or ignored without interrupting
+local project work or on-device deterministic evaluation. The API and database
+support optional authenticated capabilities such as account, sync, published
+content, analytics, billing
+projection, a server-owned AI credit ledger, and the local-only student-project
+API foundation (D-109). The latter stores manually entered structure but does
+not assess it and is not a full cloud sync of M0 drafts. Those server features must
+preserve consent and authorization. The AI gateway is optional, redacted,
+schema-checked, credit-metered, and never authoritative for evaluator truth.
 
 ## Ownership by area
 
@@ -71,7 +83,7 @@ and never authoritative for evaluator truth.
 | `apps/android` | Android entry point, manifest, and Android-specific configuration |
 | `apps/ios` | Thin iOS host that presents the shared app and owns iOS configuration |
 | `modules/domain` | Deterministic case, draft, evaluation, and state-transition rules |
-| `modules/application` | Account/session, consented analytics, sync, and recommendation orchestration |
+| `modules/application` | Account/session, consented analytics, sync, recommendation, platform projections, and bounded AI client orchestration |
 | `modules/data` | Local persistence and repository abstractions |
 | `modules/features` | Shared feature presentation models and contracts |
 | `modules/design-system` | Reusable Compose components, tokens, and icons |
@@ -127,7 +139,9 @@ unavailable.
 
 ## References
 
+- [System execution flows](system-execution-flows.md) — system context, data
+  ownership, local runtime topology, and runtime request sequences.
 - [Kotlin Multiplatform documentation](https://kotlinlang.org/docs/multiplatform.html)
 - [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/)
 - [RevenueCat Kotlin Multiplatform installation](https://www.revenuecat.com/docs/getting-started/installation/kotlin-multiplatform)
-- [AI assistance and credit contract](ai-assistance.md)
+- [D-106 AI assistance decision](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)

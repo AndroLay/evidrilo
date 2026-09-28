@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-scaffold-request.v1.json",
+  "title": "Evidrilo project AI scaffold request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "operation",
+    "projectId",
+    "templateId",
+    "templateVersion",
+    "baseProjectRevision",
+    "assignmentBrief",
+    "locale",
+    "optedIn",
+    "projectDataConsent",
+    "projectDataConsentVersion"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-scaffold" },
+    "version": { "const": "1" },
+    "operation": { "enum": ["create_project", "assist_project"] },
+    "projectId": {
+      "oneOf": [
+        { "type": "string", "format": "uuid" },
+        { "type": "null" }
+      ]
+    },
+    "templateId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 96 },
+    "templateVersion": { "type": "integer", "minimum": 1 },
+    "baseProjectRevision": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "null" }
+      ]
+    },
+    "assignmentBrief": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "researchQuestion": { "type": "string", "maxLength": 2000 },
+    "studentQuestion": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "currentFields": {
+      "type": "object",
+      "maxProperties": 32,
+      "additionalProperties": { "type": "string", "maxLength": 8000 }
+    },
+    "constraints": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+    },
+    "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 },
+    "optedIn": { "const": true },
+    "projectDataConsent": { "const": true },
+    "projectDataConsentVersion": { "const": "project-ai-data.v1" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "create_project" } }, "required": ["operation"] },
+      "then": {
+        "properties": {
+          "projectId": { "type": "null" },
+          "baseProjectRevision": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "assist_project" } }, "required": ["operation"] },
+      "then": {
+        "properties": {
+          "projectId": { "type": "string", "format": "uuid" },
+          "baseProjectRevision": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  ]
+}

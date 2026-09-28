@@ -63,7 +63,7 @@ class AnalyticsEventFactoryTest {
             null,
             billingAnalyticsAction(
                 BillingOperation.LOAD_OFFER,
-                BillingOutcome.OfferAvailable(BillingOffer("monthly", "Monthly", "$1.00")),
+                BillingOutcome.OfferAvailable(BillingOffer("monthly", "Monthly", "$1.99")),
             ),
         )
         assertEquals(

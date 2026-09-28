@@ -1,0 +1,18 @@
+{
+  "$id": "https://evidrilo.dev/contracts/student-project-cloud-consent-update.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidrilo student project cloud consent update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "policyVersion", "decision"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-cloud-consent-update" },
+    "version": { "const": "1" },
+    "policyVersion": {
+      "type": "string",
+      "pattern": "^student-project-cloud\\.v[0-9]+$",
+      "maxLength": 80
+    },
+    "decision": { "enum": ["grant", "revoke"] }
+  }
+}

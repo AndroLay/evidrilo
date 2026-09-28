@@ -10,6 +10,20 @@ const recommendationMetadataMigrationPath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '009_case_recommendation_metadata.sql',
 );
+const accountExportPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'api',
+  'Account',
+  'AccountExport.cs',
+);
+const postgresSmokePath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'integration',
+  'run-local-postgres-smoke.sh',
+);
 
 test('P2 migration contains account isolation and append-only sync boundaries', () => {
   const sql = fs.readFileSync(migrationPath, 'utf8');
@@ -221,6 +235,108 @@ test('sync writes require a published case version at the database boundary', ()
   assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
 });
 
+test('AI credit migration keeps consent, grants, and reservations server-owned', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '031_ai_credit_ledger.sql'),
+    'utf8',
+  );
+  for (const table of ['ai_credit_consents', 'ai_credit_grants', 'ai_credit_reservations']) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}`, 'i'));
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, 'i'));
+    assert.match(sql, new RegExp(`revoke all on public\\.${table} from anon, authenticated`, 'i'));
+  }
+  assert.match(sql, /unique \(account_id, grant_kind, grant_key\)/i);
+  assert.match(sql, /primary key \(account_id, request_id\)/i);
+  assert.match(sql, /reserved_credits\s*\+\s*consumed_credits\s*<=\s*credits/i);
+  assert.match(sql, /purge_ai_credit_data_on_account_deletion/i);
+  assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('worker lease migration adds an explicit fencing token for concurrent workers', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '032_worker_lease_fencing.sql'),
+    'utf8',
+  );
+  assert.match(sql, /add column if not exists lease_token\s+uuid/i);
+  assert.match(sql, /create index if not exists worker_jobs_lease_idx/i);
+  assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('AI credit fingerprint migration binds a request key to one payload', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '033_ai_credit_request_fingerprint.sql'),
+    'utf8',
+  );
+  assert.match(sql, /add column if not exists request_hash\s+text/i);
+  assert.match(sql, /alter column request_hash set not null/i);
+  assert.match(sql, /ai_credit_reservations_request_hash_check/i);
+  assert.match(sql, /repeat\('0', 64\)/i);
+  assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('notification preferences migration is account-scoped and deletion-safe', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '034_notification_preferences.sql'),
+    'utf8',
+  );
+  assert.match(sql, /create table if not exists public\.notification_preferences/i);
+  assert.match(sql, /account_id\s+uuid\s+primary key references auth\.users\(id\) on delete cascade/i);
+  assert.match(sql, /cadence\s+text[^;]*check \(cadence in \('daily', 'weekly'\)\)/is);
+  assert.match(sql, /local_hour\s+smallint[^;]*between 0 and 23/is);
+  assert.match(sql, /local_minute\s+smallint[^;]*between 0 and 59/is);
+  assert.match(sql, /revision\s+bigint\s+not null/i);
+  assert.match(sql, /alter table public\.notification_preferences enable row level security/i);
+  assert.match(sql, /account_id\s*=\s*auth\.uid\(\)/i);
+  assert.match(sql, /purge_notification_preferences_on_account_deletion/i);
+  assert.match(sql, /delete from public\.notification_preferences/i);
+  assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('account export includes the server-owned notification preference mirror', () => {
+  const source = fs.readFileSync(accountExportPath, 'utf8');
+
+  assert.match(source, /["]notificationPreferences["]/i);
+  assert.match(source, /from public\.notification_preferences preference/i);
+  assert.match(source, /where preference\.account_id = @account_id/i);
+  assert.match(source, /'continueUnfinishedEnabled'/i);
+  assert.match(source, /'reviewCompletedEnabled'/i);
+});
+
+test('PostgreSQL smoke waits for the target database, not only the server socket', () => {
+  const source = fs.readFileSync(postgresSmokePath, 'utf8');
+
+  assert.match(
+    source,
+    /pg_isready\s+-U postgres\s+-d evidrilo_it[\s\S]*&&\s*docker exec[\s\S]*psql[\s\S]*-d evidrilo_it[\s\S]*-c ['"]select 1['"]/i,
+  );
+});
+
+test('database integrity hardening binds AI reservations to their account grant and protects new published cases', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '035_database_integrity_hardening.sql'),
+    'utf8',
+  );
+  assert.match(sql, /unique\s*\(account_id,\s*grant_id\)/i);
+  assert.match(sql, /foreign key\s*\(account_id,\s*grant_id\)[\s\S]*references public\.ai_credit_grants\s*\(account_id,\s*grant_id\)/i);
+  assert.match(sql, /case_versions_published_metadata_guard/i);
+  assert.match(sql, /new\.status\s*=\s*'published'/i);
+  assert.match(sql, /old\.status\s+is distinct from new\.status/i);
+  assert.match(sql, /published_case_metadata_required/i);
+  assert.match(sql, /published_at\s+is null/i);
+  assert.match(sql, /organization_id\s+is null/i);
+  assert.match(sql, /content\s+is null/i);
+  assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('RLS smoke fixture supplies the required AI reservation fingerprint', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'integration', 'rls-smoke.sql'),
+    'utf8',
+  );
+  assert.match(sql, /ai_credit_reservations\s*\(\s*\n\s*account_id,\s*request_id,\s*grant_id,\s*status,\s*request_hash/i);
+  assert.match(sql, /repeat\('a',\s*64\)/i);
+});
+
 test('account lifecycle migration removes owned data and anonymizes shared content references', () => {
   const sql = fs.readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), '014_account_deletion_boundary.sql'),
@@ -374,6 +490,367 @@ test('security-definer trigger functions are not executable by public roles', ()
   assert.match(sql, /alter function public\.enqueue_analytics_projection\(\) set search_path\s*=\s*public\s*,\s*pg_temp/i);
   assert.doesNotMatch(sql, /grant execute.*(anon|authenticated)/i);
   assert.doesNotMatch(sql, /password\s*=|service[_ -]?role/i);
+});
+
+test('entitlement periods and AI reservation leases preserve bounded server-owned credit grants', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '036_entitlement_periods_and_ai_reservation_leases.sql'),
+    'utf8',
+  );
+
+  assert.match(sql, /add column if not exists period_started_at\s+timestamptz/i);
+  assert.match(sql, /add column if not exists period_expires_at\s+timestamptz/i);
+  assert.match(sql, /alter table public\.entitlement_events[\s\S]*add column if not exists period_started_at/i);
+  assert.match(sql, /entitlement_events_period_bounds_check/i);
+  assert.match(sql, /period_expires_at\s*>\s*period_started_at/i);
+  assert.match(sql, /lease_expires_at\s+timestamptz/i);
+  assert.match(sql, /reserved_at\s*\+\s*interval\s+'2 minutes'/i);
+  assert.match(sql, /release_reason\s+text/i);
+  assert.match(sql, /where status\s*=\s*'reserved'/i);
+  assert.match(sql, /\([^)]*lease_expires_at[^)]*\)/i);
+  assert.doesNotMatch(sql, /drop table|delete from public\.ai_credit_(?:grants|reservations)/i);
+});
+
+test('AI conversation migration stores only bounded account-scoped session metadata', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '037_ai_contextual_conversations.sql'),
+    'utf8',
+  );
+  for (const table of ['ai_conversation_sessions', 'ai_conversation_turn_requests']) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}`, 'i'));
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, 'i'));
+  }
+  assert.match(sql, /account_id\s*=\s*auth\.uid\(\)/i);
+  assert.match(sql, /turn_count smallint not null default 0 check \(turn_count between 0 and 5\)/i);
+  assert.match(sql, /unique \(account_id, creation_request_id\)/i);
+  assert.match(sql, /primary key \(account_id, request_id\)/i);
+  assert.match(sql, /active_lease_expires_at/i);
+  assert.match(sql, /on delete cascade/i);
+  assert.match(sql, /purge_ai_conversations_on_account_deletion/i);
+  assert.match(sql, /revoke all on public\.ai_conversation_sessions from anon, authenticated/i);
+  assert.match(sql, /revoke all on public\.ai_conversation_turn_requests from anon, authenticated/i);
+  assert.doesNotMatch(sql, /prompt\s+text|response\s+text|transcript\s+text|message\s+text|service[_ -]?role|password\s*=/i);
+});
+
+test('AI provider spend migration enforces monthly budget reservations and private metadata-only usage', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '038_ai_provider_spend_budget.sql'),
+    'utf8',
+  );
+  for (const table of ['ai_provider_monthly_spend', 'ai_provider_spend_reservations']) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}`, 'i'));
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, 'i'));
+    assert.match(sql, new RegExp(`revoke all on public\\.${table} from public, anon, authenticated`, 'i'));
+  }
+  assert.match(sql, /primary key \(provider, period_start\)/i);
+  assert.match(sql, /primary key \(provider, account_id, request_id\)/i);
+  assert.match(sql, /reserved_usd[^;]*spent_usd/is);
+  assert.match(sql, /status in \('reserved', 'settled', 'uncertain', 'released'\)/i);
+  assert.match(sql, /lease_expires_at/i);
+  assert.match(sql, /input_tokens integer/i);
+  assert.match(sql, /output_tokens integer/i);
+  assert.match(sql, /on delete cascade/i);
+  assert.match(sql, /purge_ai_provider_spend_on_account_deletion/i);
+  assert.match(sql, /status = 'uncertain'[\s\S]*actual_cost_usd = reserved_cost_usd/i);
+  assert.doesNotMatch(sql, /prompt\s+text|response\s+text|transcript\s+text|message\s+text|service[_ -]?role|password\s*=/i);
+});
+
+test('student project migration enforces private versioned storage and idempotent account deletion', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '039_student_owned_projects.sql'),
+    'utf8',
+  );
+  for (const table of ['student_projects', 'student_project_revisions', 'student_project_commands']) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}`, 'i'));
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, 'i'));
+  }
+  assert.match(sql, /unique \(account_id, project_id, version\)/i);
+  assert.match(sql, /primary key \(account_id, idempotency_key\)/i);
+  assert.match(sql, /request_fingerprint text not null check/i);
+  assert.match(sql, /student_project_revisions_immutable/i);
+  assert.match(sql, /pg_trigger_depth\(\) > 1/i);
+  assert.match(sql, /student_projects_owner_read[\s\S]*auth\.uid\(\)/i);
+  assert.match(sql, /purge_student_projects_on_account_deletion[\s\S]*new\.status = 'completed'/i);
+  assert.doesNotMatch(sql, /for insert with check|for update using|service[_ -]?role|password\s*=/i);
+});
+
+test('040 gates project writes on versioned consent while retaining owner-scoped reads after revocation', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '040_project_cloud_consent.sql'),
+    'utf8',
+  );
+  const projectStore = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'api', 'Projects', 'NpgsqlStudentProjectStore.cs'),
+    'utf8',
+  );
+  assert.match(sql, /create table if not exists public\.student_project_cloud_consents/i);
+  assert.match(sql, /policy_version\s+text\s+not null/i);
+  assert.match(sql, /granted\s+boolean\s+not null/i);
+  assert.match(sql, /create table if not exists public\.student_project_cloud_consent_events/i);
+  assert.match(sql, /decision\s+text\s+not null\s+check\s*\(decision in \('grant', 'revoke'\)\)/i);
+  assert.match(sql, /alter table public\.student_project_cloud_consents enable row level security/i);
+  assert.match(sql, /alter table public\.student_project_cloud_consent_events enable row level security/i);
+  assert.match(sql, /account_id\s*=\s*auth\.uid\(\)/i);
+  assert.match(projectStore, /student_project_cloud_consents[\s\S]*?for update/i);
+  assert.match(projectStore, /and granted = true[\s\S]*?for share/i);
+  assert.match(projectStore, /pg_advisory_xact_lock\(hashtextextended\(@account_id::text, 0\)\)/i);
+  for (const method of ['CreateOwnAsync', 'SaveOwnAsync']) {
+    const methodStart = projectStore.indexOf(`> ${method}(`);
+    assert.notEqual(methodStart, -1, `${method} must exist in the project store`);
+    const nextMethod = projectStore.indexOf('\n    public ', methodStart + 1);
+    const methodBody = projectStore.slice(methodStart, nextMethod < 0 ? undefined : nextMethod);
+    assert.match(
+      methodBody,
+      /await RequireCloudConsentAsync\(/,
+      `${method} must enforce current account consent inside its transaction`,
+    );
+  }
+  for (const method of ['ListOwnAsync', 'ReadOwnAsync', 'ReadRevisionsOwnAsync']) {
+    const methodStart = projectStore.indexOf(`> ${method}(`);
+    assert.notEqual(methodStart, -1, `${method} must exist in the project store`);
+    const nextMethod = projectStore.indexOf('\n    public ', methodStart + 1);
+    const methodBody = projectStore.slice(methodStart, nextMethod < 0 ? undefined : nextMethod);
+    assert.doesNotMatch(methodBody, /await RequireCloudConsentAsync\(/);
+    assert.match(methodBody, /where account_id = @account_id/i);
+  }
+  assert.match(
+    projectStore,
+    /select 1\s+from public\.student_projects\s+where account_id = @account_id and project_id = @project_id\s+for key share/i,
+    'project-ID reads must verify ownership and serialize with permanent deletion',
+  );
+  assert.doesNotMatch(sql, /project_text|student_project_document|service[_ -]?role|password\s*=/i);
+});
+
+test('041 migration preserves account tombstones and a fenced provider deletion outbox', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '041_account_auth_deletion_outbox.sql'),
+    'utf8',
+  );
+  const outboxStore = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'worker', 'AccountAuthDeletionOutboxStore.cs'),
+    'utf8',
+  );
+  assert.match(sql, /create table if not exists public\.account_deletion_tombstones/i);
+  assert.match(sql, /create table if not exists public\.account_auth_deletion_outbox/i);
+  assert.match(sql, /lease_token\s+uuid/i);
+  assert.match(sql, /leased_until\s+timestamptz/i);
+  assert.match(sql, /account_deletion_requests[\s\S]*status = 'completed'[\s\S]*account_auth_deletion_outbox/i);
+  assert.match(outboxStore, /for update skip locked/i);
+  assert.match(outboxStore, /lease_token = @lease_token/i);
+  assert.doesNotMatch(sql, /references auth\.users/i);
+  assert.doesNotMatch(sql, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('042 migration publishes only reviewed, versioned project templates and anonymizes authoring actors', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '042_project_template_catalog.sql'),
+    'utf8',
+  );
+  const smoke = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'integration', 'rls-smoke.sql'),
+    'utf8',
+  );
+  for (const table of [
+    'project_template_versions',
+    'project_template_review_decisions',
+    'project_template_lifecycle_events',
+  ]) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}`, 'i'));
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, 'i'));
+  }
+  for (const family of [
+    'experimental_laboratory',
+    'observational_survey',
+    'literature_review',
+    'qualitative_interview_field_study',
+    'design_engineering',
+  ]) assert.match(sql, new RegExp(`'${family}'`));
+  assert.match(sql, /project_template_published_read[\s\S]*state = 'published'[\s\S]*is_current_published = true/i);
+  assert.match(sql, /grant select \([\s\S]*template_id, template_version, family, content/i);
+  assert.ok(
+    sql.lastIndexOf('grant select (') > sql.lastIndexOf('revoke all on table public.project_template_versions'),
+    'the public column grant must be applied after the table-wide revoke',
+  );
+  assert.match(sql, /revoke all on table public\.project_template_review_decisions from public, anon, authenticated/i);
+  assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(new\.template_id, 0\)\)/i);
+  assert.match(sql, /project_template_content_immutable/i);
+  assert.match(sql, /project_template_independent_reviewer_required/i);
+  assert.match(sql, /project_template_reviewed_example_invalid/i);
+  assert.match(sql, /project_template_review_metadata_server_owned/i);
+  assert.match(sql, /project_template_lifecycle_append_only/i);
+  assert.match(sql, /project_template_version_append_only/i);
+  assert.match(sql, /account_deletion_project_template_actors/i);
+  assert.match(sql, /set reviewer_id = null, reason = '\[ACCOUNT_DELETED\]'/i);
+  assert.doesNotMatch(sql, /student_project_document|rawDraftText|service[_ -]?role|password\s*=/i);
+  for (const marker of [
+    'PROJECT_TEMPLATE_DRAFT_PUBLICATION_GUARD_PASS',
+    'PROJECT_TEMPLATE_SELF_REVIEW_GUARD_PASS',
+    'PROJECT_TEMPLATE_REVIEW_ANCHOR_GUARD_PASS',
+    'PROJECT_TEMPLATE_SCENARIO_KIND_INSERT_GUARD_PASS',
+    'PROJECT_TEMPLATE_LEGACY_METADATA_UPDATE_PASS',
+    'PROJECT_TEMPLATE_PREEXISTING_APPROVAL_PUBLISH_BLOCK_PASS',
+    'PROJECT_TEMPLATE_CONTENT_IMMUTABLE_PASS',
+    'PROJECT_TEMPLATE_AUDIT_APPEND_ONLY_PASS',
+    'PROJECT_TEMPLATE_DELETION_ANONYMIZATION_PASS',
+  ]) assert.ok(smoke.includes(marker), `PostgreSQL smoke must cover ${marker}`);
+});
+
+test('043 migration requires reviewed normal and edge or conflicting template examples', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '043_project_template_example_scenarios.sql'),
+    'utf8',
+  );
+  assert.match(sql, /add constraint project_template_requires_normal_and_edge_examples/i);
+  assert.match(sql, /coalesce\(content\s*->\s*'examples'\s*@>\s*'\[\{"kind":\s*"normal"\}\]'::jsonb,\s*false\)/i);
+  assert.match(sql, /coalesce\(content\s*->\s*'examples'\s*@>\s*'\[\{"kind":\s*"edge_or_conflicting"\}\]'::jsonb,\s*false\)/i);
+  assert.match(sql, /reviewed_example_ids/i);
+  assert.match(sql, /project_template_review_example_kinds_guard/i);
+  assert.match(sql, /project_template_requires_normal_and_edge_examples/i);
+  assert.doesNotMatch(sql, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('044 scenario hardening preserves immutable legacy rows and rechecks approval at publication', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '044_project_template_scenario_gate_hardening.sql'),
+    'utf8',
+  );
+  assert.match(sql, /drop constraint if exists project_template_requires_normal_and_edge_examples/i);
+  assert.match(sql, /new\.content is not distinct from old\.content/i);
+  assert.match(sql, /before insert or update on public\.project_template_versions/i);
+  assert.match(sql, /create or replace function public\.enforce_project_template_publish_example_kinds/i);
+  assert.match(sql, /before update of state on public\.project_template_versions/i);
+  assert.match(sql, /order by created_at desc, review_decision_id desc/i);
+  assert.match(sql, /project_template_requires_reviewed_normal_and_edge_examples/i);
+  assert.doesNotMatch(sql, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('045 stores revocable account-scoped Project AI consent separately from cloud consent', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '045_project_ai_consent.sql'),
+    'utf8',
+  );
+  assert.match(sql, /create table if not exists public\.project_ai_consents/i);
+  assert.match(sql, /account_id\s+uuid\s+primary key references auth\.users\(id\) on delete cascade/i);
+  assert.match(sql, /policy_version\s+text\s+not null/i);
+  assert.match(sql, /granted\s+boolean\s+not null/i);
+  assert.match(sql, /consent_generation\s+integer\s+not null/i);
+  assert.match(sql, /unique \(account_id, consent_generation\)/i);
+  assert.match(sql, /create table if not exists public\.project_ai_consent_events/i);
+  assert.match(sql, /decision\s+text\s+not null\s+check\s*\(decision in \('grant', 'revoke'\)\)/i);
+  assert.match(sql, /alter table public\.project_ai_consents enable row level security/i);
+  assert.match(sql, /alter table public\.project_ai_consent_events enable row level security/i);
+  assert.match(sql, /account_id\s*=\s*auth\.uid\(\)/i);
+  assert.match(sql, /project_ai_consent_events_append_only/i);
+  assert.match(sql, /purge_project_ai_consent_on_account_deletion/i);
+  assert.doesNotMatch(sql, /assignment_brief|student_question|prompt\s+text|response\s+text|project_document/i);
+  assert.doesNotMatch(sql, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('046 serializes Project AI consent grants with account deletion completion', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '046_project_ai_consent_deletion_fence.sql'),
+    'utf8',
+  );
+  assert.match(sql, /lock_project_ai_consent_on_account_deletion/i);
+  assert.match(sql, /before update of status on public\.account_deletion_requests/i);
+  assert.match(sql, /new\.status = 'completed'[\s\S]*old\.status is distinct from new\.status/i);
+  assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(new\.account_id::text, 0\)\)/i);
+  assert.match(sql, /revoke all on function public\.lock_project_ai_consent_on_account_deletion\(\) from public/i);
+  assert.doesNotMatch(sql, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('047 adds a bounded positive credit cost to AI reservations with a one-credit default', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '047_ai_credit_reservation_cost.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '047 must be a new forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /add column if not exists credit_cost\s+integer\s+not null\s+default\s+1/i);
+  assert.match(sql, /add constraint ai_credit_reservations_credit_cost_check/i);
+  assert.match(sql, /check\s*\(\s*credit_cost between 1 and 100\s*\)/i);
+  assert.doesNotMatch(sql, /drop column|drop constraint|delete from public\.ai_credit_reservations/i);
+});
+
+test('048 aligns student project JSONB storage limits with the validated API document budget', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '048_student_project_document_budget.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '048 must be a new forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  for (const table of ['student_projects', 'student_project_revisions']) {
+    assert.match(sql, new RegExp(`alter table public\\.${table}[\\s\\S]*?octet_length\\(document::text\\) <= 3145728`, 'i'));
+    assert.match(sql, new RegExp(`jsonb_typeof\\(document\\) = 'object'`, 'i'));
+  }
+  assert.doesNotMatch(sql, /delete from|truncate|drop table|drop column|service[_ -]?role|password\s*=/i);
+});
+
+test('049 adds metadata-only per-installation Project AI history with deletion cleanup', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '049_project_ai_activity_history.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '049 must be a new forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /create table if not exists public\.project_ai_activity/i);
+  assert.match(sql, /unique \(account_id, request_id\)/i);
+  assert.match(sql, /on delete cascade/i);
+  assert.match(sql, /mode = 'GENERAL'[\s\S]*?project_id is null[\s\S]*?stage_id is null/i);
+  assert.match(sql, /consent_generation integer/i);
+  assert.match(sql, /requested_settlement_outcome[\s\S]*?settlement_hash/i);
+  assert.match(sql, /alter table public\.project_ai_activity enable row level security/i);
+  assert.match(sql, /account_id = auth\.uid\(\)/i);
+  assert.match(sql, /purge_project_ai_activity_on_account_deletion[\s\S]*?new\.status = 'completed'[\s\S]*?delete from public\.project_ai_activity/i);
+  assert.doesNotMatch(sql, /prompt\s+text|response\s+text|transcript|source_text/i);
+  assert.doesNotMatch(sql, /truncate|drop table|service[_ -]?role|password\s*=/i);
+});
+
+test('Project AI consent, activity, credit cost, and document budgets have disposable PostgreSQL runtime coverage', () => {
+  const integrationDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'integration');
+  const smokePath = path.join(integrationDir, 'project-ai-budget-smoke.sql');
+  const smoke = fs.readFileSync(smokePath, 'utf8');
+  const runner = fs.readFileSync(path.join(integrationDir, 'run-local-postgres-smoke.sh'), 'utf8');
+  const documentBudgetMigration = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '048_student_project_document_budget.sql'),
+    'utf8',
+  );
+  const activityMigration = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '049_project_ai_activity_history.sql'),
+    'utf8',
+  );
+
+  assert.match(runner, /project-ai-budget-smoke\.sql/);
+  for (const marker of [
+    'PROJECT_AI_CONSENT_RLS_PASS',
+    'PROJECT_AI_CONSENT_APPEND_ONLY_PASS',
+    'PROJECT_AI_CONSENT_DELETION_FENCE_PASS',
+    'PROJECT_AI_CONSENT_DELETION_PURGE_PASS',
+    'AI_CREDIT_RESERVATION_COST_PASS',
+    'STUDENT_PROJECT_DOCUMENT_BUDGET_PASS',
+    'PROJECT_AI_ACTIVITY_RLS_PASS',
+    'PROJECT_AI_ACTIVITY_ACCOUNT_DELETION_PURGE_PASS',
+    'PROJECT_AI_ACTIVITY_PROJECT_DELETION_CASCADE_PASS',
+  ]) assert.match(smoke, new RegExp(marker));
+  assert.match(documentBudgetMigration, /octet_length\(document::text\)/i);
+  assert.match(smoke, /repeat\('x',\s*3100000\)/i);
+  assert.match(smoke, /repeat\('x',\s*3145800\)/i);
+  assert.match(smoke, /request\.jwt\.claim\.sub/i);
+  assert.match(smoke, /project_ai_consent_events/i);
+  assert.match(smoke, /project_ai_activity/i);
+  assert.match(activityMigration, /requested_settlement_outcome/i);
+  assert.doesNotMatch(smoke, /service[_ -]?role|password\s*=|access[_ -]?token|refresh[_ -]?token/i);
+});
+
+test('AI credit ledger reserves, settles, and recovers each persisted reservation cost', () => {
+  const ledger = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'api', 'Ai', 'AiCreditLedger.cs'),
+    'utf8',
+  );
+
+  assert.match(ledger, /string requestHash,\s+int creditCost,\s+CancellationToken cancellationToken/);
+  assert.match(ledger, /select request_hash, status, credit_cost/i);
+  assert.match(ledger, /existingCreditCost != creditCost/);
+  assert.match(ledger, /credits >= reserved_credits \+ consumed_credits \+ @credit_cost/i);
+  assert.match(ledger, /request_hash, grant_id, credit_cost,[\s\S]*?@request_hash, @grant_id, @credit_cost/i);
+  assert.match(ledger, /returning grant_id, credit_cost/i);
+  assert.match(ledger, /reserved_credits = reserved_credits - @credit_cost,\s+consumed_credits = consumed_credits \+ @credit_cost/i);
+  assert.match(ledger, /sum\(credit_cost\)::integer as released_credit_cost/i);
+  assert.match(ledger, /reserved_credits - grant_costs\.released_credit_cost/i);
 });
 
 test('case lifecycle migration records actor-bound append-only history', () => {

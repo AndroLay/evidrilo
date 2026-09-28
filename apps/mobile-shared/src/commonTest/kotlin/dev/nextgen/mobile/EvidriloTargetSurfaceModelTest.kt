@@ -12,6 +12,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionReducer
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
+import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
 import dev.nextgen.mobile.navigation.EvidriloDestination
 import dev.nextgen.mobile.navigation.EvidriloNavigationState
 import dev.nextgen.mobile.storage.ConclusionSessionPhase
@@ -20,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import androidx.compose.ui.unit.dp
 
 class EvidriloTargetSurfaceModelTest {
@@ -86,6 +88,16 @@ class EvidriloTargetSurfaceModelTest {
     }
 
     @Test
+    fun sources_copy_describes_the_bundled_case_without_claiming_import_support() {
+        assertFalse(EvidriloSourcesCopy.intro.contains("Upload", ignoreCase = true))
+        assertFalse(EvidriloSourcesCopy.assignmentBriefSubtitle.contains("PDF", ignoreCase = true))
+        assertFalse(EvidriloSourcesCopy.rubricSubtitle.contains("PDF", ignoreCase = true))
+        assertFalse(EvidriloSourcesCopy.sourcesSubtitle.contains("files", ignoreCase = true))
+        assertTrue(EvidriloSourcesCopy.importBoundary.contains("source material"))
+        assertTrue(EvidriloSourcesCopy.importBoundary.contains("record a finding"))
+    }
+
+    @Test
     fun target_root_navigation_matches_the_reference_composition() {
         assertEquals(
             listOf(
@@ -97,15 +109,58 @@ class EvidriloTargetSurfaceModelTest {
             targetNavigationSections(EvidriloTargetSection.HOME),
         )
         assertEquals(
-            listOf(
-                EvidriloTargetSection.HOME,
-                EvidriloTargetSection.SOURCES,
-                EvidriloTargetSection.EVIDENCE,
-                EvidriloTargetSection.ACTION,
-                EvidriloTargetSection.PROFILE,
-            ),
+            emptyList(),
             targetNavigationSections(EvidriloTargetSection.PROFILE),
         )
+    }
+
+    @Test
+    fun profile_context_hides_bottom_navigation_while_root_sections_keep_four_items() {
+        assertFalse(shouldShowTargetBottomNavigation(EvidriloTargetSection.PROFILE))
+        assertTrue(shouldShowTargetBottomNavigation(EvidriloTargetSection.HOME))
+        assertTrue(shouldShowTargetBottomNavigation(EvidriloTargetSection.SOURCES))
+        assertTrue(shouldShowTargetBottomNavigation(EvidriloTargetSection.EVIDENCE))
+        assertTrue(shouldShowTargetBottomNavigation(EvidriloTargetSection.ACTION))
+    }
+
+    @Test
+    fun every_project_family_has_an_overview_selection_cue_and_method_boundaries() {
+        assertEquals(
+            listOf(
+                "experimental_laboratory",
+                "observational_survey",
+                "literature_review",
+                "qualitative_interview_field_study",
+                "design_engineering",
+            ),
+            projectTemplateFamilyOverviews.map { it.family.id },
+        )
+        assertEquals(ProjectTemplateFamily.values().toList(), projectTemplateFamilyOverviews.map { it.family })
+        assertTrue(
+            projectTemplateFamilyOverviews.all { overview ->
+                overview.summary.isNotBlank() &&
+                    overview.selectionCue.isNotBlank() &&
+                    overview.whenItMayFit.isNotBlank() &&
+                    overview.workToOrganize.isNotEmpty() &&
+                    overview.workToOrganize.all(String::isNotBlank) &&
+                    overview.pointsToCheck.isNotEmpty() &&
+                    overview.pointsToCheck.all(String::isNotBlank)
+            },
+        )
+    }
+
+    @Test
+    fun project_catalog_browse_hint_explains_screen_reader_navigation() {
+        assertTrue(projectTemplateCatalogBrowseInstructions.contains("screen reader", ignoreCase = true))
+        assertTrue(projectTemplateCatalogBrowseInstructions.contains("focus", ignoreCase = true))
+        assertTrue(projectTemplateCatalogBrowseInstructions.contains("activate", ignoreCase = true))
+    }
+
+    @Test
+    fun profile_back_action_returns_to_home_after_bottom_navigation_is_hidden() {
+        val profile = EvidriloNavigationState().selectRoot(EvidriloDestination.PROFILE)
+
+        assertEquals(EvidriloDestination.HOME, profile.back().current)
     }
 
     @Test
@@ -171,7 +226,7 @@ class EvidriloTargetSurfaceModelTest {
 
         val metrics = targetWorkspaceMetrics(case, draft)
 
-        assertEquals(3, metrics.evidenceCount)
+        assertEquals(3, metrics.suppliedObservationCount)
         assertEquals(0, metrics.selectedEvidenceCount)
         assertEquals(1, metrics.requirementCount)
         assertNull(metrics.gapCount)
@@ -210,6 +265,37 @@ class EvidriloTargetSurfaceModelTest {
         assertEquals(0, metrics.actionCount)
         assertEquals(TargetEvidenceStatus.NOT_ASSESSED, metrics.evidenceStatus)
         assertNull(metrics.gapCount)
+    }
+
+    @Test
+    fun workspace_metrics_keep_supplied_observations_separate_from_selected_evidence() {
+        val case = ConclusionCases.M0_T2
+        val draft = ConclusionDraft(
+            caseId = case.id,
+            evidenceRefs = listOf("OBS-WARM-01"),
+        )
+
+        val metrics = targetWorkspaceMetrics(case, draft)
+
+        assertEquals(3, metrics.suppliedObservationCount)
+        assertEquals(1, metrics.selectedEvidenceCount)
+    }
+
+    @Test
+    fun selected_evidence_summary_describes_selection_without_claiming_support() {
+        val case = ConclusionCases.M0_T2
+        val metrics = targetWorkspaceMetrics(
+            case,
+            ConclusionDraft(caseId = case.id, evidenceRefs = listOf("OBS-WARM-01")),
+        )
+
+        assertEquals("1 selected", metrics.selectedEvidenceSummary)
+        assertEquals(TargetEvidenceStatus.NOT_ASSESSED, metrics.evidenceStatus)
+    }
+
+    @Test
+    fun m0_workspace_header_identifies_the_case_not_the_projects_list() {
+        assertEquals("Case workspace", EvidriloTargetWorkspaceCopy.caseHeading)
     }
 
     @Test
@@ -503,6 +589,104 @@ class EvidriloTargetSurfaceModelTest {
         assertEquals(
             "Review your latest before/after comparison",
             targetHistorySubtitle(snapshot),
+        )
+    }
+
+    @Test
+    fun history_evidence_copy_distinguishes_unchanged_and_changed_anchors() {
+        assertEquals(
+            "Evidence anchors unchanged",
+            targetHistoryEvidenceLabel(TargetHistorySummary.EMPTY),
+        )
+        assertEquals(
+            "Evidence anchors changed",
+            targetHistoryEvidenceLabel(
+                TargetHistorySummary(
+                    evidenceAdded = 1,
+                    evidenceRemoved = 0,
+                    actionsChanged = 0,
+                    hasComparison = true,
+                ),
+            ),
+        )
+        assertEquals(
+            "Evidence anchors changed",
+            targetHistoryEvidenceLabel(
+                TargetHistorySummary(
+                    evidenceAdded = 0,
+                    evidenceRemoved = 1,
+                    actionsChanged = 0,
+                    hasComparison = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun history_result_copy_matches_revision_or_changed_evidence_snapshot() {
+        val draft = ConclusionDraft(caseId = ConclusionCases.M0_T2.id)
+        val revision = ConclusionSessionSnapshot(
+            phase = ConclusionSessionPhase.SUMMARY,
+            initialDraft = draft,
+            currentDraft = draft,
+        )
+        val evidenceChange = ConclusionSessionSnapshot(
+            phase = ConclusionSessionPhase.EVIDENCE_CHANGE_SUMMARY,
+            initialDraft = draft,
+            currentDraft = draft.copy(caseId = ConclusionCases.EVIDENCE_CHANGE.id),
+        )
+        val otherPhase = revision.copy(phase = ConclusionSessionPhase.DRAFTING)
+
+        assertEquals("Claim revision saved", targetHistoryResultLabel(revision))
+        assertEquals("Changed-evidence response saved", targetHistoryResultLabel(evidenceChange))
+        assertEquals("Local comparison saved", targetHistoryResultLabel(otherPhase))
+    }
+
+    @Test
+    fun completed_core_summary_is_available_to_local_history() {
+        val initialDraft = completeTargetDraft(ConclusionCases.M0_T2)
+        val revisedDraft = initialDraft.copy(
+            claimText = "The revised claim stays within the supplied three-condition comparison.",
+        )
+        val reducer = ConclusionReducer()
+        val summary = ConclusionState.Summary(
+            initialDraft = initialDraft,
+            revisedDraft = revisedDraft,
+            initialEvaluation = reducer.evaluate(initialDraft),
+            finalEvaluation = reducer.evaluate(revisedDraft),
+        )
+
+        assertEquals(
+            ConclusionSessionSnapshot(
+                phase = ConclusionSessionPhase.SUMMARY,
+                initialDraft = initialDraft,
+                currentDraft = revisedDraft,
+            ),
+            completedHistorySnapshot(summary),
+        )
+    }
+
+    @Test
+    fun completed_evidence_change_summary_keeps_its_existing_history_projection() {
+        val baseCase = ConclusionCases.M0_T2
+        val challengeCase = ConclusionCases.EVIDENCE_CHANGE
+        val reducer = ConclusionReducer(case = baseCase)
+        val baseDraft = completeTargetDraft(baseCase)
+        val challengeDraft = completeChallengeDraft(challengeCase)
+        val summary = ConclusionState.EvidenceChangeSummary(
+            baseDraft = baseDraft,
+            baseEvaluation = reducer.evaluate(baseDraft),
+            challengeDraft = challengeDraft,
+            challengeEvaluation = reducer.evaluateEvidenceChange(challengeDraft),
+        )
+
+        assertEquals(
+            ConclusionSessionSnapshot(
+                phase = ConclusionSessionPhase.EVIDENCE_CHANGE_SUMMARY,
+                initialDraft = baseDraft,
+                currentDraft = challengeDraft,
+            ),
+            completedHistorySnapshot(summary),
         )
     }
 

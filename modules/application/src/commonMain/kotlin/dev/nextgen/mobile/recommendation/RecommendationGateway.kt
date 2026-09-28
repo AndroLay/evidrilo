@@ -4,7 +4,13 @@ import dev.nextgen.mobile.account.AccountHttpResponse
 import dev.nextgen.mobile.account.AccountHttpTransport
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountHttpTransport
+import dev.nextgen.mobile.account.isAllowedApiBaseUrl
 import dev.nextgen.mobile.analytics.AnalyticsConsent
+import dev.nextgen.mobile.network.DeviceConnectivity
+import dev.nextgen.mobile.network.RemoteFailureKind
+import dev.nextgen.mobile.network.RemoteFailureState
+import dev.nextgen.mobile.network.RemoteOperationKind
+import dev.nextgen.mobile.network.resolveRemoteFailure
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import kotlinx.serialization.json.Json
@@ -36,15 +42,7 @@ data class RecommendationClientConfiguration(
         get() = apiBaseUrl.trim().trimEnd('/')
 
     val isConfigured: Boolean
-        get() = normalizedApiBaseUrl.startsWith("https://", ignoreCase = true) &&
-            normalizedApiBaseUrl.substringAfter("//", "")
-                .substringBeforeAny('/', '?', '#')
-                .let { authority ->
-                    authority.isNotBlank() &&
-                        !authority.contains('@') &&
-                        !authority.any(Char::isWhitespace) &&
-                        (authority.contains('.') || authority == "localhost")
-                }
+        get() = isAllowedApiBaseUrl(normalizedApiBaseUrl)
 
     private fun String.substringBeforeAny(vararg delimiters: Char): String {
         val index = indexOfFirst { it in delimiters }
@@ -68,6 +66,10 @@ sealed interface RecommendationInteractionResult {
     data class Failed(
         val code: String,
         val retryable: Boolean,
+        val outcomeUnknown: Boolean = false,
+        val reconciliationRequired: Boolean = false,
+        val sameIntentReplayAllowed: Boolean = false,
+        val idempotencyKey: String? = null,
     ) : RecommendationInteractionResult
 }
 
@@ -97,7 +99,12 @@ class RecommendationGateway(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            return RecommendationGatewayResult.Failed("OFFLINE", retryable = true)
+            val code = if (transport.deviceConnectivity == DeviceConnectivity.OFFLINE) {
+                "OFFLINE"
+            } else {
+                "RECOMMENDATION_UNAVAILABLE"
+            }
+            return RecommendationGatewayResult.Failed(code, retryable = true)
         }
 
         return when {
@@ -186,7 +193,10 @@ class RecommendationGateway(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            return RecommendationInteractionResult.Failed("OFFLINE", retryable = true)
+            return failedInteraction(
+                clientEventId = clientEventId,
+                failure = RemoteFailureKind.TRANSPORT,
+            )
         }
 
         return when {
@@ -195,7 +205,10 @@ class RecommendationGateway(
 
             response.statusCode == 408 || response.statusCode == 425 || response.statusCode == 429 ||
                 response.statusCode in 500..599 ->
-                RecommendationInteractionResult.Failed("RECOMMENDATION_INTERACTION_UNAVAILABLE", retryable = true)
+                failedInteraction(
+                    clientEventId = clientEventId,
+                    failure = RemoteFailureKind.TRANSIENT_HTTP,
+                )
 
             response.statusCode !in 200..299 ->
                 RecommendationInteractionResult.Failed("RECOMMENDATION_INTERACTION_REJECTED", retryable = false)
@@ -207,6 +220,34 @@ class RecommendationGateway(
                 retryable = false,
             )
         }
+    }
+
+    private fun failedInteraction(
+        clientEventId: String,
+        failure: RemoteFailureKind,
+    ): RecommendationInteractionResult.Failed {
+        val resolution = resolveRemoteFailure(
+            connectivity = transport.deviceConnectivity,
+            operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
+            failure = failure,
+            requestWasDispatched = true,
+            idempotencyKey = clientEventId,
+        )
+        val code = when (resolution.state) {
+            RemoteFailureState.OFFLINE -> "OFFLINE"
+            RemoteFailureState.OUTCOME_UNKNOWN -> "RECOMMENDATION_INTERACTION_OUTCOME_UNKNOWN"
+            RemoteFailureState.SERVICE_UNAVAILABLE -> "RECOMMENDATION_INTERACTION_UNAVAILABLE"
+            RemoteFailureState.REJECTED -> "RECOMMENDATION_INTERACTION_REJECTED"
+            RemoteFailureState.CANCELLED -> "RECOMMENDATION_INTERACTION_CANCELLED"
+        }
+        return RecommendationInteractionResult.Failed(
+            code = code,
+            retryable = resolution.retryAllowed || resolution.sameIntentReplayAllowed,
+            outcomeUnknown = resolution.state == RemoteFailureState.OUTCOME_UNKNOWN,
+            reconciliationRequired = resolution.reconciliationRequired,
+            sameIntentReplayAllowed = resolution.sameIntentReplayAllowed,
+            idempotencyKey = clientEventId.takeIf { resolution.sameIntentReplayAllowed },
+        )
     }
 
     suspend fun interactWithRetry(

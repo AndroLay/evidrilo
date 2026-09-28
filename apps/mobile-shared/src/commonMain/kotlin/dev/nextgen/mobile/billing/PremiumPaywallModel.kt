@@ -56,7 +56,7 @@ internal fun premiumPaywallModel(
             PremiumPaywallState.UNLOCKED -> "Premium evidence cases are unlocked"
         },
         message = billing.message.ifBlank {
-            "The free evidence workflow remains available offline without an account or subscription."
+            "The signed-in Free evidence workflow remains available offline without a subscription."
         },
         offers = offers,
         selectedProductId = selectedProductId,

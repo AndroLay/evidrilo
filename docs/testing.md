@@ -20,7 +20,7 @@ bash scripts/ci/verify-local.sh
 The harness covers Kotlin module tests and supported target compilation, an
 Android release bundle when JDK 21 is available, Node contract and repository
 guards, asset and deployment checks, and .NET API/worker tests when their
-toolchains are available. The output explicitly reports unavailable toolchains;
+toolchains are available. The output explicitly reports `UNAVAILABLE` toolchains;
 do not treat a skipped/unavailable check as a pass.
 
 ## Focused checks
@@ -55,15 +55,37 @@ complete. Cross-boundary verification must also cover:
   authoritative learning results;
 - server-owned AI credit grants, reservations, consumption, release, expiry,
   entitlement-period idempotency, and balance reporting;
+- bounded AI conversation sessions/turns: verified account ownership,
+  idempotent create/replay, stale-context rejection, five-turn cap, duplicate
+  turn serialization, clear-during-active-turn safety, metadata-only storage,
+  and typed proposals with `autoApplied: false`;
 - configured RevenueCat product IDs, monthly/yearly-only policy, replay/order
   handling, and safe classification of test or diagnostic events;
 - organization roles versus infrastructure operators, without an unimplemented
   global admin role;
 - account export, retention, deletion, and the Supabase Auth identity boundary;
 - readiness HTTP status semantics and dependency failure behavior.
-- first-launch guide completion/skip, offline continuation, value-gated account
-  prompt dismissal, Google OAuth callback/cancellation, and local notification
-  permission/scheduling/disable behavior;
+- Get Started `not started`/`skipped`/`completed` persistence and legacy-state
+  migration; synthetic demo isolation; skip-not-bypass behavior; protected-route
+  and protected-action gating; email/Google sign-in callback and cancellation;
+  and local notification permission/scheduling/disable behavior;
+
+For retry and concurrency-sensitive boundaries, the cross-boundary suite must
+also cover:
+
+- concurrent replay of the same sync, analytics, recommendation, billing, and
+  AI operation key;
+- rejection when an idempotency key is reused with a different payload;
+- one-time AI reservation/grant consumption under concurrent requests;
+- conversation turn reservation serialization, stale-session rejection, and
+  refusal to clear a session while an accepted turn is still settling;
+- one-winner authoring transitions and last-owner membership protection;
+- worker lease-token fencing when an old lease expires and another worker
+  claims the same job.
+
+The local API/worker E2E exercises a small deterministic concurrency matrix.
+It is useful regression evidence, but it is not a load, chaos, hosted-provider,
+or production-capacity test.
 
 Historical local integration results remain tied to their original revision. A
 current checkout with unavailable .NET tooling or failing contract assertions
@@ -94,8 +116,8 @@ Tests for the conclusion workflow should cover:
 - `INCOMPLETE`, `ACTION_REQUIRED`, `PASS`, and `CANNOT_ASSESS` outcomes;
 - ambiguous, removed, stale, contradictory, and unavailable evidence;
 - abstention instead of fabricated support or a generic conflict label;
-- free-core operation when offline or when billing/provider state is
-  unavailable;
+- signed-in local-core operation when offline or when billing/provider state
+  is unavailable; no account session must keep actual Free routes gated;
 - premium access derived from the approved entitlement, never a local
   success flag.
 
@@ -113,6 +135,15 @@ AI and credit tests must additionally cover:
   configurable spend ceilings;
 - selected-context consent, secret/PII redaction, metadata-only audit, bounded
   output schema, and no evaluator-status mutation;
+- the disabled-by-default OpenAI adapter through a synthetic HTTP handler:
+  fixed endpoint, `store:false`, strict schema/anchor enums, safe provider
+  errors, request-cost preflight, and no provider call when the monthly budget
+  is exhausted. The local PostgreSQL E2E also checks serialized reservations,
+  actual/uncertain settlement, replay, and budget enforcement. These checks do
+  not contact OpenAI or validate provider-side retention configuration;
+- conversation history size/role/anchor allowlisting. Anchor allowlisting
+  validates identity only; it does not prove semantic entailment. The provider
+  remains disabled until mobile, privacy, and provider gates are approved;
 - provider-unavailable operation leaves the free deterministic workflow usable.
 
 Use adversarial fixtures to prove that plausible-sounding but unsupported
@@ -132,7 +163,7 @@ rules exercised by those fixtures.
   Test Store run covering offering load, purchase success, cancellation or
   failure, entitlement, restore, relaunch, and supported revocation/expiry
   cases. See the
-  [`RevenueCat Test Store runbook`](operations/revenuecat-test-store-runbook.md).
+  [`RevenueCat integration boundary`](architecture/revenuecat.md).
 - Do not use a provider fixture, mocked customer info, or local account flag
   as proof of a real transaction.
 - A passing AI gateway or mocked provider does not prove provider privacy,

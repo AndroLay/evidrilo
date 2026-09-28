@@ -1,0 +1,39 @@
+{
+  "$id": "https://evidrilo.dev/contracts/project-ai-consent.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidrilo Project AI data consent state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "granted",
+    "policyVersion",
+    "grantedAt",
+    "revokedAt",
+    "generation"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-consent" },
+    "version": { "const": "1" },
+    "granted": { "type": "boolean" },
+    "policyVersion": {
+      "type": "string",
+      "pattern": "^project-ai-data\\.v[0-9]+$",
+      "maxLength": 80
+    },
+    "grantedAt": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ]
+    },
+    "revokedAt": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ]
+    },
+    "generation": { "type": "integer", "minimum": 0 }
+  }
+}

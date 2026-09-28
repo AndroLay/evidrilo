@@ -24,6 +24,20 @@ sealed interface AccountGatewayResult {
         override val code: String = "OFFLINE"
     }
 
+    data object ServiceUnavailable : AccountGatewayResult {
+        override val code: String = "SERVICE_UNAVAILABLE"
+    }
+
+    data object InvalidResponse : AccountGatewayResult {
+        override val code: String = "INVALID_PROVIDER_RESPONSE"
+    }
+
+    data class OperationOutcomeUnknown(
+        val operation: AccountMutationOperation,
+    ) : AccountGatewayResult {
+        override val code: String = "ACCOUNT_OPERATION_OUTCOME_UNKNOWN"
+    }
+
     data object InvalidCredentials : AccountGatewayResult {
         override val code: String = "INVALID_CREDENTIALS"
     }
@@ -50,6 +64,13 @@ sealed interface AccountGatewayResult {
 
     data object OAuthStarted : AccountGatewayResult {
         override val code: String = "OAUTH_STARTED"
+    }
+
+    data class GoogleIdentityLink(
+        val outcome: GoogleIdentityLinkOutcome,
+        val session: StoredAccountSession? = null,
+    ) : AccountGatewayResult {
+        override val code: String = "GOOGLE_IDENTITY_LINK_${outcome.name}"
     }
 
     data object OAuthCancelled : AccountGatewayResult {
@@ -94,6 +115,23 @@ sealed interface AccountGatewayResult {
     }
 }
 
+enum class AccountMutationOperation {
+    SIGN_UP,
+    PASSWORD_RESET,
+    PASSWORD_UPDATE,
+    DELETE_ACCOUNT,
+}
+
+enum class GoogleIdentityLinkOutcome {
+    STARTED,
+    LINKED,
+    ALREADY_LINKED,
+    CANCELLED,
+    CONFLICT,
+    SETUP_REQUIRED,
+    FAILED,
+}
+
 interface AccountGateway {
     suspend fun restore(): AccountGatewayResult
 
@@ -105,6 +143,12 @@ interface AccountGateway {
     suspend fun requestPasswordReset(identifier: String): AccountGatewayResult
 
     suspend fun startGoogleSignIn(): AccountGatewayResult
+
+    /** Adds Google to the currently authenticated account; it must never create or merge accounts. */
+    suspend fun startGoogleIdentityLink(): AccountGatewayResult
+
+    /** Clears only the pending identity-link flow and preserves the signed-in account. */
+    suspend fun cancelGoogleIdentityLink(): AccountGatewayResult
 
     suspend fun completeRedirect(url: String): AccountGatewayResult
 
@@ -134,6 +178,10 @@ class UnconfiguredAccountGateway : AccountGateway {
         AccountGatewayResult.NotConfigured
 
     override suspend fun startGoogleSignIn(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+
+    override suspend fun startGoogleIdentityLink(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+
+    override suspend fun cancelGoogleIdentityLink(): AccountGatewayResult = AccountGatewayResult.NotConfigured
 
     @Suppress("UNUSED_PARAMETER")
     override suspend fun completeRedirect(url: String): AccountGatewayResult =

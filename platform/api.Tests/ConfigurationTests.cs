@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Evidrilo.Api.Tests;
 
@@ -88,10 +89,19 @@ public sealed class ConfigurationTests
     public void Staging_environment_is_supported()
     {
         var options = PlatformOptions.From(
-            BuildConfiguration(("Platform:CorsAllowedOrigins", "https://staging.example")),
+            BuildConfiguration(
+                ("Platform:CorsAllowedOrigins", "https://staging.example"),
+                ("Platform:SupabaseUrl", "https://example.supabase.co"),
+                ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+                ("Platform:DatabaseConnectionString", "Host=example.invalid;Database=evidrilo;Username=student;SSL Mode=Require"),
+                ("Platform:RevenueCatWebhookSecret", "synthetic-secret"),
+                ("Platform:RevenueCatEntitlementId", "evidrilo_pro"),
+                ("Platform:RevenueCatMonthlyProductId", "com.example.monthly"),
+                ("Platform:RevenueCatYearlyProductId", "com.example.yearly")),
             "Staging");
 
         Assert.Equal("staging", options.Environment);
+        Assert.True(options.BillingConfigured);
     }
 
     [Fact]
@@ -104,10 +114,117 @@ public sealed class ConfigurationTests
     }
 
     [Fact]
+    public void Staging_configuration_fails_closed_when_supabase_or_database_is_missing()
+    {
+        var exception = Assert.Throws<PlatformConfigurationException>(() => PlatformOptions.From(
+            BuildConfiguration(("Platform:CorsAllowedOrigins", "https://staging.example")),
+            "Staging"));
+
+        Assert.Contains("Required platform configuration", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Deployed_configuration_can_leave_revenuecat_entirely_disabled(string environment)
+    {
+        var options = PlatformOptions.From(
+            BuildConfiguration(
+                ("Platform:CorsAllowedOrigins", "https://app.example"),
+                ("Platform:SupabaseUrl", "https://example.supabase.co"),
+                ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+                ("Platform:DatabaseConnectionString", "Host=example.invalid;Database=evidrilo;Username=student;SSL Mode=Require")),
+            environment);
+
+        Assert.False(options.BillingConfigured);
+        Assert.False(options.BillingConfigurationRequested);
+    }
+
+    [Fact]
     public void Production_configuration_fails_closed_when_supabase_is_missing()
     {
         var configuration = BuildConfiguration();
         Assert.Throws<PlatformConfigurationException>(() => PlatformOptions.From(configuration, "Production"));
+    }
+
+    [Fact]
+    public void Deployed_postgresql_uri_is_normalized_and_defaults_to_encrypted_transport()
+    {
+        var options = PlatformOptions.From(
+            BuildConfiguration(
+                ("Platform:CorsAllowedOrigins", "https://app.example"),
+                ("Platform:SupabaseUrl", "https://example.supabase.co"),
+                ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+                ("Platform:DatabaseConnectionString", "postgresql://student:pass%40word%3A123+plus@db.example.invalid:5432/evidrilo")),
+            "Production");
+
+        var parsed = new NpgsqlConnectionStringBuilder(options.DatabaseConnectionString);
+
+        Assert.Equal("db.example.invalid", parsed.Host);
+        Assert.Equal("student", parsed.Username);
+        Assert.Equal("pass@word:123+plus", parsed.Password);
+        Assert.Equal("evidrilo", parsed.Database);
+        Assert.Equal(SslMode.Require, parsed.SslMode);
+    }
+
+    [Theory]
+    [InlineData("Disable")]
+    [InlineData("Allow")]
+    [InlineData("Prefer")]
+    public void Deployed_api_rejects_database_transport_that_can_be_plaintext(string sslMode)
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:CorsAllowedOrigins", "https://app.example"),
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", $"Host=db.example.invalid;Database=evidrilo;Username=student;SSL Mode={sslMode}"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, "Production"));
+
+        Assert.DoesNotContain("student", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deployed_api_rejects_connection_string_without_explicit_username()
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:CorsAllowedOrigins", "https://app.example"),
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", "Host=db.example.invalid;Database=evidrilo;SSL Mode=Require"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, "Production"));
+
+        Assert.DoesNotContain("db.example.invalid", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deployed_api_rejects_a_uri_that_explicitly_allows_plaintext_fallback()
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:CorsAllowedOrigins", "https://app.example"),
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", "postgresql://student:synthetic-password@db.example.invalid/evidrilo?sslmode=prefer"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, "Production"));
+
+        Assert.DoesNotContain("synthetic-password", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Invalid_database_configuration_does_not_echo_connection_secrets()
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:DatabaseConnectionString", "Host=db.example.invalid;Database=evidrilo;Username=student;Password=synthetic-password;UnknownOption=value"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, "Testing"));
+
+        Assert.DoesNotContain("synthetic-password", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -173,8 +290,11 @@ public sealed class ConfigurationTests
             "Testing");
 
         Assert.False(secretOnly.BillingConfigured);
+        Assert.True(secretOnly.BillingConfigurationRequested);
         Assert.False(authorizationOnly.BillingConfigured);
+        Assert.True(authorizationOnly.BillingConfigurationRequested);
         Assert.True(complete.BillingConfigured);
+        Assert.True(complete.BillingConfigurationRequested);
     }
 
     [Fact]
@@ -187,6 +307,60 @@ public sealed class ConfigurationTests
             "Testing");
 
         Assert.False(options.BillingConfigured);
+        Assert.True(options.BillingConfigurationRequested);
+    }
+
+    [Fact]
+    public void Production_billing_requires_explicit_provider_product_ids()
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:CorsAllowedOrigins", "https://app.example"),
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", "Host=example.invalid;Database=evidrilo;Username=student;SSL Mode=Require"),
+            ("Platform:RevenueCatWebhookSecret", "synthetic-secret"),
+            ("Platform:RevenueCatEntitlementId", "evidrilo_pro"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, "Production"));
+
+        Assert.Contains("RevenueCat", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Deployed_configuration_fails_closed_when_billing_webhook_authentication_is_missing(
+        string environment)
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:CorsAllowedOrigins", "https://app.example"),
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", "Host=example.invalid;Database=evidrilo;Username=student;SSL Mode=Require"),
+            ("Platform:RevenueCatEntitlementId", "evidrilo_pro"),
+            ("Platform:RevenueCatMonthlyProductId", "com.example.monthly"),
+            ("Platform:RevenueCatYearlyProductId", "com.example.yearly"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, environment));
+
+        Assert.Contains("RevenueCat", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Configured_provider_product_ids_are_exposed_without_secrets_in_safe_summary()
+    {
+        var options = PlatformOptions.From(
+            BuildConfiguration(
+                ("Platform:RevenueCatMonthlyProductId", "rc_monthly_real"),
+                ("Platform:RevenueCatYearlyProductId", "rc_yearly_real")),
+            "Testing");
+
+        Assert.Equal("rc_monthly_real", options.RevenueCatMonthlyProductId);
+        Assert.Equal("rc_yearly_real", options.RevenueCatYearlyProductId);
+        Assert.DoesNotContain("rc_monthly_real", options.ToSafeString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("rc_yearly_real", options.ToSafeString(), StringComparison.Ordinal);
     }
 
     [Fact]

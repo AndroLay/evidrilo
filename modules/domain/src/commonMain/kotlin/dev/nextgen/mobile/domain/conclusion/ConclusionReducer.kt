@@ -67,6 +67,8 @@ sealed interface ConclusionEvent {
 
     data object BeginEvidenceChange : ConclusionEvent
 
+    data class BeginEvidenceChangeFromSavedDraft(val baseDraft: ConclusionDraft) : ConclusionEvent
+
     data class UpdateEvidenceChangeDraft(val draft: ConclusionDraft) : ConclusionEvent
 
     data object SubmitEvidenceChange : ConclusionEvent
@@ -144,6 +146,17 @@ class ConclusionReducer(
                 ConclusionState.EvidenceChangeDrafting(
                     baseDraft = state.revisedDraft,
                     baseEvaluation = state.finalEvaluation,
+                    draft = ConclusionDraft(caseId = evidenceChangeCase.id),
+                )
+            } else {
+                state
+            }
+
+        is ConclusionEvent.BeginEvidenceChangeFromSavedDraft ->
+            if (state is ConclusionState.Intro && event.baseDraft.caseId == case.id) {
+                ConclusionState.EvidenceChangeDrafting(
+                    baseDraft = event.baseDraft,
+                    baseEvaluation = evaluator.evaluate(event.baseDraft),
                     draft = ConclusionDraft(caseId = evidenceChangeCase.id),
                 )
             } else {

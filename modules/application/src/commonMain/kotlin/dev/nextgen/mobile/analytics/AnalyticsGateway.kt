@@ -4,6 +4,11 @@ import dev.nextgen.mobile.account.AccountHttpResponse
 import dev.nextgen.mobile.account.AccountHttpTransport
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountHttpTransport
+import dev.nextgen.mobile.account.isAllowedApiBaseUrl
+import dev.nextgen.mobile.network.RemoteFailureKind
+import dev.nextgen.mobile.network.RemoteFailureState
+import dev.nextgen.mobile.network.RemoteOperationKind
+import dev.nextgen.mobile.network.resolveRemoteFailure
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import kotlinx.serialization.json.Json
@@ -24,14 +29,7 @@ data class AnalyticsClientConfiguration(
     val isConfigured: Boolean
         get() {
             val normalized = normalizedApiBaseUrl
-            if (!normalized.startsWith("https://", ignoreCase = true)) return false
-            val authority = normalized
-                .substringAfter("//", "")
-                .substringBeforeAny('/', '?', '#')
-            return authority.isNotBlank() &&
-                !authority.contains('@') &&
-                !authority.any(Char::isWhitespace) &&
-                (authority.contains('.') || authority == "localhost")
+            return isAllowedApiBaseUrl(normalized)
         }
 
     private fun String.substringBeforeAny(vararg delimiters: Char): String {
@@ -47,6 +45,10 @@ enum class AnalyticsDeferralReason {
     SECURE_STORAGE,
 }
 
+/** Keep consented analytics local while the app is operating in guest-only mode. */
+fun analyticsTransmissionAllowed(consent: AnalyticsConsent, guestOnlyMode: Boolean): Boolean =
+    consent == AnalyticsConsent.GRANTED && !guestOnlyMode
+
 sealed interface AnalyticsGatewayResult {
     data class Sent(val outcome: String, val requestId: String) : AnalyticsGatewayResult
 
@@ -56,6 +58,10 @@ sealed interface AnalyticsGatewayResult {
         val code: String,
         val message: String,
         val retryable: Boolean,
+        val outcomeUnknown: Boolean = false,
+        val reconciliationRequired: Boolean = false,
+        val sameIntentReplayAllowed: Boolean = false,
+        val idempotencyKey: String? = null,
     ) : AnalyticsGatewayResult
 }
 
@@ -115,22 +121,14 @@ class AnalyticsGateway(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            return AnalyticsGatewayResult.Failed(
-                code = "OFFLINE",
-                message = "Analytics is unavailable offline.",
-                retryable = true,
-            )
+            return failedMutation(event, RemoteFailureKind.TRANSPORT)
         }
         return when {
             response.statusCode == 401 || response.statusCode == 403 ->
                 AnalyticsGatewayResult.Deferred(AnalyticsDeferralReason.AUTH_REQUIRED)
 
             response.statusCode == 408 || response.statusCode == 425 || response.statusCode == 429 ||
-                response.statusCode in 500..599 -> AnalyticsGatewayResult.Failed(
-                code = "ANALYTICS_UNAVAILABLE",
-                message = "Analytics is temporarily unavailable.",
-                retryable = true,
-            )
+                response.statusCode in 500..599 -> failedMutation(event, RemoteFailureKind.TRANSIENT_HTTP)
 
             response.statusCode !in 200..299 -> AnalyticsGatewayResult.Failed(
                 code = "ANALYTICS_REQUEST_REJECTED",
@@ -146,6 +144,33 @@ class AnalyticsGateway(
                 retryable = false,
             )
         }
+    }
+
+    private fun failedMutation(
+        event: AnalyticsEvent,
+        failure: RemoteFailureKind,
+    ): AnalyticsGatewayResult.Failed {
+        val resolution = resolveRemoteFailure(
+            connectivity = transport.deviceConnectivity,
+            operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
+            failure = failure,
+            requestWasDispatched = true,
+            idempotencyKey = event.clientEventId,
+        )
+        val unknown = resolution.state == RemoteFailureState.OUTCOME_UNKNOWN
+        return AnalyticsGatewayResult.Failed(
+            code = if (unknown) "ANALYTICS_OUTCOME_UNKNOWN" else "ANALYTICS_UNAVAILABLE",
+            message = if (unknown) {
+                "Analytics delivery is not confirmed; retry uses the same event identity."
+            } else {
+                "Analytics is temporarily unavailable."
+            },
+            retryable = resolution.retryAllowed || resolution.sameIntentReplayAllowed,
+            outcomeUnknown = unknown,
+            reconciliationRequired = resolution.reconciliationRequired,
+            sameIntentReplayAllowed = resolution.sameIntentReplayAllowed,
+            idempotencyKey = event.clientEventId.takeIf { resolution.sameIntentReplayAllowed },
+        )
     }
 
     suspend fun sendWithRetry(

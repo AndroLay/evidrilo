@@ -5,6 +5,11 @@ Google Play release. Next Gen does not require a store listing or a paid Apple
 or Google developer account. It does require a working-app demonstration and a
 public, open-source source repository.
 
+D-108 is the adopted long-term student academic learning/project target. It
+does not add course, general research-project, evaluator, or classroom
+capabilities to the current release. The submission must describe only the
+frozen build and the evidence actually collected for it.
+
 ## Required submission package
 
 - [ ] A clear project name, short pitch, and honest project story.
@@ -28,19 +33,33 @@ public, open-source source repository.
 
 - [ ] The app launches from a reproducible build and demonstrates the exact
       interaction described in the story and video.
-- [ ] The free learning workflow remains usable without purchase or account.
-- [ ] First launch shows the short guide, both start/skip paths reach the same
-      offline Home flow, and any account prompt is dismissible and shown only
-      after meaningful free value.
-- [ ] If account access is included in the frozen build, email and Google sign-in
-      use the verified callback boundary and failure/cancellation returns safely
-      to the local workflow; no full-draft cloud-restoration claim is made.
+- [ ] Get Started offers an optional, clearly synthetic preview with distinct
+      `not started`, `skipped`, and `completed` states. The preview does not
+      create a project, save answers, or write learning history.
+- [ ] Skipping Get Started returns to Home and does not block accountless local
+      project work or anonymous read-only catalog browsing. Verified sign-in is
+      required only for account-bound learning/services; account failure,
+      cancellation, and expiry keep those routes protected and preserve local
+      project data.
+- [ ] Email and Google sign-in use the verified callback boundary. Signing in
+      does not enable cloud sync; local project work and sync consent are tested
+      as separate behaviors, with no full-draft cloud-restoration claim.
 - [ ] If local notifications are included, permission, scheduling, category
       controls, disable/cancellation, denied-permission recovery, and offline
       behavior are verified on the named device; remote push is not claimed.
-- [ ] RevenueCat is integrated for the intended premium purchase path; the
-      app does not claim a purchase, restore, or entitlement result that was not
-      observed on the actual test configuration.
+- [ ] RevenueCat is integrated for the intended premium purchase path. For the
+      Next Gen submission, an authorized RevenueCat Test Store/sandbox run is
+      sufficient; a production payment or store listing is not required. The
+      app and submission must label the evidence as Test Store/sandbox and must
+      not claim real revenue.
+- [ ] The Test Store flow, when available, shows offering load, monthly/yearly
+      selection, purchase, `CustomerInfo`/`evidrilo_pro` activation, premium
+      unlock, restore, and truthful pending/failure/cancellation states. A
+      repository fixture or local flag is not provider evidence.
+- [ ] The submission labels Test Store as sandbox, not production revenue.
+      Published criteria are qualitative and specify no numeric adjustment for
+      sandbox; this is not a score-parity guarantee. Judges still assess
+      whether the RevenueCat flow is thoughtful, functional, and honestly shown.
 - [ ] Premium content is accessible only from the verified entitlement state;
       failure, cancellation, pending, and restore states are represented
       truthfully.

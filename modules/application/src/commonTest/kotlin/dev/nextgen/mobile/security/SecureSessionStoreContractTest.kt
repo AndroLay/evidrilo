@@ -31,7 +31,7 @@ class SecureSessionStoreContractTest {
 
         assertEquals(record, store.read())
         val encoded = SecureSessionRecordCodec.encode(record)
-        assertEquals(5, encoded.split('.').size)
+        assertEquals(6, encoded.split('.').size)
         assertFalse("refresh-token" in encoded)
         assertNull(store.toString().takeIf { "access-token" in it })
         store.clear()
@@ -48,7 +48,7 @@ class SecureSessionStoreContractTest {
         val encoded = SecureSessionRecordCodec.encode(record)
         val restored = SecureSessionRecordCodec.decode(encoded)
 
-        assertEquals(5, encoded.split('.').size)
+        assertEquals(6, encoded.split('.').size)
         assertEquals(record, restored)
         assertNotNull(restored).material.refreshToken
         assertFalse("refresh-token" in restored.toString())
@@ -67,6 +67,23 @@ class SecureSessionStoreContractTest {
         assertEquals("account-123", restored.account.accountId)
         assertEquals("access-token", restored.material.accessToken)
         assertNull(restored.material.refreshToken)
+    }
+
+    @Test
+    fun google_identity_link_status_round_trips_and_old_five_field_records_remain_readable() {
+        val linked = StoredAccountSession(
+            account = AccountSummary(
+                "123e4567-e89b-42d3-a456-426614174000",
+                emailVerified = true,
+                googleLinked = true,
+            ),
+            material = SecureSessionMaterial("access-token", 200L, "refresh-token"),
+        )
+        val encoded = SecureSessionRecordCodec.encode(linked)
+
+        assertEquals(linked, SecureSessionRecordCodec.decode(encoded))
+        val oldFiveField = encoded.split('.').take(5).joinToString(".")
+        assertNull(SecureSessionRecordCodec.decode(oldFiveField)?.account?.googleLinked)
     }
 
     @Test

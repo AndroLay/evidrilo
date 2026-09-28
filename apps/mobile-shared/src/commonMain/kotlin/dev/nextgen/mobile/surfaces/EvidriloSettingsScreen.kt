@@ -5,12 +5,30 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
+import dev.nextgen.mobile.EvidriloColors
+import dev.nextgen.mobile.EvidriloPrimaryButton
+import dev.nextgen.mobile.EvidriloSecondaryButton
+import dev.nextgen.mobile.EvidriloThemeMode
+import dev.nextgen.mobile.evidriloNextThemeMode
+import dev.nextgen.mobile.evidriloThemeModeLabel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.analytics.AnalyticsConsent
+import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 import dev.nextgen.mobile.audio.AudioSettings
 import dev.nextgen.mobile.notifications.NotificationPermissionState
 import dev.nextgen.mobile.notifications.NotificationPreferences
@@ -56,6 +75,8 @@ internal fun EvidriloSettingsScreen(
     audioSettings: AudioSettings = AudioSettings(),
     audioStorageStatus: LocalStorageStatus? = null,
     onSetAudioSettings: (AudioSettings) -> Unit = {},
+    themeMode: EvidriloThemeMode = EvidriloThemeMode.SYSTEM,
+    onSetThemeMode: (EvidriloThemeMode) -> Unit = {},
     notificationPreferences: NotificationPreferences = NotificationPreferences(),
     notificationPermission: NotificationPermissionState = NotificationPermissionState.UNKNOWN,
     notificationScheduleLabel: String? = null,
@@ -118,6 +139,34 @@ internal fun EvidriloSettingsScreen(
 
         storageNotice?.let { notice ->
             EvidriloRecoveryNotice(notice = notice)
+        }
+
+        EvidriloSectionHeading("Appearance")
+        EvidriloSettingsGroup {
+            EvidriloSettingsRow(
+                icon = EvidriloIconName.SPARK,
+                title = "Theme",
+                subtitle = "Currently: ${evidriloThemeModeLabel(themeMode)}",
+                onClick = { onSetThemeMode(evidriloNextThemeMode(themeMode)) },
+                stateDescription = evidriloThemeModeLabel(themeMode),
+                trailingIcon = EvidriloIconName.CHEVRON_RIGHT,
+            )
+            EvidriloDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                EvidriloThemeMode.entries.forEach { option ->
+                    EvidriloThemeChoiceChip(
+                        label = evidriloThemeModeLabel(option),
+                        selected = themeMode == option,
+                        onClick = { onSetThemeMode(option) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
 
         EvidriloSectionHeading("Workflow")
@@ -188,32 +237,27 @@ internal fun EvidriloSettingsScreen(
                         "Audio is optional. The visible text remains complete. Bundled narration is preferred when reviewed assets are available; otherwise Evidrilo uses an offline-capable platform voice and never falls back to the network.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    EvidriloPrimaryButton(
+                        label = if (audioSettings.narrationEnabled) "Turn narration off" else "Turn narration on",
                         onClick = {
                             onSetAudioSettings(
                                 audioSettings.copy(narrationEnabled = !audioSettings.narrationEnabled),
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (audioSettings.narrationEnabled) "Turn narration off" else "Turn narration on")
-                    }
-                    OutlinedButton(
+                        trailingIcon = null,
+                    )
+                    EvidriloSecondaryButton(
+                        label = if (audioSettings.effectsEnabled) {
+                            "Turn interaction sounds off"
+                        } else {
+                            "Turn interaction sounds on"
+                        },
                         onClick = {
                             onSetAudioSettings(
                                 audioSettings.copy(effectsEnabled = !audioSettings.effectsEnabled),
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (audioSettings.effectsEnabled) {
-                                "Turn interaction sounds off"
-                            } else {
-                                "Turn interaction sounds on"
-                            },
-                        )
-                    }
+                    )
                     if (audioStorageStatus in setOf(
                             LocalStorageStatus.UNAVAILABLE,
                             LocalStorageStatus.CORRUPT,
@@ -257,24 +301,26 @@ internal fun EvidriloSettingsScreen(
                         "Local reminders are optional, off by default, and never promotional. Evidrilo schedules them on this device without sending draft text to a server.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    EvidriloPrimaryButton(
+                        label = when {
+                            notificationBusy -> "Updating reminders…"
+                            notificationPreferences.enabled -> "Turn reminders off"
+                            else -> "Enable local reminders"
+                        },
                         onClick = if (notificationPreferences.enabled) {
                             onDisableNotifications
                         } else {
                             onEnableNotifications
                         },
                         enabled = !notificationBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            when {
-                                notificationBusy -> "Updating reminders…"
-                                notificationPreferences.enabled -> "Turn reminders off"
-                                else -> "Enable local reminders"
-                            },
-                        )
-                    }
-                    OutlinedButton(
+                        trailingIcon = null,
+                    )
+                    EvidriloSecondaryButton(
+                        label = if (notificationPreferences.continueUnfinishedEnabled) {
+                            "Unfinished case reminders on"
+                        } else {
+                            "Unfinished case reminders off"
+                        },
                         onClick = {
                             onSetNotificationPreferences(
                                 notificationPreferences.copy(
@@ -284,17 +330,13 @@ internal fun EvidriloSettingsScreen(
                             )
                         },
                         enabled = notificationPreferences.enabled && !notificationBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (notificationPreferences.continueUnfinishedEnabled) {
-                                "Unfinished case reminders on"
-                            } else {
-                                "Unfinished case reminders off"
-                            },
-                        )
-                    }
-                    OutlinedButton(
+                    )
+                    EvidriloSecondaryButton(
+                        label = if (notificationPreferences.reviewCompletedEnabled) {
+                            "Completed review reminders on"
+                        } else {
+                            "Completed review reminders off"
+                        },
                         onClick = {
                             onSetNotificationPreferences(
                                 notificationPreferences.copy(
@@ -304,17 +346,9 @@ internal fun EvidriloSettingsScreen(
                             )
                         },
                         enabled = notificationPreferences.enabled && !notificationBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (notificationPreferences.reviewCompletedEnabled) {
-                                "Completed review reminders on"
-                            } else {
-                                "Completed review reminders off"
-                            },
-                        )
-                    }
-                    OutlinedButton(
+                    )
+                    EvidriloSecondaryButton(
+                        label = "Cadence · ${notificationPreferences.cadence.label}",
                         onClick = {
                             onSetNotificationPreferences(
                                 notificationPreferences.copy(
@@ -328,10 +362,7 @@ internal fun EvidriloSettingsScreen(
                             )
                         },
                         enabled = notificationPreferences.enabled && !notificationBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Cadence · ${notificationPreferences.cadence.label}")
-                    }
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -344,6 +375,9 @@ internal fun EvidriloSettingsScreen(
                             },
                             enabled = notificationPreferences.enabled && !notificationBusy,
                             modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(2.dp, EvidriloColors.Separator),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = EvidriloColors.Cobalt),
                         ) {
                             Text("Earlier")
                         }
@@ -360,6 +394,9 @@ internal fun EvidriloSettingsScreen(
                             },
                             enabled = notificationPreferences.enabled && !notificationBusy,
                             modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(2.dp, EvidriloColors.Separator),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = EvidriloColors.Cobalt),
                         ) {
                             Text("Later")
                         }
@@ -383,12 +420,10 @@ internal fun EvidriloSettingsScreen(
                                 "System notification permission is off. Enable it in system settings to receive reminders.",
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                            OutlinedButton(
+                            EvidriloSecondaryButton(
+                                label = "Open notification settings",
                                 onClick = onOpenNotificationSettings,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text("Open notification settings")
-                            }
+                            )
                         }
                         NotificationPermissionState.UNKNOWN -> Text(
                             "Permission is requested only after you choose Enable local reminders.",
@@ -431,19 +466,16 @@ internal fun EvidriloSettingsScreen(
                         "Drafts and the latest evidence-change comparison stay inside the platform storage adapter. The evaluator does not send learner text to a server.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    EvidriloPrimaryButton(
+                        label = "Reset current workflow",
                         onClick = { pendingAction = SettingsDestructiveAction.RESET_PRACTICE },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Reset current workflow")
-                    }
-                    OutlinedButton(
+                        trailingIcon = null,
+                    )
+                    EvidriloSecondaryButton(
+                        label = "Clear latest comparison",
                         onClick = { pendingAction = SettingsDestructiveAction.CLEAR_HISTORY },
                         enabled = historyAvailable,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Clear latest comparison")
-                    }
+                    )
                 }
             }
             EvidriloDivider()
@@ -474,20 +506,17 @@ internal fun EvidriloSettingsScreen(
                         "Analytics is optional and off by default. If enabled, a signed-in account may send completion and recommendation events without draft text, passwords, or payment data. Turning it off stops future sends.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    EvidriloPrimaryButton(
+                        label = "Enable optional analytics",
                         onClick = { onSetAnalyticsConsent(AnalyticsConsent.GRANTED) },
                         enabled = analyticsConsent != AnalyticsConsent.GRANTED,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Enable optional analytics")
-                    }
-                    OutlinedButton(
+                        trailingIcon = null,
+                    )
+                    EvidriloSecondaryButton(
+                        label = "Turn analytics off",
                         onClick = { onSetAnalyticsConsent(AnalyticsConsent.NOT_GRANTED) },
                         enabled = analyticsConsent == AnalyticsConsent.GRANTED,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Turn analytics off")
-                    }
+                    )
                 }
             }
             EvidriloDivider()
@@ -514,32 +543,39 @@ internal fun EvidriloSettingsScreen(
                         "Cloud sync is optional and off by default. When enabled for a verified account, only redacted progress metadata is sent; learner-authored draft text remains on this device.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    if (!syncSignedIn) {
+                    if (TEMPORARY_GUEST_MODE_ENABLED) {
                         Text(
-                            "Sign in first to enable this option.",
+                            "Cloud sync is paused in local guest mode. Your projects stay on this device.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                    }
-                    Button(
-                        onClick = { onSetSyncConsent(SyncConsent.GRANTED) },
-                        enabled = syncSignedIn && syncStorageAvailable && syncConsent != SyncConsent.GRANTED,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Enable cloud progress sync")
-                    }
-                    OutlinedButton(
-                        onClick = { onSetSyncConsent(SyncConsent.NOT_GRANTED) },
-                        enabled = syncConsent == SyncConsent.GRANTED,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Turn cloud sync off")
-                    }
-                    OutlinedButton(
-                        onClick = onSyncNow,
-                        enabled = sync.canSyncNow && !syncBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (syncBusy) "Checking cloud sync…" else "Sync now")
+                        EvidriloSecondaryButton(
+                            label = "Turn cloud sync off",
+                            onClick = { onSetSyncConsent(SyncConsent.NOT_GRANTED) },
+                            enabled = syncConsent == SyncConsent.GRANTED,
+                        )
+                    } else {
+                        if (!syncSignedIn) {
+                            Text(
+                                "Sign in first to enable this option.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        EvidriloPrimaryButton(
+                            label = "Enable cloud progress sync",
+                            onClick = { onSetSyncConsent(SyncConsent.GRANTED) },
+                            enabled = syncSignedIn && syncStorageAvailable && syncConsent != SyncConsent.GRANTED,
+                            trailingIcon = null,
+                        )
+                        EvidriloSecondaryButton(
+                            label = "Turn cloud sync off",
+                            onClick = { onSetSyncConsent(SyncConsent.NOT_GRANTED) },
+                            enabled = syncConsent == SyncConsent.GRANTED,
+                        )
+                        EvidriloSecondaryButton(
+                            label = if (syncBusy) "Checking cloud sync…" else "Sync now",
+                            onClick = onSyncNow,
+                            enabled = sync.canSyncNow && !syncBusy,
+                        )
                     }
                 }
             }
@@ -572,7 +608,11 @@ internal fun EvidriloSettingsScreen(
         EvidriloTintPanel {
             Text("Local-first by default", style = MaterialTheme.typography.titleSmall)
             Text(
-                cloudSyncDisclosure() + " The free core remains usable without login, network, or billing configuration.",
+                if (TEMPORARY_GUEST_MODE_ENABLED) {
+                    "Local guest mode keeps project and case work on this device. Account, Pro, cloud sync, and server AI are temporarily paused."
+                } else {
+                    cloudSyncDisclosure() + " Local projects work without an account. Sign-in is needed for account-bound learning and project AI when enabled; it does not enable cloud sync."
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -586,6 +626,38 @@ private fun NotificationPreferences.adjustTime(minutes: Int): NotificationPrefer
         hour = nextMinutes / 60,
         minute = nextMinutes % 60,
     )
+}
+
+@Composable
+private fun EvidriloThemeChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.material3.Surface(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .semantics {
+                this.selected = selected
+                stateDescription = if (selected) "Selected" else "Not selected"
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) EvidriloColors.Tint else EvidriloColors.Surface,
+        border = BorderStroke(2.dp, if (selected) EvidriloColors.Cobalt else EvidriloColors.Separator),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleSmall,
+                color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
 }
 
 private enum class SettingsDestructiveAction(

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist-settlement-request.v1.json",
+  "title": "Evidrilo stage-assist settlement request v1",
+  "description": "The Idempotency-Key header must match requestId from the preview. Reuse the identical body and key for retries. Applied or edited outcomes must name the resulting server project revision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "installationId", "requestId", "outcome"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-stage-assist-settlement" },
+    "version": { "const": "1" },
+    "installationId": { "type": "string", "format": "uuid" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+    "outcome": { "enum": ["APPLIED", "EDITED", "DISMISSED", "STALE"] },
+    "resultProjectRevision": { "type": "integer", "minimum": 2 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "enum": ["APPLIED", "EDITED"] } }, "required": ["outcome"] },
+      "then": { "required": ["resultProjectRevision"] }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["DISMISSED", "STALE"] } }, "required": ["outcome"] },
+      "then": { "not": { "required": ["resultProjectRevision"] } }
+    }
+  ]
+}

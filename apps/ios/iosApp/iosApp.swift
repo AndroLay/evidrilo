@@ -16,7 +16,7 @@ struct EvidriloApp: App {
         WindowGroup {
             ComposeViewController()
                 .onOpenURL { url in
-                    AccountAuthPlatformKt.submitAccountAuthRedirect(url: url.absoluteString)
+                    AccountAuthBridgeKt.submitAccountAuthRedirect(url: url.absoluteString)
                 }
         }
     }

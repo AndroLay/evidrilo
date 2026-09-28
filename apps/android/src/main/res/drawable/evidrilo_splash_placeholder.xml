@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  System splash icon: the transparent logo mark, inset so the circular splash
+  mask never clips it. It sits on the blue splash background, not on a boxed
+  image, so it reads as the mark rather than a square in a ring.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/evidrilo_logo_mark"
+    android:inset="22%" />

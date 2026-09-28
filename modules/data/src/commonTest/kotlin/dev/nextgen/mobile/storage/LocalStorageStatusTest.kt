@@ -1,6 +1,7 @@
 package dev.nextgen.mobile.storage
 
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
+import dev.nextgen.mobile.domain.onboarding.GetStartedStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -104,5 +105,33 @@ class LocalStorageStatusTest {
         assertEquals(LocalStorageStatus.UNAVAILABLE, historyStore.load().status)
         assertEquals(LocalStorageWriteResult.UNAVAILABLE, historyStore.save(snapshot))
         assertEquals(LocalStorageWriteResult.UNAVAILABLE, historyStore.clear())
+    }
+
+    @Test
+    fun onboarding_status_advances_only_when_the_requested_state_was_saved() {
+        assertEquals(
+            GetStartedStatus.NOT_STARTED,
+            onboardingStatusAfterWrite(
+                current = GetStartedStatus.NOT_STARTED,
+                requested = GetStartedStatus.COMPLETED,
+                result = LocalStorageWriteResult.FAILED,
+            ),
+        )
+        assertEquals(
+            GetStartedStatus.NOT_STARTED,
+            onboardingStatusAfterWrite(
+                current = GetStartedStatus.NOT_STARTED,
+                requested = GetStartedStatus.SKIPPED,
+                result = LocalStorageWriteResult.UNAVAILABLE,
+            ),
+        )
+        assertEquals(
+            GetStartedStatus.COMPLETED,
+            onboardingStatusAfterWrite(
+                current = GetStartedStatus.NOT_STARTED,
+                requested = GetStartedStatus.COMPLETED,
+                result = LocalStorageWriteResult.SAVED,
+            ),
+        )
     }
 }

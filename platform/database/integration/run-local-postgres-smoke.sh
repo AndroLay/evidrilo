@@ -29,7 +29,8 @@ docker run -d \
     "$image" >/dev/null
 
 for attempt in $(seq 1 30); do
-    if docker exec "$container_name" pg_isready -U postgres -d evidrilo_it >/dev/null 2>&1; then
+    if docker exec "$container_name" pg_isready -U postgres -d evidrilo_it >/dev/null 2>&1 \
+        && docker exec "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it -c 'select 1' >/dev/null 2>&1; then
         break
     fi
     if [[ "$attempt" == 30 ]]; then
@@ -89,5 +90,8 @@ fi
 
 docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
     < "$script_dir/rls-smoke.sql"
+
+docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
+    < "$script_dir/project-ai-budget-smoke.sql"
 
 echo "EVIDRILO_POSTGRES_INTEGRATION_PASS"

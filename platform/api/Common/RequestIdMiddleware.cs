@@ -5,6 +5,7 @@ namespace Evidrilo.Api.Common;
 public sealed class RequestIdMiddleware
 {
     public const string HeaderName = "X-Request-Id";
+    public const string IdempotencyKeyHeaderName = "Idempotency-Key";
     public const string ItemKey = "Evidrilo.RequestId";
 
     private static readonly System.Text.RegularExpressions.Regex Pattern = new(
@@ -24,6 +25,18 @@ public sealed class RequestIdMiddleware
         var requestId = IsValid(incoming) ? incoming! : $"req-{Guid.NewGuid():N}";
         context.Items[ItemKey] = requestId;
         context.Response.Headers[HeaderName] = requestId;
+
+        var idempotencyKey = context.Request.Headers[IdempotencyKeyHeaderName].FirstOrDefault();
+        if (idempotencyKey is not null && !IsValid(idempotencyKey))
+        {
+            await ApiErrors.WriteAsync(
+                context,
+                StatusCodes.Status400BadRequest,
+                "INVALID_IDEMPOTENCY_KEY",
+                "The idempotency key is invalid.");
+            return;
+        }
+
         var started = Stopwatch.GetTimestamp();
         try
         {

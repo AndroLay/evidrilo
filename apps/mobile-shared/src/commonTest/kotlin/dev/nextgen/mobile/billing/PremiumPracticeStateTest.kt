@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 
 class PremiumPracticeStateTest {
     private val reducer = PremiumPracticeReducer()
-    private val offer = BillingOffer("monthly", "Evidrilo Premium", "$1.00")
-    private val yearly = BillingOffer("yearly", "Yearly", "$10.00")
+    private val offer = BillingOffer("monthly", "Evidrilo Premium", "$1.99")
+    private val yearly = BillingOffer("yearly", "Yearly", "$19.99")
 
     @Test
     fun openingPremiumStartsInLoadingState() {

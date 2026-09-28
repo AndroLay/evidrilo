@@ -10,7 +10,74 @@
     "version": { "const": "1" },
     "accountId": { "type": "string", "format": "uuid" },
     "generatedAt": { "type": "string", "format": "date-time" },
-    "data": { "type": "object" },
+    "data": {
+      "type": "object",
+      "required": [
+        "studentProjects",
+        "studentProjectRevisions",
+        "studentProjectCloudConsent",
+        "studentProjectCloudConsentEvents"
+      ],
+      "properties": {
+        "studentProjectCloudConsent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["granted", "policyVersion", "grantedAt", "revokedAt", "updatedAt"],
+          "properties": {
+            "granted": { "type": "boolean" },
+            "policyVersion": { "type": "string", "pattern": "^student-project-cloud\\.v[0-9]+$" },
+            "grantedAt": { "type": ["string", "null"], "format": "date-time" },
+            "revokedAt": { "type": ["string", "null"], "format": "date-time" },
+            "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+          }
+        },
+        "studentProjectCloudConsentEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventId", "policyVersion", "decision", "decidedAt"],
+            "properties": {
+              "eventId": { "type": "string", "format": "uuid" },
+              "policyVersion": { "type": "string", "pattern": "^student-project-cloud\\.v[0-9]+$" },
+              "decision": { "enum": ["grant", "revoke"] },
+              "decidedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "studentProjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["projectId", "projectVersion", "project", "createdAt", "updatedAt"],
+            "properties": {
+              "projectId": { "type": "string", "format": "uuid" },
+              "projectVersion": { "type": "integer", "minimum": 1 },
+              "project": { "$ref": "student-project.v1.json#/$defs/projectDocument" },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "studentProjectRevisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["revisionId", "projectId", "version", "project", "createdAt"],
+            "properties": {
+              "revisionId": { "type": "string", "format": "uuid" },
+              "projectId": { "type": "string", "format": "uuid" },
+              "version": { "type": "integer", "minimum": 1 },
+              "project": { "$ref": "student-project.v1.json#/$defs/projectDocument" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "not": { "required": ["studentProjectCommands"] }
+    },
     "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
   }
 }

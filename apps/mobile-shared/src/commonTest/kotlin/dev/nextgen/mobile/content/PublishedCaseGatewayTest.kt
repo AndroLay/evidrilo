@@ -7,6 +7,7 @@ import dev.nextgen.mobile.account.runSuspendTest
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -157,6 +158,23 @@ class PublishedCaseGatewayTest {
         assertTrue(transport.requests.isEmpty())
     }
 
+    @Test
+    fun transport_failure_is_offline_only_when_the_platform_confirms_no_network() {
+        val offline = runSuspendTest {
+            gateway(FailingContentTransport(DeviceConnectivity.OFFLINE)).get("case-1:v1")
+        }
+        val onlineApiFailure = runSuspendTest {
+            gateway(FailingContentTransport(DeviceConnectivity.ONLINE)).get("case-1:v1")
+        }
+        val unknownConnectivity = runSuspendTest {
+            gateway(FailingContentTransport(DeviceConnectivity.UNKNOWN)).get("case-1:v1")
+        }
+
+        assertEquals("OFFLINE", assertIs<PublishedCaseGatewayResult.Failed>(offline).code)
+        assertEquals("CONTENT_UNAVAILABLE", assertIs<PublishedCaseGatewayResult.Failed>(onlineApiFailure).code)
+        assertEquals("CONTENT_UNAVAILABLE", assertIs<PublishedCaseGatewayResult.Failed>(unknownConnectivity).code)
+    }
+
     private fun gateway(
         transport: AccountHttpTransport,
         verified: Boolean = true,
@@ -192,6 +210,17 @@ private class FakeContentTransport(
         requests += ContentRequest(headers, body)
         return response
     }
+}
+
+private class FailingContentTransport(
+    override val deviceConnectivity: DeviceConnectivity,
+) : AccountHttpTransport {
+    override suspend fun request(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String,
+    ): AccountHttpResponse = error("Synthetic transport failure")
 }
 
 private class MemoryContentSecureStore(

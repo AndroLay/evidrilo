@@ -64,6 +64,19 @@ issue reports.
   configured.
 - Rate limits and worker retries are bounded; stale worker leases cannot
   overwrite a newer claim.
+- Retry keys are bounded and validated at the API boundary. A supplied
+  `Idempotency-Key` must use the same safe grammar as request identifiers;
+  malformed keys fail before the route executes.
+- Domain idempotency is durable rather than an in-memory cache: sync,
+  analytics, recommendation, billing, and account-deletion commands use
+  account/provider-scoped unique identities and compare the full replay
+  payload before returning an idempotent result.
+- AI requests bind the idempotency key to a redacted request fingerprint.
+  Reusing a key for different input is rejected, and reserved, consumed, or
+  released requests cannot reserve another credit or call the provider again.
+- Worker claims carry an explicit lease token in addition to the attempt
+  number. Completion and failure updates require the current token, so an
+  expired worker cannot finalize a job after a newer worker has reclaimed it.
 
 ## Content, analytics, and AI
 
@@ -84,6 +97,16 @@ issue reports.
   failure, malformed output, policy rejection, or unavailable configuration.
   The client cannot grant, transfer, or edit credits; raw prompts and raw
   responses are not ordinary audit-log data.
+- The OpenAI Responses adapter is server-only and remains disabled by default
+  behind two explicit activation flags. Its local implementation uses a fixed
+  HTTPS endpoint, disables redirects, tools, and provider conversation state,
+  requests strict structured output with approved anchor IDs, and enforces a
+  short timeout plus per-request and monthly spend reservations. The request
+  sets `store:false`, which does not disable standard provider abuse-monitoring
+  retention; OpenAI documents retention of such logs for up to 30 days unless
+  an eligible organization-level control is approved. Do not enable the
+  provider or claim zero retention before owner privacy/data-use review and
+  user disclosure are complete.
 
 ## Billing
 

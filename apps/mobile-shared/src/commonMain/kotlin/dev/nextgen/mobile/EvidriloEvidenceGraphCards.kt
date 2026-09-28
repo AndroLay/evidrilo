@@ -11,6 +11,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -107,7 +111,7 @@ internal fun EvidriloEvidenceLensCard(
                 )
             }
             Text(
-                "Selection is shown as a learner anchor; it is not a claim of proof by itself.",
+                "Selection is shown as a student anchor; it is not a claim of proof by itself.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             lens.entries.forEach { entry ->
@@ -152,13 +156,17 @@ internal fun EvidriloClaimBoundaryCard(
             Text("VERIFY CLAIM · CLAIM BOUNDARY", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
             Text(boundary.status.displayLabel(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             TraceFactRow(
-                label = "Learner claim",
+                label = "Student claim",
                 text = boundary.claimText.ifBlank { "Not written" },
             )
             TraceFactRow(label = "Scope", text = boundary.scope.evidriloLabel())
+            val limitationSummary = case.facts
+                .filter { it.id in boundary.limitationRefs }
+                .joinToString { it.displayLabel ?: it.text }
+                .ifBlank { "No limitation selected yet" }
             TraceFactRow(
-                label = "Limitation anchors",
-                text = boundary.limitationRefs.ifEmpty { listOf("None selected") }.joinToString(),
+                label = "Limitations",
+                text = limitationSummary,
             )
             boundary.boundary?.let { fact ->
                 TraceFactRow(label = "Case boundary · ${fact.factId}", text = fact.text)
@@ -242,6 +250,11 @@ internal fun EvidriloEvidenceDeltaCard(
     beforeCase: ConclusionCase = case,
 ) {
     val delta = evidenceDeltaFor(beforeCase, case, before, after)
+    var showDetails by remember(before, after, beforeCase, case) { mutableStateOf(false) }
+    val evidenceChangeSummary = buildList {
+        if (delta.addedEvidenceIds.isNotEmpty()) add("${delta.addedEvidenceIds.size} added")
+        if (delta.removedEvidenceIds.isNotEmpty()) add("${delta.removedEvidenceIds.size} removed or unavailable")
+    }.joinToString(" · ").ifBlank { "No evidence changed" }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -257,38 +270,31 @@ internal fun EvidriloEvidenceDeltaCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("EVIDENCE DELTA · WHAT CHANGED?", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
             Text(title, style = MaterialTheme.typography.titleLarge)
+            DeltaRow(label = "Evidence", value = evidenceChangeSummary)
             DeltaRow(
-                label = "Evidence retained",
-                value = delta.retainedEvidenceIds.ifEmpty { listOf("None") }.joinToString(),
+                label = "Verification",
+                value = "${delta.beforeAssessment.displayLabel()} → ${delta.afterAssessment.displayLabel()}",
             )
-            DeltaRow(
-                label = "Evidence added",
-                value = delta.addedEvidenceIds.ifEmpty { listOf("None") }.joinToString(),
+            DeltaRow(label = "Claim boundary", value = if (delta.claimBoundaryChanged) "Changed" else "Unchanged")
+            DeltaRow(label = "Open gap", value = if (delta.gapChanged) "Changed" else "Unchanged")
+            DeltaRow(label = "Next action", value = delta.afterActionState.evidriloLabel())
+            if (showDetails) {
+                DeltaRow(label = "Evidence retained", value = delta.retainedEvidenceIds.joinToString().ifBlank { "No retained anchors" })
+                DeltaRow(label = "Evidence added", value = delta.addedEvidenceIds.joinToString().ifBlank { "No evidence added" })
+                DeltaRow(label = "Evidence removed or unavailable", value = delta.removedEvidenceIds.joinToString().ifBlank { "No evidence removed" })
+                DeltaRow(label = "Claim text changed", value = delta.claimChanged.evidriloYesNo())
+                DeltaRow(label = "Scope changed", value = delta.scopeChanged.evidriloYesNo())
+                DeltaRow(label = "Limitations added", value = delta.addedLimitationIds.joinToString().ifBlank { "No limitation added" })
+                DeltaRow(label = "Limitations removed", value = delta.removedLimitationIds.joinToString().ifBlank { "No limitation removed" })
+                DeltaRow(label = "Limitation note changed", value = delta.limitationNoteChanged.evidriloYesNo())
+                DeltaRow(label = "Next action changed", value = delta.implicationChanged.evidriloYesNo())
+                DeltaRow(label = "Evidence relationship changed", value = delta.evidenceRelationshipChanged.evidriloYesNo())
+            }
+            EvidriloSecondaryButton(
+                label = if (showDetails) "Hide comparison details" else "Show comparison details",
+                onClick = { showDetails = !showDetails },
             )
-            DeltaRow(
-                label = "Evidence removed or unavailable",
-                value = delta.removedEvidenceIds.ifEmpty { listOf("None") }.joinToString(),
-            )
-            DeltaRow(label = "Claim text changed", value = delta.claimChanged.evidriloYesNo())
-            DeltaRow(label = "Scope changed", value = delta.scopeChanged.evidriloYesNo())
-            DeltaRow(
-                label = "Limitation anchors added",
-                value = delta.addedLimitationIds.ifEmpty { listOf("None") }.joinToString(),
-            )
-            DeltaRow(
-                label = "Limitation anchors removed",
-                value = delta.removedLimitationIds.ifEmpty { listOf("None") }.joinToString(),
-            )
-            DeltaRow(label = "Limitation note changed", value = delta.limitationNoteChanged.evidriloYesNo())
-            DeltaRow(label = "Next action changed", value = delta.implicationChanged.evidriloYesNo())
-            DeltaRow(label = "Evidence assessment before", value = delta.beforeAssessment.displayLabel())
-            DeltaRow(label = "Evidence assessment after", value = delta.afterAssessment.displayLabel())
-            DeltaRow(label = "Evidence relationship changed", value = delta.evidenceRelationshipChanged.evidriloYesNo())
-            DeltaRow(label = "Claim boundary changed", value = delta.claimBoundaryChanged.evidriloYesNo())
-            DeltaRow(label = "Open gap changed", value = delta.gapChanged.evidriloYesNo())
-            DeltaRow(label = "Action trace", value = delta.afterActionState.evidriloLabel())
         }
     }
 }

@@ -2,9 +2,15 @@ package dev.nextgen.mobile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.audio.AudioPlaybackState
 import dev.nextgen.mobile.audio.EvidriloAudioListenControl
@@ -22,6 +28,9 @@ internal fun EvidriloSupportScreen(
     onPauseOrResumeAudio: () -> Unit = {},
     onStopAudio: () -> Unit = {},
 ) {
+    val uriHandler = LocalUriHandler.current
+    var contactLaunchFailed by remember { mutableStateOf(false) }
+
     EvidriloContentColumn {
         EvidriloBackButton(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -79,8 +88,28 @@ internal fun EvidriloSupportScreen(
         EvidriloTintPanel {
             Text("Contact", style = MaterialTheme.typography.titleMedium)
             Text(
-                "The production support address is not configured in this build. Keep this surface behind the owner’s verified support channel before release.",
+                "For help, email the Evidrilo team. Do not include passwords or payment credentials.",
                 style = MaterialTheme.typography.bodyMedium,
+            )
+            SelectionContainer {
+                Text("andrlay30@gmail.com", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (contactLaunchFailed) {
+                Text(
+                    "No email app opened. Select and copy the address above.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            EvidriloSecondaryButton(
+                label = "Email support",
+                onClick = {
+                    contactLaunchFailed = try {
+                        uriHandler.openUri("mailto:andrlay30@gmail.com?subject=Evidrilo%20Support")
+                        false
+                    } catch (_: Exception) {
+                        true
+                    }
+                },
             )
         }
 

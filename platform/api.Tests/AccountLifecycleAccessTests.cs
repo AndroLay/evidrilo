@@ -17,18 +17,20 @@ public sealed class AccountLifecycleAccessTests
     private static readonly Guid UserId = Guid.Parse("123e4567-e89b-42d3-a456-426614174000");
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(true, true, true, true)]
     public void Completed_deletion_ledger_or_profile_tombstone_blocks_access(
         bool deletionRequestCompleted,
         bool profileTombstoned,
+        bool durableTombstone,
         bool expectedDeleted)
     {
         Assert.Equal(
             expectedDeleted,
-            AccountDeletionStatus.IsDeleted(deletionRequestCompleted, profileTombstoned));
+            AccountDeletionStatus.IsDeleted(deletionRequestCompleted, profileTombstoned, durableTombstone));
     }
 
     [Fact]

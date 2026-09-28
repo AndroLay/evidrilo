@@ -69,9 +69,9 @@ internal fun EvidriloHistoryScreen(
             } else {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-                    border = BorderStroke(1.dp, EvidriloColors.Separator),
+                    border = BorderStroke(2.dp, EvidriloColors.Separator),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 ) {
                     Column(
@@ -98,9 +98,9 @@ internal fun EvidriloHistoryScreen(
 private fun EvidriloHistorySnapshotCard(snapshot: ConclusionSessionSnapshot) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(

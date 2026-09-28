@@ -5,8 +5,10 @@ const val MAX_AUTH_REDIRECT_URL_BYTES: Int = 8 * 1024
 sealed interface AuthRedirect {
     data class Code(
         val code: String,
-        val state: String,
+        val state: String?,
     ) : AuthRedirect
+
+    data class ProviderError(val code: String) : AuthRedirect
 
     class Tokens(
         val accessToken: String,
@@ -37,13 +39,20 @@ fun parseAuthRedirect(
     val queryParameters = parseParameters(query) ?: return AuthRedirect.Invalid
     val fragmentParameters = parseParameters(fragment) ?: return AuthRedirect.Invalid
 
-    if (queryParameters["error"] != null || fragmentParameters["error"] != null) {
-        return AuthRedirect.Invalid
+    val providerError = queryParameters["error_code"]
+        ?: queryParameters["error"]
+        ?: fragmentParameters["error_code"]
+        ?: fragmentParameters["error"]
+    if (providerError != null) {
+        val safeCode = providerError
+            .takeIf { it.length in 1..64 && it.all { character -> character.isLetterOrDigit() || character in "-_" } }
+            ?: "provider_error"
+        return AuthRedirect.ProviderError(safeCode)
     }
 
     val code = queryParameters["code"]
     val codeState = queryParameters["state"]
-    if (code != null && !codeState.isNullOrBlank() && code.isNotBlank()) {
+    if (code != null && code.isNotBlank()) {
         return AuthRedirect.Code(code, codeState)
     }
 

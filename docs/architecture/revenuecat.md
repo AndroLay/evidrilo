@@ -5,9 +5,10 @@ product and code boundaries, not proof of a live store transaction.
 
 ## Product model
 
-- Free: one complete local learning loop, including evidence, transparent
-  feedback, one revision, the evidence-change challenge, comparison, and
-  local history.
+- Free: one complete M0 learning loop, including evidence, transparent
+  feedback, one revision, the evidence-change challenge, comparison, and local
+  history. M0 case learning requires a signed-in account; local project work
+  and anonymous catalog browsing do not.
 - Premium: the canonical entitlement
 `evidrilo_pro` unlocks two additional reviewed cases.
 - Packages: monthly and yearly only. A lifetime package is not in the
@@ -23,14 +24,65 @@ a safer outcome. Pricing and current provider catalog observations belong in
 the private pricing/evidence records; do not copy changing prices into this
 architecture note.
 
+D-108's post-competition academic learning/project direction did not itself
+alter this RevenueCat boundary. D-124 now sets the product-tier policy for that
+direction: all catalog guides and published-template previews stay Free;
+reviewed baseline templates remain Free within each family when available;
+Pro may later add reviewed specialist templates without locking an entire
+method family or core project workflow. Essential report export and full
+project-data portability remain Free. Existing entitlement, prices, case
+benefits, project limits, and AI-credit quantities are unchanged. This policy
+does not mean those template entitlements are implemented or that any reviewed
+template is currently selectable.
+
+Future cloud sync/backup is not included in the current Pro promise. It requires
+the separate R2 consent, privacy, retention, security, quota, cost, operations,
+and acceptance gates before it can be offered as a subscription benefit.
+
+Remaining dashboard price migration and purchase/restore/revoke matrix remain
+owner gates; this document does not claim that the provider dashboard is
+configured or that a transaction has been observed.
+The historical Test Store observation is recorded in the private evidence
+ledger and is not current provider proof.
+
+## Next Gen payment decision
+
+Evidrilo currently targets the Shipaton Next Gen Award. For that category, the
+RevenueCat Test Store/sandbox is sufficient; a real App Store or Google Play
+payment, production transaction, production revenue, store listing, or paid
+developer account is not required. This does not remove the RevenueCat
+requirement: the official RevenueCat SDK must still power a working purchase
+and entitlement flow in the candidate build.
+
+The minimum honest demo is:
+
+```text
+offering loads
+  → monthly/yearly Test Store purchase
+  → CustomerInfo activates evidrilo_pro
+  → premium evidence case unlocks
+  → restore or failure remains entitlement-driven
+```
+
+All evidence must be labelled `sandbox/Test Store`. It proves an integration
+flow, not real payment or production revenue. The official basis is the
+[Next Gen rules](https://revenuecat-shipaton-2026.devpost.com/rules) and the
+[RevenueCat manager clarification](https://revenuecat-shipaton-2026.devpost.com/forum_topics/44695-next-gen-eligibility-is-a-test-store-only-purchase-sufficient).
+Non-Next-Gen categories and future store releases are separate gates and must
+not be inferred from this exception. No automatic or numeric Next Gen score
+deduction for using Test Store is published; the meaningful risk is an
+incomplete, mocked, or misleading purchase flow.
+
 RevenueCat also authorizes the optional AI allowance; it does not store or
 directly mutate the AI credit balance. The approved policy is 10 one-time
 credits for a verified free account and 100 credits per active entitlement
 month for both monthly and yearly `evidrilo_pro`. Credits do not roll over, and
-failed AI requests release their reservation. See the [AI assistance and credit
-contract](ai-assistance.md).
+failed AI requests release their reservation. See [D-106](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance).
 
 ## Mobile access flow
+
+For the detailed purchase, restore, local-access, and webhook sequence, see
+[`system-execution-flows.md`](system-execution-flows.md).
 
 ```text
 Premium case request
@@ -126,8 +178,8 @@ purchase, cancellation/failure, active entitlement, restore, relaunch, and
 supported expiry/revocation cases. Sandbox results are not production
 revenue or store approval.
 
-Use the [RevenueCat Test Store runbook](../operations/revenuecat-test-store-runbook.md)
-for the controlled procedure. Current provider status is kept in the private
+Use this integration boundary and the owner-authorized provider procedure for
+the controlled Test Store run. Current provider status is kept in the private
 evidence ledger to avoid stale dashboard claims in public architecture docs.
 
 ## Configuration and privacy

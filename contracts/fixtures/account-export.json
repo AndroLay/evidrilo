@@ -12,7 +12,17 @@
     "aiAuditEvents": [],
     "entitlementEvents": [],
     "entitlements": [],
-    "progressDaily": []
+    "progressDaily": [],
+    "studentProjectCloudConsent": {
+      "granted": false,
+      "policyVersion": "student-project-cloud.v1",
+      "grantedAt": null,
+      "revokedAt": null,
+      "updatedAt": null
+    },
+    "studentProjectCloudConsentEvents": [],
+    "studentProjects": [],
+    "studentProjectRevisions": []
   },
   "requestId": "acct-export-20260921"
 }

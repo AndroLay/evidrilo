@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Evidrilo.Api;
 using Evidrilo.Api.Common;
+using Evidrilo.Api.ProjectAi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -15,6 +16,20 @@ namespace Evidrilo.Api.Tests;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    private readonly Action<IServiceCollection>? configureAdditionalServices;
+
+    public ApiFactory()
+    {
+    }
+
+    private ApiFactory(Action<IServiceCollection> configureAdditionalServices)
+    {
+        this.configureAdditionalServices = configureAdditionalServices;
+    }
+
+    public static ApiFactory WithAdditionalServices(Action<IServiceCollection> configureAdditionalServices) =>
+        new(configureAdditionalServices);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -25,11 +40,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 ["Platform:Environment"] = "Testing",
                 ["Platform:SupabaseUrl"] = "",
                 ["Platform:SupabasePublishableKey"] = "",
+                ["Platform:DatabaseConnectionString"] = "",
                 ["Platform:CorsAllowedOrigins"] = "http://localhost:3000",
+                ["AI_PROVIDER_ENABLED"] = "false",
             });
         });
         builder.ConfigureServices(services =>
         {
+            configureAdditionalServices?.Invoke(services);
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = TestAuthenticationHandler.TestScheme;

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-template-families.v1.json",
+  "title": "Evidrilo project template families response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "families", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-template-families" },
+    "version": { "const": "1" },
+    "families": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["family", "selectableTemplateCount"],
+        "properties": {
+          "family": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "displayName"],
+            "properties": {
+              "id": {
+                "enum": [
+                  "experimental_laboratory",
+                  "observational_survey",
+                  "literature_review",
+                  "qualitative_interview_field_study",
+                  "design_engineering"
+                ]
+              },
+              "displayName": { "type": "string", "minLength": 1 }
+            }
+          },
+          "selectableTemplateCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

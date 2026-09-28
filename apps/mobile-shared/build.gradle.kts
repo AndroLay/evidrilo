@@ -50,10 +50,13 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
+            implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kmp.zip.core)
         }
 
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
             implementation(libs.revenuecat.kmp.core)
             implementation(libs.revenuecat.kmp.ui)
         }
@@ -130,6 +133,11 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", supabasePublishableKey.asSafeClientConfigString())
         buildConfigField("String", "SUPABASE_AUTH_REDIRECT_URL", supabaseAuthRedirectUrl.asBuildConfigString())
         buildConfigField("String", "EVIDRILO_API_BASE_URL", evidriloApiBaseUrl.asBuildConfigString())
+        buildConfigField(
+            "String",
+            "EVIDRILO_APP_VERSION",
+            rootProject.version.toString().removeSuffix("-SNAPSHOT").asBuildConfigString(),
+        )
     }
 
     buildFeatures {

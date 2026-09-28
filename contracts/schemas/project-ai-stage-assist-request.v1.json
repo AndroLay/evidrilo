@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist-request.v1.json",
+  "title": "Evidrilo stage-bound Project AI request v1",
+  "description": "A project request binds one authenticated account, one installation, one owned project, one published template stage, and only student-selected allowlisted fields. GENERAL is accepted as a choice but remains unavailable until its cost, limit, and retention policy is approved.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {},
+    "version": {},
+    "mode": {},
+    "installationId": {},
+    "locale": {},
+    "projectId": {},
+    "templateId": {},
+    "templateVersion": {},
+    "stageId": {},
+    "operationId": {},
+    "baseProjectRevision": {},
+    "selectedFields": {}
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/projectRequest" },
+    { "$ref": "#/$defs/generalRequest" }
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "properties": {
+        "schema": { "const": "evidrilo.project-ai-stage-assist" },
+        "version": { "const": "1" },
+        "mode": { "enum": ["PROJECT", "GENERAL"] },
+        "installationId": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 }
+      },
+      "required": ["schema", "version", "mode", "installationId", "locale"]
+    },
+    "projectRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "schema": { "const": "evidrilo.project-ai-stage-assist" },
+            "version": { "const": "1" },
+            "mode": { "const": "PROJECT" },
+            "installationId": { "type": "string", "format": "uuid" },
+            "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 },
+            "projectId": { "type": "string", "format": "uuid" },
+            "templateId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 96 },
+            "templateVersion": { "type": "integer", "minimum": 1 },
+            "stageId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
+            "operationId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
+            "baseProjectRevision": { "type": "integer", "minimum": 1 },
+            "selectedFields": {
+              "type": "object",
+              "maxProperties": 32,
+              "propertyNames": { "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+              "additionalProperties": { "type": "string", "maxLength": 8000 }
+            }
+          },
+          "required": ["schema", "version", "mode", "installationId", "locale", "projectId", "templateId", "templateVersion", "stageId", "operationId", "baseProjectRevision", "selectedFields"]
+        }
+      ]
+    },
+    "generalRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "schema": { "const": "evidrilo.project-ai-stage-assist" },
+            "version": { "const": "1" },
+            "mode": { "const": "GENERAL" },
+            "installationId": { "type": "string", "format": "uuid" },
+            "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 }
+          },
+          "required": ["schema", "version", "mode", "installationId", "locale"]
+        }
+      ]
+    }
+  }
+}

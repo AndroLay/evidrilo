@@ -6,7 +6,7 @@ namespace Evidrilo.Api.Health;
 /// </summary>
 public static class DatabaseSchemaReadiness
 {
-    public const string CurrentMigrationVersion = "030_sync_published_case_boundary";
+    public const string CurrentMigrationVersion = "049_project_ai_activity_history";
 
     public static string Status(
         bool connectionSucceeded,

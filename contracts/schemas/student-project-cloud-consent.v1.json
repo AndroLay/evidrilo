@@ -1,0 +1,31 @@
+{
+  "$id": "https://evidrilo.dev/contracts/student-project-cloud-consent.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidrilo student project cloud consent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "granted",
+    "policyVersion",
+    "grantedAt",
+    "revokedAt",
+    "updatedAt",
+    "requestId"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.project-cloud-consent" },
+    "version": { "const": "1" },
+    "granted": { "type": "boolean" },
+    "policyVersion": {
+      "type": "string",
+      "pattern": "^student-project-cloud\\.v[0-9]+$",
+      "maxLength": 80
+    },
+    "grantedAt": { "type": ["string", "null"], "format": "date-time" },
+    "revokedAt": { "type": ["string", "null"], "format": "date-time" },
+    "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

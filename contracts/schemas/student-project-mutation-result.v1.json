@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/student-project-mutation-result.v1.json",
+  "title": "Evidrilo student project mutation response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "projectId", "projectVersion", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.student-project-mutation-result" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["created", "saved", "deleted", "replayed"] },
+    "projectId": { "type": "string", "format": "uuid" },
+    "projectVersion": { "type": "integer", "minimum": 1 },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

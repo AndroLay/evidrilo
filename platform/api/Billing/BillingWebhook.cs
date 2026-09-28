@@ -15,7 +15,9 @@ public sealed record BillingWebhookEnvelope(
     [property: JsonPropertyName("accountId")] Guid AccountId,
     [property: JsonPropertyName("entitlement")] string Entitlement,
     [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("occurredAt")] DateTimeOffset OccurredAt);
+    [property: JsonPropertyName("occurredAt")] DateTimeOffset OccurredAt,
+    [property: JsonPropertyName("periodStartedAt")] DateTimeOffset? PeriodStartedAt = null,
+    [property: JsonPropertyName("periodExpiresAt")] DateTimeOffset? PeriodExpiresAt = null);
 
 public sealed record RevenueCatWebhookEnvelope(
     [property: JsonPropertyName("api_version")] string? ApiVersion,
@@ -29,6 +31,7 @@ public sealed record RevenueCatWebhookEvent(
     [property: JsonPropertyName("entitlement_ids")] IReadOnlyList<string>? EntitlementIds,
     [property: JsonPropertyName("entitlement_id")] string? EntitlementId,
     [property: JsonPropertyName("event_timestamp_ms")] long? EventTimestampMs,
+    [property: JsonPropertyName("purchased_at_ms")] long? PurchasedAtMs,
     [property: JsonPropertyName("expiration_at_ms")] long? ExpirationAtMs,
     [property: JsonPropertyName("cancel_reason")] string? CancellationReason);
 
@@ -66,12 +69,28 @@ public sealed class NpgsqlBillingStore : IBillingStore, IDisposable
         {
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await using (var accountLockCommand = connection.CreateCommand())
+            {
+                accountLockCommand.Transaction = transaction;
+                accountLockCommand.CommandText = "select id from auth.users where id = @account_id for update;";
+                accountLockCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, envelope.AccountId);
+                if (await accountLockCommand.ExecuteScalarAsync(cancellationToken) is null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return "ignored";
+                }
+            }
+
             await using var eventCommand = connection.CreateCommand();
             eventCommand.Transaction = transaction;
             eventCommand.CommandText = """
                 insert into public.entitlement_events (
-                    provider_event_id, account_id, entitlement, status, occurred_at
-                ) values (@event_id, @account_id, @entitlement, @status, @occurred_at)
+                    provider_event_id, account_id, entitlement, status, occurred_at,
+                    period_started_at, period_expires_at
+                ) values (
+                    @event_id, @account_id, @entitlement, @status, @occurred_at,
+                    @period_started_at, @period_expires_at
+                )
                 on conflict (provider_event_id) do nothing
                 returning provider_event_id;
                 """;
@@ -80,6 +99,14 @@ public sealed class NpgsqlBillingStore : IBillingStore, IDisposable
             eventCommand.Parameters.AddWithValue("entitlement", NpgsqlDbType.Text, envelope.Entitlement);
             eventCommand.Parameters.AddWithValue("status", NpgsqlDbType.Text, envelope.Status);
             eventCommand.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, envelope.OccurredAt);
+            eventCommand.Parameters.AddWithValue(
+                "period_started_at",
+                NpgsqlDbType.TimestampTz,
+                (object?)envelope.PeriodStartedAt ?? DBNull.Value);
+            eventCommand.Parameters.AddWithValue(
+                "period_expires_at",
+                NpgsqlDbType.TimestampTz,
+                (object?)envelope.PeriodExpiresAt ?? DBNull.Value);
             var inserted = await eventCommand.ExecuteScalarAsync(cancellationToken);
             if (inserted is null or DBNull)
             {
@@ -92,13 +119,23 @@ public sealed class NpgsqlBillingStore : IBillingStore, IDisposable
                       and account_id = @account_id
                       and entitlement = @entitlement
                       and status = @status
-                      and occurred_at = @occurred_at;
+                      and occurred_at = @occurred_at
+                      and period_started_at is not distinct from @period_started_at
+                      and period_expires_at is not distinct from @period_expires_at;
                     """;
                 existingEventCommand.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, envelope.EventId);
                 existingEventCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, envelope.AccountId);
                 existingEventCommand.Parameters.AddWithValue("entitlement", NpgsqlDbType.Text, envelope.Entitlement);
                 existingEventCommand.Parameters.AddWithValue("status", NpgsqlDbType.Text, envelope.Status);
                 existingEventCommand.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, envelope.OccurredAt);
+                existingEventCommand.Parameters.AddWithValue(
+                    "period_started_at",
+                    NpgsqlDbType.TimestampTz,
+                    (object?)envelope.PeriodStartedAt ?? DBNull.Value);
+                existingEventCommand.Parameters.AddWithValue(
+                    "period_expires_at",
+                    NpgsqlDbType.TimestampTz,
+                    (object?)envelope.PeriodExpiresAt ?? DBNull.Value);
                 var matchesExistingEvent = await existingEventCommand.ExecuteScalarAsync(cancellationToken) is not null;
                 if (!matchesExistingEvent)
                     throw new ApiException(
@@ -114,18 +151,38 @@ public sealed class NpgsqlBillingStore : IBillingStore, IDisposable
             entitlementCommand.Transaction = transaction;
             entitlementCommand.CommandText = """
                 insert into public.entitlements (
-                    account_id, entitlement, status, updated_at, source_occurred_at
-                ) values (@account_id, @entitlement, @status, now(), @occurred_at)
+                    account_id, entitlement, status, updated_at, source_occurred_at,
+                    period_started_at, period_expires_at
+                ) values (
+                    @account_id, @entitlement, @status, now(), @occurred_at,
+                    @period_started_at, @period_expires_at
+                )
                 on conflict (account_id, entitlement) do update
                 set status = excluded.status,
                     updated_at = excluded.updated_at,
-                    source_occurred_at = excluded.source_occurred_at
+                    source_occurred_at = excluded.source_occurred_at,
+                    period_started_at = coalesce(
+                        excluded.period_started_at,
+                        public.entitlements.period_started_at
+                    ),
+                    period_expires_at = coalesce(
+                        excluded.period_expires_at,
+                        public.entitlements.period_expires_at
+                    )
                 where public.entitlements.source_occurred_at <= excluded.source_occurred_at;
                 """;
             entitlementCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, envelope.AccountId);
             entitlementCommand.Parameters.AddWithValue("entitlement", NpgsqlDbType.Text, envelope.Entitlement);
             entitlementCommand.Parameters.AddWithValue("status", NpgsqlDbType.Text, envelope.Status);
             entitlementCommand.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, envelope.OccurredAt);
+            entitlementCommand.Parameters.AddWithValue(
+                "period_started_at",
+                NpgsqlDbType.TimestampTz,
+                (object?)envelope.PeriodStartedAt ?? DBNull.Value);
+            entitlementCommand.Parameters.AddWithValue(
+                "period_expires_at",
+                NpgsqlDbType.TimestampTz,
+                (object?)envelope.PeriodExpiresAt ?? DBNull.Value);
             await entitlementCommand.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return "accepted";
@@ -213,6 +270,9 @@ public sealed class BillingWebhookService
             || providerEvent.EventTimestampMs is not > 0)
             throw new ApiException(StatusCodes.Status400BadRequest, "INVALID_BILLING_EVENT", "The billing event is invalid.");
 
+        if (string.Equals(providerEvent.Type.Trim(), "TEST", StringComparison.OrdinalIgnoreCase))
+            return "ignored";
+
         var entitlement = SelectEntitlement(providerEvent);
         var status = RevenueCatEventStatus.Map(
             providerEvent.Type,
@@ -237,13 +297,37 @@ public sealed class BillingWebhookService
             throw new ApiException(StatusCodes.Status400BadRequest, "INVALID_BILLING_EVENT", "The billing event is invalid.", exception);
         }
 
+        DateTimeOffset? periodStartedAt = null;
+        DateTimeOffset? periodExpiresAt = null;
+        if (providerEvent.PurchasedAtMs.HasValue && providerEvent.ExpirationAtMs.HasValue)
+        {
+            try
+            {
+                periodStartedAt = DateTimeOffset.FromUnixTimeMilliseconds(providerEvent.PurchasedAtMs.Value);
+                periodExpiresAt = DateTimeOffset.FromUnixTimeMilliseconds(providerEvent.ExpirationAtMs.Value);
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                throw new ApiException(
+                    StatusCodes.Status400BadRequest,
+                    "INVALID_BILLING_EVENT",
+                    "The billing event is invalid.",
+                    exception);
+            }
+
+            if (periodExpiresAt <= periodStartedAt)
+                throw new ApiException(StatusCodes.Status400BadRequest, "INVALID_BILLING_EVENT", "The billing event is invalid.");
+        }
+
         return await store.RecordAsync(
             new BillingWebhookEnvelope(
                 providerEvent.Id,
                 accountId,
                 entitlement,
                 status,
-                occurredAt),
+                occurredAt,
+                periodStartedAt,
+                periodExpiresAt),
             cancellationToken);
     }
 
@@ -261,8 +345,9 @@ public sealed class BillingWebhookService
             string.Equals(candidate, configuredEntitlement, StringComparison.Ordinal));
     }
 
-    private static bool IsApprovedProductId(string? productId) =>
-        productId is "monthly" or "yearly";
+    private bool IsApprovedProductId(string? productId) =>
+        string.Equals(productId, options.RevenueCatMonthlyProductId, StringComparison.Ordinal)
+        || string.Equals(productId, options.RevenueCatYearlyProductId, StringComparison.Ordinal);
 }
 
 public static class BillingSignature
@@ -387,7 +472,6 @@ internal static class RevenueCatEventStatus
                 or "TRANSFER"
                 or "PURCHASE_REDEEMED"
                 or "TEMPORARY_ENTITLEMENT_GRANT"
-                or "TEST"
                 => "active",
             "EXPIRATION" => "expired",
             "CANCELLATION" => normalizedCancellationReason == "CUSTOMER_SUPPORT"

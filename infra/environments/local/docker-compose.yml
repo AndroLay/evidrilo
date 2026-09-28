@@ -60,9 +60,11 @@ services:
       ASPNETCORE_URLS: http://+:5080
       PORT: "5080"
       DATABASE_URL: Host=postgres;Port=5432;Database=evidrilo;Username=evidrilo;Include Error Detail=false
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports:
-      - "${EVIDRILO_API_PORT:-5080}:5080"
+      - "127.0.0.1:${EVIDRILO_API_PORT:-5080}:5080"
     restart: unless-stopped
 
   worker:
@@ -75,9 +77,11 @@ services:
       migrations:
         condition: service_completed_successfully
     environment:
+      DOTNET_ENVIRONMENT: Development
       DATABASE_URL: Host=postgres;Port=5432;Database=evidrilo;Username=evidrilo;Include Error Detail=false
       WORKER_POLL_INTERVAL_SECONDS: "5"
       WORKER_BATCH_SIZE: "10"
+      SUPABASE_AUTH_ADMIN_ENABLED: ${SUPABASE_AUTH_ADMIN_ENABLED:-false}
     restart: unless-stopped
 
 volumes:

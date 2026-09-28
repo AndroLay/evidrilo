@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-template-catalogue.v1.json",
+  "title": "Evidrilo published project template catalog response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "templates", "nextAfterTemplateId", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-template-catalog" },
+    "version": { "const": "1" },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "family", "title", "summary", "publication"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$", "maxLength": 96 },
+          "version": { "type": "integer", "minimum": 1 },
+          "family": {
+            "enum": [
+              "experimental_laboratory",
+              "observational_survey",
+              "literature_review",
+              "qualitative_interview_field_study",
+              "design_engineering"
+            ]
+          },
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 1200 },
+          "publication": { "const": "published" }
+        }
+      }
+    },
+    "nextAfterTemplateId": { "type": ["string", "null"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

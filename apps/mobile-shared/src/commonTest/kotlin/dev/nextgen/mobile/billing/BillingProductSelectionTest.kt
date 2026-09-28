@@ -44,7 +44,7 @@ class BillingProductSelectionTest {
         )
         assertTrue(
             eligiblePracticePackOffers(
-                listOf(BillingOffer(" monthly ", "Monthly", "$1.00")),
+                listOf(BillingOffer(" monthly ", "Monthly", "$1.99")),
                 configuration,
             ).isEmpty(),
         )
@@ -82,9 +82,9 @@ class BillingProductSelectionTest {
             productIds = "monthly,yearly,lifetime",
         )
         val offers = listOf(
-            BillingOffer("monthly", "Monthly", "\$1.00"),
-            BillingOffer("unrelated", "Unrelated", "\$1.00"),
-            BillingOffer("yearly", "Yearly", "\$10.00"),
+            BillingOffer("monthly", "Monthly", "\$1.99"),
+            BillingOffer("unrelated", "Unrelated", "\$1.99"),
+            BillingOffer("yearly", "Yearly", "\$19.99"),
             BillingOffer("lifetime", "Lifetime", "\$99.99"),
         )
 
@@ -101,8 +101,8 @@ class BillingProductSelectionTest {
             productIds = "monthly,yearly,lifetime",
         )
         val offers = listOf(
-            BillingOffer("monthly", "Monthly", "\$1.00"),
-            BillingOffer("yearly", "Yearly", "\$10.00"),
+            BillingOffer("monthly", "Monthly", "\$1.99"),
+            BillingOffer("yearly", "Yearly", "\$19.99"),
         )
 
         assertEquals(

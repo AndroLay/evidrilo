@@ -91,9 +91,9 @@ internal fun EvidriloGuideScreen(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-            border = BorderStroke(1.dp, EvidriloColors.Separator),
+            border = BorderStroke(2.dp, EvidriloColors.Separator),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -133,7 +133,7 @@ internal fun EvidriloGuideScreen(
             onClick = onReplayOnboarding,
         )
         Text(
-            "No account is required. The supplied case and your draft stay on this device.",
+            "The bundled example is separate from your projects. Your own project work stays on this device.",
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -201,17 +201,17 @@ private fun EvidriloGuideProcessStep(
     Row(
         modifier = modifier
             .then(if (vertical) Modifier.fillMaxWidth() else Modifier)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(EvidriloColors.Tint)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(EvidriloColors.White),
+                .clip(RoundedCornerShape(12.dp))
+                .background(EvidriloColors.Card),
             contentAlignment = Alignment.Center,
         ) {
             EvidriloIcon(name = icon, tint = EvidriloColors.Cobalt, modifier = Modifier.size(20.dp))

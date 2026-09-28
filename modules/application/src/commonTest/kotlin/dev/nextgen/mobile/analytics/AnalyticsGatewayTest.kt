@@ -7,6 +7,7 @@ import dev.nextgen.mobile.account.runSuspendTest
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,6 +15,13 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AnalyticsGatewayTest {
+    @Test
+    fun guest_only_mode_never_sends_analytics_even_if_old_consent_exists() {
+        assertFalse(analyticsTransmissionAllowed(AnalyticsConsent.GRANTED, guestOnlyMode = true))
+        assertTrue(analyticsTransmissionAllowed(AnalyticsConsent.GRANTED, guestOnlyMode = false))
+        assertFalse(analyticsTransmissionAllowed(AnalyticsConsent.NOT_GRANTED, guestOnlyMode = false))
+    }
+
     @Test
     fun event_requires_explicit_consent_and_sends_only_minimal_properties() {
         val transport = FakeAnalyticsTransport(
@@ -106,6 +114,24 @@ class AnalyticsGatewayTest {
         assertEquals("INVALID_ANALYTICS_RESPONSE", assertIs<AnalyticsGatewayResult.Failed>(malformed).code)
     }
 
+    @Test
+    fun lost_analytics_response_is_unknown_and_retries_with_the_same_event_identity() {
+        val transport = FailingAnalyticsTransport()
+        val event = validEvent()
+        val result = runSuspendTest {
+            gateway(transport).sendWithRetry(event, AnalyticsConsent.GRANTED) { }
+        }
+        val failure = assertIs<AnalyticsGatewayResult.Failed>(result)
+
+        assertEquals("ANALYTICS_OUTCOME_UNKNOWN", failure.code)
+        assertTrue(failure.outcomeUnknown)
+        assertTrue(failure.reconciliationRequired)
+        assertTrue(failure.sameIntentReplayAllowed)
+        assertEquals(event.clientEventId, failure.idempotencyKey)
+        assertEquals(3, transport.requests.size)
+        assertTrue(transport.requests.all { it["Idempotency-Key"] == event.clientEventId })
+    }
+
     private fun validEvent() = AnalyticsEvent(
         clientEventId = "123e4567-e89b-42d3-a456-426614174000",
         name = AnalyticsEventName.ATTEMPT_COMPLETED,
@@ -151,6 +177,21 @@ private class FakeAnalyticsTransport(
     ): AccountHttpResponse {
         requests += AnalyticsRequest(headers, body)
         return response
+    }
+}
+
+private class FailingAnalyticsTransport : AccountHttpTransport {
+    override val deviceConnectivity = DeviceConnectivity.ONLINE
+    val requests = mutableListOf<Map<String, String>>()
+
+    override suspend fun request(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String,
+    ): AccountHttpResponse {
+        requests += headers
+        error("response lost")
     }
 }
 

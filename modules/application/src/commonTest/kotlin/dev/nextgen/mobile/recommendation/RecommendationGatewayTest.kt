@@ -8,6 +8,7 @@ import dev.nextgen.mobile.analytics.AnalyticsConsent
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -107,6 +108,20 @@ class RecommendationGatewayTest {
                 .next(AnalyticsConsent.GRANTED)
         }
         assertEquals("INVALID_RECOMMENDATION_RESPONSE", assertIs<RecommendationGatewayResult.Failed>(oversized).code)
+    }
+
+    @Test
+    fun recommendation_transport_error_is_not_labeled_offline_for_an_online_device() {
+        val onlineTransport = RecordingRecommendationTransport { error("API is unavailable") }
+        onlineTransport.deviceConnectivity = DeviceConnectivity.ONLINE
+        val offlineTransport = RecordingRecommendationTransport { error("Network is down") }
+        offlineTransport.deviceConnectivity = DeviceConnectivity.OFFLINE
+
+        val online = runSuspendTest { gateway(onlineTransport).next(AnalyticsConsent.GRANTED) }
+        val offline = runSuspendTest { gateway(offlineTransport).next(AnalyticsConsent.GRANTED) }
+
+        assertEquals("RECOMMENDATION_UNAVAILABLE", assertIs<RecommendationGatewayResult.Failed>(online).code)
+        assertEquals("OFFLINE", assertIs<RecommendationGatewayResult.Failed>(offline).code)
     }
 
     @Test
@@ -240,6 +255,30 @@ class RecommendationGatewayTest {
     }
 
     @Test
+    fun interaction_timeout_is_unknown_but_safe_replay_keeps_the_same_event_identity() {
+        val transport = RecordingRecommendationTransport { error("response lost") }
+        transport.deviceConnectivity = DeviceConnectivity.ONLINE
+        val eventId = "123e4567-e89b-42d3-a456-426614174013"
+
+        val result = runSuspendTest {
+            gateway(transport).interact(
+                recommendationPayload(),
+                RecommendationInteraction.ACCEPTED,
+                eventId,
+                AnalyticsConsent.GRANTED,
+            )
+        }
+        val failure = assertIs<RecommendationInteractionResult.Failed>(result)
+
+        assertEquals("RECOMMENDATION_INTERACTION_OUTCOME_UNKNOWN", failure.code)
+        assertTrue(failure.outcomeUnknown)
+        assertTrue(failure.reconciliationRequired)
+        assertTrue(failure.sameIntentReplayAllowed)
+        assertEquals(eventId, failure.idempotencyKey)
+        assertEquals(eventId, transport.requests.single().headers["Idempotency-Key"])
+    }
+
+    @Test
     fun cancellation_is_propagated_for_next_and_interaction() {
         val nextTransport = RecordingRecommendationTransport { throw CancellationException("cancelled") }
         assertFailsWith<CancellationException> {
@@ -313,6 +352,7 @@ private class RecordingRecommendationTransport : AccountHttpTransport {
     private val responses: MutableList<AccountHttpResponse>
     private val handler: (suspend () -> AccountHttpResponse)?
     val requests = mutableListOf<RecommendationRequestRecord>()
+    override var deviceConnectivity: DeviceConnectivity = DeviceConnectivity.UNKNOWN
 
     constructor(vararg responses: AccountHttpResponse) {
         this.responses = responses.toMutableList()

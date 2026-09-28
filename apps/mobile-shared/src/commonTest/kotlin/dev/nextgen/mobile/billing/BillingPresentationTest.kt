@@ -9,12 +9,12 @@ class BillingPresentationTest {
     private val offer = BillingOffer(
         productId = "monthly",
         title = "Evidrilo Practice Pack",
-        price = "\$1.00",
+        price = "\$1.99",
     )
     private val yearly = BillingOffer(
         productId = "yearly",
         title = "Yearly",
-        price = "\$10.00",
+        price = "\$19.99",
     )
     private val lifetime = BillingOffer(
         productId = "lifetime",

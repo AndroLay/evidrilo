@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive-icon foreground: the transparent Evidrilo logo mark, inset so the
+  system mask (circle, squircle, rounded square) never clips it and it reads as
+  a full mark rather than a boxed image floating in the center.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/evidrilo_logo_mark"
+    android:inset="26%" />

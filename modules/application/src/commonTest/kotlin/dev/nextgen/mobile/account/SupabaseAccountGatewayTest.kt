@@ -3,6 +3,7 @@ package dev.nextgen.mobile.account
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -188,6 +189,230 @@ class SupabaseAccountGatewayTest {
     }
 
     @Test
+    fun google_identity_link_uses_the_authenticated_user_route_and_keeps_the_existing_session() {
+        val existing = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true, googleLinked = false),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(existing)
+        val platform = FakeAccountAuthPlatform()
+        val transport = QueueAccountHttpTransport(
+            AccountHttpResponse(200, userJson(googleLinked = false)),
+            AccountHttpResponse(200, """{"url":"https://accounts.google.com/o/oauth2/v2/auth?client_id=supabase"}"""),
+        )
+        val gateway = gateway(transport, store, platform)
+
+        val result = runSuspendTest { gateway.startGoogleIdentityLink() }
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.STARTED),
+            result,
+        )
+        assertEquals(existing, store.value)
+        assertEquals(2, transport.requests.size)
+        assertEquals("GET", transport.requests[0].method)
+        assertEquals("https://example.supabase.co/auth/v1/user", transport.requests[0].url)
+        assertEquals("GET", transport.requests[1].method)
+        assertTrue(transport.requests[1].url.contains("/auth/v1/user/identities/authorize?"))
+        assertTrue(transport.requests[1].url.contains("provider=google"))
+        assertTrue(transport.requests[1].url.contains("scopes=openid%20email%20profile"))
+        assertTrue(transport.requests[1].url.contains("skip_http_redirect=true"))
+        assertEquals("Bearer existing-access", transport.requests[1].headers["Authorization"])
+        assertEquals("https://accounts.google.com/o/oauth2/v2/auth?client_id=supabase", platform.openedUrl)
+    }
+
+    @Test
+    fun google_identity_link_completes_only_for_the_original_account_and_verifies_google_identity() {
+        val accountId = "123e4567-e89b-42d3-a456-426614174000"
+        val existing = StoredAccountSession(
+            AccountSummary(accountId, true, googleLinked = false),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(existing)
+        val platform = FakeAccountAuthPlatform()
+        val transport = QueueAccountHttpTransport(
+            AccountHttpResponse(200, userJson(googleLinked = false)),
+            AccountHttpResponse(200, """{"url":"https://accounts.google.com/o/oauth2/v2/auth?client_id=supabase"}"""),
+            AccountHttpResponse(
+                200,
+                sessionJson(
+                    accountId = accountId,
+                    accessToken = "linked-access",
+                    refreshToken = "linked-refresh",
+                    googleLinked = true,
+                ),
+            ),
+            AccountHttpResponse(200, userJson(accountId = accountId, googleLinked = true)),
+        )
+        val gateway = gateway(transport, store, platform)
+        assertIs<AccountGatewayResult.GoogleIdentityLink>(runSuspendTest { gateway.startGoogleIdentityLink() })
+
+        val result = runSuspendTest {
+            gateway.completeRedirect("evidrilo://auth/callback?code=link-code")
+        }
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(
+                GoogleIdentityLinkOutcome.LINKED,
+                StoredAccountSession(
+                    AccountSummary(accountId, true, googleLinked = true),
+                    SecureSessionMaterial("linked-access", 3_600, "linked-refresh"),
+                ),
+            ),
+            result,
+        )
+        assertEquals(accountId, store.value?.account?.accountId)
+        assertEquals(true, store.value?.account?.googleLinked)
+        assertEquals("POST", transport.requests[2].method)
+        assertTrue(transport.requests[2].url.contains("grant_type=pkce"))
+        assertTrue(transport.requests[2].body.contains("link-code"))
+        assertTrue(transport.requests[2].body.contains("code_verifier"))
+        assertEquals("Bearer linked-access", transport.requests[3].headers["Authorization"])
+    }
+
+    @Test
+    fun google_identity_link_detects_an_existing_google_identity_without_starting_another_flow() {
+        val existing = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(existing)
+        val platform = FakeAccountAuthPlatform()
+        val transport = FakeAccountHttpTransport(AccountHttpResponse(200, userJson(googleLinked = true)))
+        val gateway = gateway(transport, store, platform)
+
+        val result = runSuspendTest { gateway.startGoogleIdentityLink() }
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(
+                GoogleIdentityLinkOutcome.ALREADY_LINKED,
+                existing.copy(account = existing.account.copy(googleLinked = true)),
+            ),
+            result,
+        )
+        assertEquals(true, store.value?.account?.googleLinked)
+        assertTrue(platform.openedUrl.isEmpty())
+        assertEquals(1, transport.requests.size)
+    }
+
+    @Test
+    fun google_identity_link_rejects_a_callback_that_changes_the_current_account() {
+        val original = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true, googleLinked = false),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(original)
+        val transport = QueueAccountHttpTransport(
+            AccountHttpResponse(200, userJson(googleLinked = false)),
+            AccountHttpResponse(200, """{"url":"https://accounts.google.com/o/oauth2/v2/auth?client_id=supabase"}"""),
+            AccountHttpResponse(
+                200,
+                sessionJson(
+                    accountId = "223e4567-e89b-42d3-a456-426614174000",
+                    accessToken = "wrong-account-access",
+                    refreshToken = "wrong-account-refresh",
+                    googleLinked = true,
+                ),
+            ),
+        )
+        val gateway = gateway(transport, store)
+        runSuspendTest { gateway.startGoogleIdentityLink() }
+
+        val result = runSuspendTest {
+            gateway.completeRedirect("evidrilo://auth/callback?code=link-code")
+        }
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.FAILED),
+            result,
+        )
+        assertEquals(original, store.value)
+    }
+
+    @Test
+    fun google_identity_conflict_and_disabled_manual_linking_are_safe_and_do_not_sign_out() {
+        val original = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val conflictGateway = gateway(
+            QueueAccountHttpTransport(
+                AccountHttpResponse(200, userJson(googleLinked = false)),
+                AccountHttpResponse(422, """{"error_code":"identity_already_exists"}"""),
+            ),
+            MemoryAccountSecureStore(original),
+        )
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.CONFLICT),
+            runSuspendTest { conflictGateway.startGoogleIdentityLink() },
+        )
+
+        val disabledGateway = gateway(
+            QueueAccountHttpTransport(
+                AccountHttpResponse(200, userJson(googleLinked = false)),
+                AccountHttpResponse(404, """{"error_code":"manual_linking_disabled"}"""),
+            ),
+            MemoryAccountSecureStore(original),
+        )
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.SETUP_REQUIRED),
+            runSuspendTest { disabledGateway.startGoogleIdentityLink() },
+        )
+    }
+
+    @Test
+    fun google_identity_link_rejects_non_google_authorization_urls() {
+        val original = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true, googleLinked = false),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(original)
+        val platform = FakeAccountAuthPlatform()
+        val gateway = gateway(
+            QueueAccountHttpTransport(
+                AccountHttpResponse(200, userJson(googleLinked = false)),
+                AccountHttpResponse(200, """{"url":"https://attacker.example/oauth"}"""),
+            ),
+            store,
+            platform,
+        )
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.FAILED),
+            runSuspendTest { gateway.startGoogleIdentityLink() },
+        )
+        assertEquals("", platform.openedUrl)
+        assertEquals(original, store.value)
+    }
+
+    @Test
+    fun cancelling_google_identity_link_clears_only_the_pending_flow() {
+        val existing = StoredAccountSession(
+            AccountSummary("123e4567-e89b-42d3-a456-426614174000", true, googleLinked = false),
+            SecureSessionMaterial("existing-access", 3_600, "existing-refresh"),
+        )
+        val store = MemoryAccountSecureStore(existing)
+        val gateway = gateway(
+            QueueAccountHttpTransport(
+                AccountHttpResponse(200, userJson(googleLinked = false)),
+                AccountHttpResponse(200, """{"url":"https://accounts.google.com/o/oauth2/v2/auth?client_id=supabase"}"""),
+            ),
+            store,
+        )
+        runSuspendTest { gateway.startGoogleIdentityLink() }
+
+        assertEquals(
+            AccountGatewayResult.GoogleIdentityLink(GoogleIdentityLinkOutcome.CANCELLED),
+            runSuspendTest { gateway.cancelGoogleIdentityLink() },
+        )
+        assertEquals(existing, store.value)
+        assertEquals(
+            AccountGatewayResult.InvalidRedirect,
+            runSuspendTest { gateway.completeRedirect("evidrilo://auth/callback?code=late-code") },
+        )
+    }
+
+    @Test
     fun google_sso_rejects_non_recovery_token_fragments() {
         val platform = FakeAccountAuthPlatform()
         val store = MemoryAccountSecureStore()
@@ -222,10 +447,67 @@ class SupabaseAccountGatewayTest {
             store,
         )
 
-        assertIs<AccountGatewayResult.Offline>(
+        assertIs<AccountGatewayResult.InvalidResponse>(
             runSuspendTest { gateway.signIn("person@example.test", "correct horse battery staple") },
         )
         assertNull(store.value)
+    }
+
+    @Test
+    fun account_transport_failure_is_offline_only_when_the_platform_confirms_no_network() {
+        val store = MemoryAccountSecureStore()
+        val online = runSuspendTest {
+            gateway(FailingAccountHttpTransport(DeviceConnectivity.ONLINE), store)
+                .signIn("person@example.test", "correct horse battery staple")
+        }
+        val offline = runSuspendTest {
+            gateway(FailingAccountHttpTransport(DeviceConnectivity.OFFLINE), store)
+                .signIn("person@example.test", "correct horse battery staple")
+        }
+
+        assertIs<AccountGatewayResult.ServiceUnavailable>(online)
+        assertIs<AccountGatewayResult.Offline>(offline)
+    }
+
+    @Test
+    fun account_mutation_transport_loss_is_outcome_unknown_and_preserves_local_session() {
+        val signUp = runSuspendTest {
+            gateway(FailingAccountHttpTransport(DeviceConnectivity.ONLINE), MemoryAccountSecureStore())
+                .signUp("person@example.test", "correct horse battery staple")
+        }
+        val signUpServerTimeout = runSuspendTest {
+            gateway(
+                FakeAccountHttpTransport(AccountHttpResponse(503, "{}")),
+                MemoryAccountSecureStore(),
+            ).signUp("person@example.test", "correct horse battery staple")
+        }
+        val store = MemoryAccountSecureStore(
+            StoredAccountSession(
+                AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+                SecureSessionMaterial("access", 200, "refresh"),
+            ),
+        )
+        val delete = runSuspendTest {
+            gateway(
+                FailingAccountHttpTransport(DeviceConnectivity.ONLINE),
+                store,
+                apiBaseUrl = "https://api.example.test",
+            ).deleteAccount()
+        }
+
+        assertEquals(
+            AccountMutationOperation.SIGN_UP,
+            assertIs<AccountGatewayResult.OperationOutcomeUnknown>(signUp).operation,
+        )
+        assertEquals(
+            AccountMutationOperation.SIGN_UP,
+            assertIs<AccountGatewayResult.OperationOutcomeUnknown>(signUpServerTimeout).operation,
+        )
+        assertEquals(
+            AccountMutationOperation.DELETE_ACCOUNT,
+            assertIs<AccountGatewayResult.OperationOutcomeUnknown>(delete).operation,
+        )
+        assertEquals("access", store.value?.material?.accessToken)
     }
 
     @Test
@@ -349,7 +631,27 @@ class SupabaseAccountGatewayTest {
         )
 
         assertEquals(
-            AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE),
+            AccountGatewayResult.ExportFailed(AccountUnavailableReason.SERVICE_UNAVAILABLE),
+            runSuspendTest { gateway.exportAccount() },
+        )
+    }
+
+    @Test
+    fun account_export_reports_when_the_server_export_exceeds_the_supported_size() {
+        val store = MemoryAccountSecureStore(
+            StoredAccountSession(
+                AccountSummary("123e4567-e89b-42d3-a456-426614174000", true),
+                SecureSessionMaterial("access", 200, "refresh"),
+            ),
+        )
+        val gateway = gateway(
+            FakeAccountHttpTransport(AccountHttpResponse(413, """{"code":"ACCOUNT_EXPORT_TOO_LARGE"}""")),
+            store,
+            apiBaseUrl = "https://api.example.test",
+        )
+
+        assertEquals(
+            AccountGatewayResult.ExportFailed(AccountUnavailableReason.EXPORT_TOO_LARGE),
             runSuspendTest { gateway.exportAccount() },
         )
     }
@@ -367,6 +669,25 @@ class SupabaseAccountGatewayTest {
         secureSessionStore = store,
         nowEpochSeconds = { now },
     )
+
+    private fun userJson(
+        accountId: String = "123e4567-e89b-42d3-a456-426614174000",
+        googleLinked: Boolean,
+    ): String {
+        val identities = if (googleLinked) {
+            """{"provider":"google"},{"provider":"email"}"""
+        } else {
+            """{"provider":"email"}"""
+        }
+        return """{"id":"$accountId","email_confirmed_at":"2026-09-11T00:00:00Z","identities":[$identities]}"""
+    }
+
+    private fun sessionJson(
+        accountId: String,
+        accessToken: String,
+        refreshToken: String,
+        googleLinked: Boolean,
+    ): String = """{"access_token":"$accessToken","refresh_token":"$refreshToken","expires_in":3600,"user":${userJson(accountId, googleLinked)}}"""
 }
 
 private data class RequestRecord(
@@ -409,7 +730,9 @@ private class QueueAccountHttpTransport(
     }
 }
 
-private class FailingAccountHttpTransport : AccountHttpTransport {
+private class FailingAccountHttpTransport(
+    override val deviceConnectivity: DeviceConnectivity = DeviceConnectivity.UNKNOWN,
+) : AccountHttpTransport {
     override suspend fun request(
         method: String,
         url: String,

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-scaffold-settlement-request.v1.json",
+  "title": "Evidrilo project AI scaffold settlement request v1",
+  "description": "POST this body to /v1/project-ai/scaffold/settlement. The Idempotency-Key header must equal requestId from the preview; reuse it unchanged for identical retries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "requestId", "decision"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-scaffold-settlement" },
+    "version": { "const": "1" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+    "decision": { "enum": ["apply", "dismiss"] }
+  }
+}

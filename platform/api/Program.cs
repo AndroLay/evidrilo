@@ -11,6 +11,10 @@ using Evidrilo.Api.Content;
 using Evidrilo.Api.Configuration;
 using Evidrilo.Api.Health;
 using Evidrilo.Api.Authorization;
+using Evidrilo.Api.Notifications;
+using Evidrilo.Api.ProjectAi;
+using Evidrilo.Api.ProjectTemplates;
+using Evidrilo.Api.Projects;
 using Evidrilo.Api.Recommendations;
 using Evidrilo.Api.Sync;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -20,9 +24,14 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     // Route validators bound the semantic payload; this bounds the raw JSON
     // body before JsonElement materializes it in memory.
-    options.Limits.MaxRequestBodySize = 1 * 1024 * 1024;
+    options.Limits.MaxRequestBodySize = 4 * 1024 * 1024;
 });
 var platformOptions = PlatformOptions.From(builder.Configuration, builder.Environment.EnvironmentName);
+var aiProviderOptions = AiProviderOptions.From(builder.Configuration);
+if (aiProviderOptions.Enabled && !platformOptions.DatabaseConfigured)
+{
+    throw new PlatformConfigurationException("An enabled AI provider requires a configured provider-spend database.");
+}
 
 builder.Services.AddSingleton(platformOptions);
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
@@ -67,6 +76,21 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true,
             });
     });
+    options.AddPolicy("ai", context =>
+    {
+        var key = context.User.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"ai:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
     options.AddPolicy("billing-webhook", context =>
     {
         // Do not use forwarded headers for this key unless the host has
@@ -97,11 +121,51 @@ if (platformOptions.TrustedProxyAddresses.Count > 0)
     });
 }
 builder.Services.AddSupabaseAuthentication(platformOptions);
-builder.Services.AddSingleton<IAiProvider, DisabledAiProvider>();
-builder.Services.AddSingleton<IAiQuota, InMemoryAiQuota>();
-builder.Services.AddSingleton<AiGateway>();
+builder.Services.AddSingleton(aiProviderOptions);
+if (aiProviderOptions.Enabled)
+{
+    builder.Services.AddSingleton<HttpClient>(_ => new HttpClient(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        ConnectTimeout = TimeSpan.FromSeconds(3),
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    })
+    {
+        Timeout = Timeout.InfiniteTimeSpan,
+    });
+    builder.Services.AddSingleton<IAiProviderSpendBudgetStore>(_ =>
+        new NpgsqlAiProviderSpendBudgetStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IAiProvider, OpenAiResponsesProvider>();
+}
+else
+{
+    builder.Services.AddSingleton<IAiProvider, DisabledAiProvider>();
+}
 if (platformOptions.DatabaseConfigured)
 {
+    builder.Services.AddSingleton<IAiCreditLedger>(_ =>
+        new NpgsqlAiCreditLedger(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IAiConversationStore>(_ =>
+        new NpgsqlAiConversationStore(platformOptions.DatabaseConnectionString!));
+}
+else
+{
+    builder.Services.AddSingleton<IAiCreditLedger, DatabaseUnavailableAiCreditLedger>();
+    builder.Services.AddSingleton<IAiConversationStore, DatabaseUnavailableAiConversationStore>();
+}
+builder.Services.AddSingleton<AiGateway>();
+builder.Services.AddSingleton<AiConversationGateway>();
+// Project AI remains deliberately unavailable until its independent provider,
+// privacy/consent, and variable credit-cost gates are approved and verified.
+builder.Services.AddSingleton<IProjectAiScaffoldGenerator, DisabledProjectAiScaffoldGenerator>();
+if (platformOptions.DatabaseConfigured)
+{
+    builder.Services.AddSingleton<IProjectAiConsentStore>(_ =>
+        new NpgsqlProjectAiConsentStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IProjectAiActivityStore>(_ =>
+        new NpgsqlProjectAiActivityStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IStudentProjectStore>(_ =>
+        new NpgsqlStudentProjectStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<ISyncStore>(_ =>
         new NpgsqlSyncStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IAnalyticsStore>(_ =>
@@ -132,9 +196,16 @@ if (platformOptions.DatabaseConfigured)
         new NpgsqlAccountExportStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IMembershipStore>(_ =>
         new NpgsqlMembershipStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<INotificationPreferencesStore>(_ =>
+        new NpgsqlNotificationPreferencesStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IProjectTemplateStore>(_ =>
+        new NpgsqlProjectTemplateStore(platformOptions.DatabaseConnectionString!));
 }
 else
 {
+    builder.Services.AddSingleton<IProjectAiConsentStore, DatabaseUnavailableProjectAiConsentStore>();
+    builder.Services.AddSingleton<IProjectAiActivityStore, DatabaseUnavailableProjectAiActivityStore>();
+    builder.Services.AddSingleton<IStudentProjectStore, DatabaseUnavailableStudentProjectStore>();
     builder.Services.AddSingleton<ISyncStore, DatabaseUnavailableSyncStore>();
     builder.Services.AddSingleton<IAnalyticsStore, DatabaseUnavailableAnalyticsStore>();
     builder.Services.AddSingleton<IProgressStore, DatabaseUnavailableProgressStore>();
@@ -150,6 +221,8 @@ else
     builder.Services.AddSingleton<IAccountLifecycleStore, DatabaseUnavailableAccountLifecycleStore>();
     builder.Services.AddSingleton<IAccountExportStore, DatabaseUnavailableAccountExportStore>();
     builder.Services.AddSingleton<IMembershipStore, DatabaseUnavailableMembershipStore>();
+    builder.Services.AddSingleton<INotificationPreferencesStore, DatabaseUnavailableNotificationPreferencesStore>();
+    builder.Services.AddSingleton<IProjectTemplateStore, DatabaseUnavailableProjectTemplateStore>();
 }
 builder.Services.AddSingleton<BillingWebhookService>();
 
@@ -187,6 +260,14 @@ app.MapBillingEndpoints();
 app.MapEntitlementEndpoints();
 app.MapAiEndpoints();
 app.MapMembershipEndpoints();
+app.MapNotificationEndpoints();
+app.MapStudentProjectEndpoints();
+app.MapProjectTemplateEndpoints();
+app.MapProjectAiConsentEndpoints();
+app.MapProjectAiScaffoldEndpoints();
+app.MapProjectAiStageAssistEndpoints();
+app.MapProjectAiActivityEndpoints();
+app.MapProjectAiStageAssistSettlementEndpoints();
 
 app.Run();
 

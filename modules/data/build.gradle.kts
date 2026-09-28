@@ -23,6 +23,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":modules:domain"))
+            implementation(libs.kotlinx.serialization.json)
         }
 
         commonTest.dependencies {

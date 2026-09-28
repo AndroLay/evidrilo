@@ -25,6 +25,7 @@ docker image inspect "$image" >/dev/null 2>&1 || {
 
 cleanup() {
     docker rm -f "$container_name" >/dev/null 2>&1 || true
+    rm -f -- "$backup_file"
 }
 trap cleanup EXIT
 

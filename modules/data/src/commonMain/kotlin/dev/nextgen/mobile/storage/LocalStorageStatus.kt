@@ -124,5 +124,6 @@ enum class LocalStorageWriteResult(
     SAVED(LocalStorageStatus.SAVED),
     CLEARED(LocalStorageStatus.AVAILABLE),
     UNAVAILABLE(LocalStorageStatus.UNAVAILABLE),
+    LIMIT_REACHED(LocalStorageStatus.FAILED),
     FAILED(LocalStorageStatus.FAILED),
 }

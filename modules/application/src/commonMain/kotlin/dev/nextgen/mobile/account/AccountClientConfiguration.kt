@@ -17,7 +17,7 @@ data class AccountClientConfiguration(
             && redirectUrl == DEFAULT_ACCOUNT_AUTH_REDIRECT_URL
 
     val apiConfigured: Boolean
-        get() = apiBaseUrl.isBlank() || isHttpsBaseUrl(apiBaseUrl)
+        get() = apiBaseUrl.isBlank() || isAllowedApiBaseUrl(apiBaseUrl)
 
     val normalizedSupabaseUrl: String
         get() = supabaseUrl.trim().trimEnd('/')

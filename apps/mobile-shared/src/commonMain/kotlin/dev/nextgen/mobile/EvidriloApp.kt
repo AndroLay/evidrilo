@@ -1,11 +1,15 @@
 package dev.nextgen.mobile
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Card
@@ -26,6 +30,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -38,15 +45,25 @@ import dev.nextgen.mobile.account.AccountGatewayResult
 import dev.nextgen.mobile.account.AccountSession
 import dev.nextgen.mobile.account.AccountSessionController
 import dev.nextgen.mobile.account.AccountUnavailableReason
-import dev.nextgen.mobile.account.EvidriloAccountBenefitPrompt
+import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
+import dev.nextgen.mobile.account.EvidriloAccountRequiredGate
 import dev.nextgen.mobile.account.EvidriloAccountScreen
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountGateway
 import dev.nextgen.mobile.account.createAccountHttpTransport
-import dev.nextgen.mobile.account.shouldShowAccountBenefitPrompt
 import dev.nextgen.mobile.account.subscribeAccountAuthRedirect
 import dev.nextgen.mobile.account.toSettingsSubtitle
+import dev.nextgen.mobile.ai.AiAssistPurpose
+import dev.nextgen.mobile.ai.AiAssistContext
+import dev.nextgen.mobile.ai.AiConversationGatewayResult
+import dev.nextgen.mobile.ai.AiConversationHistoryMessage
+import dev.nextgen.mobile.ai.AiConversationProposal
+import dev.nextgen.mobile.ai.AiConversationSessionInfo
+import dev.nextgen.mobile.ai.AiCredits
+import dev.nextgen.mobile.ai.AiGateway
+import dev.nextgen.mobile.ai.AiGatewayResult
 import dev.nextgen.mobile.analytics.AnalyticsConsent
+import dev.nextgen.mobile.analytics.analyticsTransmissionAllowed
 import dev.nextgen.mobile.analytics.AnalyticsEvent
 import dev.nextgen.mobile.analytics.attemptCompletedAnalyticsEvent
 import dev.nextgen.mobile.analytics.billingAnalyticsAction
@@ -72,6 +89,8 @@ import dev.nextgen.mobile.billing.BillingOperation
 import dev.nextgen.mobile.billing.BillingOutcome
 import dev.nextgen.mobile.billing.BillingPresentation
 import dev.nextgen.mobile.billing.BillingRequestGate
+import dev.nextgen.mobile.billing.BillingUiState
+import dev.nextgen.mobile.billing.PremiumAccess
 import dev.nextgen.mobile.billing.EvidriloPremiumPaywall
 import dev.nextgen.mobile.billing.PremiumPracticeEvent
 import dev.nextgen.mobile.billing.PremiumPracticeReducer
@@ -95,6 +114,46 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
+import dev.nextgen.mobile.domain.onboarding.GetStartedStatus
+import dev.nextgen.mobile.domain.onboarding.GetStartedTourEvent
+import dev.nextgen.mobile.domain.onboarding.GetStartedTourState
+import dev.nextgen.mobile.content.ContentClientConfiguration
+import dev.nextgen.mobile.content.PublishedCaseGateway
+import dev.nextgen.mobile.content.PublishedCaseGatewayResult
+import dev.nextgen.mobile.content.toBundledEvaluatorCase
+import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
+import dev.nextgen.mobile.domain.project.ProjectAiScaffoldProposal
+import dev.nextgen.mobile.domain.project.ProjectAiScaffoldOperation
+import dev.nextgen.mobile.domain.project.StudentProjectSourceRecord
+import dev.nextgen.mobile.domain.project.StudentProjectStatus
+import dev.nextgen.mobile.domain.project.StudentProjectSynthesisTheme
+import dev.nextgen.mobile.domain.project.StudentProjectDraft
+import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
+import dev.nextgen.mobile.domain.project.StudentProjectLimitationActionRecord
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGatewayResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldDecision
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldSettlementGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldSettlementResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiConsentGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiConsentGatewayResult
+import dev.nextgen.mobile.projectcatalog.PROJECT_AI_CONSENT_POLICY_VERSION
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldRequest
+import dev.nextgen.mobile.domain.project.ProjectAiScaffoldRules
+import dev.nextgen.mobile.projectcatalog.StudentProjectDraftFlow
+import dev.nextgen.mobile.projectcatalog.StudentProjectDraftFlowResult
+import dev.nextgen.mobile.projectcatalog.StudentProjectAttachmentAddReceipt
+import dev.nextgen.mobile.projectcatalog.StudentProjectAttachmentRemoveReceipt
+import dev.nextgen.mobile.projectcatalog.StudentProjectImportReceipt
+import dev.nextgen.mobile.projectcatalog.ProjectTemplateCatalogGateway
+import dev.nextgen.mobile.projectcatalog.ProjectTemplateCatalogGatewayResult
+import dev.nextgen.mobile.projectcatalog.ProjectTemplateClientConfiguration
+import dev.nextgen.mobile.projectcatalog.ProjectTemplateRemoteFamily
+import dev.nextgen.mobile.projectcatalog.ProjectTemplateSummary
+import dev.nextgen.mobile.platform.PlatformEntitlements
+import dev.nextgen.mobile.platform.PlatformProjectionGateway
+import dev.nextgen.mobile.platform.PlatformProjectionResult
+import dev.nextgen.mobile.platform.PlatformProgressSummary
 import dev.nextgen.mobile.storage.ConclusionSessionPhase
 import dev.nextgen.mobile.storage.ConclusionSessionSnapshot
 import dev.nextgen.mobile.storage.ConclusionSessionStore
@@ -102,17 +161,29 @@ import dev.nextgen.mobile.storage.LocalStorageWriteResult
 import dev.nextgen.mobile.storage.LocalStorageStatus
 import dev.nextgen.mobile.storage.createConclusionSessionStore
 import dev.nextgen.mobile.storage.createConclusionHistoryStore
-import dev.nextgen.mobile.storage.createAccountOfferStore
+import dev.nextgen.mobile.storage.createStudentProjectDraftStore
+import dev.nextgen.mobile.storage.createStudentProjectAttachmentStore
 import dev.nextgen.mobile.storage.createOnboardingStore
+import dev.nextgen.mobile.storage.onboardingStatusAfterWrite
+import dev.nextgen.mobile.storage.notice
 import dev.nextgen.mobile.storage.recoverCorruptLocalStorage
 import dev.nextgen.mobile.storage.storageNoticeFor
 import dev.nextgen.mobile.audio.createAudioSettingsStore
 import dev.nextgen.mobile.audio.createPlatformAudioEngine
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import dev.nextgen.mobile.navigation.EvidriloDestination
+import dev.nextgen.mobile.navigation.requiresAuthenticatedFreeAccess
+import dev.nextgen.mobile.navigation.runWithAuthenticatedAccess
 import dev.nextgen.mobile.navigation.EvidriloNavigationState
+import dev.nextgen.mobile.navigation.EvidriloSystemBackHandler
 import dev.nextgen.mobile.notifications.NotificationPermissionState
+import dev.nextgen.mobile.notifications.NotificationPermissionUiState
 import dev.nextgen.mobile.notifications.NotificationPreferences
+import dev.nextgen.mobile.notifications.NotificationPreferencesGateway
+import dev.nextgen.mobile.notifications.NotificationPreferencesGatewayResult
+import dev.nextgen.mobile.notifications.NOTIFICATION_PERMISSION_REQUEST_DENIED_MESSAGE
+import dev.nextgen.mobile.notifications.SYSTEM_NOTIFICATION_PERMISSION_OFF_MESSAGE
+import dev.nextgen.mobile.notifications.NotificationClientConfiguration
 import dev.nextgen.mobile.notifications.createLocalNotificationScheduler
 import dev.nextgen.mobile.notifications.createNotificationPreferencesStore
 import dev.nextgen.mobile.recommendation.RecommendationCaseRegistry
@@ -136,12 +207,20 @@ import dev.nextgen.mobile.sync.syncCommandFor
 import dev.nextgen.mobile.sync.syncConsentClearOutcome
 import kotlin.time.Clock
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
 @Composable
-internal fun EvidriloApp(billingGateway: BillingGateway) {
-    val baseCase = ConclusionCases.M0_T2
+internal fun EvidriloApp(
+    billingGateway: BillingGateway,
+    themeController: EvidriloThemeController = remember { EvidriloThemeController() },
+) {
+    val bundledBaseCase = ConclusionCases.M0_T2
+    var remoteBaseCase by remember { mutableStateOf<ConclusionCase?>(null) }
+    val baseCase = remoteBaseCase ?: bundledBaseCase
     val evidenceChangeCase = ConclusionCases.EVIDENCE_CHANGE
     val reducer = remember(baseCase.id, evidenceChangeCase.id) {
         ConclusionReducer(case = baseCase, evidenceChangeCase = evidenceChangeCase)
@@ -150,7 +229,6 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     val sessionStore = remember { createConclusionSessionStore() }
     val historyStore = remember { createConclusionHistoryStore() }
     val onboardingStore = remember { createOnboardingStore() }
-    val accountOfferStore = remember { createAccountOfferStore() }
     val audioSettingsStore = remember { createAudioSettingsStore() }
     val initialAudioSettings = remember { audioSettingsStore.load() }
     var audioSettings by remember { mutableStateOf(initialAudioSettings) }
@@ -176,10 +254,84 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     val accountConfiguration = remember { createAccountClientConfiguration() }
     val accountGateway = remember(accountConfiguration) { createAccountGateway() }
     val secureSessionStore = remember { SecureSessionStoreFactory.create() }
+    val projectTemplateCatalogGateway = remember(accountConfiguration) {
+        ProjectTemplateCatalogGateway(
+            configuration = ProjectTemplateClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+        )
+    }
+    val projectAiScaffoldGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiScaffoldGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectAiSettlementGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiScaffoldSettlementGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectAiConsentGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiConsentGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectProEntitlementActive = remember { mutableStateOf(false) }
+    val studentProjectAttachmentStore = remember { createStudentProjectAttachmentStore() }
+    val studentProjectDraftFlow = remember {
+        StudentProjectDraftFlow(
+            store = createStudentProjectDraftStore(),
+            idGenerator = ::newAnalyticsEventId,
+            clock = { Clock.System.now().toEpochMilliseconds() },
+            hasVerifiedProEntitlement = { projectProEntitlementActive.value },
+        )
+    }
+    val publishedCaseGateway = remember(accountConfiguration, secureSessionStore) {
+        PublishedCaseGateway(
+            configuration = ContentClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectionGateway = remember(accountConfiguration, secureSessionStore) {
+        PlatformProjectionGateway(
+            configuration = dev.nextgen.mobile.platform.PlatformClientConfiguration(
+                accountConfiguration.normalizedApiBaseUrl,
+            ),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val aiGateway = remember(accountConfiguration, secureSessionStore) {
+        AiGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
     val analyticsGateway = remember { createPlatformAnalyticsGateway() }
     val accountScope = rememberCoroutineScope()
     val notificationScheduler = remember { createLocalNotificationScheduler() }
     val notificationPreferencesStore = remember { createNotificationPreferencesStore() }
+    val notificationPreferencesGateway = remember(accountConfiguration, secureSessionStore) {
+        NotificationPreferencesGateway(
+            configuration = NotificationClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
     var syncJob by remember { mutableStateOf<Job?>(null) }
     val accountController = remember {
         AccountSessionController(
@@ -201,16 +353,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     }
     val savedSnapshot = initialSessionLoad.value
     val initialOnboardingLoad = remember { onboardingStore.load() }
-    var onboardingCompleted by remember(savedSnapshot) {
-        mutableStateOf(initialOnboardingLoad.value == true || savedSnapshot != null)
+    var onboardingStatus by remember {
+        mutableStateOf(initialOnboardingLoad.value ?: GetStartedStatus.NOT_STARTED)
     }
+    var onboardingTour by remember { mutableStateOf(GetStartedTourState()) }
     var onboardingRequested by remember { mutableStateOf(false) }
     var onboardingStorageStatus by remember { mutableStateOf(initialOnboardingLoad.status) }
-    val initialAccountOfferLoad = remember { accountOfferStore.load() }
-    var accountOfferPresented by remember {
-        mutableStateOf(initialAccountOfferLoad.value == true)
-    }
-    var accountOfferVisible by remember { mutableStateOf(false) }
     val initialAnalyticsConsentLoad = remember { analyticsConsentStore.load() }
     var analyticsConsent by remember {
         mutableStateOf(initialAnalyticsConsentLoad.value ?: AnalyticsConsent.NOT_GRANTED)
@@ -240,15 +388,32 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var notificationBusy by remember { mutableStateOf(false) }
     var notificationStatusMessage by remember { mutableStateOf<String?>(null) }
     var accountSession by remember { mutableStateOf<AccountSession>(accountController.state) }
-    var accountRestoreComplete by remember { mutableStateOf(false) }
+    var accountRestoreComplete by remember { mutableStateOf(TEMPORARY_GUEST_MODE_ENABLED) }
     var lastSyncAccountId by remember { mutableStateOf<String?>(null) }
     var accountBusy by remember { mutableStateOf(false) }
     var accountExportJson by remember { mutableStateOf<String?>(null) }
     var accountExportError by remember { mutableStateOf<AccountUnavailableReason?>(null) }
+    var remoteContentStatus by remember { mutableStateOf("Offline-ready bundled case") }
+    var platformProgress by remember { mutableStateOf<PlatformProgressSummary?>(null) }
+    var platformEntitlements by remember { mutableStateOf<PlatformEntitlements?>(null) }
+    var platformStatus by remember { mutableStateOf<String?>(null) }
+    var aiCredits by remember { mutableStateOf<AiCredits?>(null) }
+    var aiAssistState by remember {
+        mutableStateOf<EvidriloAiAssistUiState>(EvidriloAiAssistUiState.SignInRequired)
+    }
+    var aiAssistRequestContextKey by remember { mutableStateOf<String?>(null) }
+    var aiConversationSession by remember { mutableStateOf<AiConversationSessionInfo?>(null) }
+    var aiConversationContextKey by remember { mutableStateOf<String?>(null) }
+    var aiConversationAccountId by remember { mutableStateOf<String?>(null) }
+    var aiConversationClearState by remember {
+        mutableStateOf<EvidriloAiConversationClearState>(EvidriloAiConversationClearState.Idle)
+    }
     var recommendationSessionGeneration by remember { mutableStateOf(0L) }
     val currentAccountBusy by rememberUpdatedState(accountBusy)
+    val currentAccountSession by rememberUpdatedState(accountSession)
     fun currentBillingAccountId(): String? =
         (accountSession as? AccountSession.SignedIn)?.account?.accountId
+    val latestBillingAccountId = rememberUpdatedState(currentBillingAccountId())
     fun refreshSyncQueueState() {
         val loaded = syncQueueStore.load()
         syncStorageStatus = loaded.status
@@ -260,9 +425,9 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             dev.nextgen.mobile.sync.SyncDeferralReason.NOT_CONFIGURED ->
                 "Cloud sync is not configured in this build; local progress remains safe."
             dev.nextgen.mobile.sync.SyncDeferralReason.AUTH_REQUIRED ->
-                "Sign in again before syncing progress."
+                if (TEMPORARY_GUEST_MODE_ENABLED) "Cloud sync is temporarily unavailable in guest mode." else "Sign in again before syncing progress."
             dev.nextgen.mobile.sync.SyncDeferralReason.SESSION_EXPIRED ->
-                "Your session expired; sign in again before syncing progress."
+                if (TEMPORARY_GUEST_MODE_ENABLED) "Cloud sync is temporarily unavailable in guest mode." else "Your session expired; sign in again before syncing progress."
             dev.nextgen.mobile.sync.SyncDeferralReason.SECURE_STORAGE ->
                 "Secure session storage is unavailable; no progress was sent."
         }
@@ -288,7 +453,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     fun syncNow() {
         val account = (accountSession as? AccountSession.SignedIn)?.account
         if (account == null) {
-            syncStatusMessage = "Sign in before syncing progress."
+            syncStatusMessage = if (TEMPORARY_GUEST_MODE_ENABLED) {
+                "Cloud sync is temporarily unavailable in guest mode."
+            } else {
+                "Sign in before syncing progress."
+            }
             return
         }
         if (syncConsent != SyncConsent.GRANTED) {
@@ -369,6 +538,107 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             ),
         )
     }
+    var pendingAccountGateDestination by remember { mutableStateOf<EvidriloDestination?>(null) }
+
+    fun requestGetStartedTour() {
+        onboardingTour = GetStartedTourState()
+        onboardingRequested = true
+    }
+
+    fun openAccountGate(destination: EvidriloDestination) {
+        pendingAccountGateDestination = destination
+        navigationState = navigationState.openAccountGate()
+    }
+
+    fun completeGetStartedTour() {
+        val result = onboardingStore.complete()
+        onboardingStorageStatus = result.status
+        onboardingStatus = onboardingStatusAfterWrite(
+            current = onboardingStatus,
+            requested = GetStartedStatus.COMPLETED,
+            result = result,
+        )
+        onboardingRequested = false
+    }
+
+    fun skipGetStartedTour() {
+        val result = onboardingStore.skip()
+        onboardingStorageStatus = result.status
+        onboardingStatus = onboardingStatusAfterWrite(
+            current = onboardingStatus,
+            requested = GetStartedStatus.SKIPPED,
+            result = result,
+        )
+        onboardingRequested = false
+        onboardingTour = GetStartedTourState()
+    }
+
+    fun requireDestinationAccess(destination: EvidriloDestination): Boolean {
+        return runWithAuthenticatedAccess(
+            destination = destination,
+            authenticated = accountSession is AccountSession.SignedIn,
+            onAuthenticationRequired = ::openAccountGate,
+            action = {},
+        )
+    }
+
+    fun acceptAccountGatewayResult(result: AccountGatewayResult): AccountSession {
+        val accepted = accountController.acceptGatewayResult(result)
+        accountSession = accepted
+        if (accepted is AccountSession.SignedIn) {
+            val requested = pendingAccountGateDestination
+            pendingAccountGateDestination = null
+            if (requested != null) {
+                navigationState = EvidriloNavigationState.afterSuccessfulAccountGate(requested)
+            }
+        }
+        return accepted
+    }
+    var selectedProjectTemplateFamily by remember {
+        mutableStateOf(ProjectTemplateFamily.EXPERIMENTAL_LABORATORY)
+    }
+    var selectedProjectTemplateSummary by remember { mutableStateOf<ProjectTemplateSummary?>(null) }
+    var projectTemplateFamiliesState by remember {
+        mutableStateOf<ProjectTemplateRemoteUiState<List<ProjectTemplateRemoteFamily>>>(ProjectTemplateRemoteUiState.NotRequested)
+    }
+    var projectTemplateFamilyState by remember {
+        mutableStateOf<ProjectTemplateRemoteUiState<List<ProjectTemplateSummary>>>(ProjectTemplateRemoteUiState.NotRequested)
+    }
+    var projectTemplateDetailState by remember {
+        mutableStateOf<ProjectTemplateRemoteUiState<dev.nextgen.mobile.domain.project.ProjectTemplateDefinition>>(
+            ProjectTemplateRemoteUiState.NotRequested,
+        )
+    }
+    var projectTemplateCatalogReload by remember { mutableStateOf(0) }
+    var projectTemplateFamilyReload by remember { mutableStateOf(0) }
+    var projectTemplateDetailReload by remember { mutableStateOf(0) }
+    var projectAiScaffoldState by remember { mutableStateOf<ProjectAiScaffoldUiState>(ProjectAiScaffoldUiState.Idle) }
+    var projectAiRequestToken by remember { mutableStateOf<String?>(null) }
+    var projectAiRequestInFlight by remember { mutableStateOf(false) }
+    var projectAiConsentState by remember { mutableStateOf<ProjectAiConsentUiState>(ProjectAiConsentUiState.Unknown) }
+    var projectAiConsentRequestGeneration by remember { mutableStateOf(0L) }
+    var projectAiBoundAccountId by remember { mutableStateOf<String?>(null) }
+    var studentProjectListState by remember {
+        mutableStateOf<StudentProjectListUiState>(StudentProjectListUiState.Loading)
+    }
+    var studentProjectListReload by remember { mutableStateOf(0) }
+    var studentProjectNotice by remember { mutableStateOf<String?>(null) }
+    var studentProjectSaveError by remember { mutableStateOf<String?>(null) }
+    var activeStudentProjectDraft by remember { mutableStateOf<StudentProjectDraft?>(null) }
+    var studentProjectEditorIsDirty by remember { mutableStateOf(false) }
+    var studentProjectExitConfirmation by remember { mutableStateOf(false) }
+    val projectTemplateCatalogListState = rememberLazyListState()
+    var projectFamilyQuickGuideExpanded by remember { mutableStateOf(false) }
+    EvidriloSystemBackHandler(
+        enabled = navigationState.canHandleSystemBack,
+        onBack = {
+            if (navigationState.current == EvidriloDestination.PROJECT_EDITOR && studentProjectEditorIsDirty) {
+                studentProjectExitConfirmation = true
+            } else {
+                navigationState = navigationState.back()
+            }
+        },
+    )
     var premiumState by remember {
         mutableStateOf<PremiumPracticeState>(PremiumPracticeState.Hidden)
     }
@@ -379,7 +649,841 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var customerCenterVisible by remember { mutableStateOf(false) }
     val revenueCatUiAvailability = remember { createRevenueCatUiAvailability() }
     val billingRequestGate = remember { BillingRequestGate() }
+
+    fun replaceStudentProjectInList(draft: StudentProjectDraft) {
+        val current = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty()
+        studentProjectListState = StudentProjectListUiState.Loaded(
+            (current.filterNot { it.id == draft.id } + draft)
+                .sortedByDescending(StudentProjectDraft::updatedAtEpochMillis),
+        )
+    }
+
+    fun settleProjectAiScaffold(
+        requestId: String,
+        decision: ProjectAiScaffoldDecision,
+        creditCost: Int,
+        projectAlreadyApplied: Boolean,
+    ) {
+        if (!projectAiSessionMatchesOwner(projectAiBoundAccountId, currentBillingAccountId())) {
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                "This AI action is unavailable in local guest mode. Your local project remains unchanged.",
+            )
+            return
+        }
+        projectAiScaffoldState = ProjectAiScaffoldUiState.Settling(
+            requestId = requestId,
+            decision = decision,
+            creditCost = creditCost,
+            projectAlreadyApplied = projectAlreadyApplied,
+        )
+        accountScope.launch {
+            val result = try {
+                projectAiSettlementGateway.settle(requestId, decision, creditCost)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiScaffoldSettlementResult.Unavailable("PROJECT_AI_SETTLEMENT_UNAVAILABLE")
+            }
+            val activeSettlement = projectAiScaffoldState as? ProjectAiScaffoldUiState.Settling
+            if (activeSettlement?.requestId != requestId || activeSettlement.decision != decision) return@launch
+            when (result) {
+                is ProjectAiScaffoldSettlementResult.Settled -> {
+                    projectAiRequestToken = null
+                    projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+                    studentProjectNotice = when (decision) {
+                        ProjectAiScaffoldDecision.APPLY ->
+                            "Selected AI suggestions were applied. ${result.creditCost} credit${if (result.creditCost == 1) "" else "s"} confirmed."
+                        ProjectAiScaffoldDecision.DISMISS -> "AI suggestions discarded; reserved credits were released."
+                    }
+                    val credits = try {
+                        aiGateway.getCredits()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (credits is dev.nextgen.mobile.ai.AiGatewayResult.CreditsFound) {
+                        aiCredits = credits.value
+                    }
+                }
+                is ProjectAiScaffoldSettlementResult.Deferred -> {
+                    projectAiScaffoldState = ProjectAiScaffoldUiState.SettlementFailed(
+                        requestId, decision, creditCost, projectAlreadyApplied,
+                        "A verified, active account session is required to confirm this AI-credit action. " +
+                            if (projectAlreadyApplied) "Your project change is already saved locally." else "The suggestion remains unapplied.",
+                        canRetry = true,
+                    )
+                }
+                is ProjectAiScaffoldSettlementResult.Unavailable -> {
+                    projectAiScaffoldState = ProjectAiScaffoldUiState.SettlementFailed(
+                        requestId, decision, creditCost, projectAlreadyApplied,
+                        "AI-credit confirmation is unavailable. " +
+                            if (projectAlreadyApplied) "Your project change is already saved locally; retry before requesting more AI." else "The suggestion remains unapplied; retry to release its reservation.",
+                        canRetry = true,
+                    )
+                }
+                is ProjectAiScaffoldSettlementResult.Rejected -> {
+                    projectAiScaffoldState = ProjectAiScaffoldUiState.SettlementFailed(
+                        requestId, decision, creditCost, projectAlreadyApplied,
+                        "The server could not confirm this AI-credit action (${result.code}). " +
+                            if (projectAlreadyApplied) "Your project change remains saved locally." else "The suggestion remains unapplied.",
+                        canRetry = false,
+                    )
+                }
+                is ProjectAiScaffoldSettlementResult.Failed -> {
+                    projectAiScaffoldState = ProjectAiScaffoldUiState.SettlementFailed(
+                        requestId, decision, creditCost, projectAlreadyApplied,
+                        if (result.outcomeUnknown) {
+                            "The credit update's outcome is unknown. Retry the same request to reconcile it. " +
+                                if (projectAlreadyApplied) "Your project change remains saved locally." else "The suggestion remains unapplied."
+                        } else {
+                            "The AI-credit action could not be confirmed (${result.code}). " +
+                                if (projectAlreadyApplied) "Your project change remains saved locally." else "The suggestion remains unapplied."
+                        },
+                        canRetry = result.retryable || result.sameIntentReplayAllowed,
+                    )
+                }
+            }
+        }
+    }
+
+    fun discardProjectAiPreview(requestId: String, creditCost: Int) {
+        settleProjectAiScaffold(
+            requestId = requestId,
+            decision = ProjectAiScaffoldDecision.DISMISS,
+            creditCost = creditCost,
+            projectAlreadyApplied = false,
+        )
+    }
+
+    fun retryProjectAiSettlement(failed: ProjectAiScaffoldUiState.SettlementFailed) {
+        settleProjectAiScaffold(
+            requestId = failed.requestId,
+            decision = failed.decision,
+            creditCost = failed.creditCost,
+            projectAlreadyApplied = failed.projectAlreadyApplied,
+        )
+    }
+
+    fun releaseAbandonedProjectAiPreview(
+        ownerAccountId: String,
+        requestId: String,
+        creditCost: Int,
+    ) {
+        if (!projectAiSessionMatchesOwner(ownerAccountId, currentBillingAccountId())) return
+        accountScope.launch {
+            val result = try {
+                projectAiSettlementGateway.settle(
+                    requestId,
+                    ProjectAiScaffoldDecision.DISMISS,
+                    creditCost,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiScaffoldSettlementResult.Unavailable("PROJECT_AI_SETTLEMENT_UNAVAILABLE")
+            }
+            if (result is ProjectAiScaffoldSettlementResult.Settled) {
+                val credits = try {
+                    aiGateway.getCredits()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    null
+                }
+                if (credits is dev.nextgen.mobile.ai.AiGatewayResult.CreditsFound) {
+                    aiCredits = credits.value
+                }
+            } else if (projectAiRequestToken == null && projectAiScaffoldState == ProjectAiScaffoldUiState.Idle) {
+                projectAiScaffoldState = ProjectAiScaffoldUiState.SettlementFailed(
+                    requestId = requestId,
+                    decision = ProjectAiScaffoldDecision.DISMISS,
+                    creditCost = creditCost,
+                    projectAlreadyApplied = false,
+                    message = "An abandoned AI preview could not be confirmed as released. Retry before the next project-AI request.",
+                    canRetry = result !is ProjectAiScaffoldSettlementResult.Rejected,
+                )
+            }
+        }
+    }
+
+    fun releaseActiveProjectAiPreview() {
+        when (val current = projectAiScaffoldState) {
+            is ProjectAiScaffoldUiState.Preview -> discardProjectAiPreview(current.requestId, current.creditCost)
+            ProjectAiScaffoldUiState.Idle,
+            is ProjectAiScaffoldUiState.Unavailable,
+            -> {
+                projectAiRequestToken = null
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+            }
+            ProjectAiScaffoldUiState.Loading,
+            -> {
+                projectAiRequestToken = null
+                projectAiRequestInFlight = false
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+            }
+            is ProjectAiScaffoldUiState.Settling,
+            is ProjectAiScaffoldUiState.SettlementFailed,
+            -> Unit
+        }
+    }
+
+    LaunchedEffect(navigationState.current) {
+        if (navigationState.current != EvidriloDestination.PROJECT_TEMPLATE_DETAIL &&
+            navigationState.current != EvidriloDestination.PROJECT_EDITOR
+        ) {
+            releaseActiveProjectAiPreview()
+        }
+    }
+
+    fun startStudentProject(template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition) {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)) return
+        releaseActiveProjectAiPreview()
+        when (val result = studentProjectDraftFlow.start(template, template.title.trim().take(160).ifBlank { "My project" })) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectNotice = null
+                studentProjectSaveError = null
+                studentProjectEditorIsDirty = false
+                studentProjectExitConfirmation = false
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_EDITOR)
+            }
+            else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
+        }
+    }
+
+    fun startManualStudentProject() {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) return
+        releaseActiveProjectAiPreview()
+        when (val result = studentProjectDraftFlow.startManual("New research project")) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectNotice = null
+                studentProjectSaveError = null
+                studentProjectEditorIsDirty = false
+                studentProjectExitConfirmation = false
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_EDITOR)
+            }
+            else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
+        }
+    }
+
+    fun beginManualProjectFromHome() {
+        if (!requireDestinationAccess(EvidriloDestination.HOME)) return
+        val loaded = studentProjectListState as? StudentProjectListUiState.Loaded
+        if (loaded == null) {
+            navigationState = navigationState.open(EvidriloDestination.PROJECTS)
+            return
+        }
+        val activeCount = loaded.projects.count {
+            it.status == StudentProjectStatus.DRAFT || it.status == StudentProjectStatus.ACTIVE
+        }
+        val activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
+            projectProEntitlementActive.value,
+        )
+        if (activeCount >= activeLimit) {
+            navigationState = navigationState.open(EvidriloDestination.PROJECTS)
+        } else {
+            startManualStudentProject()
+        }
+    }
+
+    fun requestProjectAiScaffold(
+        template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition,
+        assignmentBrief: String,
+        studentQuestion: String?,
+        currentFields: Map<String, String>,
+        projectId: String?,
+        baseRevision: Int?,
+        projectDataConsent: Boolean,
+    ) {
+        val requestAccountId = currentBillingAccountId()
+        if (requestAccountId == null) {
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                "Project AI is temporarily unavailable in local guest mode. Your local project remains available; no context was sent.",
+            )
+            return
+        }
+        projectAiBoundAccountId = requestAccountId
+        if (!canRequestProjectAi(projectDataConsent, assignmentBrief)) {
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                "Provide an assignment brief and explicitly agree to send the selected context before requesting AI. Nothing was sent.",
+            )
+            return
+        }
+        if ((projectId == null) != (baseRevision == null)) {
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                "The selected project identity and revision did not match. No AI request was sent.",
+            )
+            return
+        }
+        if (projectAiConsentState !is ProjectAiConsentUiState.Granted) {
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                "Check and grant revocable account-level consent before requesting assistance. No project context was sent.",
+            )
+            return
+        }
+        if (projectAiRequestInFlight || projectAiScaffoldState is ProjectAiScaffoldUiState.Loading) {
+            studentProjectNotice = "A project-AI request is still being reconciled. Wait for it to finish before starting another."
+            return
+        }
+        if (projectAiScaffoldState is ProjectAiScaffoldUiState.Preview ||
+            projectAiScaffoldState is ProjectAiScaffoldUiState.Settling ||
+            projectAiScaffoldState is ProjectAiScaffoldUiState.SettlementFailed
+        ) {
+            studentProjectNotice = "Apply or discard the current AI suggestion and resolve its credit action before requesting another."
+            return
+        }
+        projectAiScaffoldState = ProjectAiScaffoldUiState.Loading
+        projectAiRequestInFlight = true
+        val request = ProjectAiScaffoldRequest(
+            templateId = template.id,
+            templateVersion = template.version,
+            baseProjectRevision = baseRevision,
+            assignmentBrief = assignmentBrief,
+            researchQuestion = template.inputFields
+                .firstOrNull { it.kind == dev.nextgen.mobile.domain.project.ProjectTemplateInputKind.RESEARCH_QUESTION }
+                ?.id?.let(currentFields::get),
+            studentQuestion = studentQuestion,
+            currentFields = currentFields,
+            constraints = emptyList(),
+            locale = "en",
+            optedIn = projectDataConsent,
+            projectDataConsent = projectDataConsent,
+            projectDataConsentVersion = ProjectAiScaffoldRules.PROJECT_DATA_CONSENT_VERSION,
+            projectId = projectId,
+            operation = if (projectId == null) {
+                ProjectAiScaffoldOperation.CREATE_PROJECT
+            } else {
+                ProjectAiScaffoldOperation.ASSIST_PROJECT
+            },
+        )
+        val idempotencyKey = "project-ai-${newAnalyticsEventId()}"
+        projectAiRequestToken = idempotencyKey
+        accountScope.launch {
+            val consentResult = try {
+                projectAiConsentGateway.refresh()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiRequestToken != idempotencyKey) {
+                return@launch
+            }
+            if (!projectAiSessionMatchesOwner(requestAccountId, currentBillingAccountId())) {
+                projectAiRequestToken = null
+                projectAiRequestInFlight = false
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+                return@launch
+            }
+            val savedConsent = consentResult as? ProjectAiConsentGatewayResult.State
+            if (savedConsent == null || !savedConsent.value.granted ||
+                savedConsent.value.policyVersion != PROJECT_AI_CONSENT_POLICY_VERSION
+            ) {
+                projectAiConsentState = consentResult.toProjectAiConsentUiState()
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
+                    when (consentResult) {
+                        is ProjectAiConsentGatewayResult.State -> "Saved project AI consent is not current. Review and grant it before requesting assistance. No project context was sent."
+                        ProjectAiConsentGatewayResult.PolicyStale -> "The project AI consent policy changed. Review and grant it again before requesting assistance. No project context was sent."
+                        else -> "Saved project AI consent could not be verified. No project context was sent; check your connection and consent status."
+                    },
+                )
+                projectAiRequestToken = null
+                projectAiRequestInFlight = false
+                return@launch
+            }
+            projectAiConsentState = ProjectAiConsentUiState.Granted
+            if (!projectAiSessionMatchesOwner(requestAccountId, currentBillingAccountId())) {
+                projectAiRequestToken = null
+                projectAiRequestInFlight = false
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+                return@launch
+            }
+            val result = try {
+                projectAiScaffoldGateway.generatePreview(request, idempotencyKey)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiScaffoldGatewayResult.Unavailable("PROJECT_AI_UNAVAILABLE")
+            }
+            projectAiRequestInFlight = false
+            if (projectAiRequestToken != idempotencyKey) {
+                if (result is ProjectAiScaffoldGatewayResult.Preview) {
+                    releaseAbandonedProjectAiPreview(requestAccountId, result.requestId, result.creditCost)
+                }
+                return@launch
+            }
+            if (!projectAiSessionMatchesOwner(requestAccountId, currentBillingAccountId())) {
+                projectAiRequestToken = null
+                projectAiRequestInFlight = false
+                projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+                if (result is ProjectAiScaffoldGatewayResult.Preview) {
+                    releaseAbandonedProjectAiPreview(requestAccountId, result.requestId, result.creditCost)
+                }
+                return@launch
+            }
+            when (result) {
+                is ProjectAiScaffoldGatewayResult.Preview -> {
+                    val issue = ProjectAiScaffoldRules.validate(
+                        template,
+                        result.proposal,
+                        baseRevision,
+                        expectedProjectId = projectId,
+                    )
+                    if (issue == null) {
+                        projectAiScaffoldState = result.toProjectAiScaffoldUiState()
+                        val credits = try {
+                            aiGateway.getCredits()
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            null
+                        }
+                        if (credits is dev.nextgen.mobile.ai.AiGatewayResult.CreditsFound) {
+                            aiCredits = credits.value
+                        }
+                    } else {
+                        studentProjectNotice = "The suggestion did not match this reviewed template/revision ($issue); its credit reservation is being released."
+                        discardProjectAiPreview(result.requestId, result.creditCost)
+                    }
+                }
+                else -> {
+                    projectAiRequestToken = null
+                    projectAiScaffoldState = result.toProjectAiScaffoldUiState()
+                }
+            }
+        }
+    }
+
+    fun refreshProjectAiConsent() {
+        val accountId = currentBillingAccountId()
+        if (accountId == null) {
+            projectAiConsentState = ProjectAiConsentUiState.Unavailable(
+                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+            )
+            return
+        }
+        val requestGeneration = projectAiConsentRequestGeneration + 1
+        projectAiConsentRequestGeneration = requestGeneration
+        projectAiConsentState = ProjectAiConsentUiState.Checking
+        accountScope.launch {
+            val result = try {
+                projectAiConsentGateway.refresh()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiConsentRequestGeneration == requestGeneration &&
+                projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+            ) {
+                projectAiConsentState = result.toProjectAiConsentUiState()
+            }
+        }
+    }
+
+    fun grantProjectAiConsent() {
+        val accountId = currentBillingAccountId()
+        if (accountId == null) {
+            projectAiConsentState = ProjectAiConsentUiState.Unavailable(
+                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+            )
+            return
+        }
+        val requestGeneration = projectAiConsentRequestGeneration + 1
+        projectAiConsentRequestGeneration = requestGeneration
+        projectAiConsentState = ProjectAiConsentUiState.Checking
+        accountScope.launch {
+            val result = try {
+                projectAiConsentGateway.grantAfterExplicitUserAction(explicitlyConfirmed = true)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiConsentRequestGeneration == requestGeneration &&
+                projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+            ) {
+                projectAiConsentState = result.toProjectAiConsentUiState()
+            }
+        }
+    }
+
+    fun revokeProjectAiConsent() {
+        val accountId = currentBillingAccountId()
+        if (accountId == null) {
+            projectAiConsentState = ProjectAiConsentUiState.Unavailable(
+                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+            )
+            return
+        }
+        val requestGeneration = projectAiConsentRequestGeneration + 1
+        projectAiConsentRequestGeneration = requestGeneration
+        releaseActiveProjectAiPreview()
+        projectAiConsentState = ProjectAiConsentUiState.Checking
+        accountScope.launch {
+            val result = try {
+                projectAiConsentGateway.revoke()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiConsentRequestGeneration == requestGeneration &&
+                projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+            ) {
+                projectAiConsentState = result.toProjectAiConsentUiState()
+            }
+        }
+    }
+
+    fun createStudentProjectWithAi(
+        template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition,
+        title: String,
+        proposal: ProjectAiScaffoldProposal,
+        selectedFieldIds: Set<String>,
+        editedValues: Map<String, String>,
+        requestId: String,
+        creditCost: Int,
+    ) {
+        val preview = projectAiScaffoldState as? ProjectAiScaffoldUiState.Preview
+        if (!projectAiSessionMatchesOwner(projectAiBoundAccountId, currentBillingAccountId()) ||
+            preview == null || preview.requestId != requestId || preview.proposal != proposal || preview.creditCost != creditCost
+        ) {
+            studentProjectNotice = "This AI suggestion is unavailable in local guest mode. No suggestion was applied."
+            return
+        }
+        when (val result = studentProjectDraftFlow.startWithAiScaffold(
+            template = template,
+            title = title,
+            proposal = proposal,
+            selectedFieldIds = selectedFieldIds,
+            editedValues = editedValues,
+        )) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectNotice = null
+                studentProjectSaveError = null
+                studentProjectEditorIsDirty = false
+                studentProjectExitConfirmation = false
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_EDITOR)
+                settleProjectAiScaffold(
+                    requestId,
+                    ProjectAiScaffoldDecision.APPLY,
+                    creditCost,
+                    projectAlreadyApplied = true,
+                )
+            }
+            else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
+        }
+    }
+
+    fun applyProjectAiScaffold(
+        proposal: ProjectAiScaffoldProposal,
+        selectedFieldIds: Set<String>,
+        editedValues: Map<String, String>,
+        explicitlyReplacedFieldIds: Set<String>,
+        requestId: String,
+        creditCost: Int,
+    ): StudentProjectDraft? {
+        val preview = projectAiScaffoldState as? ProjectAiScaffoldUiState.Preview
+        if (!projectAiSessionMatchesOwner(projectAiBoundAccountId, currentBillingAccountId()) ||
+            preview == null || preview.requestId != requestId || preview.proposal != proposal || preview.creditCost != creditCost
+        ) {
+            studentProjectNotice = "This AI suggestion is unavailable in local guest mode. No suggestion was applied."
+            return null
+        }
+        val active = activeStudentProjectDraft ?: return null
+        return when (val result = studentProjectDraftFlow.applyAiScaffoldToProject(
+            projectId = active.id,
+            proposal = proposal,
+            selectedFieldIds = selectedFieldIds,
+            editedValues = editedValues,
+            explicitlyReplacedFieldIds = explicitlyReplacedFieldIds,
+        )) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectSaveError = null
+                settleProjectAiScaffold(
+                    requestId,
+                    ProjectAiScaffoldDecision.APPLY,
+                    creditCost,
+                    projectAlreadyApplied = true,
+                )
+                result.value
+            }
+            else -> {
+                studentProjectSaveError = studentProjectDraftFlowMessage(result)
+                null
+            }
+        }
+    }
+
+    fun resumeStudentProject(projectId: String) {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) return
+        releaseActiveProjectAiPreview()
+        when (val result = studentProjectDraftFlow.resume(projectId)) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                studentProjectSaveError = null
+                studentProjectEditorIsDirty = false
+                studentProjectExitConfirmation = false
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_EDITOR)
+            }
+            else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
+        }
+    }
+
+    fun saveStudentProject(
+        title: String,
+        fieldValues: Map<String, String>,
+        sources: List<StudentProjectSourceRecord>,
+        themes: List<StudentProjectSynthesisTheme>,
+        claimEvidenceSourceIds: Set<String>,
+        evidenceItems: List<dev.nextgen.mobile.domain.project.StudentProjectEvidenceItem>,
+        findings: List<dev.nextgen.mobile.domain.project.StudentProjectFindingRecord>,
+        evidenceRelations: List<dev.nextgen.mobile.domain.project.StudentProjectEvidenceRelation>,
+        claims: List<StudentProjectClaimRecord>,
+        limitationActions: List<StudentProjectLimitationActionRecord>,
+        checkpoint: Boolean = true,
+    ): StudentProjectDraft? {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECT_EDITOR)) return null
+        val active = activeStudentProjectDraft ?: return null
+        return when (val result = studentProjectDraftFlow.update(
+            active.id,
+            title,
+            fieldValues,
+            sources,
+            themes,
+            claimEvidenceSourceIds,
+            evidenceItems,
+            findings,
+            evidenceRelations,
+            claims,
+            limitationActions = limitationActions,
+            checkpoint = checkpoint,
+        )) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectSaveError = null
+                result.value
+            }
+            else -> {
+                studentProjectSaveError = studentProjectDraftFlowMessage(result)
+                null
+            }
+        }
+    }
+
+    suspend fun addStudentProjectAttachment(
+        fileName: String,
+        bytes: ByteArray,
+        ensureActive: () -> Unit,
+    ): StudentProjectDraftFlowResult<StudentProjectAttachmentAddReceipt> {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECT_EDITOR)) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_SIGN_IN_REQUIRED")
+        }
+        val active = activeStudentProjectDraft ?: return StudentProjectDraftFlowResult.NotFound
+        val result = withContext(NonCancellable + Dispatchers.Default) {
+            studentProjectDraftFlow.addAttachment(active.id, fileName, bytes, ensureActive)
+        }
+        if (result is StudentProjectDraftFlowResult.Value) {
+            activeStudentProjectDraft = result.value.project
+            replaceStudentProjectInList(result.value.project)
+            studentProjectSaveError = null
+            studentProjectEditorIsDirty = false
+        }
+        return result
+    }
+
+    suspend fun removeStudentProjectAttachment(
+        attachmentId: String,
+    ): StudentProjectDraftFlowResult<StudentProjectAttachmentRemoveReceipt> {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECT_EDITOR)) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_SIGN_IN_REQUIRED")
+        }
+        val active = activeStudentProjectDraft ?: return StudentProjectDraftFlowResult.NotFound
+        val result = withContext(Dispatchers.Default) {
+            studentProjectDraftFlow.removeAttachment(active.id, attachmentId)
+        }
+        if (result is StudentProjectDraftFlowResult.Value) {
+            activeStudentProjectDraft = result.value.project
+            replaceStudentProjectInList(result.value.project)
+            studentProjectSaveError = null
+            studentProjectEditorIsDirty = false
+        }
+        return result
+    }
+
+    fun restoreStudentProjectRevision(revision: Int): StudentProjectDraft? {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECT_EDITOR)) return null
+        val active = activeStudentProjectDraft ?: return null
+        return when (val result = studentProjectDraftFlow.restoreRevision(active.id, revision)) {
+            is StudentProjectDraftFlowResult.Value -> {
+                activeStudentProjectDraft = result.value
+                replaceStudentProjectInList(result.value)
+                studentProjectEditorIsDirty = false
+                studentProjectSaveError = null
+                result.value
+            }
+            else -> {
+                studentProjectSaveError = studentProjectDraftFlowMessage(result)
+                null
+            }
+        }
+    }
+
+    fun handleStudentProjectAction(result: StudentProjectDraftFlowResult<*>): Boolean = when (result) {
+            is StudentProjectDraftFlowResult.Value -> {
+                studentProjectListReload += 1
+                studentProjectNotice = null
+                true
+            }
+            else -> {
+                studentProjectNotice = studentProjectDraftFlowMessage(result)
+                false
+            }
+        }
+
+    suspend fun importStudentProject(
+        payload: StudentProjectArchiveImportPayload,
+        importAsCopy: Boolean,
+        archiveWhenAtCapacity: Boolean,
+        ensureActive: () -> Unit,
+    ): StudentProjectDraftFlowResult<StudentProjectImportReceipt> {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_SIGN_IN_REQUIRED")
+        }
+        val result = withContext(Dispatchers.Default) {
+            ensureActive()
+            studentProjectDraftFlow.importValidatedArchive(
+                preview = payload.preview,
+                archiveBytes = payload.bytes,
+                attachmentStore = studentProjectAttachmentStore,
+                importAsCopy = importAsCopy,
+                archiveWhenAtCapacity = archiveWhenAtCapacity,
+                ensureActive = ensureActive,
+            )
+        }
+        if (result is StudentProjectDraftFlowResult.Value) {
+            replaceStudentProjectInList(result.value.project)
+            studentProjectNotice = when {
+                result.value.attachmentCleanupFailed -> "Project and attachments were imported, but temporary attachment cleanup did not finish. The saved project remains available."
+                result.value.importedAsCopy -> "Project imported as a separate copy with remapped IDs, relationships, and attachments."
+                result.value.archivedToRespectCapacity -> "Project imported as archived so it does not use an active project slot."
+                else -> "Project imported to this device. It has not been uploaded or academically evaluated."
+            }
+        }
+        return result
+    }
+
+    fun restoreStudentProjectFromArchive(
+        project: StudentProjectDraft,
+    ): StudentProjectDraftFlowResult<StudentProjectImportReceipt> {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_SIGN_IN_REQUIRED")
+        }
+        val result = studentProjectDraftFlow.restoreImportedProjectAsRevision(project)
+        if (result is StudentProjectDraftFlowResult.Value) {
+            replaceStudentProjectInList(result.value.project)
+            studentProjectNotice = "Archive content was restored as a new local revision. Earlier project history remains available."
+        }
+        return result
+    }
+
+    LaunchedEffect(accountSession) {
+        val nextAccountId = currentBillingAccountId()
+        val previousAccountId = projectAiBoundAccountId
+        projectAiConsentRequestGeneration += 1
+        projectAiConsentState = ProjectAiConsentUiState.Unknown
+        if (previousAccountId != null && previousAccountId != nextAccountId) {
+            projectAiRequestToken = null
+            projectAiRequestInFlight = false
+            projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
+        }
+        projectAiBoundAccountId = nextAccountId
+    }
+
+    fun archiveStudentProject(project: StudentProjectDraft): Boolean =
+        requireDestinationAccess(EvidriloDestination.PROJECTS) &&
+            handleStudentProjectAction(studentProjectDraftFlow.archive(project.id))
+
+    fun completeStudentProject(project: StudentProjectDraft): Boolean =
+        requireDestinationAccess(EvidriloDestination.PROJECTS) &&
+            handleStudentProjectAction(studentProjectDraftFlow.markCompleted(project.id))
+
+    fun trashStudentProject(project: StudentProjectDraft): Boolean =
+        requireDestinationAccess(EvidriloDestination.PROJECTS) &&
+            handleStudentProjectAction(studentProjectDraftFlow.moveToTrash(project.id))
+
+    fun restoreStudentProject(project: StudentProjectDraft, archivedWhenAtLimit: Boolean): Boolean =
+        requireDestinationAccess(EvidriloDestination.PROJECTS) && handleStudentProjectAction(
+            if (project.status == StudentProjectStatus.TRASHED) {
+                studentProjectDraftFlow.restoreFromTrash(project.id, archivedWhenAtLimit)
+            } else {
+                studentProjectDraftFlow.reactivate(project.id)
+            },
+        )
+
+    fun permanentlyDeleteStudentProject(project: StudentProjectDraft): Boolean =
+        requireDestinationAccess(EvidriloDestination.PROJECTS) &&
+            handleStudentProjectAction(studentProjectDraftFlow.permanentlyDelete(project.id))
+
+    LaunchedEffect(navigationState.current, studentProjectListReload, accountSession, accountRestoreComplete) {
+        if (navigationState.current == EvidriloDestination.PROJECTS ||
+            navigationState.current == EvidriloDestination.HOME
+        ) {
+            studentProjectListState = StudentProjectListUiState.Loading
+            val result = studentProjectDraftFlow.list()
+            studentProjectListState = result.toStudentProjectListUiState()
+            studentProjectNotice = when (result) {
+                is StudentProjectDraftFlowResult.Value -> null
+                else -> studentProjectDraftFlowMessage(result)
+            }
+            projectProEntitlementActive.value = false
+            if (accountSession is AccountSession.SignedIn) {
+                val entitlementToken = billingRequestGate.begin(currentBillingAccountId())
+                billingGateway.refreshAccess { outcome ->
+                    if (billingRequestGate.isCurrent(entitlementToken, currentBillingAccountId()) &&
+                        (navigationState.current == EvidriloDestination.PROJECTS || navigationState.current == EvidriloDestination.HOME)
+                    ) {
+                        projectProEntitlementActive.value = outcome is BillingOutcome.Access && outcome.value == PremiumAccess.UNLOCKED
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(navigationState.current, projectTemplateCatalogReload) {
+        if (navigationState.current == EvidriloDestination.PROJECT_CATALOG) {
+            projectTemplateFamiliesState = ProjectTemplateRemoteUiState.Loading
+            projectTemplateFamiliesState = projectTemplateCatalogGateway.listFamilies().toRemoteUiState()
+        }
+    }
+    LaunchedEffect(navigationState.current, selectedProjectTemplateFamily, projectTemplateFamilyReload) {
+        if (navigationState.current == EvidriloDestination.PROJECT_FAMILY_DETAIL) {
+            projectTemplateFamilyState = ProjectTemplateRemoteUiState.Loading
+            projectTemplateFamilyState = projectTemplateCatalogGateway
+                .listTemplates(selectedProjectTemplateFamily)
+                .toRemoteUiState()
+        }
+    }
+    LaunchedEffect(navigationState.current, selectedProjectTemplateSummary, projectTemplateDetailReload) {
+        val summary = selectedProjectTemplateSummary
+        if (navigationState.current == EvidriloDestination.PROJECT_TEMPLATE_DETAIL && summary != null) {
+            projectTemplateDetailState = ProjectTemplateRemoteUiState.Loading
+            projectTemplateDetailState = projectTemplateCatalogGateway
+                .getTemplate(summary.id, summary.version, summary.family)
+                .toRemoteUiState()
+        }
+    }
     LaunchedEffect(accountController) {
+        if (TEMPORARY_GUEST_MODE_ENABLED) return@LaunchedEffect
         val result = try {
             accountGateway.restore()
         } catch (cancellation: CancellationException) {
@@ -387,37 +1491,43 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         } catch (_: Exception) {
             AccountGatewayResult.Offline
         }
-        accountSession = accountController.acceptGatewayResult(result)
+        acceptAccountGatewayResult(result)
         accountRestoreComplete = true
     }
     DisposableEffect(accountGateway) {
-        val unsubscribe = subscribeAccountAuthRedirect { url ->
-            if (!currentAccountBusy) {
-                accountBusy = true
-                accountSession = accountController.beginSignIn()
-                accountScope.launch {
-                    try {
-                        val result = try {
-                            accountGateway.completeRedirect(url)
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (_: Exception) {
-                            AccountGatewayResult.Offline
+        if (TEMPORARY_GUEST_MODE_ENABLED) {
+            onDispose { }
+        } else {
+            val unsubscribe = subscribeAccountAuthRedirect { url ->
+                if (!currentAccountBusy) {
+                    accountBusy = true
+                    val existingAccountIsActive = currentAccountSession is AccountSession.SignedIn
+                    if (!existingAccountIsActive) accountSession = accountController.beginSignIn()
+                    accountScope.launch {
+                        try {
+                            val result = try {
+                                accountGateway.completeRedirect(url)
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (_: Exception) {
+                                AccountGatewayResult.Offline
+                            }
+                            acceptAccountGatewayResult(result)
+                        } finally {
+                            accountBusy = false
                         }
-                        accountSession = accountController.acceptGatewayResult(result)
-                    } finally {
-                        accountBusy = false
                     }
                 }
             }
+            onDispose { unsubscribe() }
         }
-        onDispose { unsubscribe() }
     }
     fun performAccountOperation(
         showSigningInState: Boolean,
         onResult: (AccountGatewayResult) -> Unit = {},
         operation: suspend () -> AccountGatewayResult,
     ) {
+        if (TEMPORARY_GUEST_MODE_ENABLED) return
         if (!accountBusy) {
             accountExportJson = null
             accountExportError = null
@@ -432,7 +1542,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                     } catch (_: Exception) {
                         AccountGatewayResult.Offline
                     }
-                    accountSession = accountController.acceptGatewayResult(result)
+                    acceptAccountGatewayResult(result)
                     onResult(result)
                 } finally {
                     accountBusy = false
@@ -443,24 +1553,112 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     var state by remember(savedSnapshot) {
         mutableStateOf(savedSnapshot?.restore(reducer) ?: ConclusionState.Intro)
     }
-    val hasMeaningfulAccountValue = state is ConclusionState.Feedback ||
-        state is ConclusionState.Summary ||
-        state is ConclusionState.EvidenceChangeFeedback ||
-        state is ConclusionState.EvidenceChangeSummary
-    LaunchedEffect(hasMeaningfulAccountValue, accountSession, accountOfferPresented, accountRestoreComplete) {
-        if (accountRestoreComplete && shouldShowAccountBenefitPrompt(
-                hasMeaningfulValue = hasMeaningfulAccountValue,
-                session = accountSession,
-                alreadyPresented = accountOfferPresented,
-            )
-        ) {
-            accountOfferPresented = true
-            accountOfferStore.markPresented()
-            accountOfferVisible = true
-        }
-    }
     val case = targetCaseFor(state, baseCase, evidenceChangeCase)
     val backendCaseVersionId = requireNotNull(baseCase.remoteCaseVersionId)
+    LaunchedEffect(accountSession, accountRestoreComplete, state is ConclusionState.Intro) {
+        if (!accountRestoreComplete) return@LaunchedEffect
+        val account = (accountSession as? AccountSession.SignedIn)?.account
+        if (state !is ConclusionState.Intro) {
+            remoteContentStatus = "Using the case already loaded for this active review"
+            return@LaunchedEffect
+        }
+        if (account == null || !account.emailVerified) {
+            remoteBaseCase = null
+            remoteContentStatus = "Offline-ready bundled case"
+            return@LaunchedEffect
+        }
+        when (val result = publishedCaseGateway.get(requireNotNull(bundledBaseCase.remoteCaseVersionId))) {
+            is PublishedCaseGatewayResult.Found -> {
+                val adapted = result.case.toBundledEvaluatorCase(bundledBaseCase)
+                if (adapted == null) {
+                    remoteBaseCase = null
+                    remoteContentStatus = "Bundled case kept: published content did not match the local evaluator contract"
+                } else {
+                    remoteBaseCase = adapted
+                    remoteContentStatus = "Published case connected · ${result.case.contentHash.take(12)}…"
+                }
+            }
+            is PublishedCaseGatewayResult.Deferred -> {
+                remoteBaseCase = null
+                remoteContentStatus = "Bundled case kept until a verified account is available"
+            }
+            is PublishedCaseGatewayResult.Failed -> {
+                remoteBaseCase = null
+                remoteContentStatus = "Bundled case kept · published content is unavailable"
+            }
+        }
+    }
+    LaunchedEffect(accountSession, accountRestoreComplete) {
+        val signedInAccountId = (accountSession as? AccountSession.SignedIn)?.account?.accountId
+        if (aiConversationAccountId != signedInAccountId) {
+            aiConversationSession = null
+            aiConversationContextKey = null
+            aiConversationAccountId = signedInAccountId
+            aiConversationClearState = EvidriloAiConversationClearState.Idle
+        }
+        aiCredits = null
+        aiAssistState = if (accountRestoreComplete && accountSession is AccountSession.SignedIn) {
+            EvidriloAiAssistUiState.Loading
+        } else {
+            EvidriloAiAssistUiState.SignInRequired
+        }
+        if (!accountRestoreComplete || accountSession !is AccountSession.SignedIn) {
+            return@LaunchedEffect
+        }
+        when (val result = aiGateway.getCredits()) {
+            is AiGatewayResult.CreditsFound -> {
+                aiCredits = result.value
+                aiAssistState = EvidriloAiAssistUiState.Ready(result.value)
+            }
+            is AiGatewayResult.Deferred -> {
+                aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                    message = "AI credits are available only to a verified account.",
+                    retryable = false,
+                )
+            }
+            is AiGatewayResult.Fallback -> {
+                aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                    message = "AI credits could not be loaded; deterministic feedback remains available.",
+                    retryable = true,
+                )
+            }
+            is AiGatewayResult.Failed -> {
+                aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                    message = "AI credits are temporarily unavailable; deterministic feedback remains available.",
+                    retryable = result.retryable,
+                )
+            }
+            is AiGatewayResult.AssistFound -> {
+                aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                    message = "AI credits returned an unexpected response.",
+                    retryable = false,
+                )
+            }
+        }
+    }
+    LaunchedEffect(accountSession, accountRestoreComplete) {
+        platformProgress = null
+        platformEntitlements = null
+        platformStatus = if (accountRestoreComplete && accountSession is AccountSession.SignedIn) {
+            "Refreshing verified platform projections…"
+        } else {
+            null
+        }
+        if (!accountRestoreComplete || accountSession !is AccountSession.SignedIn) {
+            return@LaunchedEffect
+        }
+        val progressResult = projectionGateway.getProgress()
+        val entitlementResult = projectionGateway.getEntitlements()
+        platformProgress = (progressResult as? PlatformProjectionResult.Found<PlatformProgressSummary>)?.value
+        platformEntitlements = (entitlementResult as? PlatformProjectionResult.Found<PlatformEntitlements>)?.value
+        platformStatus = when {
+            platformProgress != null && platformEntitlements != null ->
+                "Progress and entitlement projections are up to date"
+            progressResult is PlatformProjectionResult.Deferred || entitlementResult is PlatformProjectionResult.Deferred ->
+                "Platform projections need a verified session; local data remains available"
+            else -> "Platform projections are temporarily unavailable; local data remains available"
+        }
+    }
     val initialHistoryLoad = remember {
         recoverCorruptLocalStorage(historyStore.load()) { historyStore.clear() }
     }
@@ -474,6 +1672,27 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             hasCompletedCase = hasCompletedCase,
         ),
     )
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentNotificationPermissionUiState by rememberUpdatedState(
+        NotificationPermissionUiState(
+            permission = notificationPermission,
+            statusMessage = notificationStatusMessage,
+        ),
+    )
+    DisposableEffect(lifecycleOwner, notificationScheduler) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                accountScope.launch {
+                    val refreshed = notificationScheduler.permissionState()
+                    val nextUiState = currentNotificationPermissionUiState.withPermission(refreshed)
+                    notificationPermission = nextUiState.permission
+                    notificationStatusMessage = nextUiState.statusMessage
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(notificationScheduler) {
         notificationPermission = notificationScheduler.permissionState()
     }
@@ -501,7 +1720,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.PermissionDenied -> {
                     notificationPermission = NotificationPermissionState.DENIED
                     notificationStatusMessage =
-                        "System notification permission is off. Open system settings to enable reminders."
+                        SYSTEM_NOTIFICATION_PERMISSION_OFF_MESSAGE
                 }
                 dev.nextgen.mobile.notifications.LocalNotificationScheduleResult.Unavailable -> {
                     notificationStatusMessage =
@@ -513,9 +1732,52 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             }
         }
     }
+    LaunchedEffect(accountSession, accountRestoreComplete) {
+        if (!accountRestoreComplete || accountSession !is AccountSession.SignedIn) return@LaunchedEffect
+
+        when (val result = notificationPreferencesGateway.refresh()) {
+            is NotificationPreferencesGatewayResult.Found -> {
+                val remote = result.value
+                val localDefaults = NotificationPreferences()
+                if (remote.revision > 0 || notificationPreferences == localDefaults) {
+                    notificationPreferences = remote.preferences
+                    notificationStorageStatus = notificationPreferencesStore.save(remote.preferences).status
+                    notificationStatusMessage = "Reminder preferences restored for this account."
+                } else {
+                    when (notificationPreferencesGateway.save(notificationPreferences)) {
+                        is NotificationPreferencesGatewayResult.Saved ->
+                            notificationStatusMessage = "Local reminder preferences backed up to your account."
+                        NotificationPreferencesGatewayResult.Conflict ->
+                            notificationStatusMessage = "Reminder preferences changed elsewhere; local settings were kept."
+                        else -> Unit
+                    }
+                }
+            }
+            NotificationPreferencesGatewayResult.Conflict ->
+                notificationStatusMessage = "Reminder preferences changed elsewhere; local settings remain available."
+            is NotificationPreferencesGatewayResult.Deferred,
+            is NotificationPreferencesGatewayResult.Failed,
+            is NotificationPreferencesGatewayResult.Saved,
+            -> Unit
+        }
+    }
     fun saveNotificationPreferences(next: NotificationPreferences) {
         notificationStorageStatus = notificationPreferencesStore.save(next).status
         notificationPreferences = next
+        if (accountSession is AccountSession.SignedIn) {
+            accountScope.launch {
+                when (notificationPreferencesGateway.save(next)) {
+                    is NotificationPreferencesGatewayResult.Saved ->
+                        notificationStatusMessage = "Reminder preferences saved on this device and account."
+                    NotificationPreferencesGatewayResult.Conflict ->
+                        notificationStatusMessage = "Reminder preferences changed elsewhere; local settings were kept."
+                    is NotificationPreferencesGatewayResult.Deferred,
+                    is NotificationPreferencesGatewayResult.Failed,
+                    is NotificationPreferencesGatewayResult.Found,
+                    -> Unit
+                }
+            }
+        }
     }
     val enableNotifications: () -> Unit = {
         if (!notificationBusy) {
@@ -529,7 +1791,7 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 } else {
                     notificationStatusMessage = when (permission) {
                         NotificationPermissionState.DENIED ->
-                            "Permission was not granted. Open system settings if you want reminders."
+                            NOTIFICATION_PERMISSION_REQUEST_DENIED_MESSAGE
                         NotificationPermissionState.UNAVAILABLE ->
                             "Local reminders are unavailable in this build."
                         NotificationPermissionState.UNKNOWN ->
@@ -547,6 +1809,28 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         notificationStatusMessage = "Local reminders turned off."
     }
     val targetDraft = targetDraftFor(state, case)
+    val aiAssistantContextKey = "${currentBillingAccountId().orEmpty()}|" + evidriloAssistantContextKey(
+        case,
+        targetDraft,
+        targetEvaluationFor(state)?.primaryFeedback,
+    )
+    val latestAiAssistantContextKey = rememberUpdatedState(aiAssistantContextKey)
+    fun recoverFromStaleAiRequest(requestContextKey: String) {
+        if (aiAssistRequestContextKey == requestContextKey &&
+            latestAiAssistantContextKey.value != requestContextKey
+        ) {
+            aiAssistRequestContextKey = null
+            aiAssistState = if (currentAccountSession is AccountSession.SignedIn) {
+                aiCredits?.let { EvidriloAiAssistUiState.Ready(it) }
+                    ?: EvidriloAiAssistUiState.Unavailable(
+                        "The case changed while AI was responding. Open the current verification to try again.",
+                        retryable = false,
+                    )
+            } else {
+                EvidriloAiAssistUiState.SignInRequired
+            }
+        }
+    }
     LaunchedEffect(navigationState.current, accountSession) {
         audioCoordinator.stop()
     }
@@ -569,9 +1853,297 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         notificationStorageStatus,
     )
     fun emitAnalytics(event: AnalyticsEvent) {
-        if (analyticsConsent == AnalyticsConsent.GRANTED) {
+        if (analyticsTransmissionAllowed(analyticsConsent, TEMPORARY_GUEST_MODE_ENABLED)) {
             accountScope.launch {
                 analyticsGateway.sendWithRetry(event, analyticsConsent)
+            }
+        }
+    }
+    val requestAiAssist: (AiAssistPurpose, String, List<AiConversationHistoryMessage>) -> Unit = { purpose, question, history ->
+        val feedback = targetEvaluationFor(state)?.primaryFeedback
+        when {
+            accountSession !is AccountSession.SignedIn -> aiAssistState = EvidriloAiAssistUiState.SignInRequired
+            feedback == null -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                message = "Complete a deterministic verification first; there is no feedback to explain yet.",
+                retryable = false,
+            )
+            aiAssistState is EvidriloAiAssistUiState.Loading -> Unit
+            case.remoteCaseVersionId == null -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                message = "AI assistance is available only when this reviewed case has a verified published context. Your deterministic feedback remains available.",
+                retryable = false,
+            )
+            else -> {
+                val caseVersionId = requireNotNull(case.remoteCaseVersionId)
+                val accountId = currentBillingAccountId()
+                val context = AiAssistContext(
+                    caseVersionId = caseVersionId,
+                    feedbackCode = feedback.code,
+                    feedbackStatus = feedback.status.name,
+                    anchorIds = feedback.anchorIds,
+                    limitationIds = targetDraft.limitationRefs,
+                    claimText = targetDraft.claimText.takeIf { it.isNotBlank() },
+                    claimScope = targetDraft.scope?.name,
+                    nextAction = feedback.nextAction,
+                )
+                val learnerLimitation = targetDraft.limitationNote.takeIf { it.isNotBlank() }
+                val requestContextKey = aiAssistantContextKey
+                aiAssistRequestContextKey = requestContextKey
+                aiAssistState = EvidriloAiAssistUiState.Loading
+                accountScope.launch {
+                    var session = if (aiConversationContextKey == requestContextKey &&
+                        aiConversationAccountId == accountId
+                    ) aiConversationSession else null
+                    if (session == null) {
+                        val previousSession = aiConversationSession
+                        if (previousSession != null && aiConversationAccountId == accountId) {
+                            aiGateway.clearConversation(previousSession.sessionId)
+                        }
+                        aiConversationSession = null
+                        aiConversationContextKey = null
+                        val started = try {
+                            aiGateway.startConversation(
+                                context = context,
+                                learnerLimitation = learnerLimitation,
+                                locale = "en-US",
+                                optedIn = true,
+                                idempotencyKey = newAnalyticsEventId(),
+                            )
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            AiConversationGatewayResult.Failed(AiGatewayResult.Failed("AI_UNAVAILABLE", retryable = true))
+                        }
+                        when (started) {
+                            is AiConversationGatewayResult.SessionStarted -> {
+                                session = started.value
+                                aiConversationSession = started.value
+                                aiConversationContextKey = requestContextKey
+                                aiConversationAccountId = accountId
+                            }
+                            is AiConversationGatewayResult.Deferred -> {
+                                if (latestAiAssistantContextKey.value == requestContextKey) {
+                                    aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                                        "AI assistance needs a verified account and an active session.",
+                                        retryable = false,
+                                    )
+                                }
+                                return@launch
+                            }
+                            is AiConversationGatewayResult.Fallback -> {
+                                if (latestAiAssistantContextKey.value == requestContextKey) {
+                                    aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                                        "A grounded AI conversation could not be started. Your deterministic feedback is unchanged.",
+                                        retryable = false,
+                                    )
+                                }
+                                return@launch
+                            }
+                            is AiConversationGatewayResult.Failed -> {
+                                if (latestAiAssistantContextKey.value == requestContextKey) {
+                                    aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                                        "AI assistance is temporarily unavailable; your local feedback was kept.",
+                                        retryable = started.error.retryable && !started.error.outcomeUnknown,
+                                    )
+                                }
+                                return@launch
+                            }
+                            is AiConversationGatewayResult.TurnReceived,
+                            is AiConversationGatewayResult.Cleared -> return@launch
+                        }
+                    }
+                    val activeSession = session ?: return@launch
+                    if (latestAiAssistantContextKey.value != requestContextKey ||
+                        aiAssistRequestContextKey != requestContextKey
+                    ) {
+                        aiGateway.clearConversation(activeSession.sessionId)
+                        if (aiConversationSession?.sessionId == activeSession.sessionId) {
+                            aiConversationSession = null
+                            aiConversationContextKey = null
+                        }
+                        recoverFromStaleAiRequest(requestContextKey)
+                        return@launch
+                    }
+                    val result = try {
+                        aiGateway.sendConversationTurn(
+                            sessionId = activeSession.sessionId,
+                            purpose = purpose,
+                            input = question.trim().take(2_000),
+                            locale = "en-US",
+                            optedIn = true,
+                            context = context,
+                            learnerLimitation = learnerLimitation,
+                            history = history.takeLast(4),
+                            idempotencyKey = newAnalyticsEventId(),
+                        )
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        AiConversationGatewayResult.Failed(AiGatewayResult.Failed("AI_UNAVAILABLE", retryable = true))
+                    }
+                    if (latestAiAssistantContextKey.value != requestContextKey ||
+                        aiAssistRequestContextKey != requestContextKey
+                    ) {
+                        if (aiConversationSession?.sessionId == activeSession.sessionId) {
+                            aiGateway.clearConversation(activeSession.sessionId)
+                            aiConversationSession = null
+                            aiConversationContextKey = null
+                        }
+                        recoverFromStaleAiRequest(requestContextKey)
+                        return@launch
+                    }
+                    when (result) {
+                        is AiConversationGatewayResult.TurnReceived -> {
+                            val refreshedCredits = aiGateway.getCredits()
+                            val remaining = (refreshedCredits as? AiGatewayResult.CreditsFound)?.value?.available
+                            if (refreshedCredits is AiGatewayResult.CreditsFound) {
+                                aiCredits = refreshedCredits.value
+                            }
+                            aiConversationSession = activeSession.copy(turnsUsed = result.value.turnsUsed)
+                            aiAssistState = EvidriloAiAssistUiState.Answer(
+                                text = requireNotNull(result.value.text),
+                                remainingCredits = remaining,
+                                groundedAnchorIds = result.value.groundedAnchorIds,
+                                requestId = result.value.requestId,
+                                turnsUsed = result.value.turnsUsed,
+                                proposal = result.value.proposal,
+                            )
+                        }
+                        is AiConversationGatewayResult.Fallback -> {
+                            val refreshedCredits = aiGateway.getCredits()
+                            if (refreshedCredits is AiGatewayResult.CreditsFound) aiCredits = refreshedCredits.value
+                            aiConversationSession = activeSession.copy(turnsUsed = result.turnsUsed ?: activeSession.turnsUsed)
+                            aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                                message = "AI could not answer this turn. No draft change was made; deterministic feedback remains authoritative.",
+                                retryable = result.reasonCode == "AI_PROVIDER_UNAVAILABLE" ||
+                                    result.reasonCode == "AI_PROVIDER_TIMEOUT" ||
+                                    result.reasonCode == "AI_UNAVAILABLE",
+                                turnsUsed = result.turnsUsed,
+                                requestId = result.requestId,
+                            )
+                        }
+                        is AiConversationGatewayResult.Deferred -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = "AI assistance needs a verified account and an active session.",
+                            retryable = false,
+                        )
+                        is AiConversationGatewayResult.Failed -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = if (result.error.outcomeUnknown) {
+                                "The server may have received this turn, so it was not retried automatically. Check credits before continuing."
+                            } else {
+                                "AI assistance is temporarily unavailable; your local feedback was kept."
+                            },
+                            retryable = result.error.retryable && !result.error.outcomeUnknown,
+                        )
+                        is AiConversationGatewayResult.SessionStarted,
+                        is AiConversationGatewayResult.Cleared -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = "AI returned an unexpected conversation response.",
+                            retryable = false,
+                        )
+                    }
+                }
+            }
+        }
+    }
+    suspend fun clearAiConversationSession(sessionId: String): AiConversationGatewayResult = try {
+            aiGateway.clearConversation(sessionId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            AiConversationGatewayResult.Failed(
+                AiGatewayResult.Failed(
+                    code = "AI_UNAVAILABLE",
+                    retryable = true,
+                    outcomeUnknown = true,
+                ),
+            )
+        }
+    val clearAiConversation: () -> Unit = {
+        val session = aiConversationSession
+        val accountId = currentBillingAccountId()
+        val sameAccount = accountId != null && aiConversationAccountId == accountId
+        aiConversationSession = null
+        aiConversationContextKey = null
+        aiConversationClearState = if (accountId != null) {
+            EvidriloAiConversationClearState.Clearing(
+                sessionId = session?.sessionId?.takeIf { sameAccount },
+                accountId = accountId,
+            )
+        } else {
+            EvidriloAiConversationClearState.Idle
+        }
+        accountScope.launch {
+            val clearResult = if (session != null && sameAccount) {
+                clearAiConversationSession(session.sessionId)
+            } else {
+                null
+            }
+            if (latestBillingAccountId.value != accountId) return@launch
+            val refreshed = try {
+                aiGateway.getCredits()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                AiGatewayResult.Failed("AI_UNAVAILABLE", retryable = true)
+            }
+            when (refreshed) {
+                is AiGatewayResult.CreditsFound -> {
+                    aiCredits = refreshed.value
+                    aiAssistState = EvidriloAiAssistUiState.Ready(refreshed.value)
+                }
+                is AiGatewayResult.Deferred -> aiAssistState = EvidriloAiAssistUiState.SignInRequired
+                else -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                    "The local chat was cleared, but credits could not be refreshed.",
+                    retryable = refreshed is AiGatewayResult.Failed && refreshed.retryable,
+                )
+            }
+            if (latestBillingAccountId.value == accountId) {
+                aiConversationClearState = if (session != null && sameAccount && clearResult != null) {
+                    aiConversationClearStateAfterGatewayResult(
+                        sessionId = session.sessionId,
+                        accountId = requireNotNull(accountId),
+                        result = clearResult,
+                    )
+                } else {
+                    EvidriloAiConversationClearState.Idle
+                }
+            }
+        }
+    }
+    val retryClearAiConversation: (String) -> Unit = { sessionId ->
+        val failure = aiConversationClearState as? EvidriloAiConversationClearState.Failed
+        val accountId = currentBillingAccountId()
+        if (failure?.sessionId == sessionId &&
+            failure.accountId == accountId &&
+            failure.retryable
+        ) {
+            aiConversationClearState = EvidriloAiConversationClearState.Clearing(sessionId, failure.accountId)
+            accountScope.launch {
+                val result = clearAiConversationSession(sessionId)
+                if (latestBillingAccountId.value == failure.accountId) {
+                    aiConversationClearState = aiConversationClearStateAfterGatewayResult(
+                        sessionId = sessionId,
+                        accountId = failure.accountId,
+                        result = result,
+                    )
+                }
+            }
+        }
+    }
+    val retryAiAssist: () -> Unit = {
+        if (accountSession is AccountSession.SignedIn) {
+            accountScope.launch {
+                when (val result = aiGateway.getCredits()) {
+                    is AiGatewayResult.CreditsFound -> {
+                        aiCredits = result.value
+                        aiAssistState = EvidriloAiAssistUiState.Ready(
+                            result.value,
+                            conversationTurnsUsed = aiConversationSession?.turnsUsed,
+                        )
+                    }
+                    else -> aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                        message = "AI credits are still unavailable; deterministic feedback remains available.",
+                        retryable = result is AiGatewayResult.Failed && result.retryable,
+                    )
+                }
             }
         }
     }
@@ -596,12 +2168,13 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             emitAnalytics(clientErrorAnalyticsEvent(errorCode, surfaceId = "premium"))
         }
     }
-    val dispatch: (ConclusionEvent) -> Unit = { event ->
+    val dispatch: (ConclusionEvent) -> Unit = dispatch@{ event ->
         val currentState = state
         if (event == ConclusionEvent.Reset ||
             event == ConclusionEvent.Submit ||
             event == ConclusionEvent.BeginRevision ||
             event == ConclusionEvent.BeginEvidenceChange ||
+            event is ConclusionEvent.BeginEvidenceChangeFromSavedDraft ||
             event == ConclusionEvent.SubmitEvidenceChange ||
             event == ConclusionEvent.FinishEvidenceChange
         ) {
@@ -609,12 +2182,15 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         }
         if (event == ConclusionEvent.Begin && currentState is ConclusionState.Intro) {
             activeAttemptId = newAnalyticsEventId()
+            aiCredits?.let { aiAssistState = EvidriloAiAssistUiState.Ready(it) }
         }
-        if (event == ConclusionEvent.Reset && currentState is ConclusionState.EvidenceChangeSummary) {
-            val result = historyStore.save(currentState.toHistorySnapshot())
-            historyStorageStatus = result.status
-            if (result == LocalStorageWriteResult.SAVED) {
-                historySnapshot = currentState.toHistorySnapshot()
+        if (event == ConclusionEvent.Reset) {
+            completedHistorySnapshot(currentState)?.let { snapshot ->
+                val result = historyStore.save(snapshot)
+                historyStorageStatus = result.status
+                if (result == LocalStorageWriteResult.SAVED) {
+                    historySnapshot = snapshot
+                }
             }
         }
         val nextState = reducer.reduce(currentState, event)
@@ -632,7 +2208,9 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 nextState is ConclusionState.EvidenceChangeFeedback ->
                 playEffect(AudioEffectId.SUCCESS)
             event == ConclusionEvent.BeginRevision -> playEffect(AudioEffectId.SELECTION)
-            event == ConclusionEvent.BeginEvidenceChange -> playEffect(AudioEffectId.CHALLENGE_REVEAL)
+            event == ConclusionEvent.BeginEvidenceChange ||
+                event is ConclusionEvent.BeginEvidenceChangeFromSavedDraft ->
+                playEffect(AudioEffectId.CHALLENGE_REVEAL)
             event == ConclusionEvent.FinishEvidenceChange -> playEffect(AudioEffectId.SUCCESS)
         }
         when {
@@ -732,11 +2310,48 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         if (nextState is ConclusionState.Intro) {
             navigationState = navigationState.resetToHome()
         }
-        if (nextState is ConclusionState.EvidenceChangeSummary) {
-            val result = historyStore.save(nextState.toHistorySnapshot())
+        completedHistorySnapshot(nextState)?.let { snapshot ->
+            val result = historyStore.save(snapshot)
             historyStorageStatus = result.status
             if (result == LocalStorageWriteResult.SAVED) {
-                historySnapshot = nextState.toHistorySnapshot()
+                historySnapshot = snapshot
+            }
+        }
+    }
+    val canApplyAiProposal: (AiConversationProposal) -> Boolean = { proposal ->
+        val currentState = state
+        val editable = when (currentState) {
+            is ConclusionState.Drafting,
+            is ConclusionState.Revision,
+            is ConclusionState.Incomplete -> true
+            is ConclusionState.Feedback -> currentState.canRevise
+            else -> false
+        }
+        editable && applyGroundedAiProposal(targetDraftFor(currentState, case), proposal) != null
+    }
+    val applyAiProposal: (AiConversationProposal) -> Boolean = apply@{ proposal ->
+        val currentState = state
+        val updatedDraft = applyGroundedAiProposal(targetDraftFor(currentState, case), proposal)
+        if (updatedDraft == null) {
+            false
+        } else {
+            when (currentState) {
+                is ConclusionState.Drafting,
+                is ConclusionState.Revision,
+                is ConclusionState.Incomplete -> dispatch(ConclusionEvent.UpdateDraft(updatedDraft))
+                is ConclusionState.Feedback -> {
+                    if (!currentState.canRevise) return@apply false
+                    dispatch(ConclusionEvent.BeginRevision)
+                    if (state !is ConclusionState.Revision) return@apply false
+                    dispatch(ConclusionEvent.UpdateDraft(updatedDraft))
+                }
+                else -> return@apply false
+            }
+            if (targetDraftFor(state, case) != updatedDraft) {
+                false
+            } else {
+                navigationState = navigationState.open(EvidriloDestination.PRACTICE)
+                true
             }
         }
     }
@@ -789,10 +2404,14 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             recommendationController.reload(key, AnalyticsConsent.GRANTED, canDisplay = true)
         }
     }
-    val completeOnboarding: () -> Unit = {
-        onboardingStorageStatus = onboardingStore.complete().status
-        onboardingCompleted = true
-        onboardingRequested = false
+    fun dispatchGetStartedTourEvent(event: GetStartedTourEvent) {
+        onboardingTour = onboardingTour.reduce(event)
+    }
+
+    fun advanceGetStartedTour() {
+        val next = onboardingTour.reduce(GetStartedTourEvent.Next)
+        onboardingTour = next
+        if (next.isComplete) completeGetStartedTour()
     }
     val dispatchPremium: (PremiumPracticeEvent) -> Unit = { event ->
         when {
@@ -956,9 +2575,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         // Evidence review is a root workflow. Returning from any utility surface
         // must not strand the user in that surface's stack entry, and this
         // does not reset the persisted/evaluator state.
+        releaseActiveProjectAiPreview()
         navigationState = navigationState.resetToHome()
     }
     val openTargetSection: (EvidriloTargetSection) -> Unit = { section ->
+        releaseActiveProjectAiPreview()
         navigationState = when (section) {
             EvidriloTargetSection.HOME -> navigationState.selectRoot(EvidriloDestination.HOME)
             EvidriloTargetSection.SOURCES -> navigationState.selectRoot(EvidriloDestination.SOURCES)
@@ -968,10 +2589,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         }
     }
     val startTargetPractice: () -> Unit = {
-        if (state is ConclusionState.Intro) {
-            dispatch(ConclusionEvent.Begin)
+        if (requireDestinationAccess(EvidriloDestination.PRACTICE)) {
+            if (state is ConclusionState.Intro) {
+                dispatch(ConclusionEvent.Begin)
+            }
+            navigationState = navigationState.open(EvidriloDestination.PRACTICE)
         }
-        navigationState = navigationState.open(EvidriloDestination.PRACTICE)
     }
     val syncStorageAvailable = syncStorageStatus !in setOf(
         LocalStorageStatus.UNAVAILABLE,
@@ -1016,30 +2639,68 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
     val stopAudio: () -> Unit = { audioCoordinator.stop() }
 
     val onboardingPresentation = evidriloOnboardingPresentation(
-        completed = onboardingCompleted,
-        hasSavedPractice = savedSnapshot != null,
         forceShow = onboardingRequested,
     )
-    if (onboardingPresentation.isVisible) {
+    val accountGateVisible = accountRestoreComplete &&
+        accountSession !is AccountSession.SignedIn &&
+        navigationState.current.requiresAuthenticatedFreeAccess()
+    val assistantVisible = !TEMPORARY_GUEST_MODE_ENABLED &&
+        accountRestoreComplete &&
+        accountSession is AccountSession.SignedIn &&
+        !onboardingPresentation.isVisible &&
+        !accountGateVisible &&
+        !revenueCatPaywallVisible &&
+        !customerCenterVisible &&
+        premiumState is PremiumPracticeState.Hidden &&
+        navigationState.current !in setOf(
+            EvidriloDestination.SETTINGS,
+            EvidriloDestination.PROFILE,
+            EvidriloDestination.ACCOUNT,
+            EvidriloDestination.SUPPORT,
+            EvidriloDestination.ABOUT,
+            EvidriloDestination.PREMIUM,
+            EvidriloDestination.PROJECT_CATALOG,
+            EvidriloDestination.PROJECT_FAMILY_DETAIL,
+            EvidriloDestination.PROJECT_TEMPLATE_DETAIL,
+            EvidriloDestination.PROJECTS,
+            EvidriloDestination.PROJECT_EDITOR,
+        )
+    val assistantAiState = if (aiAssistRequestContextKey != null &&
+        aiAssistRequestContextKey != aiAssistantContextKey
+    ) {
+        if (accountSession is AccountSession.SignedIn) {
+            aiCredits?.let { EvidriloAiAssistUiState.Ready(it) }
+                ?: EvidriloAiAssistUiState.Loading
+        } else {
+            EvidriloAiAssistUiState.SignInRequired
+        }
+    } else {
+        aiAssistState
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+    if (!accountRestoreComplete) {
+        EvidriloLoadingScreen(mode = EvidriloLoadingMode.APP_BOOTSTRAP)
+    } else if (onboardingPresentation.isVisible) {
         EvidriloOnboardingScreen(
-            presentation = onboardingPresentation,
-            onStart = {
-                completeOnboarding()
-                if (state is ConclusionState.Intro) {
-                    dispatch(ConclusionEvent.Begin)
-                }
-                navigationState = navigationState.resetToHome()
+            tourState = onboardingTour,
+            onNext = ::advanceGetStartedTour,
+            onBack = { dispatchGetStartedTourEvent(GetStartedTourEvent.Back) },
+            onSkip = ::skipGetStartedTour,
+            onStartProject = {
+                advanceGetStartedTour()
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECTS)
             },
-            onSkip = completeOnboarding,
-            audioState = audioState,
-            onListen = {
-                playNarration(
-                    AudioNarrationId.ONBOARDING,
-                    AudioNarrationCopy.onboarding(onboardingPresentation),
-                )
+            storageNotice = onboardingStorageStatus.notice(),
+        )
+    } else if (accountGateVisible) {
+        EvidriloAccountRequiredGate(
+            accountConfigured = accountConfiguration.isConfigured,
+            onSignIn = { openAccountGate(navigationState.current) },
+            onOpenLocalProjects = {
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECTS)
             },
-            onPauseOrResumeAudio = pauseOrResumeAudio,
-            onStopAudio = stopAudio,
+            onOpenSupport = { navigationState = navigationState.open(EvidriloDestination.SUPPORT) },
+            storageNotice = onboardingStorageStatus.notice(),
         )
     } else if (revenueCatPaywallVisible) {
         RevenueCatManagedPaywall(onDismiss = closeManagedBillingUi)
@@ -1112,10 +2773,178 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onStopAudio = stopAudio,
             onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
         )
+    } else if (navigationState.current == EvidriloDestination.PROJECT_CATALOG) {
+        EvidriloProjectTemplateCatalogScreen(
+            listState = projectTemplateCatalogListState,
+            quickGuideExpanded = projectFamilyQuickGuideExpanded,
+            remoteFamilies = projectTemplateFamiliesState,
+            onRetryRemoteFamilies = { projectTemplateCatalogReload += 1 },
+            onToggleQuickGuide = {
+                projectFamilyQuickGuideExpanded = !projectFamilyQuickGuideExpanded
+            },
+            onBack = { navigationState = navigationState.back() },
+            onOpenProjects = {
+                studentProjectNotice = null
+                navigationState = navigationState.open(EvidriloDestination.PROJECTS)
+            },
+            onNavigate = openTargetSection,
+            onSelectFamily = { family ->
+                selectedProjectTemplateFamily = family
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
+            },
+        )
+    } else if (navigationState.current == EvidriloDestination.PROJECT_FAMILY_DETAIL) {
+        EvidriloProjectTemplateFamilyScreen(
+            overview = projectTemplateFamilyOverview(selectedProjectTemplateFamily),
+            remoteTemplates = projectTemplateFamilyState,
+            onRetryRemoteTemplates = { projectTemplateFamilyReload += 1 },
+            onInspectTemplate = { summary ->
+                releaseActiveProjectAiPreview()
+                selectedProjectTemplateSummary = summary
+                projectTemplateDetailState = ProjectTemplateRemoteUiState.NotRequested
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
+            },
+            onBack = { navigationState = navigationState.back() },
+            onNavigate = openTargetSection,
+        )
+    } else if (navigationState.current == EvidriloDestination.PROJECT_TEMPLATE_DETAIL) {
+        EvidriloProjectTemplateDetailScreen(
+            templateSummary = selectedProjectTemplateSummary,
+            state = projectTemplateDetailState,
+            notice = studentProjectNotice,
+            projectAiAccountKey = currentBillingAccountId(),
+            projectAiState = projectAiScaffoldState,
+            projectAiConsentState = projectAiConsentState,
+            onRetry = { projectTemplateDetailReload += 1 },
+            onRefreshProjectAiConsent = ::refreshProjectAiConsent,
+            onGrantProjectAiConsent = ::grantProjectAiConsent,
+            onRevokeProjectAiConsent = ::revokeProjectAiConsent,
+            onStartProject = ::startStudentProject,
+            onRequestProjectAi = { template, projectId, brief, question, fields, revision, consent ->
+                requestProjectAiScaffold(template, brief, question, fields, projectId, revision, consent)
+            },
+            onCreateProjectWithAi = ::createStudentProjectWithAi,
+            onDiscardProjectAiPreview = ::discardProjectAiPreview,
+            onRetryProjectAiSettlement = ::retryProjectAiSettlement,
+            onBack = {
+                releaseActiveProjectAiPreview()
+                navigationState = navigationState.back()
+            },
+            onNavigate = openTargetSection,
+        )
+    } else if (navigationState.current == EvidriloDestination.PROJECTS) {
+        EvidriloStudentProjectsScreen(
+            state = studentProjectListState,
+            notice = studentProjectNotice,
+            onRetry = { studentProjectListReload += 1 },
+            onOpenCatalog = { navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG) },
+            onResume = { project -> resumeStudentProject(project.id) },
+            onCreateManualProject = ::startManualStudentProject,
+            onMarkCompleted = ::completeStudentProject,
+            onArchive = ::archiveStudentProject,
+            onMoveToTrash = ::trashStudentProject,
+            onRestore = ::restoreStudentProject,
+            onPermanentlyDelete = ::permanentlyDeleteStudentProject,
+            onImportProject = ::importStudentProject,
+            onRestoreArchiveRevision = ::restoreStudentProjectFromArchive,
+            activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(projectProEntitlementActive.value),
+            onOpenPremium = openPremium,
+            onBack = { navigationState = navigationState.back() },
+            onNavigate = openTargetSection,
+        )
+    } else if (navigationState.current == EvidriloDestination.PROJECT_EDITOR) {
+        val draft = activeStudentProjectDraft
+        if (draft == null) {
+            EvidriloStudentProjectsScreen(
+                state = StudentProjectListUiState.StorageFailed,
+                notice = "The selected project is no longer available.",
+                onRetry = { studentProjectListReload += 1 },
+                onOpenCatalog = { navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECT_CATALOG) },
+                onResume = { project -> resumeStudentProject(project.id) },
+                onCreateManualProject = ::startManualStudentProject,
+                onMarkCompleted = ::completeStudentProject,
+                onArchive = ::archiveStudentProject,
+                onMoveToTrash = ::trashStudentProject,
+                onRestore = ::restoreStudentProject,
+                onPermanentlyDelete = ::permanentlyDeleteStudentProject,
+                onImportProject = ::importStudentProject,
+                onRestoreArchiveRevision = ::restoreStudentProjectFromArchive,
+                activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(projectProEntitlementActive.value),
+                onOpenPremium = openPremium,
+                onBack = { navigationState = navigationState.back() },
+                onNavigate = openTargetSection,
+            )
+        } else {
+            EvidriloStudentProjectEditorScreen(
+                draft = draft,
+                attachmentStore = studentProjectAttachmentStore,
+                projectAiAccountKey = currentBillingAccountId(),
+                projectAiState = projectAiScaffoldState,
+                projectAiConsentState = projectAiConsentState,
+                notice = studentProjectNotice,
+                isDirty = studentProjectEditorIsDirty,
+                showExitConfirmation = studentProjectExitConfirmation,
+                saveError = studentProjectSaveError,
+                onDirtyChanged = { studentProjectEditorIsDirty = it },
+                onSave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions ->
+                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions)
+                },
+                onAutosave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions ->
+                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, checkpoint = false)
+                },
+                onAddAttachment = ::addStudentProjectAttachment,
+                onRemoveAttachment = ::removeStudentProjectAttachment,
+                onRestoreRevision = ::restoreStudentProjectRevision,
+                onRefreshProjectAiConsent = ::refreshProjectAiConsent,
+                onGrantProjectAiConsent = ::grantProjectAiConsent,
+                onRevokeProjectAiConsent = ::revokeProjectAiConsent,
+                onRequestProjectAi = { projectId, brief, question, fields, revision, projectDataConsent ->
+                    draft.templateSnapshot?.let { template ->
+                        requestProjectAiScaffold(
+                            template,
+                            brief,
+                            question,
+                            fields,
+                            projectId,
+                            revision,
+                            projectDataConsent,
+                        )
+                    }
+                },
+                onApplyProjectAi = ::applyProjectAiScaffold,
+                onDiscardProjectAiPreview = ::discardProjectAiPreview,
+                onRetryProjectAiSettlement = ::retryProjectAiSettlement,
+                onRequestClose = {
+                    if (studentProjectEditorIsDirty) {
+                        studentProjectExitConfirmation = true
+                    } else {
+                        releaseActiveProjectAiPreview()
+                        navigationState = navigationState.back()
+                    }
+                },
+                onSaveAndLeave = {
+                    studentProjectEditorIsDirty = false
+                    studentProjectExitConfirmation = false
+                    releaseActiveProjectAiPreview()
+                    navigationState = navigationState.back()
+                },
+                onDiscardAndLeave = {
+                    studentProjectEditorIsDirty = false
+                    studentProjectExitConfirmation = false
+                    releaseActiveProjectAiPreview()
+                    navigationState = navigationState.back()
+                },
+                onCancelExit = { studentProjectExitConfirmation = false },
+            )
+        }
     } else if (navigationState.current == EvidriloDestination.SOURCES) {
         EvidriloTargetSourcesScreen(
             case = case,
+            remoteContentStatus = remoteContentStatus,
             onNavigate = openTargetSection,
+            onOpenProjects = {
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECTS)
+            },
             onOpenWorkspace = {
                 navigationState = navigationState.selectRoot(EvidriloDestination.HOME)
                     .open(EvidriloDestination.WORKSPACE)
@@ -1229,8 +3058,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                     onNavigate = openTargetSection,
                     onBack = { navigationState = navigationState.back() },
                     onOpenHistory = { navigationState = navigationState.back() },
+                    challengeAvailable =
+                        snapshot.phase == ConclusionSessionPhase.SUMMARY &&
+                            snapshot.currentDraft.caseId == case.id &&
+                            state is ConclusionState.Intro,
                     onStartChallenge = {
-                        dispatch(ConclusionEvent.BeginEvidenceChange)
+                        dispatch(ConclusionEvent.BeginEvidenceChangeFromSavedDraft(snapshot.currentDraft))
                         navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
                     },
                 )
@@ -1244,14 +3077,36 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             )
         }
     } else if (navigationState.current == EvidriloDestination.PROFILE) {
+        val profileSignedIn = !TEMPORARY_GUEST_MODE_ENABLED &&
+            accountRestoreComplete && accountSession is AccountSession.SignedIn
         EvidriloTargetProfileScreen(
-            profileSubtitle = accountSession.toSettingsSubtitle(),
+            signedIn = profileSignedIn,
+            profileSubtitle = if (TEMPORARY_GUEST_MODE_ENABLED) {
+                "Guest mode · Local only"
+            } else {
+                accountSession.toSettingsSubtitle()
+            },
             history = historySnapshot,
+            onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
             onOpenPremium = openPremium,
-            onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
+            onOpenHistory = {
+                if (requireDestinationAccess(EvidriloDestination.HISTORY)) {
+                    navigationState = navigationState.open(EvidriloDestination.HISTORY)
+                }
+            },
             onOpenSettings = { navigationState = navigationState.open(EvidriloDestination.SETTINGS) },
-            onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
+            onOpenAccount = {
+                if (TEMPORARY_GUEST_MODE_ENABLED) {
+                    navigationState = navigationState.open(EvidriloDestination.ACCOUNT)
+                } else if (profileSignedIn) {
+                    navigationState = navigationState.open(EvidriloDestination.ACCOUNT)
+                } else {
+                    openAccountGate(EvidriloDestination.PROFILE)
+                }
+            },
+            onOpenLocalProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
+            onOpenSupport = { navigationState = navigationState.open(EvidriloDestination.SUPPORT) },
         )
     } else if (navigationState.current == EvidriloDestination.ACCOUNT) {
         EvidriloAccountScreen(
@@ -1260,18 +3115,34 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             accountConfigured = accountConfiguration.isConfigured,
             exportJson = accountExportJson,
             exportError = accountExportError,
-            onBack = { navigationState = navigationState.back() },
+            persistenceNotice = onboardingStorageStatus.notice(),
+            onBack = {
+                pendingAccountGateDestination = null
+                navigationState = navigationState.back()
+            },
             onSignIn = { email, password ->
-                performAccountOperation(true) { accountGateway.signIn(email, password) }
+                performAccountOperation(showSigningInState = true) {
+                    accountGateway.signIn(email, password)
+                }
             },
             onSignUp = { email, password ->
-                performAccountOperation(true) { accountGateway.signUp(email, password) }
+                performAccountOperation(showSigningInState = true) {
+                    accountGateway.signUp(email, password)
+                }
             },
             onResetPassword = { email ->
                 performAccountOperation(true) { accountGateway.requestPasswordReset(email) }
             },
             onGoogleSignIn = {
-                performAccountOperation(true) { accountGateway.startGoogleSignIn() }
+                performAccountOperation(showSigningInState = true) {
+                    accountGateway.startGoogleSignIn()
+                }
+            },
+            onGoogleLink = {
+                performAccountOperation(false) { accountGateway.startGoogleIdentityLink() }
+            },
+            onCancelGoogleLink = {
+                performAccountOperation(false) { accountGateway.cancelGoogleIdentityLink() }
             },
             onCancelOAuth = {
                 performAccountOperation(false) { accountGateway.signOut() }
@@ -1336,18 +3207,21 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             },
             onBack = { navigationState = navigationState.back() },
             onOpenPractice = {
-                if (state is ConclusionState.Intro) {
-                    dispatch(ConclusionEvent.Begin)
+                if (requireDestinationAccess(EvidriloDestination.PRACTICE)) {
+                    if (state is ConclusionState.Intro) {
+                        dispatch(ConclusionEvent.Begin)
+                    }
+                    navigationState = navigationState.open(EvidriloDestination.PRACTICE)
                 }
-                navigationState = navigationState.open(EvidriloDestination.PRACTICE)
             },
-            onReplayOnboarding = { onboardingRequested = true },
+            onReplayOnboarding = ::requestGetStartedTour,
             audioState = audioState,
             onListen = { playNarration(AudioNarrationId.GUIDE, AudioNarrationCopy.guide()) },
             onPauseOrResumeAudio = pauseOrResumeAudio,
             onStopAudio = stopAudio,
         )
     } else if (navigationState.current == EvidriloDestination.SETTINGS) {
+        val previousDestination = navigationState.stack.dropLast(1).lastOrNull()
         EvidriloSettingsScreen(
             historyAvailable = historySnapshot != null,
             storageNotice = storageNotice,
@@ -1374,9 +3248,12 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onResetPractice = { dispatch(ConclusionEvent.Reset) },
             onClearHistory = clearHistory,
             onBack = { navigationState = navigationState.back() },
+            backLabel = if (previousDestination == EvidriloDestination.PROFILE) "Profile" else "Home",
             audioSettings = audioSettings,
             audioStorageStatus = audioStorageStatus,
             onSetAudioSettings = setAudioSettings,
+            themeMode = themeController.mode,
+            onSetThemeMode = themeController::select,
             notificationPreferences = notificationPreferences,
             notificationPermission = notificationPermission,
             notificationScheduleLabel = notificationScheduleLabel,
@@ -1395,7 +3272,11 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
             customerCenterAvailable = revenueCatUiAvailability.canPresent,
             onOpenCustomerCenter = openCustomerCenter,
-            backLabel = if (previousDestination == EvidriloDestination.SETTINGS) "Settings" else "Home",
+            backLabel = when (previousDestination) {
+                EvidriloDestination.SETTINGS -> "Settings"
+                EvidriloDestination.PROFILE -> "Profile"
+                else -> "Home"
+            },
             audioState = audioState,
             onListen = { playNarration(AudioNarrationId.SUPPORT, AudioNarrationCopy.support()) },
             onPauseOrResumeAudio = pauseOrResumeAudio,
@@ -1418,6 +3299,16 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
             onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
             onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
             onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
+            onOpenProjectCatalog = {
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
+            },
+            projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
+            projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
+            projectsLoadError = studentProjectListState.toHomeErrorMessage(),
+            onRetryProjects = { studentProjectListReload += 1 },
+            onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
+            onCreateProject = ::beginManualProjectFromHome,
+            onResumeProject = { project -> resumeStudentProject(project.id) },
             onStartPractice = startTargetPractice,
             onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
             onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
@@ -1443,6 +3334,16 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
                 onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
                 onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
                 onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
+                onOpenProjectCatalog = {
+                    navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
+                },
+                projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
+                projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
+                projectsLoadError = studentProjectListState.toHomeErrorMessage(),
+                onRetryProjects = { studentProjectListReload += 1 },
+                onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
+                onCreateProject = ::beginManualProjectFromHome,
+                onResumeProject = { project -> resumeStudentProject(project.id) },
                 onStartPractice = startTargetPractice,
                 onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
                 onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
@@ -1585,15 +3486,27 @@ internal fun EvidriloApp(billingGateway: BillingGateway) {
         }
     }
 
-    if (accountOfferVisible) {
-        EvidriloAccountBenefitPrompt(
-            onSignIn = {
-                accountOfferVisible = false
-                accountExportJson = null
-                navigationState = navigationState.open(EvidriloDestination.ACCOUNT)
-            },
-            onDismiss = { accountOfferVisible = false },
-        )
+    EvidriloFloatingAssistant(
+        visible = assistantVisible,
+        dockNearTop = navigationState.current == EvidriloDestination.PRACTICE,
+        case = case,
+        draft = targetDraft,
+        feedback = targetEvaluationFor(state)?.primaryFeedback,
+        accountId = currentBillingAccountId(),
+        aiState = assistantAiState,
+        aiClearState = aiConversationClearState,
+        onRequestAi = requestAiAssist,
+        onClearAiConversation = clearAiConversation,
+        onRetryClearAiConversation = retryClearAiConversation,
+        canApplyAiProposal = canApplyAiProposal,
+        onApplyAiProposal = applyAiProposal,
+        onRetryAi = retryAiAssist,
+        onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
+        onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
+        onOpenPractice = startTargetPractice,
+        onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
+    )
+
     }
 }
 
@@ -1623,22 +3536,30 @@ private fun EvidriloPremiumSurface(
     when (state) {
         PremiumPracticeState.Hidden -> Unit
 
-        is PremiumPracticeState.Locked -> EvidriloTargetSurface(
-            selected = EvidriloTargetSection.PROFILE,
-            onNavigate = onNavigate,
-        ) {
-            EvidriloPremiumLockedScreen(
-                billing = state.billing.copy(isBusy = isBusy),
-                managedPaywallAvailable = managedPaywallAvailable,
-                onOpenManagedPaywall = onOpenManagedPaywall,
-                onPurchase = onPurchase,
-                onRestore = onRestore,
-                onRetry = onRetry,
-                onSelectOffer = onSelectOffer,
-                onBack = onBack,
-                backLabel = backLabel,
-            )
-        }
+        is PremiumPracticeState.Locked ->
+            if (state.billing.state == BillingUiState.LOADING) {
+                EvidriloLoadingScreen(
+                    mode = EvidriloLoadingMode.NETWORK_PAGE,
+                    onBack = onBack,
+                )
+            } else {
+                EvidriloTargetSurface(
+                    selected = EvidriloTargetSection.PROFILE,
+                    onNavigate = onNavigate,
+                ) {
+                    EvidriloPremiumLockedScreen(
+                        billing = state.billing.copy(isBusy = isBusy),
+                        managedPaywallAvailable = managedPaywallAvailable,
+                        onOpenManagedPaywall = onOpenManagedPaywall,
+                        onPurchase = onPurchase,
+                        onRestore = onRestore,
+                        onRetry = onRetry,
+                        onSelectOffer = onSelectOffer,
+                        onBack = onBack,
+                        backLabel = backLabel,
+                    )
+                }
+            }
 
         is PremiumPracticeState.Catalog -> EvidriloTargetSurface(
             selected = EvidriloTargetSection.PROFILE,
@@ -1903,6 +3824,7 @@ private fun EvidriloDraftScreen(
 ) {
     var step by remember(case.id, initialStep) { mutableStateOf(initialStep) }
     var confirmReset by remember(case.id, initialStep) { mutableStateOf(false) }
+    var showCaseDetails by remember(case.id, initialStep) { mutableStateOf(false) }
 
     EvidriloContentColumn {
         EvidriloBrandHeader(onSettings = null)
@@ -1919,7 +3841,7 @@ private fun EvidriloDraftScreen(
         )
         Text(
             when (step) {
-                EvidriloDraftStep.EVIDENCE -> "Start with the supplied facts. Select only observations that directly support the relationship you want to describe."
+                EvidriloDraftStep.EVIDENCE -> "Compare the case prediction with the observations, then choose the facts that support your conclusion."
                 EvidriloDraftStep.CLAIM -> "Write what your selected evidence supports, then choose how far the claim can go."
                 EvidriloDraftStep.LIMITS -> "Name the limitations that still matter and one practical next action."
             },
@@ -1943,8 +3865,7 @@ private fun EvidriloDraftScreen(
 
         when (step) {
             EvidriloDraftStep.EVIDENCE -> {
-                EvidriloWorkspaceTraceCard(case = case, draft = draft)
-                EvidriloCaseFactsCard(case)
+                EvidriloCaseQuestionCard(case)
                 EvidriloSectionTitle("1. What relationship are you making?")
                 ConclusionRelation.entries
                     .filter { it != ConclusionRelation.UNSUPPORTED }
@@ -1975,6 +3896,14 @@ private fun EvidriloDraftScreen(
                             )
                         },
                     )
+                }
+                EvidriloSecondaryButton(
+                    label = if (showCaseDetails) "Hide case details" else "Read all case facts and trace",
+                    onClick = { showCaseDetails = !showCaseDetails },
+                )
+                if (showCaseDetails) {
+                    EvidriloWorkspaceTraceCard(case = case, draft = draft)
+                    EvidriloCaseFactsCard(case)
                 }
                 EvidriloPrimaryButton(
                     label = "Continue to claim",
@@ -2116,6 +4045,27 @@ private fun EvidriloDraftScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun EvidriloCaseQuestionCard(case: ConclusionCase) {
+    val aim = case.factsOfType(ConclusionFactType.AIM).firstOrNull()
+    val suppliedHypothesis = case.factsOfType(ConclusionFactType.CONTEXT)
+        .firstOrNull { it.id.contains("HYP") }
+
+    EvidriloTintPanel {
+        Text("Case question", style = MaterialTheme.typography.titleSmall)
+        Text(aim?.text ?: case.description, style = MaterialTheme.typography.bodyMedium)
+        suppliedHypothesis?.let { hypothesis ->
+            Text("Supplied hypothesis · context", style = MaterialTheme.typography.labelLarge)
+            Text(hypothesis.text, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "This is a prediction to compare with the results, not an observation to select as evidence.",
+                style = MaterialTheme.typography.bodySmall,
+                color = EvidriloColors.Slate,
+            )
+        }
     }
 }
 
@@ -2392,12 +4342,12 @@ private fun EvidriloEvidenceChangeSummaryScreen(
 private fun EvidriloCaseFactsCard(case: ConclusionCase) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Supplied case facts", style = MaterialTheme.typography.titleMedium)
             case.facts.forEach { fact -> EvidriloFactRow(fact) }
         }
@@ -2457,19 +4407,19 @@ private fun EvidriloChoiceButton(
             .semantics(mergeDescendants = true) {
                 stateDescription = if (selected) "Selected" else "Not selected"
             },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) EvidriloColors.Tint else EvidriloColors.White,
         ),
         border = BorderStroke(
-            width = if (selected) 2.dp else 1.dp,
+            width = 2.dp,
             color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Separator,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Text(
             label,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             style = MaterialTheme.typography.bodyLarge,
         )
     }
@@ -2482,14 +4432,14 @@ private fun EvidriloFeedbackCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (prominent) EvidriloColors.Tint else EvidriloColors.Surface,
         ),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(feedback.status.displayLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
                 feedback.code + " · " + feedback.field.displayLabel(),
@@ -2507,12 +4457,12 @@ private fun EvidriloFeedbackCard(
 private fun EvidriloCheckCard(check: ConclusionCheckResult) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(check.check.displayLabel(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(check.status.displayLabel(), style = MaterialTheme.typography.labelLarge)
             Text(check.reason, style = MaterialTheme.typography.bodyMedium)
@@ -2539,10 +4489,10 @@ private fun EvidriloNotice(
                 -> EvidriloColors.ErrorSurface
             },
         ),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(status.displayLabel(), style = MaterialTheme.typography.labelLarge)
             Text(body, style = MaterialTheme.typography.bodyMedium)
@@ -2554,12 +4504,12 @@ private fun EvidriloNotice(
 private fun EvidriloContextCard(note: EvidriloContextNote) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(note.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(note.body, style = MaterialTheme.typography.bodyMedium)
         }
@@ -2573,12 +4523,12 @@ internal fun EvidriloDraftSnapshot(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             EvidriloSnapshotRow("Relation", draft.relation?.displayLabel() ?: "Not selected")
             EvidriloSnapshotRow("Evidence", draft.evidenceRefs.ifEmpty { listOf("None") }.joinToString())
@@ -2686,13 +4636,6 @@ private fun ConclusionState.persist(store: ConclusionSessionStore): LocalStorage
             ),
         )
     }
-
-private fun ConclusionState.EvidenceChangeSummary.toHistorySnapshot(): ConclusionSessionSnapshot =
-    ConclusionSessionSnapshot(
-        phase = ConclusionSessionPhase.EVIDENCE_CHANGE_SUMMARY,
-        initialDraft = baseDraft,
-        currentDraft = challengeDraft,
-    )
 
 private fun ConclusionRelation.displayLabel(): String = when (this) {
     ConclusionRelation.OBSERVED_DIFFERENCE -> "The observations show a difference"

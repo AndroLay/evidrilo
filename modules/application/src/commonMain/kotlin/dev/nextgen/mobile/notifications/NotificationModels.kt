@@ -32,6 +32,35 @@ enum class NotificationPermissionState {
     UNAVAILABLE,
 }
 
+const val SYSTEM_NOTIFICATION_PERMISSION_OFF_MESSAGE =
+    "System notification permission is off. Open system settings to enable reminders."
+const val NOTIFICATION_PERMISSION_REQUEST_DENIED_MESSAGE =
+    "Permission was not granted. Open system settings if you want reminders."
+
+data class NotificationPermissionUiState(
+    val permission: NotificationPermissionState = NotificationPermissionState.UNKNOWN,
+    val statusMessage: String? = null,
+) {
+    fun withPermission(refreshedPermission: NotificationPermissionState): NotificationPermissionUiState = copy(
+        permission = refreshedPermission,
+        statusMessage = if (
+            refreshedPermission == NotificationPermissionState.GRANTED &&
+            statusMessage in STALE_PERMISSION_DENIAL_MESSAGES
+        ) {
+            null
+        } else {
+            statusMessage
+        },
+    )
+
+    private companion object {
+        val STALE_PERMISSION_DENIAL_MESSAGES = setOf(
+            SYSTEM_NOTIFICATION_PERMISSION_OFF_MESSAGE,
+            NOTIFICATION_PERMISSION_REQUEST_DENIED_MESSAGE,
+        )
+    }
+}
+
 data class NotificationPreferences(
     val enabled: Boolean = false,
     val continueUnfinishedEnabled: Boolean = false,

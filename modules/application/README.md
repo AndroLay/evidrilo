@@ -10,6 +10,9 @@ It currently contains:
 - consented analytics event/gateway contracts;
 - offline-safe sync queue/coordinator and request gates;
 - recommendation parsing, retry, lifecycle, and interaction orchestration.
+- read-only, anonymous project-template catalog HTTP reads, plus local
+  browse/inspect/choose orchestration delegated to the domain's version and
+  publication gates. This does not create or sync a student project.
 
 The package names remain `dev.nextgen.mobile.*` to avoid a behavior-changing
 namespace migration. The module deliberately has no Compose, RevenueCat, or

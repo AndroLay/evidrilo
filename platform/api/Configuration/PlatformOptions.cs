@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using Evidrilo.Platform;
 using Microsoft.Extensions.Configuration;
 
 namespace Evidrilo.Api.Configuration;
@@ -29,7 +30,9 @@ public sealed class PlatformOptions
         string? databaseConnectionString,
         string? revenueCatWebhookSecret,
         string? revenueCatWebhookAuthorization,
-        string? revenueCatEntitlementId)
+        string? revenueCatEntitlementId,
+        string? revenueCatMonthlyProductId,
+        string? revenueCatYearlyProductId)
     {
         Environment = environment;
         Port = port;
@@ -41,6 +44,8 @@ public sealed class PlatformOptions
         RevenueCatWebhookSecret = revenueCatWebhookSecret;
         RevenueCatWebhookAuthorization = revenueCatWebhookAuthorization;
         RevenueCatEntitlementId = revenueCatEntitlementId;
+        RevenueCatMonthlyProductId = revenueCatMonthlyProductId;
+        RevenueCatYearlyProductId = revenueCatYearlyProductId;
     }
 
     public string Environment { get; }
@@ -74,16 +79,43 @@ public sealed class PlatformOptions
     /// </summary>
     public string? RevenueCatEntitlementId { get; }
 
+    /// <summary>
+    /// Provider product identifier mapped to the internal monthly package.
+    /// Development and test environments default to the synthetic alias
+    /// <c>monthly</c>; staging and production must configure the real ID.
+    /// </summary>
+    public string? RevenueCatMonthlyProductId { get; }
+
+    /// <summary>
+    /// Provider product identifier mapped to the internal yearly package.
+    /// Development and test environments default to the synthetic alias
+    /// <c>yearly</c>; staging and production must configure the real ID.
+    /// </summary>
+    public string? RevenueCatYearlyProductId { get; }
+
     public bool SupabaseConfigured => !string.IsNullOrWhiteSpace(SupabaseUrl)
         && !string.IsNullOrWhiteSpace(SupabasePublishableKey);
 
     public bool DatabaseConfigured => !string.IsNullOrWhiteSpace(DatabaseConnectionString);
+
+    public bool BillingConfigurationRequested =>
+        !string.IsNullOrWhiteSpace(RevenueCatWebhookSecret)
+        || !string.IsNullOrWhiteSpace(RevenueCatWebhookAuthorization)
+        || !string.IsNullOrWhiteSpace(RevenueCatEntitlementId)
+        || !string.IsNullOrWhiteSpace(RevenueCatMonthlyProductId)
+        || !string.IsNullOrWhiteSpace(RevenueCatYearlyProductId);
 
     public bool BillingConfigured => (!string.IsNullOrWhiteSpace(RevenueCatWebhookSecret)
         || !string.IsNullOrWhiteSpace(RevenueCatWebhookAuthorization))
         && string.Equals(
             RevenueCatEntitlementId,
             ExpectedRevenueCatEntitlementId,
+            StringComparison.Ordinal)
+        && !string.IsNullOrWhiteSpace(RevenueCatMonthlyProductId)
+        && !string.IsNullOrWhiteSpace(RevenueCatYearlyProductId)
+        && !string.Equals(
+            RevenueCatMonthlyProductId,
+            RevenueCatYearlyProductId,
             StringComparison.Ordinal);
 
     public ReadinessDependencies Readiness => SupabaseConfigured
@@ -110,11 +142,23 @@ public sealed class PlatformOptions
         var supabaseUrl = Optional(First(configuration["Platform:SupabaseUrl"], configuration["SUPABASE_URL"]));
         var publishableKey = Optional(
             First(configuration["Platform:SupabasePublishableKey"], configuration["SUPABASE_PUBLISHABLE_KEY"]));
-        var databaseConnectionString = Optional(
+        var rawDatabaseConnectionString = Optional(
             First(
                 configuration["Platform:DatabaseConnectionString"],
                 configuration["DATABASE_URL"],
                 configuration["SUPABASE_DB_CONNECTION_STRING"]));
+        string? databaseConnectionString;
+        try
+        {
+            databaseConnectionString = DatabaseConnectionStringParser.Normalize(
+                rawDatabaseConnectionString,
+                environment is "staging" or "production");
+        }
+        catch (FormatException)
+        {
+            throw new PlatformConfigurationException(
+                "DATABASE_URL or SUPABASE_DB_CONNECTION_STRING is invalid; deployed environments require encrypted PostgreSQL transport and an explicit username.");
+        }
         var revenueCatWebhookSecret = Optional(
             First(configuration["Platform:RevenueCatWebhookSecret"], configuration["REVENUECAT_WEBHOOK_SECRET"]));
         var revenueCatWebhookAuthorization = Optional(
@@ -123,6 +167,17 @@ public sealed class PlatformOptions
                 configuration["REVENUECAT_WEBHOOK_AUTHORIZATION"]));
         var revenueCatEntitlementId = Optional(
             First(configuration["Platform:RevenueCatEntitlementId"], configuration["REVENUECAT_ENTITLEMENT_ID"]));
+        var revenueCatMonthlyProductId = ParseRevenueCatProductId(
+            First(configuration["Platform:RevenueCatMonthlyProductId"], configuration["REVENUECAT_MONTHLY_PRODUCT_ID"]),
+            "REVENUECAT_MONTHLY_PRODUCT_ID");
+        var revenueCatYearlyProductId = ParseRevenueCatProductId(
+            First(configuration["Platform:RevenueCatYearlyProductId"], configuration["REVENUECAT_YEARLY_PRODUCT_ID"]),
+            "REVENUECAT_YEARLY_PRODUCT_ID");
+        if (environment is not ("staging" or "production"))
+        {
+            revenueCatMonthlyProductId ??= "monthly";
+            revenueCatYearlyProductId ??= "yearly";
+        }
 
         if (supabaseUrl is not null
             && (!Uri.TryCreate(supabaseUrl, UriKind.Absolute, out var parsed)
@@ -141,17 +196,26 @@ public sealed class PlatformOptions
             databaseConnectionString,
             revenueCatWebhookSecret,
             revenueCatWebhookAuthorization,
-            revenueCatEntitlementId);
+            revenueCatEntitlementId,
+            revenueCatMonthlyProductId,
+            revenueCatYearlyProductId);
         options.ValidateForStartup();
         return options;
     }
 
     public void ValidateForStartup()
     {
-        if (Environment.Equals("production", StringComparison.OrdinalIgnoreCase)
-            && (!SupabaseConfigured || !DatabaseConfigured))
+        var isDeployedEnvironment = Environment.Equals("staging", StringComparison.OrdinalIgnoreCase)
+            || Environment.Equals("production", StringComparison.OrdinalIgnoreCase);
+        if (isDeployedEnvironment && (!SupabaseConfigured || !DatabaseConfigured))
         {
             throw new PlatformConfigurationException("Required platform configuration is missing.");
+        }
+
+        if (isDeployedEnvironment && BillingConfigurationRequested && !BillingConfigured)
+        {
+            throw new PlatformConfigurationException(
+                "When enabled, RevenueCat requires complete webhook, entitlement, monthly, and yearly product configuration in staging and production.");
         }
     }
 
@@ -252,5 +316,18 @@ public sealed class PlatformOptions
     {
         var trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static string? ParseRevenueCatProductId(string? value, string name)
+    {
+        var productId = Optional(value);
+        if (productId is null) return null;
+        if (productId.Length > 128 || productId.Any(char.IsWhiteSpace))
+        {
+            throw new PlatformConfigurationException(
+                $"{name} must be a non-empty provider product identifier of at most 128 characters.");
+        }
+
+        return productId;
     }
 }

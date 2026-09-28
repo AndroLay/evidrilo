@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/student-project-list.v1.json",
+  "title": "Evidrilo student project list response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "projects", "nextCursor", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.student-project-list" },
+    "version": { "const": "1" },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["projectId", "version", "title", "question", "method", "createdAt", "updatedAt"],
+        "properties": {
+          "projectId": { "type": "string", "format": "uuid" },
+          "version": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "question": { "type": "string" },
+          "method": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "nextCursor": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["createdAt", "projectId"],
+          "properties": {
+            "createdAt": { "type": "string", "format": "date-time" },
+            "projectId": { "type": "string", "format": "uuid" }
+          }
+        }
+      ]
+    },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

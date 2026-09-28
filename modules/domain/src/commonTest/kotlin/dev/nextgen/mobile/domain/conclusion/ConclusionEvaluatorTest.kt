@@ -311,7 +311,7 @@ class ConclusionEvaluatorTest {
     }
 
     @Test
-    fun relationConflictAbstainsInsteadOfChoosingBetweenStructuredAndFreeTextMeaning() {
+    fun unsupportedRelationMismatchAbstainsInsteadOfChoosingBetweenStructuredAndFreeTextMeaning() {
         val feedback = evaluator.evaluate(
             validDraft().copy(
                 relation = ConclusionRelation.CANNOT_CONCLUDE_FROM_CASE,
@@ -323,7 +323,7 @@ class ConclusionEvaluatorTest {
         assertEquals(ConclusionStatus.CANNOT_ASSESS, feedback.status)
         assertEquals(ConclusionPriority.P1, feedback.priority)
         assertEquals(ConclusionField.CLAIM_TEXT, feedback.field)
-        assertEquals("RELATION_CONFLICT", feedback.code)
+        assertEquals("UNSUPPORTED_RELATION", feedback.code)
     }
 
     @Test

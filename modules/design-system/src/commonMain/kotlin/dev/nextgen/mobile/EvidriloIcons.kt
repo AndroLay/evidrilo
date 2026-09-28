@@ -49,12 +49,14 @@ public enum class EvidriloIconName {
     PLUS,
     LOCK,
     SPARK,
+    CHAT_BUBBLE,
     EVIDENCE_GRAPH,
     LIGHTNING,
     CHECK_FILLED,
     HOME_FILLED,
     ACCOUNT_FILLED,
     FOLDER_FILLED,
+    TROPHY,
 }
 
 @Composable
@@ -70,8 +72,9 @@ public fun EvidriloIcon(
         val stroke = Stroke(
             // The drawing commands use a 24 x 24 coordinate system. Compensate
             // for the canvas scale so icons keep a consistent visual stroke at
-            // 16, 24, 26, and 48 dp instead of becoming filled blobs.
-            width = 1.8.dp.toPx() / strokeScale,
+            // 16, 24, 26, and 48 dp instead of becoming filled blobs. The
+            // slightly heavier line matches the bold, friendly type scale.
+            width = 2.2.dp.toPx() / strokeScale,
             cap = StrokeCap.Round,
             join = StrokeJoin.Round,
         )
@@ -106,12 +109,14 @@ public fun EvidriloIcon(
                 EvidriloIconName.PLUS -> drawPlus(tint, stroke)
                 EvidriloIconName.LOCK -> drawLock(tint, stroke)
                 EvidriloIconName.SPARK -> drawSpark(tint, stroke)
+                EvidriloIconName.CHAT_BUBBLE -> drawChatBubble(tint, stroke)
                 EvidriloIconName.EVIDENCE_GRAPH -> drawEvidenceGraph(tint, stroke)
                 EvidriloIconName.LIGHTNING -> drawLightning(tint)
                 EvidriloIconName.CHECK_FILLED -> drawFilledCheck(tint, stroke)
                 EvidriloIconName.HOME_FILLED -> drawFilledHome(tint)
                 EvidriloIconName.ACCOUNT_FILLED -> drawFilledAccount(tint)
                 EvidriloIconName.FOLDER_FILLED -> drawFilledFolder(tint)
+                EvidriloIconName.TROPHY -> drawTrophy(tint, stroke)
             }
         }
     }
@@ -358,6 +363,32 @@ private fun DrawScope.drawCrown(color: Color, stroke: Stroke) {
     drawStyledLine(color, Offset(7f, 21f), Offset(17f, 21f), stroke)
 }
 
+private fun DrawScope.drawTrophy(color: Color, stroke: Stroke) {
+    val cup = Path().apply {
+        moveTo(7f, 4f)
+        lineTo(17f, 4f)
+        lineTo(17f, 9f)
+        cubicTo(17f, 12.5f, 14.8f, 15f, 12f, 15f)
+        cubicTo(9.2f, 15f, 7f, 12.5f, 7f, 9f)
+        close()
+    }
+    drawPath(cup, color, style = stroke)
+    val leftHandle = Path().apply {
+        moveTo(7f, 6f)
+        lineTo(4f, 6f)
+        cubicTo(4f, 9.5f, 5.5f, 11f, 7.6f, 11.4f)
+    }
+    drawPath(leftHandle, color, style = stroke)
+    val rightHandle = Path().apply {
+        moveTo(17f, 6f)
+        lineTo(20f, 6f)
+        cubicTo(20f, 9.5f, 18.5f, 11f, 16.4f, 11.4f)
+    }
+    drawPath(rightHandle, color, style = stroke)
+    drawStyledLine(color, Offset(12f, 15f), Offset(12f, 18.5f), stroke)
+    drawStyledLine(color, Offset(8f, 20.5f), Offset(16f, 20.5f), stroke)
+}
+
 private fun DrawScope.drawDatabase(color: Color, stroke: Stroke) {
     drawOval(color, Offset(4f, 3f), Size(16f, 6f), style = stroke)
     drawArc(color, 0f, 180f, false, Offset(4f, 6f), Size(16f, 6f), style = stroke)
@@ -409,6 +440,27 @@ private fun DrawScope.drawSpark(color: Color, stroke: Stroke) {
     drawStyledLine(color, Offset(3f, 12f), Offset(21f, 12f), stroke)
     drawStyledLine(color, Offset(6f, 6f), Offset(18f, 18f), stroke)
     drawStyledLine(color, Offset(18f, 6f), Offset(6f, 18f), stroke)
+}
+
+private fun DrawScope.drawChatBubble(color: Color, stroke: Stroke) {
+    val outline = Path().apply {
+        moveTo(6.5f, 4.5f)
+        lineTo(17.5f, 4.5f)
+        cubicTo(20f, 4.5f, 21f, 6f, 21f, 8.5f)
+        lineTo(21f, 14f)
+        cubicTo(21f, 16.5f, 19.5f, 18f, 17.5f, 18f)
+        lineTo(10f, 18f)
+        lineTo(5f, 21f)
+        lineTo(5f, 17.7f)
+        cubicTo(3.8f, 17.1f, 3f, 15.7f, 3f, 14f)
+        lineTo(3f, 8.5f)
+        cubicTo(3f, 6f, 4.5f, 4.5f, 6.5f, 4.5f)
+        close()
+    }
+    drawPath(outline, color, style = stroke)
+    listOf(8f, 12f, 16f).forEach { x ->
+        drawCircle(color, radius = 1.05f, center = Offset(x, 11f))
+    }
 }
 
 private fun DrawScope.drawEvidenceGraph(color: Color, stroke: Stroke) {

@@ -157,6 +157,34 @@ class ConclusionReducerTest {
     }
 
     @Test
+    fun savedBaseDraftCanStartEvidenceChangeAfterProcessRestart() {
+        val savedBase = validDraft().copy(scope = ConclusionScope.THIS_OBSERVATION)
+
+        val challenge = reducer.reduce(
+            ConclusionState.Intro,
+            ConclusionEvent.BeginEvidenceChangeFromSavedDraft(savedBase),
+        )
+
+        assertTrue(challenge is ConclusionState.EvidenceChangeDrafting)
+        assertEquals(savedBase, challenge.baseDraft)
+        assertEquals(reducer.evaluate(savedBase), challenge.baseEvaluation)
+        assertEquals(ConclusionCases.EVIDENCE_CHANGE.id, challenge.draft.caseId)
+        assertTrue(challenge.draft.evidenceRefs.isEmpty())
+    }
+
+    @Test
+    fun savedDraftForAnotherCaseCannotStartEvidenceChange() {
+        val otherCaseDraft = validDraft().copy(caseId = "foreign-case")
+
+        val challenge = reducer.reduce(
+            ConclusionState.Intro,
+            ConclusionEvent.BeginEvidenceChangeFromSavedDraft(otherCaseDraft),
+        )
+
+        assertEquals(ConclusionState.Intro, challenge)
+    }
+
+    @Test
     fun evidenceChangeCannotCarryBaseDraftOrBeRevisedTwice() {
         val base = validDraft()
         val revisedBase = base.copy(scope = ConclusionScope.THIS_OBSERVATION)

@@ -6,18 +6,21 @@ namespace Evidrilo.Worker;
 public sealed record ProjectionJob(
     Guid JobId,
     Guid AccountId,
-    int Attempts);
+    int Attempts,
+    Guid LeaseToken);
 
 internal static class ProjectionJobSql
 {
     public const string FencedRunningJob = """
         status = 'running'
         and attempts = @attempts
+        and lease_token = @lease_token
         """;
 
     public const string OwnedLease = """
         status = 'running'
         and attempts = @attempts
+        and lease_token = @lease_token
         and leased_until > now()
         """;
 }
@@ -88,11 +91,12 @@ public sealed class NpgsqlProjectionJobStore : IProjectionJobStore, IDisposable
                 update public.worker_jobs jobs
                 set status = 'running',
                     attempts = jobs.attempts + 1,
+                    lease_token = gen_random_uuid(),
                     leased_until = now() + interval '60 seconds',
                     last_error_code = null
                 from candidate
                 where jobs.job_id = candidate.job_id
-                returning jobs.job_id, jobs.account_id, jobs.attempts;
+                returning jobs.job_id, jobs.account_id, jobs.attempts, jobs.lease_token;
                 """;
             command.Parameters.AddWithValue("batch_size", NpgsqlDbType.Integer, batchSize);
             var jobs = new List<ProjectionJob>(batchSize);
@@ -100,7 +104,11 @@ public sealed class NpgsqlProjectionJobStore : IProjectionJobStore, IDisposable
             {
                 while (await reader.ReadAsync(cancellationToken))
                 {
-                    jobs.Add(new ProjectionJob(reader.GetGuid(0), reader.GetGuid(1), reader.GetInt32(2)));
+                    jobs.Add(new ProjectionJob(
+                        reader.GetGuid(0),
+                        reader.GetGuid(1),
+                        reader.GetInt32(2),
+                        reader.GetGuid(3)));
                 }
             }
 
@@ -135,6 +143,7 @@ public sealed class NpgsqlProjectionJobStore : IProjectionJobStore, IDisposable
                 """;
             lease.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, job.JobId);
             lease.Parameters.AddWithValue("attempts", NpgsqlDbType.Integer, job.Attempts);
+            lease.Parameters.AddWithValue("lease_token", NpgsqlDbType.Uuid, job.LeaseToken);
             if (await lease.ExecuteScalarAsync(cancellationToken) is null)
             {
                 throw new WorkerLeaseLostException();
@@ -241,6 +250,7 @@ public sealed class NpgsqlProjectionJobStore : IProjectionJobStore, IDisposable
                 """;
             complete.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, job.JobId);
             complete.Parameters.AddWithValue("attempts", NpgsqlDbType.Integer, job.Attempts);
+            complete.Parameters.AddWithValue("lease_token", NpgsqlDbType.Uuid, job.LeaseToken);
             if (await complete.ExecuteNonQueryAsync(cancellationToken) != 1)
             {
                 throw new WorkerLeaseLostException();
@@ -277,6 +287,7 @@ public sealed class NpgsqlProjectionJobStore : IProjectionJobStore, IDisposable
                 """;
             command.Parameters.AddWithValue("job_id", NpgsqlDbType.Uuid, job.JobId);
             command.Parameters.AddWithValue("attempts", NpgsqlDbType.Integer, job.Attempts);
+            command.Parameters.AddWithValue("lease_token", NpgsqlDbType.Uuid, job.LeaseToken);
             command.Parameters.AddWithValue("error_code", NpgsqlDbType.Text, SafeErrorCode(errorCode));
             await command.ExecuteNonQueryAsync(cancellationToken);
         }

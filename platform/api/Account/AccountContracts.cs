@@ -20,14 +20,6 @@ public sealed record AccountDeletionResponse(
     [property: JsonPropertyName("outcome")] string Outcome,
     [property: JsonPropertyName("requestId")] string RequestId);
 
-public sealed record AccountExportResponse(
-    [property: JsonPropertyName("schema")] string Schema,
-    [property: JsonPropertyName("version")] string Version,
-    [property: JsonPropertyName("accountId")] string AccountId,
-    [property: JsonPropertyName("generatedAt")] string GeneratedAt,
-    [property: JsonPropertyName("data")] JsonElement Data,
-    [property: JsonPropertyName("requestId")] string RequestId);
-
 public static class AccountEndpoints
 {
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
@@ -118,16 +110,10 @@ public static class AccountEndpoints
                 if (!TryGetVerifiedAccount(context, out var accountId, out var failure))
                     return failure!;
 
-                var data = await store.GetOwnAsync(accountId, cancellationToken);
-                return Results.Ok(new AccountExportResponse(
-                    "evidrilo.account-export",
-                    "1",
-                    accountId.ToString(),
-                    DateTimeOffset.UtcNow.ToString(
-                        "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
-                        CultureInfo.InvariantCulture),
-                    data,
-                    RequestIdMiddleware.Get(context)));
+                return new AccountExportResult(
+                    store,
+                    accountId,
+                    RequestIdMiddleware.Get(context));
             })
             .RequireAuthorization()
             .RequireRateLimiting("api");
@@ -159,5 +145,104 @@ public static class AccountEndpoints
         }
 
         return true;
+    }
+}
+
+internal sealed class AccountExportResult(
+    IAccountExportStore store,
+    Guid accountId,
+    string requestId) : IResult
+{
+    internal const int MaximumResponseBytes = 128 * 1024;
+
+    public async Task ExecuteAsync(HttpContext httpContext)
+    {
+        var cancellationToken = httpContext.RequestAborted;
+        httpContext.Response.Headers.CacheControl = "no-store";
+        await using var payload = new BoundedAccountExportStream(MaximumResponseBytes);
+        try
+        {
+            await using (var export = await store.OpenOwnAsync(accountId, cancellationToken))
+            {
+                await using var writer = new Utf8JsonWriter(payload);
+                writer.WriteStartObject();
+                writer.WriteString("schema", "evidrilo.account-export");
+                writer.WriteString("version", "1");
+                writer.WriteString("accountId", accountId.ToString());
+                writer.WriteString(
+                    "generatedAt",
+                    DateTimeOffset.UtcNow.ToString(
+                        "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                        CultureInfo.InvariantCulture));
+                writer.WritePropertyName("data");
+                await export.WriteDataAsync(writer, cancellationToken);
+                writer.WriteString("requestId", requestId);
+                writer.WriteEndObject();
+                await writer.FlushAsync(cancellationToken);
+            }
+        }
+        catch (AccountExportTooLargeException)
+        {
+            await ApiErrors.WriteAsync(
+                httpContext,
+                StatusCodes.Status413PayloadTooLarge,
+                "ACCOUNT_EXPORT_TOO_LARGE",
+                "The account export exceeds the supported response size.",
+                cancellationToken);
+            return;
+        }
+
+        httpContext.Response.ContentType = "application/json; charset=utf-8";
+        httpContext.Response.ContentLength = payload.Length;
+        payload.Position = 0;
+        await payload.CopyToAsync(httpContext.Response.Body, cancellationToken);
+    }
+}
+
+internal sealed class AccountExportTooLargeException()
+    : IOException("The account export exceeded its response size limit.");
+
+internal sealed class BoundedAccountExportStream(int maximumBytes) : MemoryStream
+{
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        EnsureWithinLimit(count);
+        base.Write(buffer, offset, count);
+    }
+
+    public override void Write(ReadOnlySpan<byte> buffer)
+    {
+        EnsureWithinLimit(buffer.Length);
+        base.Write(buffer);
+    }
+
+    public override void WriteByte(byte value)
+    {
+        EnsureWithinLimit(1);
+        base.WriteByte(value);
+    }
+
+    public override Task WriteAsync(
+        byte[] buffer,
+        int offset,
+        int count,
+        CancellationToken cancellationToken)
+    {
+        EnsureWithinLimit(count);
+        return base.WriteAsync(buffer, offset, count, cancellationToken);
+    }
+
+    public override ValueTask WriteAsync(
+        ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureWithinLimit(buffer.Length);
+        return base.WriteAsync(buffer, cancellationToken);
+    }
+
+    private void EnsureWithinLimit(int count)
+    {
+        if (count < 0 || count > maximumBytes - Length)
+            throw new AccountExportTooLargeException();
     }
 }

@@ -5,6 +5,8 @@ This module owns Evidrilo's framework-independent learning domain:
 - deterministic conclusion-chain cases and evaluation;
 - bounded feedback and revision state;
 - practice reducers and domain models;
+- the versioned five-family project-template catalog contract and its
+  publication/readiness validation;
 - the `evidrilo_pro` entitlement identifier used by domain access rules.
 
 The module has no Compose, RevenueCat, network, database, platform SDK, or

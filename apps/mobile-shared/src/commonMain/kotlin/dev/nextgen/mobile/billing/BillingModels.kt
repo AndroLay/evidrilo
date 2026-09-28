@@ -131,3 +131,13 @@ class UnavailableBillingGateway(
         onResult(BillingOutcome.Failure(BillingOperation.RESTORE, reason))
     }
 }
+
+/** Avoid initializing the store provider at all while the app is guest-only. */
+internal fun billingGatewayForAccessMode(
+    guestOnlyMode: Boolean,
+    configuredProvider: () -> BillingGateway,
+): BillingGateway = if (guestOnlyMode) {
+    UnavailableBillingGateway("Pro is temporarily unavailable in local guest mode.")
+} else {
+    configuredProvider()
+}

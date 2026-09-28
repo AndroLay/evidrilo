@@ -26,6 +26,7 @@ credentials*.json
 .idea/
 *.iml
 .DS_Store
+/artifacts/
 build/
 **/build/
 bin/
@@ -66,6 +67,7 @@ DerivedData/
 /docs/business/
 /docs/product/*
 !/docs/product/m0-product-contract.md
+!/docs/product/workflows.md
 /docs/licenses/audio-narration-source-inventory.md
 /docs/architecture/revenuecat-integration.md
 /NEXT_GEN_IDEATION.md
@@ -84,6 +86,7 @@ DerivedData/
 /apps/ios/Configuration/*.xcconfig.local
 
 # Temporary local repository metadata used by tooling
+/AGENTS.md
 .codex/
 .agents/
 .superpowers/

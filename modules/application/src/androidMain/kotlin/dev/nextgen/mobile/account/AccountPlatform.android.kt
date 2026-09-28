@@ -3,8 +3,11 @@ package dev.nextgen.mobile.account
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import dev.nextgen.mobile.application.BuildConfig
+import dev.nextgen.mobile.network.DeviceConnectivity
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -53,6 +56,29 @@ private class AndroidAccountAuthPlatform : AccountAuthPlatform {
 actual fun createAccountHttpTransport(): AccountHttpTransport = AndroidAccountHttpTransport()
 
 private class AndroidAccountHttpTransport : AccountHttpTransport {
+    override val deviceConnectivity: DeviceConnectivity
+        get() {
+            val context = AndroidAccountAuthStorage.context() ?: return DeviceConnectivity.UNKNOWN
+            val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return DeviceConnectivity.UNKNOWN
+            return try {
+                val activeNetwork = manager.activeNetwork ?: return DeviceConnectivity.OFFLINE
+                val capabilities = manager.getNetworkCapabilities(activeNetwork)
+                    ?: return DeviceConnectivity.UNKNOWN
+                when {
+                    !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ->
+                        DeviceConnectivity.LIMITED
+
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ->
+                        DeviceConnectivity.ONLINE
+
+                    else -> DeviceConnectivity.LIMITED
+                }
+            } catch (_: SecurityException) {
+                DeviceConnectivity.UNKNOWN
+            }
+        }
+
     override suspend fun request(
         method: String,
         url: String,

@@ -22,7 +22,7 @@ internal fun EvidriloRecoveryNotice(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (notice.isError) {
                 EvidriloColors.ErrorSurface
@@ -30,11 +30,11 @@ internal fun EvidriloRecoveryNotice(
                 EvidriloColors.SuccessSurface
             },
         ),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             EvidriloIcon(

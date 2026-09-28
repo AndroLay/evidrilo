@@ -23,7 +23,7 @@ internal data class AudioListenPresentation(
     val stateDescription: String,
 )
 
-internal fun audioListenPresentation(state: AudioPlaybackState): AudioListenPresentation = when (narrationState(state)) {
+internal fun audioListenStatePresentation(state: AudioPlaybackState): AudioListenPresentation = when (narrationState(state)) {
     AudioPlaybackState.Idle -> AudioListenPresentation(
         label = "Listen",
         contentDescription = "Listen to this content",
@@ -67,6 +67,11 @@ internal fun audioListenPresentation(state: AudioPlaybackState): AudioListenPres
     )
 }
 
+private const val NARRATION_CONTROLS_VISIBLE_IN_CURRENT_FLOW = false
+
+internal fun currentAudioListenPresentation(state: AudioPlaybackState): AudioListenPresentation? =
+    if (NARRATION_CONTROLS_VISIBLE_IN_CURRENT_FLOW) audioListenStatePresentation(state) else null
+
 private fun narrationState(state: AudioPlaybackState): AudioPlaybackState = when (state) {
     is AudioPlaybackState.Loading -> if (state.channel == AudioChannel.EFFECT) {
         AudioPlaybackState.Idle
@@ -97,7 +102,7 @@ internal fun EvidriloAudioListenControl(
     onStopAudio: () -> Unit,
 ) {
     val narrationPlaybackState = narrationState(state)
-    val presentation = audioListenPresentation(narrationPlaybackState)
+    val presentation = currentAudioListenPresentation(narrationPlaybackState) ?: return
     val isActive = narrationPlaybackState is AudioPlaybackState.Loading ||
         narrationPlaybackState is AudioPlaybackState.Playing ||
         narrationPlaybackState is AudioPlaybackState.Paused

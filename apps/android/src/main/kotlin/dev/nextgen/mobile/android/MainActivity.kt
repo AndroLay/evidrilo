@@ -1,17 +1,20 @@
 package dev.nextgen.mobile.android
 
 import android.os.Bundle
+import android.content.res.Configuration
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import dev.nextgen.mobile.App
+import dev.nextgen.mobile.AndroidChatHistoryStorage
 import dev.nextgen.mobile.account.AndroidAccountAuthStorage
 import dev.nextgen.mobile.account.submitAccountAuthRedirect
 import dev.nextgen.mobile.security.AndroidSecureSessionStorage
-import dev.nextgen.mobile.storage.AndroidAccountOfferStorage
 import dev.nextgen.mobile.storage.AndroidConclusionStorage
 import dev.nextgen.mobile.storage.AndroidConclusionHistoryStorage
 import dev.nextgen.mobile.storage.AndroidOnboardingStorage
+import dev.nextgen.mobile.storage.AndroidStudentProjectDraftStorage
+import dev.nextgen.mobile.storage.AndroidStudentProjectAttachmentStorage
 import dev.nextgen.mobile.sync.AndroidSyncQueueStorage
 import dev.nextgen.mobile.sync.AndroidSyncConsentStorage
 import dev.nextgen.mobile.analytics.AndroidAnalyticsConsentStorage
@@ -26,11 +29,13 @@ class MainActivity : ComponentActivity() {
         AndroidConclusionStorage.initialize(applicationContext)
         AndroidConclusionHistoryStorage.initialize(applicationContext)
         AndroidOnboardingStorage.initialize(applicationContext)
-        AndroidAccountOfferStorage.initialize(applicationContext)
+        AndroidStudentProjectDraftStorage.initialize(applicationContext)
+        AndroidStudentProjectAttachmentStorage.initialize(applicationContext)
         AndroidSyncQueueStorage.initialize(applicationContext)
         AndroidSyncConsentStorage.initialize(applicationContext)
         AndroidAnalyticsConsentStorage.initialize(applicationContext)
         AndroidAudioStorage.initialize(applicationContext)
+        AndroidChatHistoryStorage.initialize(applicationContext)
         AndroidSecureSessionStorage.initialize(applicationContext)
         AndroidAccountAuthStorage.initialize(applicationContext)
         AndroidNotificationPreferencesStorage.initialize(applicationContext)
@@ -40,11 +45,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun configureSystemBars() {
-        window.statusBarColor = android.graphics.Color.WHITE
-        window.navigationBarColor = android.graphics.Color.WHITE
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
-                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        val darkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        val barColor = if (darkMode) android.graphics.Color.rgb(14, 18, 32) else android.graphics.Color.WHITE
+        window.statusBarColor = barColor
+        window.navigationBarColor = barColor
+        window.decorView.systemUiVisibility = if (darkMode) {
+            0
+        } else {
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

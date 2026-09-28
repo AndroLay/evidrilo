@@ -10,7 +10,8 @@ public static class AccountDeletionStatus
 {
     public static bool IsDeleted(
         bool deletionRequestCompleted,
-        bool profileTombstoned) => deletionRequestCompleted || profileTombstoned;
+        bool profileTombstoned,
+        bool durableTombstone) => deletionRequestCompleted || profileTombstoned || durableTombstone;
 }
 
 public interface IAccountLifecycleStore
@@ -58,6 +59,24 @@ public sealed class NpgsqlAccountLifecycleStore : IAccountLifecycleStore, IDispo
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             await SetRequestAccountAsync(connection, transaction, accountId, cancellationToken);
+
+            await using (var tombstone = connection.CreateCommand())
+            {
+                tombstone.Transaction = transaction;
+                tombstone.CommandText = """
+                    select exists (
+                        select 1
+                        from public.account_deletion_tombstones
+                        where account_id = @account_id
+                    );
+                    """;
+                tombstone.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+                if (await tombstone.ExecuteScalarAsync(cancellationToken) is true)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return new AccountDeletionOperation("already_completed");
+                }
+            }
 
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
@@ -134,11 +153,17 @@ public sealed class NpgsqlAccountLifecycleStore : IAccountLifecycleStore, IDispo
                         from public.account_profiles
                         where account_id = @account_id
                           and deleted_at is not null
+                    ),
+                    exists (
+                        select 1
+                        from public.account_deletion_tombstones
+                        where account_id = @account_id
                     );
                 """;
             command.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
             bool deletionRequestCompleted;
             bool profileTombstoned;
+            bool durableTombstone;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 if (!await reader.ReadAsync(cancellationToken))
@@ -149,9 +174,13 @@ public sealed class NpgsqlAccountLifecycleStore : IAccountLifecycleStore, IDispo
 
                 deletionRequestCompleted = reader.GetBoolean(0);
                 profileTombstoned = reader.GetBoolean(1);
+                durableTombstone = reader.GetBoolean(2);
             }
             await transaction.CommitAsync(cancellationToken);
-            return AccountDeletionStatus.IsDeleted(deletionRequestCompleted, profileTombstoned);
+            return AccountDeletionStatus.IsDeleted(
+                deletionRequestCompleted,
+                profileTombstoned,
+                durableTombstone);
         }
         catch (OperationCanceledException)
         {

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-scaffold-settlement.v1.json",
+  "title": "Evidrilo project AI scaffold settlement response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "requestId", "creditCost"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-scaffold-settlement" },
+    "version": { "const": "1" },
+    "status": { "enum": ["applied", "dismissed"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+    "creditCost": { "enum": [1, 3] }
+  }
+}

@@ -73,10 +73,12 @@ function createFixture() {
     'docs/release.md',
     'docs/roadmap.md',
     'docs/testing.md',
+    'docs/architecture/system-execution-flows.md',
     'docs/architecture/revenuecat.md',
     'docs/architecture/platform-decision.md',
     'docs/architecture/repository-structure.md',
     'docs/product/m0-product-contract.md',
+    'docs/product/workflows.md',
   ]) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), 'synthetic public fixture\n');

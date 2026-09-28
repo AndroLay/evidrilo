@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/student-project-permanent-delete.v1.json",
+  "title": "Evidrilo student project permanent deletion request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "expectedVersion", "confirmPermanently"],
+  "properties": {
+    "schema": { "const": "evidrilo.student-project-permanent-delete" },
+    "version": { "const": "1" },
+    "expectedVersion": { "type": "integer", "minimum": 1 },
+    "confirmPermanently": {
+      "const": true,
+      "description": "Explicit second confirmation. Trash and restore are not implemented by this API."
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-activity-history.v1.json",
+  "title": "Evidrilo per-installation Project AI activity history v1",
+  "description": "Metadata only. General entries are unlinked. Prompt and response transcripts are not included or retained by this contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "activities", "nextCursor"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-activity" },
+    "version": { "const": "1" },
+    "activities": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["activityId", "mode", "projectId", "stageId", "operationId", "baseProjectRevision", "resultProjectRevision", "outcome", "createdAt", "updatedAt"],
+        "properties": {
+          "activityId": { "type": "string", "format": "uuid" },
+          "mode": { "enum": ["PROJECT", "GENERAL"] },
+          "projectId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+          "stageId": { "oneOf": [{ "type": "string", "maxLength": 80 }, { "type": "null" }] },
+          "operationId": { "oneOf": [{ "type": "string", "maxLength": 80 }, { "type": "null" }] },
+          "baseProjectRevision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+          "resultProjectRevision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+          "outcome": { "enum": ["PENDING", "APPLIED", "EDITED", "DISMISSED", "STALE", "FAILED"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "nextCursor": { "oneOf": [{ "type": "string", "maxLength": 256 }, { "type": "null" }] }
+  }
+}

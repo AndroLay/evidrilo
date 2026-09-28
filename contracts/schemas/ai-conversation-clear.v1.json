@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/ai-conversation-clear.v1.json",
+  "title": "Evidrilo AI conversation clear response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "status", "sessionId", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.ai-conversation-clear" },
+    "version": { "const": "1" },
+    "status": { "const": "cleared" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

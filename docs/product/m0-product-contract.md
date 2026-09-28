@@ -5,22 +5,26 @@
 This file is the approved base-case and deterministic-evaluator contract. It
 defines the supplied tablet-dissolution scenario, supported inputs, feedback
 rules, and fairness constraints; it is not a live implementation or milestone
-status report. The broader product story is in the
-[5W+1H narrative](evidrilo-product-narrative-5w1h.md), while release and test
+status report. It is the current Shipaton/M0 contract and is intentionally not a
+specification for future courses or student-authored research projects. The
+long-term direction is recorded in D-108 and the
+[current roadmap](../roadmap.md), while release and test
 procedures are in the [roadmap](../roadmap.md), [testing guide](../testing.md),
 and [release checklist](../release.md).
 
 ## Product intent
 
-Within Evidrilo's academic workspace, this case helps a learner connect supplied
-observations and limitations to a properly scoped claim, an explainable next
-action, and one revision. The case is a bounded first example of the product
-mechanism, not the full product identity. The evaluator is not a grading tool,
-scientific-truth oracle, or answer generator.
+Within Evidrilo's academic workspace, this case helps a student connect
+supplied observations and limitations to a properly scoped claim, an
+explainable next action, and one revision. The case is a bounded first example
+of the product mechanism, not the full product identity. The evaluator is not a
+grading tool, scientific-truth oracle, or answer generator.
 
-The intended learner is a student or other learner working on an evidence-heavy
-academic task. Formative research participation has separate adult-consent
-requirements; it does not limit who the product is designed to serve.
+The intended product user is an active student working on an evidence-heavy
+academic task. In implementation contracts, `learner` is the internal role
+name for that student; it does not expand the primary audience to unspecified
+adult learners or professional users. Formative research participation has
+separate adult-consent requirements.
 
 ## M0 case: tablet dissolution
 
@@ -34,7 +38,7 @@ The supplied facts are:
 | ID | Type | Fact | Boundary |
 |---|---|---|---|
 | `AIM-01` | Aim | Compare dissolution time across warm, room-temperature, and cold water. | The only case goal. |
-| `HYP-01` | Context | The practice hypothesis expects faster dissolution in warmer water. | Not evidence. |
+| `HYP-01` | Supplied context | The case supplies a hypothesis that expects faster dissolution in warmer water. | Not a student-authored hypothesis and not evidence. |
 | `OBS-WARM-01` | Observation | Warm water: 32 seconds. | One supplied observation. |
 | `OBS-ROOM-01` | Observation | Room temperature: 58 seconds. | One supplied observation. |
 | `OBS-COLD-01` | Observation | Cold water: 92 seconds. | One supplied observation. |
@@ -147,8 +151,8 @@ purchase. The premium case pack uses two additional bounded cases:
 - water volume — 100 mL versus 200 mL.
 
 Premium content is not evidence of willingness to pay until real usage and
-billing observations are collected. The current subscription direction and
-price hypothesis are recorded in the [monetization and pricing note](../business/monetization-and-pricing.md).
+billing observations are collected. The approved price anchors are recorded in
+[D-100](../decisions.md#d-100-raise-the-monthlyyearly-planning-anchors-for-the-bounded-ai-extension).
 RevenueCat integration follows the contract in
 [`../architecture/revenuecat.md`](../architecture/revenuecat.md).
 
@@ -173,28 +177,59 @@ draft or send provider secrets. AI output is labelled as assistance and is
 shown alongside the deterministic feedback, never as a replacement for it.
 When AI is disabled or unavailable, the M0 workflow remains complete.
 
-## First launch, optional account, and notifications
+## First launch, Get Started, authentication, and notifications
 
-The first-launch contract is intentionally local-first:
+First launch opens Home. The Get Started tour is available only when the
+student explicitly opens it, remains replayable from Home/Help, and targets
+approximately three minutes. It
+uses a clearly labeled synthetic demo, walks through a reviewed template when
+one is available (otherwise it must label the example as a demo), a task
+brief/question, a source, a source-linked finding, a short evidence-change
+case, and a bounded output with visible limitations and next action. The demo
+does not create or prefill a real student project or make academic grades or
+universal-truth claims.
 
-- show a short guide explaining the evidence workflow, local storage, and the
-  first action;
-- let the learner start the free case or skip the guide;
-- enter the same Home flow in both cases, including when the device is offline;
-- do not require an account, network, API, AI provider, billing key, or
-  notification permission for the free case.
+- A signed-out student may start the demo, choose a supported sign-in method,
+  or skip Get Started. The demo is preview-only. Local Project Workspace work
+  is separate and does not require authentication; the M0 learning flow remains
+  account-gated.
+- After successful Google sign-in/sign-up, restore the requested destination
+  without forcing the full-screen tour. The Home guide entry remains available
+  without interrupting local project work.
+- Skipping Get Started opens the normal entry flow; it does not grant access to
+  account-bound learning, AI, billing, or sync. Keep skipped and completed
+  states distinct; make the tour replayable from Help/Profile, and do not
+  automatically replay a completed tour.
+- Sign-in does not itself upload project drafts or promise cloud backup/sync.
+  Existing local-storage, consent, and data-transfer boundaries remain in
+  force.
 
-After meaningful free value, the app may show one dismissible account prompt.
-The prompt may explain verified account recovery, RevenueCat identity, consented
-progress metadata sync, and live-AI eligibility only when those capabilities are
-actually configured. It must not imply that learner-authored drafts are backed
-up to the cloud while the sync contract remains metadata-only.
+This access policy supersedes D-102's account-optional entry rule for
+account-bound learning. D-120 supersedes D-118 only for local Project Workspace
+and anonymous read-only catalog access; D-121 clarifies Home-first entry and
+optional guide presentation. These decisions do not remove account requirements
+for M0 learning, project AI, billing entitlements, or consented cloud services.
+The client has a fail-closed route policy, protected account-bound operations,
+a synthetic Get Started tour, and distinct persisted
+`not_started`/`skipped`/`completed` states with legacy completion migration.
+Local tests and Compose compilation do not prove Android provider/runtime,
+accessibility, or device acceptance. See [D-120](../decisions.md#d-120-keep-project-workspace-local-first-and-available-without-an-account).
 
 Email sign-up/sign-in/recovery and Google sign-in are supported through the
 provider-neutral account boundary. Google uses the configured Supabase OAuth
 authorization-code flow with PKCE and validated state/callback handling. A
-cancelled, offline, unconfigured, or failed auth attempt returns safely to the
-local workflow.
+cancelled, offline, unconfigured, or failed auth attempt returns safely to
+the signed-out entry/demo flow and must not unlock account-bound functionality.
+Local project work remains available.
+
+When already signed in, a student can separately choose `Link Google to this
+account`. This authenticated identity-link flow must preserve the current
+account ID, validate the returned Google identity before saving the new
+session, and reject an identity already associated with another account
+without merging or switching accounts. Cancellation or failed verification
+preserves the existing session. Supabase manual identity linking must be
+enabled; source/tests do not by themselves prove live provider configuration or
+runtime behavior.
 
 A verified signed-in account may request a versioned export of server-owned
 metadata through the account surface. The export does not include learner
@@ -214,7 +249,8 @@ notification boundary is approved.
 
 ## Care, privacy, and accessibility
 
-- Keep the first flow local-first; no account, upload, or required network.
+- Keep project data local-first after authentication; authentication alone does
+  not authorize upload or imply cloud sync.
 - Do not store participant identity, reviewer contact details, or private draft
   data in the public repository.
 - Communicate abstention as “cannot assess from the supplied information,” not

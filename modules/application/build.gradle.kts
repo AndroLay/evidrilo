@@ -45,6 +45,7 @@ kotlin {
             api(project(":modules:data"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kmp.zip.core)
         }
 
         named { it.lowercase().startsWith("ios") }.configureEach {

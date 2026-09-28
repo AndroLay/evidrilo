@@ -18,16 +18,10 @@ class AuthRedirectParserTest {
     }
 
     @Test
-    fun rejects_wrong_origin_missing_state_and_duplicate_parameters() {
+    fun rejects_wrong_origin_duplicate_parameters_and_malformed_encoding() {
         assertIs<AuthRedirect.Invalid>(
             parseAuthRedirect(
                 "https://attacker.example/callback?code=auth-code&state=state-123",
-                DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
-            ),
-        )
-        assertIs<AuthRedirect.Invalid>(
-            parseAuthRedirect(
-                "evidrilo://auth/callback?code=auth-code",
                 DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
             ),
         )
@@ -43,6 +37,28 @@ class AuthRedirectParserTest {
                 DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
             ),
         )
+    }
+
+    @Test
+    fun parses_state_less_pkce_callback_for_authenticated_identity_linking() {
+        val result = parseAuthRedirect(
+            "evidrilo://auth/callback?code=link-code",
+            DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
+        )
+
+        assertIs<AuthRedirect.Code>(result)
+        assertEquals("link-code", result.code)
+        assertEquals(null, result.state)
+    }
+
+    @Test
+    fun parses_provider_error_code_without_exposing_untrusted_description() {
+        val result = parseAuthRedirect(
+            "evidrilo://auth/callback?error=access_denied&error_code=identity_already_exists&error_description=private%20detail",
+            DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
+        )
+
+        assertEquals(AuthRedirect.ProviderError("identity_already_exists"), result)
     }
 
     @Test

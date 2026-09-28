@@ -11,6 +11,7 @@ public sealed class ProjectionLeaseFencingTests
         Assert.Contains("status = 'running'", ProjectionJobSql.OwnedLease);
         Assert.Contains("attempts = @attempts", ProjectionJobSql.OwnedLease);
         Assert.Contains("leased_until > now()", ProjectionJobSql.OwnedLease);
+        Assert.Contains("lease_token = @lease_token", ProjectionJobSql.OwnedLease);
     }
 
     [Fact]
@@ -18,6 +19,7 @@ public sealed class ProjectionLeaseFencingTests
     {
         Assert.Contains("status = 'running'", ProjectionJobSql.FencedRunningJob);
         Assert.Contains("attempts = @attempts", ProjectionJobSql.FencedRunningJob);
+        Assert.Contains("lease_token = @lease_token", ProjectionJobSql.FencedRunningJob);
         Assert.DoesNotContain("leased_until", ProjectionJobSql.FencedRunningJob);
     }
 

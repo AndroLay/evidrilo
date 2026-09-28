@@ -4,6 +4,8 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.domain.project.StudentProjectDraft
+import dev.nextgen.mobile.domain.project.StudentProjectStatus
 import dev.nextgen.mobile.recommendation.RecommendationUiState
 
 enum class EvidriloHomeAction(
@@ -105,3 +107,19 @@ fun recommendationHomeSurface(state: RecommendationUiState): EvidriloRecommendat
 
 fun recommendationUnavailableCopy(): String =
     "A suggested review is temporarily unavailable."
+
+data class EvidriloHomeProjectOverview(
+    val primaryProject: StudentProjectDraft?,
+    val activeProjectCount: Int,
+)
+
+/** Picks one honest Home continuation target; completed, archived, and trashed projects are excluded. */
+fun homeProjectOverview(projects: List<StudentProjectDraft>): EvidriloHomeProjectOverview {
+    val activeProjects = projects.filter {
+        it.status == StudentProjectStatus.DRAFT || it.status == StudentProjectStatus.ACTIVE
+    }
+    return EvidriloHomeProjectOverview(
+        primaryProject = activeProjects.maxByOrNull(StudentProjectDraft::updatedAtEpochMillis),
+        activeProjectCount = activeProjects.size,
+    )
+}

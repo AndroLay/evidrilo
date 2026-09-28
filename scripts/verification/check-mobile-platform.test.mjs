@@ -35,6 +35,13 @@ test('iOS host registers the same auth callback scheme', () => {
   assert.match(read('apps/ios/iosApp/iosApp.swift'), /submitAccountAuthRedirect/);
 });
 
+test('iOS host routes auth callbacks through a ComposeApp-exported bridge', () => {
+  const swift = read('apps/ios/iosApp/iosApp.swift');
+  const bridge = read('apps/mobile-shared/src/iosMain/kotlin/dev/nextgen/mobile/ios/AccountAuthBridge.kt');
+  assert.match(swift, /AccountAuthBridgeKt\.submitAccountAuthRedirect\(url: url\.absoluteString\)/);
+  assert.match(bridge, /submitAccountAuthRedirectToApplication\(url\)/);
+});
+
 test('iOS host build phase invokes the repository Gradle wrapper', () => {
   const project = read('apps/ios/iosApp.xcodeproj/project.pbxproj');
   const buildPhaseStart = project.indexOf('name = "Compile Kotlin Framework";');
@@ -43,6 +50,36 @@ test('iOS host build phase invokes the repository Gradle wrapper', () => {
   assert.match(buildPhase, /cd \\\"\$SRCROOT\/\.\.\/\.\.\\"/);
   assert.match(buildPhase, /\.\/gradlew :composeApp:embedAndSignAppleFrameworkForXcode/);
   assert.equal(fs.existsSync(path.join(repositoryRoot, 'gradlew')), true);
+});
+
+test('iOS app target uses only the simulator architecture built by Kotlin', () => {
+  const project = read('apps/ios/iosApp.xcodeproj/project.pbxproj');
+  const debugStart = project.indexOf('7555FFA6242A565B00829871 /* Debug */ = {');
+  const releaseStart = project.indexOf('7555FFA7242A565B00829871 /* Release */ = {');
+  assert.notEqual(debugStart, -1, 'iOS app Debug build configuration is missing');
+  assert.notEqual(releaseStart, -1, 'iOS app Release build configuration is missing');
+
+  const debugTarget = project.slice(debugStart, project.indexOf('name = Debug;', debugStart));
+  const releaseTarget = project.slice(releaseStart, project.indexOf('name = Release;', releaseStart));
+  assert.match(debugTarget, /ARCHS = arm64;/);
+  assert.match(releaseTarget, /ARCHS = arm64;/);
+});
+
+test('Kotlin/Native release builds have separate heaps and bounded worker concurrency', () => {
+  const properties = read('gradle.properties');
+  assert.match(properties, /^org\.gradle\.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile\.encoding=UTF-8$/m);
+  assert.match(properties, /^org\.gradle\.workers\.max=2$/m);
+  assert.match(properties, /^kotlin\.daemon\.jvmargs=-Xmx4g$/m);
+  assert.match(properties, /^kotlin\.native\.jvmArgs=-Xmx4g$/m);
+
+  const workflow = read('.github/workflows/ios-simulator.yml');
+  const buildStart = workflow.indexOf('- name: Build unsigned iOS Release host');
+  assert.notEqual(buildStart, -1, 'iOS Release build step is missing');
+
+  const nextStep = workflow.indexOf('\n      - name:', buildStart + 1);
+  const buildStep = workflow.slice(buildStart, nextStep === -1 ? undefined : nextStep);
+  assert.match(buildStep, /xcodebuild/);
+  assert.doesNotMatch(buildStep, /GRADLE_OPTS:/);
 });
 
 test('Android release configuration is optimized and signing-safe', () => {

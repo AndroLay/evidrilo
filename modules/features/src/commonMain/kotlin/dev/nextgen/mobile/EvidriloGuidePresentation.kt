@@ -32,6 +32,6 @@ fun guideTopicCopy(topic: EvidriloGuideTopic): EvidriloGuideTopicCopy = when (to
     EvidriloGuideTopic.FEEDBACK_REVISION -> EvidriloGuideTopicCopy(
         title = "Read feedback, then revise",
         subtitle = "Inspect the reason. Revise once.",
-        body = "Feedback points to a specific field and its fact anchors. Use that reason to make one learner-authored revision; the original draft remains available for comparison.",
+        body = "Feedback points to a specific field and its fact anchors. Use that reason to make one student-authored revision; the original draft remains available for comparison.",
     )
 }

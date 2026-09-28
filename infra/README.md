@@ -63,6 +63,33 @@ EVIDRILO_API_PORT=15080 docker compose -f infra/environments/local/docker-compos
 curl --fail http://127.0.0.1:15080/health/live
 ```
 
+When the Supabase project is already connected through `agentctl`, use the
+repository bootstrap instead of copying credentials into a local `.env` file:
+
+```bash
+EVIDRILO_API_PORT=15080 \
+  scripts/bootstrap/local-api-with-agentctl.sh
+```
+
+The bootstrap resolves only the selected Supabase project and its mobile-safe
+client key in memory, passes them to Docker Compose for the current process,
+and performs a readiness check. `agentctl` redacts `api_key` fields in its
+human-readable JSON output, so the bootstrap reuses the same agentctl-managed
+Secret Service credential for one official Management API request when that
+redaction is encountered. It does not write credentials to the repository or
+to a dotenv file. The local API port is bound to loopback only.
+
+To build the Android debug client with the same project and local API URL:
+
+```bash
+EVIDRILO_API_PORT=15080 \
+  scripts/bootstrap/build-android-local-with-agentctl.sh
+```
+
+Set `EVIDRILO_INSTALL_ANDROID=1` only when an authorized local emulator/device
+is already running. These scripts are for local development; production and
+staging still require the platform secret store and HTTPS configuration.
+
 ## Image boundaries
 
 - `infra/docker/api.Dockerfile` builds only `platform/api` and runs the
@@ -82,18 +109,31 @@ store or protected environment configuration:
 
 | Component | Required configuration | Boundary |
 | --- | --- | --- |
-| API | `ASPNETCORE_ENVIRONMENT=Production` | startup rejects missing Supabase/database/CORS-origin configuration |
+| API | `ASPNETCORE_ENVIRONMENT=Staging` or `Production` | startup rejects missing Supabase/database/HTTPS CORS-origin configuration |
 | API | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | HTTPS Supabase Auth/JWKS validation |
-| API and worker | `DATABASE_URL` or `SUPABASE_DB_CONNECTION_STRING` | managed PostgreSQL connection with least privilege |
+| API and worker | `DATABASE_URL` or `SUPABASE_DB_CONNECTION_STRING` | PostgreSQL URI (`postgresql://...`) or Npgsql `key=value;...` connection string with least-privilege credentials; staging/production require an explicit username and encrypted transport |
 | API | `CORS_ALLOWED_ORIGINS` | required explicit origins; wildcard and missing values are rejected in production |
 | API | `TRUSTED_PROXY_ADDRESSES` | explicit proxy IPs only when forwarded headers are required |
-| API | `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_WEBHOOK_AUTHORIZATION` | server-only billing delivery authentication |
-| API | `REVENUECAT_ENTITLEMENT_ID` | expected premium entitlement, currently `evidrilo_pro` |
+| API | `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_WEBHOOK_AUTHORIZATION` | server-only billing delivery authentication; supply the full RevenueCat configuration together when billing is enabled |
+| API | `REVENUECAT_ENTITLEMENT_ID` | expected premium entitlement, currently `evidrilo_pro`; partial configuration fails startup in staging/production |
+| API | `REVENUECAT_MONTHLY_PRODUCT_ID`, `REVENUECAT_YEARLY_PRODUCT_ID` | configured RevenueCat product IDs mapped to the internal monthly/yearly aliases; never use `lifetime`; omit every RevenueCat setting only when billing is intentionally disabled |
 | Worker | `WORKER_POLL_INTERVAL_SECONDS`, `WORKER_BATCH_SIZE` | bounded polling and batch size |
+| Worker | `SUPABASE_AUTH_ADMIN_ENABLED=true`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | worker-only Auth Admin deletion; HTTPS origin and secret key are required before the production worker starts |
 
 Do not put those values in a Dockerfile, Compose file, image layer, source
 fixture, log, screenshot, or public repository. The mobile publishable key is
-configured separately through ignored local platform settings.
+configured separately through ignored local platform settings. Prefer the new
+Supabase `sb_secret_...` key and send it only in `apikey`; the worker accepts
+legacy `SUPABASE_SERVICE_ROLE_KEY` during migration, but that key is deprecated.
+The Admin key must never be configured in the API or mobile app.
+
+The API and worker normalize both PostgreSQL URI and Npgsql key/value formats.
+For staging/production, a URI without `sslmode` defaults to `require`; an
+explicit plaintext-capable mode (`disable`, `allow`, or `prefer`) is rejected.
+Npgsql-format strings must specify `SSL Mode=Require`, `VerifyCA`, or
+`VerifyFull`. Prefer `verify-full` with a trusted root certificate when the
+database provider supplies one, so encryption also validates server identity.
+Development keeps local PostgreSQL compatible with its Compose network.
 
 ## Safe rollout sequence
 
@@ -123,7 +163,13 @@ configured separately through ignored local platform settings.
   replay only provider event IDs that were not acknowledged.
 - Monitor API 5xx/429 rates, readiness degradation, webhook rejection and
   latency, database pool exhaustion, worker lease failures, retry exhaustion,
-  and projection lag.
+  dead-letter count, and projection lag. The worker log records only safe error
+  codes and attempt counts, not account identifiers or provider response bodies.
+- Before approving an account-deletion dead-letter replay, repair the provider
+  secret/configuration, identify the row by opaque outbox ID, verify exactly one
+  row was requeued, and confirm it reaches `completed`. Completed outbox rows
+  scrub the account UUID; the minimal access tombstone and consent decision
+  audit remain subject to a separately approved retention policy.
 - A multi-instance deployment must replace the in-memory rate limiter with a
   distributed limiter before claiming horizontal-scale behavior.
 

@@ -1,4 +1,5 @@
 import java.io.File
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
@@ -22,4 +23,14 @@ check(releaseVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) {
 allprojects {
     group = "dev.nextgen.mobile"
     version = "$releaseVersion-SNAPSHOT"
+
+    tasks.withType<Test>().configureEach {
+        val workerTempDirectory = temporaryDir
+        systemProperty("java.io.tmpdir", workerTempDirectory.absolutePath)
+        doFirst {
+            check(workerTempDirectory.mkdirs() || workerTempDirectory.isDirectory) {
+                "Could not create Gradle test temporary directory: $workerTempDirectory"
+            }
+        }
+    }
 }

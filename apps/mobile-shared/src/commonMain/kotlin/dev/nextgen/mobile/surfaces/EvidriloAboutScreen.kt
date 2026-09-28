@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 
 @Composable
 internal fun EvidriloAboutScreen(
@@ -34,7 +35,7 @@ internal fun EvidriloAboutScreen(
             }
         }
         Text(
-            "Evidrilo helps a learner connect supplied observations to a bounded conclusion, then see what changes when one observation is unavailable.",
+            "Evidrilo helps students connect supplied observations to a bounded conclusion, then see what changes when one observation is unavailable.",
             style = MaterialTheme.typography.bodyLarge,
         )
 
@@ -48,7 +49,11 @@ internal fun EvidriloAboutScreen(
         )
         EvidriloAboutPanel(
             title = "Privacy boundary",
-            body = "The free evidence workflow is local-first. Optional account, sync, AI, and billing integrations remain separate boundaries and are not required for the free case.",
+            body = if (TEMPORARY_GUEST_MODE_ENABLED) {
+                "Projects, the catalog, case work, and history work in local guest mode. Account, cloud sync, Pro, and server AI are temporarily unavailable. Project data stays on this device."
+            } else {
+                "Local projects work without an account. Account-bound learning and project AI require sign-in; AI also needs separate consent and is disabled in this build. Project data stays on this device unless you separately enable cloud sync. Billing is not required for local work."
+            },
         )
         EvidriloAboutPanel(
             title = "Open-source and attribution",
@@ -61,9 +66,9 @@ internal fun EvidriloAboutScreen(
 private fun EvidriloAboutPanel(title: String, body: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(

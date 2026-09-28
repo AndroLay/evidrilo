@@ -150,11 +150,39 @@
       "testAnchor": "/v1/billing/entitlements"
     },
     {
+      "method": "GET",
+      "path": "/v1/ai/credits",
+      "responseSchema": "ai-credits.v1.json",
+      "testFile": "platform/api.Tests/AiEndpointTests.cs",
+      "testAnchor": "/v1/ai/credits"
+    },
+    {
       "method": "POST",
       "path": "/v1/ai/assist",
       "responseSchema": "ai-assist-result.v1.json",
       "testFile": "platform/api.Tests/AiEndpointTests.cs",
       "testAnchor": "/v1/ai/assist"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/ai/conversations",
+      "responseSchema": "ai-conversation-session.v1.json",
+      "testFile": "platform/api.Tests/AiEndpointTests.cs",
+      "testAnchor": "/v1/ai/conversations"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/ai/conversations/{sessionId:guid}/turns",
+      "responseSchema": "ai-conversation-turn.v1.json",
+      "testFile": "platform/api.Tests/AiEndpointTests.cs",
+      "testAnchor": "/v1/ai/conversations"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/ai/conversations/{sessionId:guid}",
+      "responseSchema": "ai-conversation-clear.v1.json",
+      "testFile": "platform/api.Tests/AiEndpointTests.cs",
+      "testAnchor": "/v1/ai/conversations"
     },
     {
       "method": "POST",
@@ -176,6 +204,188 @@
       "responseSchema": "membership-operation-result.v1.json",
       "testFile": "platform/api.Tests/MembershipEndpointTests.cs",
       "testAnchor": "/v1/organizations/"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications/preferences",
+      "responseSchema": "notification-preferences.v1.json",
+      "testFile": "platform/api.Tests/NotificationPreferenceEndpointTests.cs",
+      "testAnchor": "/v1/notifications/preferences"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/notifications/preferences",
+      "requestSchema": "notification-preferences-update.v1.json",
+      "responseSchema": "notification-preferences-update-result.v1.json",
+      "testFile": "platform/api.Tests/NotificationPreferenceEndpointTests.cs",
+      "testAnchor": "/v1/notifications/preferences"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/projects",
+      "responseSchema": "student-project-mutation-result.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/cloud-consent",
+      "responseSchema": "student-project-cloud-consent.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects/cloud-consent"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/projects/cloud-consent",
+      "responseSchema": "student-project-cloud-consent.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects/cloud-consent"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/project-ai/scaffold",
+      "requestSchema": "project-ai-scaffold-request.v1.json",
+      "responseSchema": "project-ai-scaffold.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldEndpointTests.cs",
+      "testAnchor": "/v1/project-ai/scaffold"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/project-ai/scaffold/settlement",
+      "requestSchema": "project-ai-scaffold-settlement-request.v1.json",
+      "responseSchema": "project-ai-scaffold-settlement.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/scaffold/settlement"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/project-ai/stage-assist",
+      "requestSchema": "project-ai-stage-assist-request.v1.json",
+      "responseSchema": "project-ai-stage-assist.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/stage-assist"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/project-ai/stage-assist/settlement",
+      "requestSchema": "project-ai-stage-assist-settlement-request.v1.json",
+      "responseSchema": "project-ai-stage-assist-settlement.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/stage-assist/settlement"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/project-ai/activity",
+      "responseSchema": "project-ai-activity-history.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/activity"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/project-ai/activity/general",
+      "responseSchema": "project-ai-activity-clear.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/activity/general"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/project-ai/consent",
+      "responseSchema": "project-ai-consent.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiConsentEndpointTests.cs",
+      "testAnchor": "/v1/project-ai/consent"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/project-ai/consent",
+      "requestSchema": "project-ai-consent-grant.v1.json",
+      "responseSchema": "project-ai-consent.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiConsentEndpointTests.cs",
+      "testAnchor": "/v1/project-ai/consent"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/project-ai/consent",
+      "responseSchema": "project-ai-consent.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiConsentEndpointTests.cs",
+      "testAnchor": "/v1/project-ai/consent"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects",
+      "responseSchema": "student-project-list.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectId:guid}",
+      "responseSchema": "student-project.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects/"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/projects/{projectId:guid}",
+      "responseSchema": "student-project-mutation-result.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/v1/projects/"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId:guid}/permanent",
+      "requestSchema": "student-project-permanent-delete.v1.json",
+      "responseSchema": "student-project-mutation-result.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/permanent"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectId:guid}/revisions",
+      "responseSchema": "student-project-revisions.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/revisions?limit=1"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectId:guid}/structure-report",
+      "responseSchema": "student-project-structure-report.v1.json",
+      "testFile": "platform/api.Tests/StudentProjectEndpointTests.cs",
+      "testAnchor": "/structure-report"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/project-template-families",
+      "responseSchema": "project-template-families.v1.json",
+      "testFile": "platform/api.Tests/ProjectTemplateEndpointTests.cs",
+      "testAnchor": "/v1/project-template-families"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/project-templates",
+      "responseSchema": "project-template-catalogue.v1.json",
+      "testFile": "platform/api.Tests/ProjectTemplateEndpointTests.cs",
+      "testAnchor": "/v1/project-templates?family"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/project-templates/{templateId}/versions/{templateVersion:int}",
+      "responseSchema": "project-template-detail.v1.json",
+      "testFile": "platform/api.Tests/ProjectTemplateEndpointTests.cs",
+      "testAnchor": "/v1/project-templates/template-1/versions/1"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/authoring/project-templates",
+      "responseSchema": "project-template-operation.v1.json",
+      "testFile": "platform/api.Tests/ProjectTemplateEndpointTests.cs",
+      "testAnchor": "/v1/authoring/project-templates"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/authoring/project-templates/{templateId}/versions/{templateVersion:int}/transition",
+      "responseSchema": "project-template-operation.v1.json",
+      "testFile": "platform/api.Tests/ProjectTemplateEndpointTests.cs",
+      "testAnchor": "/v1/authoring/project-templates/template-1/versions/1/transition"
     }
   ]
 }

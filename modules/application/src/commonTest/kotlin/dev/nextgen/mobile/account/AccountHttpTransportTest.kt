@@ -14,10 +14,15 @@ import kotlin.test.assertNull
 
 class AccountHttpTransportTest {
     @Test
-    fun request_validation_requires_https() {
+    fun request_validation_rejects_remote_cleartext() {
         assertFailsWith<IllegalArgumentException> {
             validateAccountHttpRequest("http://example.test/auth", "{}")
         }
+    }
+
+    @Test
+    fun request_validation_allows_the_android_emulator_local_api_host() {
+        validateAccountHttpRequest("http://10.0.2.2:5080/v1/sync/commands", "{}")
     }
 
     @Test

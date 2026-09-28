@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-activity-clear.v1.json",
+  "title": "Evidrilo General chat activity clear response v1",
+  "description": "Clears unlinked metadata for one authenticated account and installation; it never mutates projects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "clearedCount"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-activity" },
+    "version": { "const": "1" },
+    "clearedCount": { "type": "integer", "minimum": 0 }
+  }
+}

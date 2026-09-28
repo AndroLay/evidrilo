@@ -1,8 +1,10 @@
 # Security policy
 
 Evidrilo is a local-first Kotlin Multiplatform application with an optional
-ASP.NET Core and PostgreSQL platform lane. The free learning flow must remain
-usable without an account, backend, network, AI provider, or billing key.
+ASP.NET Core and PostgreSQL platform lane. A verified account is required to
+enter real Free project and learning features. After sign-in, project data
+stays on the device unless the student separately enables cloud sync; AI and
+billing are not prerequisites for the local workflow.
 
 ## Reporting a vulnerability
 

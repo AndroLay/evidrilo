@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\api\Evidrilo.Api.csproj" />
+    <ProjectReference Include="..\worker\Evidrilo.Worker.csproj" />
   </ItemGroup>
 </Project>

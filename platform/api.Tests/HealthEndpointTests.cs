@@ -30,12 +30,12 @@ public sealed class HealthEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Readiness_is_degraded_without_external_configuration()
+    public async Task Readiness_returns_service_unavailable_when_dependencies_are_degraded()
     {
         using var response = await client.GetAsync("/health/ready");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("ready", body.GetProperty("check").GetString());
         Assert.Equal("degraded", body.GetProperty("status").GetString());
         Assert.Equal("missing", body.GetProperty("dependencies").GetProperty("config").GetString());

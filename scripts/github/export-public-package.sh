@@ -141,6 +141,7 @@ public_paths=(
   apps/mobile-shared
   apps/android
   apps/ios
+  apps/landing
   modules
   contracts
   platform
@@ -160,7 +161,9 @@ public_paths=(
   docs/architecture/platform-decision.md
   docs/architecture/repository-structure.md
   docs/architecture/revenuecat.md
+  docs/architecture/system-execution-flows.md
   docs/product/m0-product-contract.md
+  docs/product/workflows.md
 )
 
 for relative_path in "${public_paths[@]}"; do

@@ -122,6 +122,8 @@ function createExporterFixture() {
   writeFixtureFile(root, 'docs/api/README.md');
   writeFixtureFile(root, 'docs/adr/README.md');
   writeFixtureFile(root, 'docs/operations/README.md');
+  writeFixtureFile(root, 'docs/architecture/system-execution-flows.md', '# Public system flows\n');
+  writeFixtureFile(root, 'docs/product/workflows.md', '# Public product workflows\n');
   writeFixtureFile(root, '.github/workflows/verify.yml');
   writeFixtureFile(root, 'gradle/libs.versions.toml');
   writeFixtureFile(root, 'apps/ios/Configuration/Config.xcconfig', '// safe checked-in baseline\n');
@@ -245,6 +247,8 @@ test('exports a valid effects-only package without local Apple or provider confi
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Config.xcconfig')), true);
     assert.equal(fs.existsSync(path.join(destination, 'apps/ios/Configuration/Debug.xcconfig.example')), true);
+    assert.equal(fs.existsSync(path.join(destination, 'docs/architecture/system-execution-flows.md')), true);
+    assert.equal(fs.existsSync(path.join(destination, 'docs/product/workflows.md')), true);
     assert.equal(
       fs.existsSync(
         path.join(

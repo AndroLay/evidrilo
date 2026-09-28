@@ -3,7 +3,9 @@ package dev.nextgen.mobile.account
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +33,7 @@ class SupabaseAccountGateway(
     private val nowEpochSeconds: () -> Long,
 ) : AccountGateway {
     private var pendingPkce: PkcePair? = null
+    private var pendingGoogleIdentityLink: PendingGoogleIdentityLink? = null
     private var recoverySession: StoredAccountSession? = null
 
     override suspend fun restore(): AccountGatewayResult {
@@ -70,7 +73,7 @@ class SupabaseAccountGateway(
                 "email" to email,
                 "password" to secret,
             ),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return transportUnavailableResult()
         return response.toSessionResult()
     }
 
@@ -88,9 +91,14 @@ class SupabaseAccountGateway(
                     put("emailRedirectTo", configuration.redirectUrl)
                 },
             ),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.SIGN_UP)
         if (response.statusCode == 429) return AccountGatewayResult.RateLimited
-        if (response.statusCode !in 200..299) return response.toFailure(AccountGatewayResult.InvalidCredentials)
+        if (response.statusCode !in 200..299) {
+            if (response.isAmbiguousMutationResponse()) {
+                return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.SIGN_UP)
+            }
+            return response.toFailure(AccountGatewayResult.InvalidCredentials)
+        }
         val session = response.parseSession()
             ?: return AccountGatewayResult.EmailConfirmationRequired
         return session.toVerifiedResult()
@@ -107,17 +115,20 @@ class SupabaseAccountGateway(
                 "email" to email,
                 "redirect_to" to configuration.redirectUrl,
             ),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.PASSWORD_RESET)
         if (response.statusCode == 429) return AccountGatewayResult.RateLimited
         return when {
             response.statusCode in 200..299 -> AccountGatewayResult.PasswordResetRequested
             response.statusCode in 400..499 -> AccountGatewayResult.PasswordResetRequested
-            else -> AccountGatewayResult.Offline
+            response.isAmbiguousMutationResponse() ->
+                AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.PASSWORD_RESET)
+            else -> AccountGatewayResult.ServiceUnavailable
         }
     }
 
     override suspend fun startGoogleSignIn(): AccountGatewayResult {
         if (!configuration.isConfigured) return AccountGatewayResult.NotConfigured
+        if (pendingGoogleIdentityLink != null || pendingPkce != null) return AccountGatewayResult.InvalidInput
         val pkce = createPkcePair()
         val authorizeUrl = buildString {
             append(configuration.normalizedSupabaseUrl)
@@ -137,12 +148,119 @@ class SupabaseAccountGateway(
         return AccountGatewayResult.OAuthStarted
     }
 
+    override suspend fun startGoogleIdentityLink(): AccountGatewayResult {
+        if (!configuration.isConfigured) return AccountGatewayResult.NotConfigured
+        if (pendingGoogleIdentityLink != null || pendingPkce != null) {
+            return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        }
+
+        val existing = try {
+            secureSessionStore.read()
+        } catch (_: Exception) {
+            return AccountGatewayResult.SecureStorageUnavailable
+        } ?: return AccountGatewayResult.NoSession
+        if (!existing.account.emailVerified) return AccountGatewayResult.InvalidCredentials
+
+        val currentSession = if (existing.material.expiresAtEpochSeconds <= nowEpochSeconds() + REFRESH_SKEW_SECONDS) {
+            when (val refreshed = restore()) {
+                is AccountGatewayResult.Verified -> refreshed.session
+                AccountGatewayResult.Expired -> return refreshed
+                AccountGatewayResult.NoSession -> return refreshed
+                AccountGatewayResult.NotConfigured -> return refreshed
+                else -> return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+            }
+        } else {
+            existing
+        }
+
+        val remoteUserResponse = request(
+            method = "GET",
+            path = "/auth/v1/user",
+            bearerToken = currentSession.material.accessToken,
+        ) ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (remoteUserResponse.statusCode == 401) return AccountGatewayResult.Expired
+        if (remoteUserResponse.statusCode == 429) return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (remoteUserResponse.statusCode !in 200..299) {
+            return remoteUserResponse.toGoogleIdentityLinkFailure()
+        }
+        val remoteAccount = remoteUserResponse.parseUser()
+            ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (remoteAccount.accountId != currentSession.account.accountId || remoteAccount.googleLinked == null) {
+            return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        }
+        val refreshedCurrentSession = currentSession.copy(account = remoteAccount)
+        if (remoteAccount.googleLinked) {
+            return persistGoogleIdentityLinkSession(
+                refreshedCurrentSession,
+                GoogleIdentityLinkOutcome.ALREADY_LINKED,
+            )
+        }
+
+        val pkce = createPkcePair()
+        val authorizeResponse = request(
+            method = "GET",
+            path = buildString {
+                append("/auth/v1/user/identities/authorize?provider=google&scopes=openid%20email%20profile&redirect_to=")
+                append(encodeAuthUrlComponent(configuration.redirectUrl))
+                append("&code_challenge=")
+                append(encodeAuthUrlComponent(pkce.challenge))
+                append("&code_challenge_method=s256&skip_http_redirect=true")
+            },
+            bearerToken = currentSession.material.accessToken,
+        ) ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (authorizeResponse.statusCode == 401) return AccountGatewayResult.Expired
+        if (authorizeResponse.statusCode == 429) return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (authorizeResponse.statusCode !in 200..299) {
+            return authorizeResponse.toGoogleIdentityLinkFailure()
+        }
+        val providerUrl = authorizeResponse.parseObject()
+            ?.get("url")
+            ?.asJsonPrimitiveOrNull()
+            ?.contentOrNull
+            ?.takeIf(::isGoogleOAuthUrl)
+            ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+
+        try {
+            secureSessionStore.write(refreshedCurrentSession)
+        } catch (_: Exception) {
+            return AccountGatewayResult.SecureStorageUnavailable
+        }
+        pendingGoogleIdentityLink = PendingGoogleIdentityLink(
+            pkce = pkce,
+            accountId = currentSession.account.accountId,
+        )
+        if (!platform.openExternalUrl(providerUrl)) {
+            pendingGoogleIdentityLink = null
+            return googleIdentityLink(GoogleIdentityLinkOutcome.CANCELLED)
+        }
+        return googleIdentityLink(GoogleIdentityLinkOutcome.STARTED)
+    }
+
+    override suspend fun cancelGoogleIdentityLink(): AccountGatewayResult {
+        pendingGoogleIdentityLink = null
+        return googleIdentityLink(GoogleIdentityLinkOutcome.CANCELLED)
+    }
+
     override suspend fun completeRedirect(url: String): AccountGatewayResult {
         if (!configuration.isConfigured) return AccountGatewayResult.NotConfigured
         return when (val redirect = parseAuthRedirect(url, configuration.redirectUrl)) {
-            AuthRedirect.Invalid -> AccountGatewayResult.InvalidRedirect
-            is AuthRedirect.Code -> completeCodeRedirect(redirect)
-            is AuthRedirect.Tokens -> completeTokenRedirect(redirect)
+            AuthRedirect.Invalid -> if (pendingGoogleIdentityLink != null) {
+                pendingGoogleIdentityLink = null
+                googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+            } else {
+                AccountGatewayResult.InvalidRedirect
+            }
+            is AuthRedirect.Code -> if (pendingGoogleIdentityLink != null) {
+                completeGoogleIdentityLinkRedirect(redirect)
+            } else {
+                completeCodeRedirect(redirect)
+            }
+            is AuthRedirect.ProviderError -> completeProviderErrorRedirect(redirect)
+            is AuthRedirect.Tokens -> if (pendingGoogleIdentityLink != null) {
+                googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+            } else {
+                completeTokenRedirect(redirect)
+            }
         }
     }
 
@@ -155,12 +273,15 @@ class SupabaseAccountGateway(
             path = "/auth/v1/user",
             bearerToken = session.material.accessToken,
             body = jsonObject("password" to newPassword),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.PASSWORD_UPDATE)
         if (response.statusCode == 401) {
             recoverySession = null
             return AccountGatewayResult.Expired
         }
         if (response.statusCode == 429) return AccountGatewayResult.RateLimited
+        if (response.isAmbiguousMutationResponse()) {
+            return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.PASSWORD_UPDATE)
+        }
         if (response.statusCode !in 200..299) return response.toFailure(AccountGatewayResult.InvalidInput)
         recoverySession = null
         return persistVerified(session)
@@ -181,6 +302,7 @@ class SupabaseAccountGateway(
         }
         recoverySession = null
         pendingPkce = null
+        pendingGoogleIdentityLink = null
         return try {
             secureSessionStore.clear()
             AccountGatewayResult.SignedOut
@@ -205,12 +327,14 @@ class SupabaseAccountGateway(
             bearerToken = stored.material.accessToken,
             headers = mapOf("X-Account-Deletion-Confirm" to "delete-my-account"),
             includeSupabaseApiKey = false,
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.DELETE_ACCOUNT)
         return when {
             response.statusCode == 401 -> AccountGatewayResult.Expired
             response.statusCode == 403 -> AccountGatewayResult.InvalidCredentials
             response.statusCode == 429 -> AccountGatewayResult.RateLimited
             response.statusCode == 409 -> AccountGatewayResult.OwnerTransferRequired
+            response.isAmbiguousMutationResponse() ->
+                AccountGatewayResult.OperationOutcomeUnknown(AccountMutationOperation.DELETE_ACCOUNT)
             response.statusCode in 200..299 -> try {
                 secureSessionStore.clear()
                 recoverySession = null
@@ -219,7 +343,7 @@ class SupabaseAccountGateway(
                 AccountGatewayResult.SecureStorageUnavailable
             }
             response.statusCode in 400..499 -> AccountGatewayResult.InvalidInput
-            else -> AccountGatewayResult.Offline
+            else -> AccountGatewayResult.ServiceUnavailable
         }
     }
 
@@ -239,15 +363,16 @@ class SupabaseAccountGateway(
             url = "${configuration.normalizedApiBaseUrl}/v1/account/me/export",
             bearerToken = stored.material.accessToken,
             includeSupabaseApiKey = false,
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return AccountGatewayResult.ExportFailed(transportUnavailableReason())
         return when {
             response.statusCode == 401 -> AccountGatewayResult.Expired
             response.statusCode == 403 -> AccountGatewayResult.InvalidCredentials
             response.statusCode == 429 -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.RATE_LIMITED)
+            response.statusCode == 413 -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.EXPORT_TOO_LARGE)
             response.statusCode in 200..299 && isValidExportPayload(response.body, stored.account.accountId) ->
                 AccountGatewayResult.ExportReady(response.body)
             response.statusCode in 400..499 -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.INVALID_INPUT)
-            else -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.OFFLINE)
+            else -> AccountGatewayResult.ExportFailed(AccountUnavailableReason.SERVICE_UNAVAILABLE)
         }
     }
 
@@ -262,8 +387,87 @@ class SupabaseAccountGateway(
                 "auth_code" to redirect.code,
                 "code_verifier" to pkce.verifier,
             ),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return transportUnavailableResult()
         return response.toSessionResult()
+    }
+
+    private suspend fun completeGoogleIdentityLinkRedirect(redirect: AuthRedirect.Code): AccountGatewayResult {
+        val pending = pendingGoogleIdentityLink ?: return AccountGatewayResult.InvalidRedirect
+        if (redirect.code.isBlank()) return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        // Consume before exchange so an identical callback cannot be replayed.
+        pendingGoogleIdentityLink = null
+        val response = request(
+            method = "POST",
+            path = "/auth/v1/token?grant_type=pkce",
+            body = jsonObject(
+                "auth_code" to redirect.code,
+                "code_verifier" to pending.pkce.verifier,
+            ),
+        ) ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (response.statusCode !in 200..299) return response.toGoogleIdentityLinkFailure()
+        val parsedCandidate = response.parseSession()
+            ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        val candidate = parsedCandidate.session
+        if (!parsedCandidate.account.emailVerified || parsedCandidate.account.accountId != pending.accountId) {
+            return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        }
+
+        val userResponse = request(
+            method = "GET",
+            path = "/auth/v1/user",
+            bearerToken = candidate.material.accessToken,
+        ) ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        if (userResponse.statusCode !in 200..299) {
+            return userResponse.toGoogleIdentityLinkFailure()
+        }
+        val verifiedAccount = userResponse.parseUser()
+            ?.takeIf { it.accountId == pending.accountId && it.googleLinked == true }
+            ?: return googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        return persistGoogleIdentityLinkSession(
+            candidate.copy(account = verifiedAccount),
+            GoogleIdentityLinkOutcome.LINKED,
+        )
+    }
+
+    private fun completeProviderErrorRedirect(redirect: AuthRedirect.ProviderError): AccountGatewayResult {
+        val linkPending = pendingGoogleIdentityLink != null
+        if (linkPending) pendingGoogleIdentityLink = null else pendingPkce = null
+        val outcome = when (redirect.code.lowercase()) {
+            "access_denied", "user_cancelled", "request_denied" -> GoogleIdentityLinkOutcome.CANCELLED
+            "identity_already_exists" -> GoogleIdentityLinkOutcome.CONFLICT
+            "manual_linking_disabled" -> GoogleIdentityLinkOutcome.SETUP_REQUIRED
+            else -> GoogleIdentityLinkOutcome.FAILED
+        }
+        return if (linkPending) googleIdentityLink(outcome) else when (redirect.code.lowercase()) {
+            "access_denied", "user_cancelled", "request_denied" -> AccountGatewayResult.OAuthCancelled
+            else -> AccountGatewayResult.InvalidRedirect
+        }
+    }
+
+    private fun AccountHttpResponse.toGoogleIdentityLinkFailure(): AccountGatewayResult.GoogleIdentityLink =
+        when (googleAuthErrorCode()) {
+            "identity_already_exists" -> googleIdentityLink(GoogleIdentityLinkOutcome.CONFLICT)
+            "manual_linking_disabled" -> googleIdentityLink(GoogleIdentityLinkOutcome.SETUP_REQUIRED)
+            else -> googleIdentityLink(GoogleIdentityLinkOutcome.FAILED)
+        }
+
+    private fun AccountHttpResponse.googleAuthErrorCode(): String? =
+        parseObject()?.let { body ->
+            body["error_code"]?.asJsonPrimitiveOrNull()?.contentOrNull
+                ?: body["code"]?.asJsonPrimitiveOrNull()?.contentOrNull
+        }
+
+    private fun googleIdentityLink(outcome: GoogleIdentityLinkOutcome): AccountGatewayResult.GoogleIdentityLink =
+        AccountGatewayResult.GoogleIdentityLink(outcome)
+
+    private fun persistGoogleIdentityLinkSession(
+        session: StoredAccountSession,
+        outcome: GoogleIdentityLinkOutcome,
+    ): AccountGatewayResult = try {
+        secureSessionStore.write(session)
+        AccountGatewayResult.GoogleIdentityLink(outcome, session)
+    } catch (_: Exception) {
+        AccountGatewayResult.SecureStorageUnavailable
     }
 
     private suspend fun completeTokenRedirect(redirect: AuthRedirect.Tokens): AccountGatewayResult {
@@ -273,7 +477,12 @@ class SupabaseAccountGateway(
             // surface, so fragments are reserved for Supabase recovery links.
             return AccountGatewayResult.InvalidRedirect
         }
-        val session = loadRecoverySession(redirect) ?: return AccountGatewayResult.Offline
+        val session = loadRecoverySession(redirect)
+            ?: return if (transport.deviceConnectivity == DeviceConnectivity.OFFLINE) {
+                AccountGatewayResult.Offline
+            } else {
+                AccountGatewayResult.ServiceUnavailable
+            }
         if (!session.account.emailVerified) return AccountGatewayResult.EmailConfirmationRequired
         recoverySession = session
         return AccountGatewayResult.PasswordRecoveryReady(session)
@@ -305,13 +514,15 @@ class SupabaseAccountGateway(
             method = "POST",
             path = "/auth/v1/token?grant_type=refresh_token",
             body = jsonObject("refresh_token" to refreshToken),
-        ) ?: return AccountGatewayResult.Offline
+        ) ?: return transportUnavailableResult()
         if (response.statusCode == 401 || response.statusCode == 400) {
             return clearAfterInvalidStoredSession(AccountGatewayResult.Expired)
         }
         if (response.statusCode == 429) return AccountGatewayResult.RateLimited
-        val session = response.parseSession(refreshToken)
-            ?: return response.toFailure(AccountGatewayResult.Offline)
+        if (response.statusCode !in 200..299) {
+            return response.toFailure(AccountGatewayResult.ServiceUnavailable)
+        }
+        val session = response.parseSession(refreshToken) ?: return AccountGatewayResult.InvalidResponse
         if (!session.account.emailVerified) {
             // The provider is authoritative during refresh. Do not leave the
             // previously verified record available to another local boundary
@@ -324,16 +535,33 @@ class SupabaseAccountGateway(
     private fun AccountHttpResponse.toSessionResult(): AccountGatewayResult {
         if (statusCode == 401 || statusCode == 400) return AccountGatewayResult.InvalidCredentials
         if (statusCode == 429) return AccountGatewayResult.RateLimited
-        if (statusCode !in 200..299) return toFailure(AccountGatewayResult.Offline)
-        val session = parseSession() ?: return AccountGatewayResult.Offline
+        if (statusCode !in 200..299) return toFailure(AccountGatewayResult.ServiceUnavailable)
+        val session = parseSession() ?: return AccountGatewayResult.InvalidResponse
         return session.toVerifiedResult()
     }
 
     private fun AccountHttpResponse.toFailure(default: AccountGatewayResult): AccountGatewayResult = when {
         statusCode == 429 -> AccountGatewayResult.RateLimited
         statusCode in 400..499 -> default
-        else -> AccountGatewayResult.Offline
+        else -> AccountGatewayResult.ServiceUnavailable
     }
+
+    private fun AccountHttpResponse.isAmbiguousMutationResponse(): Boolean =
+        statusCode == 408 || statusCode == 425 || statusCode in 500..599
+
+    private fun transportUnavailableResult(): AccountGatewayResult =
+        if (transport.deviceConnectivity == DeviceConnectivity.OFFLINE) {
+            AccountGatewayResult.Offline
+        } else {
+            AccountGatewayResult.ServiceUnavailable
+        }
+
+    private fun transportUnavailableReason(): AccountUnavailableReason =
+        if (transport.deviceConnectivity == DeviceConnectivity.OFFLINE) {
+            AccountUnavailableReason.OFFLINE
+        } else {
+            AccountUnavailableReason.SERVICE_UNAVAILABLE
+        }
 
     private fun ParsedSession.toVerifiedResult(): AccountGatewayResult {
         if (!account.emailVerified) {
@@ -430,12 +658,36 @@ class SupabaseAccountGateway(
                     ?.contentOrNull
             }
             .any { it.isNotBlank() }
-        return AccountSummary(accountId, emailVerified)
+        val identities = user["identities"] as? JsonArray
+        val googleLinked = identities?.any { identity ->
+            identity.asJsonObjectOrNull()
+                ?.get("provider")
+                ?.asJsonPrimitiveOrNull()
+                ?.contentOrNull
+                ?.equals("google", ignoreCase = true) == true
+        }
+        return AccountSummary(accountId, emailVerified, googleLinked)
     }
 
     private fun JsonElement.asJsonPrimitiveOrNull(): JsonPrimitive? = this as? JsonPrimitive
 
     private fun JsonElement.asJsonObjectOrNull(): JsonObject? = this as? JsonObject
+
+    private fun AccountHttpResponse.parseObject(): Map<String, JsonElement>? = parseObject(body)
+
+    private fun AccountHttpResponse.parseUser(): AccountSummary? = parseUser(body)
+
+    private fun isGoogleOAuthUrl(value: String): Boolean {
+        if (value.length !in 1..MAX_AUTH_REDIRECT_URL_BYTES || value.any { it.isWhitespace() || it.code < 0x20 }) {
+            return false
+        }
+        val authority = value.substringAfter("://", missingDelimiterValue = "")
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+        return value.startsWith("https://", ignoreCase = true) &&
+            authority.equals("accounts.google.com", ignoreCase = true)
+    }
 
     private fun parseObject(body: String): Map<String, JsonElement>? =
         runCatching { authJson.parseToJsonElement(body) as? JsonObject }.getOrNull()
@@ -478,6 +730,11 @@ class SupabaseAccountGateway(
     private data class ParsedSession(
         val session: StoredAccountSession,
         val account: AccountSummary,
+    )
+
+    private data class PendingGoogleIdentityLink(
+        val pkce: PkcePair,
+        val accountId: String,
     )
 }
 

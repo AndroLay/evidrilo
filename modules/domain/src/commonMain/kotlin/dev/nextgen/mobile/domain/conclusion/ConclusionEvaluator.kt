@@ -273,7 +273,7 @@ class ConclusionEvaluator(
             !CANNOT_CONCLUDE_MARKER_PATTERN.containsMatchIn(normalized)
         ) {
             return unsupportedClaim(
-                code = "RELATION_CONFLICT",
+                code = "UNSUPPORTED_RELATION",
                 why = "The free-text claim does not state what this case cannot establish.",
                 nextAction = "Explain the limitation of the case instead of asserting the observed difference.",
             )

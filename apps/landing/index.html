@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1558e8" />
+    <meta name="description" content="Evidrilo helps students organize a research project, connect source notes to evidence and claims, and keep limitations and next steps visible." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Evidrilo — Make a claim the evidence can carry" />
+    <meta property="og:description" content="A student research workspace for connecting a project brief, sources, evidence notes, synthesis, claims, and next steps—with a separate guided case preview." />
+    <link rel="icon" type="image/png" href="./assets/evidrilo-mark.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./script.js" defer></script>
+    <title>Evidrilo — Make a claim the evidence can carry</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="page-progress" aria-hidden="true"></div>
+    <svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6" /></symbol>
+      <symbol id="icon-github" viewBox="0 0 16 16"><path fill="currentColor" stroke="none" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2.5 6.2M3 4v7h7" /></symbol>
+      <symbol id="icon-document" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2.4-2.4a5 5 0 0 0-7.1-7.1l-1.3 1.3" /><path d="M14 11a5 5 0 0 0-7.1 0l-2.4 2.4a5 5 0 0 0 7.1 7.1l1.3-1.3" /></symbol>
+      <symbol id="icon-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 21a7 7 0 0 1 14 0" /></symbol>
+      <symbol id="icon-boundary" viewBox="0 0 24 24"><path d="M4 5h6v14H4zM14 5h6v14h-6z" /><path d="M10 12h4" /></symbol>
+      <symbol id="pattern-evidence-thread" viewBox="0 0 1440 900">
+        <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M-80 695C100 695 105 520 280 520s185 150 345 90 170-190 325-160 185 150 330 65 170-190 255-185" />
+          <path d="M210-80c0 150 210 145 210 300s-170 150-90 290 230 115 260 240" />
+          <path d="M920-60c0 160 225 120 225 295s-185 130-130 275 220 115 235 250" />
+          <path d="M-50 220c185 0 205 180 380 180s185-130 330-105 165 130 290 130 205-160 350-130" />
+          <circle cx="280" cy="520" r="7" fill="#fff" /><circle cx="625" cy="610" r="7" fill="#fff" />
+          <circle cx="950" cy="450" r="7" fill="#fff" /><circle cx="1280" cy="515" r="7" fill="#fff" />
+          <circle cx="420" cy="220" r="6" fill="#fff" /><circle cx="330" cy="400" r="6" fill="#fff" />
+          <circle cx="1145" cy="235" r="6" fill="#fff" /><circle cx="1015" cy="510" r="6" fill="#fff" />
+        </g>
+      </symbol>
+    </svg>
+
+    <header class="site-header" id="top">
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="Evidrilo, back to top">
+          <span class="brand-mark"><img src="./assets/evidrilo-mark.png" width="84" height="84" alt="" /></span>
+          <span>Evidrilo</span>
+        </a>
+        <nav class="desktop-nav" aria-label="Primary navigation">
+          <a href="#how-it-works">How it works</a>
+          <a href="#try-it">Guided case</a>
+          <a href="#project-workspace">Project workspace</a>
+          <a href="#questions">Questions</a>
+        </nav>
+        <a class="nav-github" href="https://github.com/AndroLay/evidrilo" target="_blank" rel="noopener noreferrer">
+          <svg class="icon icon-github" aria-hidden="true"><use href="#icon-github" /></svg>
+          Explore Evidrilo
+        </a>
+        <details class="mobile-nav">
+          <summary>Menu <svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary>
+          <nav aria-label="Mobile navigation">
+            <a href="#how-it-works">How it works</a>
+            <a href="#try-it">Guided case</a>
+            <a href="#project-workspace">Project workspace</a>
+            <a href="#questions">Questions</a>
+            <a class="github-link" href="https://github.com/AndroLay/evidrilo" target="_blank" rel="noopener noreferrer"><svg class="icon icon-github" aria-hidden="true"><use href="#icon-github" /></svg> Explore Evidrilo on GitHub</a>
+          </nav>
+        </details>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="hero-wrap">
+        <section class="hero" aria-labelledby="hero-title">
+          <svg class="section-thread section-thread-on-dark" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+          <div class="shell hero-inner">
+            <div class="hero-copy">
+              <p class="hero-eyebrow">A workspace for student research</p>
+              <h1 id="hero-title"><span class="hero-line">Make a claim</span><span class="hero-line hero-line-accent">the evidence can carry.</span></h1>
+              <p>Bring your research question, sources, evidence notes, and synthesis into one clear path—with the limits and next steps still in view.</p>
+              <div class="hero-actions">
+                <a class="button button-light" href="#how-it-works">See how it works <svg class="icon" aria-hidden="true"><use href="#icon-arrow" /></svg></a>
+                <a class="hero-source-link" href="#try-it">Explore a guided case <svg class="icon" aria-hidden="true"><use href="#icon-arrow" /></svg></a>
+              </div>
+              <p class="hero-trust-note">Start with your own brief. You choose the sources and write the conclusions.</p>
+            </div>
+            <div class="hero-showcase">
+              <figure class="hero-phone hero-phone-featured">
+                <img src="./assets/evidence-map.webp" width="420" height="880" alt="Evidrilo screen from a synthetic guided case, connecting a requirement with supplied observations" fetchpriority="high" />
+              </figure>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="assurance-strip" aria-label="Evidrilo essentials">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell assurance-grid">
+          <article>
+            <span class="assurance-icon"><svg class="icon" aria-hidden="true"><use href="#icon-document" /></svg></span>
+            <p><strong>Start with your brief</strong><span>Frame the assignment and research question you are working on.</span></p>
+          </article>
+          <article>
+            <span class="assurance-icon"><svg class="icon" aria-hidden="true"><use href="#icon-link" /></svg></span>
+            <p><strong>Keep evidence connected</strong><span>Link your own source notes to themes and claims.</span></p>
+          </article>
+          <article>
+            <span class="assurance-icon"><svg class="icon" aria-hidden="true"><use href="#icon-person" /></svg></span>
+            <p><strong>You stay in control</strong><span>Choose sources, write the synthesis, and decide what to revise.</span></p>
+          </article>
+          <article>
+            <span class="assurance-icon"><svg class="icon" aria-hidden="true"><use href="#icon-boundary" /></svg></span>
+            <p><strong>Know the boundaries</strong><span>Keep limitations and next steps alongside each claim.</span></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="thinking-section" id="how-it-works" aria-labelledby="thinking-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell thinking-grid">
+          <div>
+            <p class="section-eyebrow">Traceable reasoning</p>
+            <h2 id="thinking-title">The answer matters. <span>So does how you got there.</span></h2>
+          </div>
+          <div class="thinking-copy">
+            <p>The current manual project path is designed for directed literature synthesis. You enter and review your sources, connect evidence notes to your synthesis and claims, then keep scope, limitations, and next steps visible. Evidrilo does not find or verify sources.</p>
+            <div class="workflow-map" role="group" aria-label="Illustrative map of the manual project workflow, not a live app screen">
+              <div class="workflow-map-heading"><strong>Your project path</strong><span>Illustrative structure</span></div>
+              <ol class="workflow-map-list">
+                <li><span class="workflow-map-node">01</span><span><strong>Brief and question</strong><small>What are you trying to understand?</small></span></li>
+                <li><span class="workflow-map-node">02</span><span><strong>Sources and evidence notes</strong><small>What did you choose to examine?</small></span></li>
+                <li><span class="workflow-map-node">03</span><span><strong>Synthesis and claim</strong><small>What do your linked notes support?</small></span></li>
+                <li><span class="workflow-map-node">04</span><span><strong>Limits and next step</strong><small>What remains uncertain or useful to do?</small></span></li>
+              </ol>
+              <p class="workflow-map-note">A guide to the project structure, not a screenshot or completed student project.</p>
+            </div>
+          </div>
+        </div>
+        <div class="shell">
+          <ol class="reasoning-line" aria-label="Student research project workflow">
+            <li>Brief</li><li>Sources</li><li>Evidence</li><li>Synthesis</li><li>Claim</li><li>Next step</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="demo-section" id="try-it" aria-labelledby="demo-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell">
+          <div class="section-heading demo-heading">
+            <div><p class="section-eyebrow">Explore alternatives</p><h2 id="demo-title">Take away one fact. <span>What can you still say?</span></h2></div>
+            <p>Remove an observation from this synthetic tablet-dissolution example and watch the comparison narrow. It is a practice case, separate from a student-created research project.</p>
+          </div>
+          <div class="demo-grid">
+            <div class="demo-facts">
+              <div class="demo-topline"><span>Supplied case</span><strong>Tablet dissolution · water temperature</strong></div>
+              <fieldset>
+                <legend>Available observations</legend>
+                <label class="fact-row">
+                  <input type="checkbox" data-fact="warm" checked disabled />
+                  <span class="fact-icon" aria-hidden="true"></span>
+                  <span class="fact-name">Warm water</span>
+                  <strong>32 sec</strong>
+                  <span class="fact-bar" aria-hidden="true"></span>
+                </label>
+                <label class="fact-row">
+                  <input type="checkbox" data-fact="room" checked disabled />
+                  <span class="fact-icon" aria-hidden="true"></span>
+                  <span class="fact-name">Room temperature</span>
+                  <strong>58 sec</strong>
+                  <span class="fact-bar" aria-hidden="true"></span>
+                </label>
+                <label class="fact-row">
+                  <input type="checkbox" data-fact="cold" checked disabled />
+                  <span class="fact-icon" aria-hidden="true"></span>
+                  <span class="fact-name">Cold water</span>
+                  <strong>92 sec</strong>
+                  <span class="fact-bar" aria-hidden="true"></span>
+                </label>
+              </fieldset>
+              <button class="reset-button" id="reset-facts" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-reset" /></svg> Restore all observations</button>
+              <noscript><p class="demo-noscript">Enable JavaScript to change the observations in this example.</p></noscript>
+            </div>
+            <div class="demo-answer">
+              <div class="answer-topline"><span>What the available facts can say</span><span class="availability" id="availability">3 of 3 available</span></div>
+              <div class="evidence-trace" aria-hidden="true">
+                <span class="trace-node" data-trace-fact="warm"><b>32</b><small>Warm</small></span>
+                <span class="trace-node" data-trace-fact="room"><b>58</b><small>Room</small></span>
+                <span class="trace-node" data-trace-fact="cold"><b>92</b><small>Cold</small></span>
+              </div>
+              <div class="demo-output" aria-live="polite" aria-atomic="true">
+                <p class="answer-quote" id="bounded-description">In this supplied case, dissolution took 32 seconds in warm water, 58 seconds at room temperature, and 92 seconds in cold water.</p>
+                <div class="answer-note"><span class="note-symbol" aria-hidden="true">i</span><p id="scope-note">All three supplied conditions are available for comparison. The description stays inside this case.</p></div>
+              </div>
+            </div>
+          </div>
+          <p class="demo-disclaimer">Interactive explainer based on Evidrilo's synthetic case. It does not evaluate your own work.</p>
+        </div>
+      </section>
+
+      <section class="boundary-section" aria-labelledby="boundary-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell">
+          <div class="boundary-heading">
+            <p class="section-eyebrow">Know your boundaries</p>
+            <h2 id="boundary-title">A stronger answer knows <span>where to stop.</span></h2>
+          <p>In this synthetic example, one trial per condition supports a case-specific comparison—not a universal rule.</p>
+          </div>
+          <div class="boundary-scene" data-boundary-scene>
+            <article class="claim-card claim-card-over">
+              <div class="claim-card-top"><span>Overstated claim</span><span class="claim-status">Goes beyond the facts</span></div>
+              <p>“Warm water <span>always</span> makes tablets dissolve faster.”</p>
+              <div class="claim-card-foot"><span class="claim-line" aria-hidden="true"></span><small>One trial per condition cannot establish an always-true result.</small></div>
+            </article>
+            <div class="boundary-bridge" aria-hidden="true"><span></span><svg class="icon"><use href="#icon-arrow" /></svg></div>
+            <article class="claim-card claim-card-bounded">
+              <div class="claim-card-top"><span>Evidence-aligned claim</span><span class="claim-status">Within this case</span></div>
+              <p>“In this supplied trial, the tablet dissolved in <strong>32 seconds</strong> in warm water and <strong>92 seconds</strong> in cold water.”</p>
+              <div class="claim-card-foot"><span class="claim-line" aria-hidden="true"></span><small>The comparison names the observations and stays within their limit.</small></div>
+            </article>
+          </div>
+          <div class="boundary-endnote"><p>Same case. Clearer boundary. A more useful next step.</p><a href="#inside-the-app">See the guided case flow <svg class="icon" aria-hidden="true"><use href="#icon-arrow" /></svg></a></div>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="project-workspace" aria-labelledby="workspace-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell workspace-grid">
+          <div class="workspace-copy">
+            <p class="section-eyebrow">A complete workspace</p>
+            <h2 id="workspace-title">A place for every part of the thinking.</h2>
+            <p>Keep the brief, source records, evidence notes, synthesis themes, claims, limitations, and next steps together in a manual project you can return to.</p>
+            <p class="workspace-local-note">Projects are stored on this device in the current build. Cross-device sync is not available.</p>
+          </div>
+          <div class="workspace-preview" role="img" aria-label="Illustrative structure of a student project, not a live app screen">
+            <div class="workspace-preview-top"><span class="workspace-file-mark"><svg class="icon" aria-hidden="true"><use href="#icon-document" /></svg></span><span><strong>My research project</strong><small>Directed literature synthesis</small></span><span class="workspace-menu" aria-hidden="true">•••</span></div>
+            <div class="workspace-field"><span class="workspace-field-icon">?</span><span><strong>Research question</strong><small>Written in your own words</small></span><svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></div>
+            <div class="workspace-field"><span class="workspace-field-icon"><svg class="icon" aria-hidden="true"><use href="#icon-document" /></svg></span><span><strong>Sources and evidence</strong><small>Entered and reviewed by you</small></span><svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></div>
+            <div class="workspace-field"><span class="workspace-field-icon"><svg class="icon" aria-hidden="true"><use href="#icon-link" /></svg></span><span><strong>Synthesis and claims</strong><small>Linked to evidence notes</small></span><svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></div>
+            <div class="workspace-field"><span class="workspace-field-icon"><svg class="icon" aria-hidden="true"><use href="#icon-boundary" /></svg></span><span><strong>Limits and next steps</strong><small>Keep the boundary visible</small></span><svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></div>
+            <p class="workspace-preview-note">Illustrative project structure · not a live application screen</p>
+          </div>
+          <div class="workspace-benefits">
+            <article><span class="workspace-benefit-icon"><svg class="icon" aria-hidden="true"><use href="#icon-document" /></svg></span><div><h3>See the facts before you interpret them.</h3><p>Enter the sources you chose and keep your evidence notes beside your synthesis.</p></div></article>
+            <article><span class="workspace-benefit-icon"><svg class="icon" aria-hidden="true"><use href="#icon-link" /></svg></span><div><h3>Keep the reasoning connected.</h3><p>Link evidence notes to themes and claims so you can revisit the path behind them.</p></div></article>
+            <article><span class="workspace-benefit-icon"><svg class="icon" aria-hidden="true"><use href="#icon-boundary" /></svg></span><div><h3>Make the limits part of the answer.</h3><p>Record what your evidence cannot establish and a practical next step.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="inside-section" id="inside-the-app" aria-labelledby="inside-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell">
+          <div class="section-heading inside-heading">
+            <div><p class="section-eyebrow">Case practice</p><h2 id="inside-title">See the reasoning in action.</h2></div>
+            <p>These app screens show a separate synthetic case: inspect observations, trace a requirement, and keep a claim within its evidence boundary.</p>
+          </div>
+          <p class="story-scroll-cue" aria-hidden="true"><span>Scroll to follow the case</span><span class="story-scroll-arrow">↓</span></p>
+          <div class="story-layout" data-scroll-story>
+            <div class="story-stage" data-story-stage data-active="0" role="group" aria-label="Evidrilo app screen. The screen changes with each guided case step.">
+              <div class="story-device-frame">
+                <div class="story-stage-art">
+                  <img class="story-shot is-current" data-story-shot src="./assets/evidence-lens.webp" width="720" height="1280" loading="eager" alt="Evidence Lens listing warm, room-temperature, and cold-water observations" />
+                  <img class="story-shot" data-story-shot src="./assets/requirement-trace.webp" width="720" height="1280" loading="eager" alt="Requirement Trace showing the case requirement and its supporting evidence" aria-hidden="true" />
+                  <img class="story-shot" data-story-shot src="./assets/claim-boundary.webp" width="720" height="1280" loading="eager" alt="Claim Boundary prompting review of the claim, its scope, and limitations" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+            <div class="story-steps">
+              <article class="story-step is-current" data-story-step="0">
+                <span class="story-step-label">Explore / 01</span>
+                <h3>Inspect the supplied observations.</h3>
+                <p>Review the facts in this synthetic case and select which ones are relevant to the conclusion you want to describe.</p>
+                <div class="story-step-image"><img src="./assets/evidence-lens.webp" width="720" height="1280" loading="lazy" alt="Evidence Lens listing warm, room-temperature, and cold-water observations" /></div>
+              </article>
+              <article class="story-step" data-story-step="1">
+                <span class="story-step-label">Connect / 02</span>
+                <h3>Trace the requirement to its evidence.</h3>
+                <p>See which supplied observations relate to the task in this example and keep the intended conclusion in view.</p>
+                <div class="story-step-image"><img src="./assets/requirement-trace.webp" width="720" height="1280" loading="lazy" alt="Requirement Trace showing the case requirement and its supporting evidence" /></div>
+              </article>
+              <article class="story-step" data-story-step="2">
+                <span class="story-step-label">Refine / 03</span>
+                <h3>Keep the claim inside its boundary.</h3>
+                <p>State a claim and its limitation, then use case-bounded feedback to make one purposeful revision.</p>
+                <div class="story-step-image"><img src="./assets/claim-boundary.webp" width="720" height="1280" loading="lazy" alt="Claim Boundary prompting review of the claim, its scope, and limitations" /></div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="revision-section" id="revision" aria-labelledby="revision-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell">
+          <div class="revision-intro">
+            <div><p class="section-eyebrow">Write with confidence</p><h2 id="revision-title">You keep the pen. <span>The evidence stays in view.</span></h2></div>
+            <p>In this guided case, you write the first claim, review feedback linked to supplied facts, then make one revision in your own words.</p>
+          </div>
+          <div class="revision-desk" data-revision-desk>
+            <div class="revision-thread" aria-hidden="true"></div>
+            <article class="revision-sheet revision-draft">
+              <div class="revision-sheet-top"><span>Your first draft</span><span>Student-written</span></div>
+              <p>“Warm water made the tablet dissolve fastest.”</p>
+              <div class="revision-sheet-foot"><span class="revision-dot" aria-hidden="true"></span> A useful observation, still missing its limit.</div>
+            </article>
+            <article class="revision-sheet revision-feedback">
+              <div class="revision-sheet-top"><span>Anchored feedback</span><span>One next step</span></div>
+              <p>Name the one-trial limit before making the comparison sound certain.</p>
+              <div class="revision-sheet-foot"><span class="revision-anchor">LIMIT-TRIAL-01</span> Each condition was measured once.</div>
+            </article>
+            <article class="revision-sheet revision-after">
+              <div class="revision-sheet-top"><span>Your revision</span><span>Still your words</span></div>
+              <p>“In this supplied case, warm water took 32 seconds, compared with 58 and 92 seconds. Each condition was measured once.”</p>
+              <div class="revision-sheet-foot"><span class="revision-dot" aria-hidden="true"></span> A claim with its boundary in view.</div>
+            </article>
+          </div>
+          <div class="revision-outro">
+            <p>Illustrative wording from the synthetic case. The app checks selected facts and rules; it does not write the student's answer.</p>
+            <a href="#try-it">Change the evidence yourself <svg class="icon" aria-hidden="true"><use href="#icon-arrow" /></svg></a>
+          </div>
+        </div>
+      </section>
+
+      <section class="principles-section" aria-labelledby="principles-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell principles-grid">
+            <div class="principles-lead"><p class="section-eyebrow">Student-led by design</p><h2 id="principles-title">Your research stays yours.</h2><p>The project workspace organizes student-entered sources, evidence notes, synthesis, and claims. Structure checks do not judge research quality or scientific truth.</p></div>
+            <div class="principles-list">
+            <div><strong>Student-entered sources</strong><p>You choose, record, and review sources; Evidrilo does not search for or verify them.</p></div>
+            <div><strong>Visible evidence links</strong><p>Connect evidence notes to synthesis themes and claims so you can revisit where your statements came from.</p></div>
+            <div><strong>Checks without grades</strong><p>Project checks flag missing fields or links. The separate guided case uses bounded checks against its supplied facts.</p></div>
+            </div>
+        </div>
+      </section>
+
+      <section class="faq-section" id="questions" aria-labelledby="faq-title">
+        <svg class="section-thread" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell faq-grid">
+          <div class="faq-intro"><p class="section-eyebrow">Frequently asked questions</p><h2 id="faq-title">Good questions deserve clear answers.</h2><p>What the current Evidrilo build does—and where its limits are.</p></div>
+          <div class="faq-list">
+            <details><summary>What can I do in a project?<svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary><p>The current manual path focuses on directed literature synthesis: frame a brief and question, record sources and evidence notes, connect them to synthesis themes and claims, and note limitations and next steps.</p></details>
+            <details><summary>Can I preview before creating an account?<svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary><p>Yes. Get Started is a skippable synthetic walkthrough; it does not create a project or save learning activity. You can create and manage local projects without an account. Sign in for M0 case practice and account-bound features; signing in does not upload local projects.</p></details>
+            <details><summary>Can I sync or back up a project?<svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary><p>Project data stays on this device; cloud sync is not available in the current build. Markdown, PDF, and DOCX reports, structured CSV, and .evproj import/export exist in development code, but device file handling still needs verification before you rely on them as a backup.</p></details>
+            <details><summary>Does Evidrilo find sources or provide live AI?<svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary><p>No. You enter and review your own sources; there is no literature search or DOI verification. Reviewed catalog templates are not yet selectable, and Project AI is not live because its provider remains disabled.</p></details>
+            <details><summary>Will Evidrilo write or grade my research?<svg class="icon" aria-hidden="true"><use href="#icon-chevron" /></svg></summary><p>No. You write the synthesis and claims. Project checks flag missing fields or links; they are not quality scores, scientific verdicts, or academic grades. The separate guided case gives bounded feedback only on its supplied facts and rules.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="final-section" aria-labelledby="final-title">
+        <svg class="section-thread section-thread-on-dark" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"><use href="#pattern-evidence-thread" /></svg>
+        <div class="shell final-inner">
+          <span class="final-brandmark"><img src="./assets/evidrilo-mark.png" width="116" height="116" alt="" /></span>
+          <h2 id="final-title">Keep the path from evidence to claim in view.</h2>
+          <p>Explore the student-led project workflow, or try the separate synthetic case example.</p>
+          <div class="final-actions">
+            <a class="button button-light github-link" href="https://github.com/AndroLay/evidrilo" target="_blank" rel="noopener noreferrer"><svg class="icon icon-github" aria-hidden="true"><use href="#icon-github" /></svg> Explore Evidrilo on GitHub</a>
+            <a class="final-text-link" href="#how-it-works">See the project workflow <svg class="icon" aria-hidden="true"><use href="#icon-arrow" /></svg></a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <a class="footer-brand" href="#top"><img src="./assets/evidrilo-mark.png" width="58" height="58" alt="" /><span><strong>Evidrilo</strong><small>From evidence to action.</small></span></a>
+        <nav aria-label="Footer navigation"><a href="#how-it-works">How it works</a><a href="#project-workspace">Project workspace</a><a href="#try-it">Guided case</a><a href="#questions">Questions</a><a class="github-link" href="https://github.com/AndroLay/evidrilo" target="_blank" rel="noopener noreferrer"><svg class="icon icon-github" aria-hidden="true"><use href="#icon-github" /></svg> GitHub</a><a href="https://github.com/AndroLay/evidrilo/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></nav>
+      </div>
+    </footer>
+  </body>
+</html>

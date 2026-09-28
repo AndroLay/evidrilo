@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/notification-preferences-update.v1.json",
+  "title": "Evidrilo notification preferences update v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "enabled",
+    "continueUnfinishedEnabled",
+    "reviewCompletedEnabled",
+    "cadence",
+    "localHour",
+    "localMinute",
+    "expectedRevision"
+  ],
+  "properties": {
+    "schema": { "const": "evidrilo.notification-preferences-update" },
+    "version": { "const": "1" },
+    "enabled": { "type": "boolean" },
+    "continueUnfinishedEnabled": { "type": "boolean" },
+    "reviewCompletedEnabled": { "type": "boolean" },
+    "cadence": { "enum": ["daily", "weekly"] },
+    "localHour": { "type": "integer", "minimum": 0, "maximum": 23 },
+    "localMinute": { "type": "integer", "minimum": 0, "maximum": 59 },
+    "expectedRevision": { "type": "integer", "minimum": 0 }
+  }
+}

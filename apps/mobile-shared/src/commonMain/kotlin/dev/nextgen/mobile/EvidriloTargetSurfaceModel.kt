@@ -34,6 +34,18 @@ internal enum class TargetPageState {
     RECOVERY,
 }
 
+internal object EvidriloSourcesCopy {
+    const val intro = "The bundled example is available offline. For your own work, open My Projects and add materials there."
+    const val assignmentBriefSubtitle = "Requirement supplied with this case"
+    const val rubricSubtitle = "Bounded checks for this case"
+    const val sourcesSubtitle = "Bundled observations and stated limits"
+    const val importBoundary = "Project attachments stay source material until you choose and record a finding."
+}
+
+internal object EvidriloTargetWorkspaceCopy {
+    const val caseHeading = "Case workspace"
+}
+
 internal fun TargetPageState.targetDisplayLabel(): String = when (this) {
     TargetPageState.CONTENT -> "Ready"
     TargetPageState.NOT_ASSESSED -> "Not assessed"
@@ -78,15 +90,19 @@ internal fun targetSectionLabel(section: EvidriloTargetSection): String = when (
 }
 
 internal fun targetNavigationSections(selected: EvidriloTargetSection): List<EvidriloTargetSection> =
-    buildList {
-        add(EvidriloTargetSection.HOME)
-        add(EvidriloTargetSection.SOURCES)
-        add(EvidriloTargetSection.EVIDENCE)
-        add(EvidriloTargetSection.ACTION)
-        if (selected == EvidriloTargetSection.PROFILE) {
-            add(EvidriloTargetSection.PROFILE)
-        }
+    if (selected == EvidriloTargetSection.PROFILE) {
+        emptyList()
+    } else {
+        listOf(
+            EvidriloTargetSection.HOME,
+            EvidriloTargetSection.SOURCES,
+            EvidriloTargetSection.EVIDENCE,
+            EvidriloTargetSection.ACTION,
+        )
     }
+
+internal fun shouldShowTargetBottomNavigation(selected: EvidriloTargetSection): Boolean =
+    selected != EvidriloTargetSection.PROFILE
 
 internal fun TargetEvidenceStatus.targetDisplayLabel(): String = when (this) {
     TargetEvidenceStatus.NOT_ASSESSED -> "Not assessed"
@@ -114,6 +130,36 @@ internal fun targetHistorySummary(
     )
 }
 
+internal fun targetHistoryEvidenceLabel(summary: TargetHistorySummary): String =
+    if (summary.evidenceAdded == 0 && summary.evidenceRemoved == 0) {
+        "Evidence anchors unchanged"
+    } else {
+        "Evidence anchors changed"
+    }
+
+internal fun targetHistoryResultLabel(snapshot: ConclusionSessionSnapshot): String =
+    when (snapshot.phase) {
+        ConclusionSessionPhase.SUMMARY -> "Claim revision saved"
+        ConclusionSessionPhase.EVIDENCE_CHANGE_SUMMARY -> "Changed-evidence response saved"
+        else -> "Local comparison saved"
+    }
+
+internal fun completedHistorySnapshot(state: ConclusionState): ConclusionSessionSnapshot? = when (state) {
+    is ConclusionState.Summary -> ConclusionSessionSnapshot(
+        phase = ConclusionSessionPhase.SUMMARY,
+        initialDraft = state.initialDraft,
+        currentDraft = state.revisedDraft,
+    )
+
+    is ConclusionState.EvidenceChangeSummary -> ConclusionSessionSnapshot(
+        phase = ConclusionSessionPhase.EVIDENCE_CHANGE_SUMMARY,
+        initialDraft = state.baseDraft,
+        currentDraft = state.challengeDraft,
+    )
+
+    else -> null
+}
+
 internal data class TargetEvidenceDelta(
     val addedEvidenceIds: List<String>,
     val removedEvidenceIds: List<String>,
@@ -133,13 +179,16 @@ internal data class TargetEvidenceDelta(
 
 internal data class TargetWorkspaceMetrics(
     val requirementCount: Int,
-    val evidenceCount: Int,
+    val suppliedObservationCount: Int,
     val selectedEvidenceCount: Int,
     val gapCount: Int?,
     val actionCount: Int,
     val draftCompletenessPercent: Int,
     val evidenceStatus: TargetEvidenceStatus,
-)
+) {
+    val selectedEvidenceSummary: String
+        get() = "$selectedEvidenceCount selected"
+}
 
 internal data class EvidriloContextNote(
     val title: String,
@@ -195,7 +244,7 @@ internal fun targetWorkspaceMetrics(
 
     return TargetWorkspaceMetrics(
         requirementCount = 1,
-        evidenceCount = observationIds.size,
+        suppliedObservationCount = observationIds.size,
         selectedEvidenceCount = selectedObservationIds.size,
         gapCount = when (evidenceStatus) {
             TargetEvidenceStatus.SUPPORTED -> 0

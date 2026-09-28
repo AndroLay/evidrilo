@@ -111,6 +111,7 @@ worker_database_url="Host=127.0.0.1;Port=${db_port};Database=evidrilo_it;Usernam
     DOTNET_ROOT="$dotnet_root" \
     DOTNET_CLI_HOME="$worker_cli_home" \
     NUGET_PACKAGES="$nuget_packages" \
+    DOTNET_ENVIRONMENT=Development \
     DATABASE_URL="$worker_database_url" \
     WORKER_POLL_INTERVAL_SECONDS=1 \
     WORKER_BATCH_SIZE=1 \

@@ -29,13 +29,18 @@ public static class HealthEndpoints
                 && database == "ready"
                 ? "ready"
                 : "degraded";
-            return Results.Ok(new HealthResponse(
+            var response = new HealthResponse(
                 "evidrilo.health",
                 "1",
                 "ready",
                 status,
                 RequestIdMiddleware.Get(context),
-                new HealthDependencies(readiness.Config, readiness.Auth, database)));
+                new HealthDependencies(readiness.Config, readiness.Auth, database));
+            return Results.Json(
+                response,
+                statusCode: status == "ready"
+                    ? StatusCodes.Status200OK
+                    : StatusCodes.Status503ServiceUnavailable);
         });
 
         return endpoints;

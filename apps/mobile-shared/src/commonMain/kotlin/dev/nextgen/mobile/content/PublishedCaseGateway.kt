@@ -4,6 +4,8 @@ import dev.nextgen.mobile.account.AccountHttpResponse
 import dev.nextgen.mobile.account.AccountHttpTransport
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountHttpTransport
+import dev.nextgen.mobile.account.isAllowedApiBaseUrl
+import dev.nextgen.mobile.network.DeviceConnectivity
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import kotlinx.serialization.json.Json
@@ -18,6 +20,8 @@ import kotlinx.serialization.json.longOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 
+private const val MAX_CONTENT_RESPONSE_BYTES = 128 * 1024
+
 internal data class ContentClientConfiguration(
     val apiBaseUrl: String,
 ) {
@@ -27,12 +31,7 @@ internal data class ContentClientConfiguration(
     val isConfigured: Boolean
         get() {
             val normalized = normalizedApiBaseUrl
-            if (!normalized.startsWith("https://", ignoreCase = true)) return false
-            val authority = normalized.substringAfter("//", "").substringBeforeAny('/', '?', '#')
-            return authority.isNotBlank() &&
-                !authority.contains('@') &&
-                !authority.any(Char::isWhitespace) &&
-                (authority.contains('.') || authority == "localhost")
+            return isAllowedApiBaseUrl(normalized)
         }
 
     private fun String.substringBeforeAny(vararg delimiters: Char): String {
@@ -135,9 +134,14 @@ internal class PublishedCaseGateway(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
+            val offline = transport.deviceConnectivity == DeviceConnectivity.OFFLINE
             return PublishedCaseGatewayResult.Failed(
-                code = "OFFLINE",
-                message = "Published content is unavailable offline.",
+                code = if (offline) "OFFLINE" else "CONTENT_UNAVAILABLE",
+                message = if (offline) {
+                    "Published content is unavailable offline."
+                } else {
+                    "The published content service is unavailable."
+                },
                 retryable = true,
             )
         }
@@ -163,6 +167,13 @@ internal class PublishedCaseGateway(
                 message = "Published content could not be loaded.",
                 retryable = false,
             )
+
+            response.body.encodeToByteArray().size > MAX_CONTENT_RESPONSE_BYTES ->
+                PublishedCaseGatewayResult.Failed(
+                    code = "INVALID_CONTENT_RESPONSE",
+                    message = "Published content response is too large.",
+                    retryable = false,
+                )
 
             else -> parseResponse(response, caseVersionId)?.let(PublishedCaseGatewayResult::Found)
                 ?: PublishedCaseGatewayResult.Failed(

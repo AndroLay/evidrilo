@@ -9,12 +9,17 @@ the app experience and deterministic product rules through
 
 Use ASP.NET Core/.NET and PostgreSQL for optional online capabilities. Keep
 the API a capability-organized modular monolith and the worker a separate
-bounded process. The bundled free learning loop must not require an account,
-network, API, database, AI provider, or purchase.
+bounded process. Free access has separate account rules: local projects and
+anonymous read-only catalog browsing do not require an account, while the
+bundled M0 case-learning route requires a signed-in account. The M0 evaluator
+and case-session storage remain on-device; purchase, AI, and the online API are
+not required to evaluate a case after the account gate is satisfied.
 
 RevenueCat is isolated behind the mobile billing boundary. It controls
 premium content access only; evaluator behavior and free learning remain
-available independently.
+available independently of payment. This does not remove the separate
+sign-in requirement for M0 case learning; the accountless local project path
+remains available without billing.
 
 ## Why this fits
 

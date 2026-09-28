@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY version.props Directory.Build.props ./
+COPY platform/shared/ platform/shared/
 COPY platform/api/Evidrilo.Api.csproj platform/api/
 RUN dotnet restore platform/api/Evidrilo.Api.csproj
 

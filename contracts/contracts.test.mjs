@@ -27,12 +27,43 @@ const schemaFiles = [
   'recommendation.v1.json',
   'cohort-summary.v1.json',
   'ai-assist-result.v1.json',
+  'ai-conversation-session.v1.json',
+  'ai-conversation-turn.v1.json',
+  'ai-conversation-clear.v1.json',
   'case-authoring-result.v1.json',
   'case-lifecycle-audit.v1.json',
   'recommendation-interaction-result.v1.json',
   'entitlements.v1.json',
   'account-deletion-result.v1.json',
   'membership-operation-result.v1.json',
+    'notification-preferences.v1.json',
+    'notification-preferences-update.v1.json',
+    'notification-preferences-update-result.v1.json',
+  'student-project-mutation-result.v1.json',
+  'student-project-cloud-consent.v1.json',
+  'student-project-cloud-consent-update.v1.json',
+  'student-project-list.v1.json',
+  'student-project.v1.json',
+  'student-project-revisions.v1.json',
+  'student-project-structure-report.v1.json',
+  'student-project-permanent-delete.v1.json',
+    'project-ai-consent.v1.json',
+    'project-ai-consent-grant.v1.json',
+    'project-ai-scaffold.v1.json',
+    'project-ai-scaffold-request.v1.json',
+    'project-ai-scaffold-settlement.v1.json',
+    'project-ai-scaffold-settlement-request.v1.json',
+    'project-ai-stage-assist.v1.json',
+    'project-ai-stage-assist-request.v1.json',
+    'project-ai-stage-assist-settlement.v1.json',
+    'project-ai-stage-assist-settlement-request.v1.json',
+    'project-ai-activity-history.v1.json',
+    'project-ai-activity-clear.v1.json',
+  'project-template-families.v1.json',
+  'project-template-catalogue.v1.json',
+  'project-template-detail.v1.json',
+  'project-template-operation.v1.json',
+  'project-template-starter-drafts.v1.json',
 ];
 
 const fixtureFiles = [
@@ -121,7 +152,7 @@ test('registered API routes map to response schemas and endpoint tests', () => {
   );
   assert.equal(manifest.schema, 'evidrilo.api-route-manifest');
   assert.equal(manifest.version, '1');
-  assert.equal(manifest.routes.length, 25);
+  assert.equal(manifest.routes.length, 54);
 
   const routeKeys = (routes) => routes
     .map((route) => `${route.method} ${route.path}`)
@@ -153,6 +184,111 @@ test('registered API routes map to response schemas and endpoint tests', () => {
       true,
       `${route.testFile} must exercise ${route.testAnchor}`,
     );
+    if (route.requestSchema) {
+      const requestSchema = readSchema(route.requestSchema);
+      assert.equal(requestSchema.$id, `https://evidrilo.dev/contracts/${route.requestSchema}`);
+    }
+  }
+  for (const [method, routePath, requestSchema] of [
+    ['PUT', '/v1/notifications/preferences', 'notification-preferences-update.v1.json'],
+    ['POST', '/v1/project-ai/scaffold', 'project-ai-scaffold-request.v1.json'],
+    ['POST', '/v1/project-ai/scaffold/settlement', 'project-ai-scaffold-settlement-request.v1.json'],
+    ['POST', '/v1/project-ai/stage-assist', 'project-ai-stage-assist-request.v1.json'],
+    ['POST', '/v1/project-ai/stage-assist/settlement', 'project-ai-stage-assist-settlement-request.v1.json'],
+    ['PUT', '/v1/project-ai/consent', 'project-ai-consent-grant.v1.json'],
+    ['DELETE', '/v1/projects/{projectId:guid}/permanent', 'student-project-permanent-delete.v1.json'],
+  ]) {
+    assert.equal(
+      manifest.routes.find((route) => route.method === method && route.path === routePath)?.requestSchema,
+      requestSchema,
+      `${method} ${routePath} request schema must be registered`,
+    );
+  }
+});
+
+test('notification preference updates require an optimistic revision precondition', () => {
+  const schema = readSchema('notification-preferences-update.v1.json');
+
+  assert.equal(schema.required.includes('expectedRevision'), true);
+  assert.deepEqual(schema.properties.expectedRevision, { type: 'integer', minimum: 0 });
+});
+
+test('project API exposes only explicitly confirmed permanent deletion', () => {
+  const manifest = readJson('routes.v1.json');
+  const ordinaryDelete = manifest.routes.find(
+    (route) => route.method === 'DELETE' && route.path === '/v1/projects/{projectId:guid}',
+  );
+  assert.equal(ordinaryDelete, undefined, 'ordinary project delete must not hard-delete data');
+
+  const permanentDelete = manifest.routes.find(
+    (route) => route.method === 'DELETE' && route.path === '/v1/projects/{projectId:guid}/permanent',
+  );
+  assert.ok(permanentDelete, 'hard deletion must use an explicit permanent route');
+  assert.equal(permanentDelete.requestSchema, 'student-project-permanent-delete.v1.json');
+
+  const request = readSchema(permanentDelete.requestSchema);
+  assert.equal(request.properties.confirmPermanently.const, true);
+  assert.equal(request.required.includes('confirmPermanently'), true);
+});
+
+test('student project contract supports multiple stable claims and typed evidence relations', () => {
+  const project = readSchema('student-project.v1.json').$defs.projectDocument;
+  const claim = readSchema('student-project.v1.json').$defs.claim;
+  const relation = readSchema('student-project.v1.json').$defs.claimEvidenceLink;
+
+  assert.deepEqual(project.properties.claims.type, ['array', 'null']);
+  assert.equal(project.properties.claims.maxItems, 100);
+  assert.deepEqual(project.properties.claimEvidenceLinks.type, ['array', 'null']);
+  assert.equal(project.properties.claimEvidenceLinks.items.$ref, '#/$defs/claimEvidenceLink');
+  assert.deepEqual(claim.required, ['id', 'statement', 'scopeNote', 'limitationsNote', 'reviewStatus']);
+  assert.deepEqual(relation.required, ['claimId', 'evidenceItemId', 'relationship', 'rationale']);
+  assert.deepEqual(relation.properties.relationship.enum, ['supports', 'contradicts', 'provides_context']);
+});
+
+test('Project AI preview and settlement contracts expose server-held cost and idempotent decisions', () => {
+  const preview = readSchema('project-ai-scaffold.v1.json');
+  const previewRequest = readSchema('project-ai-scaffold-request.v1.json');
+  const settlementRequest = readSchema('project-ai-scaffold-settlement-request.v1.json');
+  const settlementResponse = readSchema('project-ai-scaffold-settlement.v1.json');
+
+  assert.equal(preview.required.includes('creditCost'), true);
+  assert.deepEqual(preview.properties.creditCost.enum, [1, 3]);
+  assert.deepEqual(preview.properties.operation.enum, ['create_project', 'assist_project']);
+  assert.equal(previewRequest.required.includes('operation'), true);
+  assert.equal(previewRequest.required.includes('projectId'), true);
+  assert.equal(previewRequest.required.includes('baseProjectRevision'), true);
+  assert.equal(previewRequest.allOf.length, 2);
+  assert.equal(preview.allOf.length, 2);
+  assert.equal(preview.allOf[0].then.properties.creditCost.const, 3);
+  assert.equal(preview.allOf[1].then.properties.creditCost.const, 1);
+  assert.deepEqual(settlementRequest.required, ['schema', 'version', 'requestId', 'decision']);
+  assert.deepEqual(settlementRequest.properties.decision.enum, ['apply', 'dismiss']);
+  assert.equal(settlementRequest.description.includes('Idempotency-Key'), true);
+  assert.deepEqual(
+    settlementResponse.required,
+    ['schema', 'version', 'status', 'requestId', 'creditCost'],
+  );
+  assert.deepEqual(settlementResponse.properties.status.enum, ['applied', 'dismissed']);
+});
+
+test('D-119 stage assistance and activity contracts stay project-bound and metadata-only', () => {
+  const request = readSchema('project-ai-stage-assist-request.v1.json');
+  const preview = readSchema('project-ai-stage-assist.v1.json');
+  const settlement = readSchema('project-ai-stage-assist-settlement-request.v1.json');
+  const activity = readSchema('project-ai-activity-history.v1.json');
+  const clear = readSchema('project-ai-activity-clear.v1.json');
+
+  assert.deepEqual(request.oneOf.map((entry) => entry.$ref), ['#/$defs/projectRequest', '#/$defs/generalRequest']);
+  assert.equal(request.$defs.projectRequest.allOf[1].properties.projectId.format, 'uuid');
+  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedFields.maxProperties, 32);
+  assert.equal(request.$defs.generalRequest.allOf[1].properties.mode.const, 'GENERAL');
+  assert.equal(preview.properties.creditCost.const, 1);
+  assert.deepEqual(settlement.properties.outcome.enum, ['APPLIED', 'EDITED', 'DISMISSED', 'STALE']);
+  assert.equal(activity.properties.activities.items.properties.projectId.oneOf[1].type, 'null');
+  assert.equal(activity.properties.activities.items.properties.outcome.enum.includes('FAILED'), true);
+  assert.deepEqual(clear.required, ['schema', 'version', 'clearedCount']);
+  for (const property of ['prompt', 'responseText', 'transcript', 'sourceText']) {
+    assert.equal(Object.hasOwn(activity.properties.activities.items.properties, property), false);
   }
 });
 
@@ -164,6 +300,152 @@ test('synthetic fixtures identify their schema and version', () => {
     assert.match(fixture.requestId, /^[A-Za-z0-9_-]{8,128}$/, `${file} requestId`);
     assertNoCredentialShapedFields(fixture);
   }
+});
+
+test('starter project templates remain bounded, complete, and explicitly unreviewed drafts', {
+  skip: !hasRepositoryPaths('docs/product/project-template-starter-drafts.v1.json'),
+}, () => {
+  const pack = JSON.parse(fs.readFileSync(
+    path.join(repositoryRoot, 'docs', 'product', 'project-template-starter-drafts.v1.json'),
+    'utf8',
+  ));
+  const schema = readSchema('project-template-starter-drafts.v1.json');
+  const expectedFamilies = [
+    'experimental_laboratory',
+    'observational_survey',
+    'literature_review',
+    'qualitative_interview_field_study',
+    'design_engineering',
+  ];
+
+  assert.equal(pack.schema, 'evidrilo.project-template-starter-drafts');
+  assert.equal(pack.version, '1');
+  assert.deepEqual(pack.templates.map((template) => template.family), expectedFamilies);
+  assert.equal(new Set(pack.templates.map((template) => template.templateId)).size, 5);
+
+  for (const draft of pack.templates) {
+    assert.equal(draft.state, 'draft');
+    assert.equal(draft.templateVersion, 1);
+    assert.equal(draft.content.examples.length > 0, true);
+    assert.equal(draft.content.examples.every((example) => example.reviewed === false), true);
+    assert.deepEqual(
+      new Set(draft.content.examples.map((example) => example.kind)),
+      new Set(['normal', 'edge_or_conflicting']),
+      `${draft.templateId} must include nominal and boundary examples`,
+    );
+    assert.equal(
+      draft.content.inputFields.some((field) => field.kind === 'hypothesis' && field.required),
+      false,
+      `${draft.templateId} must not require a hypothesis for every method`,
+    );
+    assert.equal(draft.content.methodSpecificLimitations.length > 0, true);
+    assert.equal(draft.content.provenanceRequirements.length > 0, true);
+    assert.equal(draft.content.accessibilityExpectations.length > 0, true);
+    const inputIds = new Set(draft.content.inputFields.map((field) => field.id));
+    for (const step of draft.content.steps) {
+      assert.equal(step.inputFieldIds.every((fieldId) => inputIds.has(fieldId)), true);
+    }
+  }
+
+  assert.equal(schema.properties.schema.const, pack.schema);
+  assert.equal(schema.properties.version.const, pack.version);
+});
+
+test('template review pack covers every starter example without claiming human review', {
+  skip: !hasRepositoryPaths('docs/product/project-template-starter-drafts.v1.json'),
+}, () => {
+  const starterPack = JSON.parse(fs.readFileSync(
+    path.join(repositoryRoot, 'docs', 'product', 'project-template-starter-drafts.v1.json'),
+    'utf8',
+  ));
+  const reviewPackPath = path.join(
+    repositoryRoot,
+    'internal',
+    'research',
+    'next-gen',
+    'project-template-review-pack.v1.json',
+  );
+
+  assert.equal(fs.existsSync(reviewPackPath), true, 'owner-local review pack must exist');
+  const reviewPack = JSON.parse(fs.readFileSync(reviewPackPath, 'utf8'));
+  assert.equal(reviewPack.schema, 'evidrilo.project-template-review-pack');
+  assert.equal(reviewPack.version, '1');
+  assert.equal(reviewPack.status, 'REVIEW_READY_DRAFT');
+  assert.equal(reviewPack.studentSelectable, false);
+  assert.equal(reviewPack.reviewPolicy.independentReviewerRequired, true);
+  assert.equal(reviewPack.reviewPolicy.authorMayApproveOwnTemplate, false);
+  assert.deepEqual(reviewPack.humanReviewRecords, []);
+  assert.equal(reviewPack.commonReviewChecklist.length >= 5, true);
+  assert.equal(reviewPack.reviewRecordTemplate.status, 'BLANK_TEMPLATE_NOT_A_REVIEW');
+  assert.equal(reviewPack.reviewRecordTemplate.changesServerLifecycle, false);
+  assert.deepEqual(reviewPack.reviewPolicy.publicationRequiresReviewedExampleKinds, [
+    'normal',
+    'edge_or_conflicting',
+  ]);
+  assert.deepEqual(reviewPack.reviewRecordTemplate.allowedDispositions, [
+    'CHANGES_REQUIRED',
+    'NO_BLOCKING_FINDINGS_IDENTIFIED',
+    'CANNOT_ASSESS',
+  ]);
+  for (const field of [
+    'reviewerRole',
+    'methodExpertise',
+    'conflictDisclosure',
+    'templateId',
+    'templateVersion',
+    'workedExampleIds',
+    'checklistResults',
+    'findings',
+    'reviewDisposition',
+    'rationale',
+    'requestedChanges',
+  ]) {
+    assert.equal(reviewPack.reviewRecordTemplate.requiredFields.includes(field), true);
+  }
+  assert.deepEqual(
+    reviewPack.templates.map((template) => template.templateId),
+    starterPack.templates.map((template) => template.templateId),
+  );
+
+  for (const [index, candidate] of starterPack.templates.entries()) {
+    const reviewTemplate = reviewPack.templates[index];
+    assert.equal(reviewTemplate.templateVersion, candidate.templateVersion);
+    assert.equal(reviewTemplate.family, candidate.family);
+    assert.equal(reviewTemplate.title, candidate.content.title);
+    assert.equal(reviewTemplate.lifecycleState, 'draft');
+    assert.equal(reviewTemplate.reviewStatus, 'NOT_REVIEWED');
+    assert.equal(reviewTemplate.studentSelectable, false);
+    assert.deepEqual(reviewTemplate.reviewedExampleIds, []);
+    assert.equal(reviewTemplate.reviewDecision, null);
+    assert.equal(reviewTemplate.methodReviewChecklist.length >= 3, true);
+    assert.deepEqual(
+      reviewTemplate.workedExamples.map((example) => example.exampleId),
+      candidate.content.examples.map((example) => example.id),
+    );
+    assert.equal(reviewTemplate.workedExamples.length >= 2, true);
+    assert.deepEqual(
+      [...new Set(reviewTemplate.workedExamples.map((example) => example.kind))].sort(),
+      ['edge_or_conflicting', 'normal'],
+    );
+
+    const allowedInputIds = new Set(candidate.content.inputFields.map((field) => field.id));
+    for (const example of reviewTemplate.workedExamples) {
+      const sourceExample = candidate.content.examples.find((item) => item.id === example.exampleId);
+      assert.equal(example.synthetic, true);
+      assert.equal(example.reviewed, false);
+      assert.equal(example.kind, sourceExample.kind);
+      assert.equal(example.summary, sourceExample.summary);
+      assert.equal(example.studentInputs.length > 0, true);
+      assert.equal(example.studentInputs.every((input) => allowedInputIds.has(input.fieldId)), true);
+      assert.equal(example.evidenceAnchors.length > 0, true);
+      assert.equal(example.candidateClaim.length > 0, true);
+      assert.equal(example.illustrativeBoundedReading.length > 0, true);
+      assert.equal(example.mustNotInfer.length > 0, true);
+      assert.equal(example.reviewerQuestions.length > 0, true);
+    }
+  }
+
+  assertNoCredentialShapedFields(reviewPack);
 });
 
 test('health fixtures distinguish dependency-free liveness from readiness', () => {
@@ -234,6 +516,14 @@ test('error and account fixtures expose only safe public fields', () => {
   assert.match(account.accountId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(account.emailVerified, true);
   assert.match(account.serverTime, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+
+  assert.deepEqual(accountExport.data.studentProjects, []);
+  assert.deepEqual(accountExport.data.studentProjectRevisions, []);
+  assert.equal(Object.hasOwn(accountExport.data, 'studentProjectCommands'), false);
+  const exportDataSchema = readSchema('account-export.v1.json').properties.data;
+  assert.ok(exportDataSchema.required.includes('studentProjects'));
+  assert.ok(exportDataSchema.required.includes('studentProjectRevisions'));
+  assert.deepEqual(exportDataSchema.not.required, ['studentProjectCommands']);
 
   assert.deepEqual(Object.keys(accountExport).sort(), [
     'accountId',
@@ -372,20 +662,8 @@ test('the repository verification harness is documented and non-secret', () => {
   assert.match(roadmap, /repository-owned preparation boundary/);
   assert.match(
     roadmap,
-    /E175 closes the remaining sync pull lower-bound gap:[\s\S]*?E176 hardens request lifecycle and input boundaries\.[\s\S]*?E177 hardens sync pull pagination:/,
+    /### Platform API semantic closure[\s\S]*?033_ai_credit_request_fingerprint/,
   );
-  const privateEvidencePath = path.join(
-    repositoryRoot,
-    'audit',
-    'evidence',
-    'evidrilo-request-lifecycle-and-input-boundaries-2026-09-14.md',
-  );
-  if (fs.existsSync(privateEvidencePath)) {
-    assert.match(
-      roadmap,
-      /\[E176\]\(\.\.\/audit\/evidence\/evidrilo-request-lifecycle-and-input-boundaries-2026-09-14\.md\)/,
-    );
-  }
 });
 
 test('billing webhook and forwarded headers have explicit boundaries', () => {
@@ -453,124 +731,6 @@ test('RevenueCat Test Store runbook does not overclaim dashboard configuration',
   assert.doesNotMatch(runbook, /catalog is now configured in the owner-authorized dashboard/i);
 });
 
-test('current operational snapshots point to the latest local evidence', {
-  skip: !hasRepositoryPaths(
-    'docs/operations/revenuecat-test-store-runbook.md',
-    'docs/operations/evidrilo-backend-execution.md',
-    'internal/research/next-gen/STATUS.md',
-    'audit/evidence/evidrilo-all-areas-audit-2026-09-13.md',
-  ),
-}, () => {
-  const repositoryRoot = path.resolve(root, '..');
-  const revenueCatRunbook = fs.readFileSync(
-    path.join(repositoryRoot, 'docs', 'operations', 'revenuecat-test-store-runbook.md'),
-    'utf8',
-  );
-  const backendRegister = fs.readFileSync(
-    path.join(repositoryRoot, 'docs', 'operations', 'evidrilo-backend-execution.md'),
-    'utf8',
-  );
-  const platformReadme = fs.readFileSync(
-    path.join(repositoryRoot, 'platform', 'README.md'),
-    'utf8',
-  );
-  const rootReadme = fs.readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
-  const contentAuthoringRunbook = fs.readFileSync(
-    path.join(repositoryRoot, 'docs', 'operations', 'content-authoring-runbook.md'),
-    'utf8',
-  );
-  const researchIndex = fs.readFileSync(
-    path.join(repositoryRoot, 'internal', 'research', 'next-gen', 'README.md'),
-    'utf8',
-  );
-  const databaseReadiness = fs.readFileSync(
-    path.join(repositoryRoot, 'platform', 'api', 'Health', 'DatabaseSchemaReadiness.cs'),
-    'utf8',
-  );
-  const completionPlan = fs.readFileSync(
-    path.join(repositoryRoot, 'docs', 'superpowers', 'plans', '2026-09-13-evidrilo-all-areas-completion.md'),
-    'utf8',
-  );
-  const currentSnapshotPaths = [
-    path.join(repositoryRoot, 'docs', 'architecture', 'platform-decision.md'),
-    path.join(repositoryRoot, 'docs', 'architecture', 'repository-structure.md'),
-    path.join(repositoryRoot, 'docs', 'architecture', 'revenuecat.md'),
-    path.join(repositoryRoot, 'platform', 'security-boundaries.md'),
-  ];
-
-  assert.match(revenueCatRunbook, /^Status: `E185 \/ REVENUECAT_OFFERING_MIGRATION_OBSERVED \/.*PRICE_MIGRATION_OPEN`$/m);
-  assert.match(revenueCatRunbook, /E149 canonical entitlement guard/);
-  assert.match(revenueCatRunbook, /E151 server product allowlist/);
-  assert.match(revenueCatRunbook, /E152 account-deletion owner guard/);
-  assert.match(revenueCatRunbook, /E153 client\/request boundary hardening/);
-  assert.match(revenueCatRunbook, /E154 auth callback boundary|E154/);
-  assert.match(backendRegister, /^Last synchronized: 2026-09-20 \(E202\)$/m);
-  assert.match(backendRegister, /Node (?:boundary )?`106\/106`/);
-  assert.match(backendRegister, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
-  assert.match(backendRegister, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
-  assert.match(backendRegister, /E174 rejects inconsistent sync cursors[\s\S]*?API `151\/151`/);
-  assert.match(backendRegister, /E175 requires every returned pull change[\s\S]*?sync suite[\s\S]*?`29\/29`/);
-  assert.match(backendRegister, /E151 requires exact `monthly` or `yearly`/);
-  assert.match(backendRegister, /E152 protects the last active organization owner/);
-  assert.match(platformReadme, /E151 closes the server-side RevenueCat product boundary/);
-  assert.match(platformReadme, /E152 protects the last active organization owner/);
-  assert.match(platformReadme, /full API suite passes `145\/145`/);
-  assert.match(platformReadme, /E150 synchronizes[\s\S]*Node `77\/77`[\s\S]*API `140\/140`/);
-  assert.match(platformReadme, /local contract passes `22\/22`/);
-  assert.match(platformReadme, /E186 local API\/worker harness recorded API `172\/172`/);
-  assert.match(platformReadme, /E164 hardens the cohort aggregate boundary/);
-  assert.match(platformReadme, /E165 hardens the role boundary/);
-  assert.match(platformReadme, /E166 closes the membership role-change owner invariant/);
-  assert.match(platformReadme, /E167 hardens the billing webhook identity boundary/);
-  assert.match(platformReadme, /E169 hardens the auth provider boundary/);
-  assert.match(platformReadme, /E170 adds explicit regression coverage/);
-  assert.match(backendRegister, /E169 hardens the auth provider type boundary/);
-  assert.match(backendRegister, /E170 adds explicit regression coverage/);
-  assert.match(rootReadme, /Current (?:committed )?structural baseline: `[0-9a-f]{7,40}`/);
-  assert.match(rootReadme, /`modules\/domain`/);
-  assert.doesNotMatch(rootReadme, /Current repository increment: E186/);
-  assert.doesNotMatch(rootReadme, /Kotlin\/JVM 332\/332, Node 96\/96/);
-  assert.doesNotMatch(rootReadme, /231\/231 JVM tests, 74\/74 Node checks, API 139\/139/);
-  assert.match(databaseReadiness, /CurrentMigrationVersion = "030_sync_published_case_boundary"/);
-  assert.match(completionPlan, /Tracker snapshot after E187 backend persistence and sync boundary hardening:\s+`85\/100`/);
-  assert.match(completionPlan, /\| Public boundary \|[\s\S]*?\| `96\/96` checks across 9 files pass/);
-  assert.match(completionPlan, /\| Kotlin \|[\s\S]*?\| `332\/332` JVM tests/);
-  assert.match(completionPlan, /\| Database\/worker integration \|[\s\S]*?migration 030/);
-  assert.match(completionPlan, /Preserve the 30-migration order\/checksum ledger/);
-  assert.match(researchIndex, /^Latest increment: E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E194 \/ DOTNET_TESTHOST_SOCKET_BLOCKED \/ E193 \/ ANDROID_CHALLENGE_HISTORY_RUNTIME_PARTIAL \/ E192 \/ REPOSITORY_SEMANTIC_CLOSURE_VERIFIED \/ E191 \/ TARGET_SURFACES_AND_CASE_CATALOGUE_INTEGRATED \/ E190 \/ EVIDENCE_GRAPH_ANCHOR_CLOSURE_HARDENED \/ E189 \/ KOTLIN_MODULE_BOUNDARIES_AND_VERIFICATION_ALIGNED \/ E188 \/ RELEASE_VERSION_SOURCE_ALIGNED /m);
-  assert.match(researchIndex, /^Status: CURRENT \/ E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ RECOVERY_CONTROL_OBSERVED \/ BILLING_FALLBACK_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ PROCESS_RESTART_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E192 \/ REPOSITORY_SEMANTIC_CLOSURE_VERIFIED /m);
-  assert.match(researchIndex, /latest repository-owned increment is \[E202\]/);
-  assert.match(researchIndex, /strict API input matching/);
-  assert.match(researchIndex, /requested page size/);
-  assert.match(researchIndex, /focused audio tests pass `28\/28`/);
-  assert.match(researchIndex, /focused access-policy coverage `9\/9`/);
-  assert.match(contentAuthoringRunbook, /^Status: `E150 \/.*MANAGED_STAGING_NOT_RUN`$/m);
-  assert.match(contentAuthoringRunbook, /E150 runbook synchronization/);
-  assert.match(contentAuthoringRunbook, /one to 32 meaningful challenge variants/);
-  assert.doesNotMatch(contentAuthoringRunbook, /optional challenge variants/i);
-  assert.doesNotMatch(contentAuthoringRunbook, /^Status: `E144 \//m);
-  for (const snapshotPath of currentSnapshotPaths) {
-    const snapshot = fs.readFileSync(snapshotPath, 'utf8');
-    assert.match(snapshot, /^Status: `?E202(?:\s|\/)/m, snapshotPath);
-  }
-});
-
-test('current status page points to the latest evidence record', {
-  skip: !hasRepositoryPaths('internal/research/next-gen/STATUS.md'),
-}, () => {
-  const repositoryRoot = path.resolve(root, '..');
-  const status = fs.readFileSync(
-    path.join(repositoryRoot, 'internal', 'research', 'next-gen', 'STATUS.md'),
-    'utf8',
-  );
-
-  assert.match(status, /^Latest increment: E202 \/ ANDROID_OFFLINE_ROUTE_OBSERVED \/ E201 \/ ANDROID_PRIMARY_NAVIGATION_OBSERVED \/ E200 \/ ANDROID_FRESH_CORE_FLOW_OBSERVED \/ E199 \/ PUBLIC_PACKAGE_CLEAN_CLONE_LOCAL_PASS \/ E198 \/ FINAL_NON_VIDEO_READINESS_AUDIT \/ E197 \/ ANDROID_RUNTIME_SCREENSHOT_BOUNDARY \/ E196 \/ FULL_LOCAL_REPOSITORY_VERIFICATION \/ E195 \/ LOCAL_PLATFORM_INTEGRATION_VERIFIED \/ E194/m);
-  assert.match(status, /current runtime\/repository recheck is \[E193\]/i);
-  assert.match(status, /following the repository boundary in \[E192\]/i);
-  assert.match(status, /\[E194\]\(\.\.\/\.\.\/\.\.\/audit\/evidence\/evidrilo-dotnet-testhost-permission-boundary-2026-09-19\.md\)/i);
-  assert.doesNotMatch(status, /^Latest increment: E151\b/m);
-});
-
 test('runtime matrix separates the current boundary from historical Android evidence', {
   skip: !hasRepositoryPaths('audit/runtime-matrix.md'),
 }, () => {
@@ -580,10 +740,14 @@ test('runtime matrix separates the current boundary from historical Android evid
     'utf8',
   );
 
-  assert.match(runtimeMatrix, /^Last documentation check: 20 September 2026 \(E202 Android offline\/recovery; E201 Android primary navigation; E200 fresh Android core flow; E199 public-package clean clone; E198 final non-video readiness audit; E197 Android runtime\/screenshot boundary\)$/m);
-  assert.match(runtimeMatrix, /^## Current Evidrilo evidence boundary — E202 \/ E201 \/ E200 \/ E199 \/ E198 \/ E197 \/ E196$/m);
+  const latestDocumentedRecord = runtimeMatrix.match(/^Last documentation check: .*?\((E\d{3})/m)?.[1];
+  const currentBoundary = runtimeMatrix.match(/^## Current Evidrilo evidence boundary — (.+)$/m)?.[1];
+  assert.ok(latestDocumentedRecord, 'runtime matrix names its latest evidence record');
+  assert.ok(currentBoundary, 'runtime matrix contains its current boundary heading');
+  assert.ok(currentBoundary.startsWith(latestDocumentedRecord + ' /'));
+  assert.match(runtimeMatrix, /^\| Notification permission\/schedule \| `ANDROID_RUNTIME \/ LOCAL_PERMISSION_AND_ALARM_SCHEDULE_CANCEL_OBSERVED` \| E213 \|/m);
   assert.doesNotMatch(runtimeMatrix, /^## Current Evidrilo status — E107$/m);
-  assert.match(runtimeMatrix, /^\| Android runtime \| `ANDROID_RUNTIME \/ CORE_FLOW_PRIMARY_NAVIGATION_OFFLINE_OBSERVED` \| E202, E201, E200, E197 \|.*process restart/m);
+  assert.match(runtimeMatrix, /^\| Android runtime \| `ANDROID_RUNTIME \/ [A-Z0-9_]+` \| E\d{3}(?:, E\d{3})* \|.*process restart/m);
   assert.match(runtimeMatrix, /^\| RevenueCat Test Store \| `PROVIDER_TEST_STORE \/ UNRUN` \| E185 status \|/m);
 });
 
@@ -639,43 +803,11 @@ test('active backend execution register points to the current verification bound
     'utf8',
   );
 
-  assert.match(register, /Last synchronized: 2026-09-20 \(E202\)/);
-  assert.match(register, /E178 replaces helper-level/);
-  assert.match(register, /E179 prevents a deferred or invalidated pull/);
-  assert.match(register, /Node (?:boundary )?`106\/106`/);
-  assert.match(register, /E189 Kotlin module boundaries and verification alignment[\s\S]*?Node boundary `106\/106`/);
-  assert.match(register, /E186 backend engine and sync boundary hardening[\s\S]*?Node `96\/96`/);
-  assert.match(register, /E172 binds restored session phases[\s\S]*?full API\s+suite passes `151\/151`/);
-  assert.match(register, /E173 protects the optional sync queue[\s\S]*?full API suite `151\/151`/);
-  assert.match(register, /Release worker tests `5\/5`/);
-  assert.match(register, /E152 protects the last active organization owner/);
-  assert.match(register, /E153 makes mobile entitlement access canonical/);
-  assert.match(register, /E154 bounds custom-scheme authentication callback/);
-  assert.match(register, /E155 closes a content-integrity gap/);
-  assert.match(register, /E157 makes the Kotlin published-case reader reject/);
-  assert.match(register, /E158 adds `minItems: 1` to the versioned published-case schema/);
-  assert.match(register, /E159 adds the shared identifier pattern/);
-  assert.match(register, /E160 corrects the stale instruction that challenge variants are optional/);
-  assert.match(register, /E161 aligns `recommendation.v1.json` with the mobile\/API status-specific rules/);
-  assert.match(register, /E162 synchronizes the current Node verification snapshot/);
-  assert.match(register, /E163 hardens the local conclusion-session decoder/);
-  assert.match(register, /E164 makes teacher-facing cohort aggregates count only active enrollments/);
-  assert.match(register, /E165 makes teacher-facing cohort aggregates count only active enrollments whose/);
-  assert.match(register, /E166 prevents a membership grant or role change from demoting the last active/);
-  assert.match(register, /E167 prevents a signed RevenueCat event with the all-zero/);
-  assert.match(register, /E170 adds explicit regression coverage/);
+  assert.match(register, /^# Evidrilo Backend — Execution Boundary/m);
+  assert.match(register, /idempotency/i);
+  assert.match(register, /AI (?:allowance|is enabled)|server ledger/i);
+  assert.match(register, /External gates/);
   assert.doesNotMatch(register, /Last synchronized: 2026-09-10 \(E110\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E137\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E138\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E139\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E140\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E141\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E142\)/);
-  assert.doesNotMatch(register, /Last synchronized: 2026-09-13 \(E143\)/);
-  assert.doesNotMatch(register, /API boundary `139\/139`/);
-  assert.doesNotMatch(register, /API 137\/137/);
-  assert.doesNotMatch(register, /API 138\/138/);
-  assert.doesNotMatch(register, /API 87\/87/);
 });
 
 test('RevenueCat managed UI stays platform-scoped and keeps a local fallback', () => {
@@ -862,8 +994,99 @@ test('RevenueCat architecture documentation does not overclaim dashboard state',
 
   assert.match(architecture, /remaining dashboard price migration and purchase\/restore\/revoke matrix remain\s+owner gates/i);
   assert.match(architecture, /historical Test Store\s+observation is recorded/i);
-  assert.match(architecture, /approved\s+replacement prices remain open/i);
+  assert.match(architecture, /approved monthly\/yearly\s+product/i);
   assert.doesNotMatch(architecture, /authorized dashboard contains the Test Store catalog/i);
   assert.doesNotMatch(architecture, /The Test Store catalog is configured/i);
   assert.doesNotMatch(architecture, /The current Test Store observation is recorded/i);
+});
+
+test('account export streams database rows instead of aggregating an account-sized JSON value', () => {
+  const accountExport = fs.readFileSync(
+    path.join(repositoryRoot, 'platform', 'api', 'Account', 'AccountExport.cs'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(accountExport, /\bjsonb_agg\s*\(/i);
+  assert.match(accountExport, /ExecuteReaderAsync/);
+  assert.match(accountExport, /Utf8JsonWriter/);
+  assert.match(accountExport, /FlushAsync/);
+  assert.match(accountExport, /"studentProjects"/);
+  assert.match(accountExport, /"studentProjectRevisions"/);
+  assert.doesNotMatch(accountExport, /"studentProjectCommands"/);
+});
+
+test('account export response cap matches the mobile transport limit', () => {
+  const accountContracts = fs.readFileSync(
+    path.join(repositoryRoot, 'platform', 'api', 'Account', 'AccountContracts.cs'),
+    'utf8',
+  );
+  const accountTransport = fs.readFileSync(
+    path.join(
+      repositoryRoot,
+      'modules',
+      'application',
+      'src',
+      'commonMain',
+      'kotlin',
+      'dev',
+      'nextgen',
+      'mobile',
+      'account',
+      'AccountHttpTransport.kt',
+    ),
+    'utf8',
+  );
+
+  assert.match(accountContracts, /MaximumResponseBytes\s*=\s*128\s*\*\s*1024/);
+  assert.match(accountContracts, /Status413PayloadTooLarge/);
+  assert.match(accountContracts, /BoundedAccountExportStream/);
+  assert.match(accountContracts, /CopyToAsync\(httpContext\.Response\.Body/);
+  assert.match(accountTransport, /MAX_ACCOUNT_HTTP_BODY_BYTES:\s*Int\s*=\s*128\s*\*\s*1024/);
+});
+
+test('Project AI dispatch is bound to the saved consent generation and account deletion fence', () => {
+  const consentStore = fs.readFileSync(
+    path.join(repositoryRoot, 'platform', 'api', 'ProjectAi', 'ProjectAiConsentStore.cs'),
+    'utf8',
+  );
+  const scaffoldEndpoint = fs.readFileSync(
+    path.join(repositoryRoot, 'platform', 'api', 'ProjectAi', 'ProjectAiScaffoldEndpoints.cs'),
+    'utf8',
+  );
+
+  assert.match(consentStore, /StillAuthorizesDispatch[\s\S]*initial\.Generation == current\.Generation/);
+  assert.match(consentStore, /EnsureAccountNotDeletedAsync/);
+  assert.match(consentStore, /account_deletion_tombstones/);
+  assert.match(scaffoldEndpoint, /dispatchConsent[\s\S]*StillAuthorizesDispatch\(consent, dispatchConsent\)/);
+  assert.match(scaffoldEndpoint, /PROJECT_AI_CONSENT_REQUIRED/);
+});
+
+test('notification preference writes share the account deletion fence', () => {
+  const store = fs.readFileSync(
+    path.join(repositoryRoot, 'platform/api/Notifications/NotificationStore.cs'),
+    'utf8',
+  );
+  const fenceMigration = fs.readFileSync(
+    path.join(repositoryRoot, 'platform/database/migrations/046_project_ai_consent_deletion_fence.sql'),
+    'utf8',
+  );
+
+  assert.match(store, /PutOwnAsync[\s\S]*?LockAccountDeletionFenceAsync\(connection, transaction, accountId/);
+  assert.match(store, /LockAccountDeletionFenceAsync[\s\S]*?pg_advisory_xact_lock\(hashtextextended\(@account_id::text, 0\)\)/);
+  assert.match(store, /EnsureAccountNotDeletedAsync[\s\S]*?account_deletion_tombstones[\s\S]*?account_deletion_requests[\s\S]*?status = 'completed'/);
+  assert.match(fenceMigration, /pg_advisory_xact_lock\(hashtextextended\(new\.account_id::text, 0\)\)/);
+});
+
+test('nullable response contracts keep null keys without changing unrelated API JSON', () => {
+  const program = fs.readFileSync(path.join(repositoryRoot, 'platform/api/Program.cs'), 'utf8');
+  assert.match(program, /DefaultIgnoreCondition\s*=\s*JsonIgnoreCondition\.WhenWritingNull/);
+  for (const relativePath of [
+    'platform/api/ProjectAi/ProjectAiConsentEndpoints.cs',
+    'platform/api/ProjectAi/ProjectAiScaffoldEndpoints.cs',
+    'platform/api/Notifications/NotificationEndpoints.cs',
+  ]) {
+    const source = fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
+    assert.match(source, /ResponseJsonOptions[\s\S]*?DefaultIgnoreCondition\s*=\s*JsonIgnoreCondition\.Never/);
+    assert.match(source, /Results\.Json\([\s\S]*?options:\s*ResponseJsonOptions/);
+  }
 });

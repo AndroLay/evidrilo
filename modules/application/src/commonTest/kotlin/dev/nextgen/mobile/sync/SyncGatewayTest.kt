@@ -7,6 +7,7 @@ import dev.nextgen.mobile.account.runSuspendTest
 import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.StoredAccountSession
+import dev.nextgen.mobile.network.DeviceConnectivity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -140,6 +141,37 @@ class SyncGatewayTest {
     }
 
     @Test
+    fun sync_transport_failure_only_uses_offline_when_the_platform_confirms_it() {
+        val online = runSuspendTest {
+            gateway(FailingSyncTransport(DeviceConnectivity.ONLINE)).pull(SyncConsent.GRANTED, cursor = 0)
+        }
+        val offline = runSuspendTest {
+            gateway(FailingSyncTransport(DeviceConnectivity.OFFLINE)).pull(SyncConsent.GRANTED, cursor = 0)
+        }
+
+        assertEquals("SYNC_UNAVAILABLE", assertIs<SyncGatewayResult.Failed>(online).code)
+        assertEquals("OFFLINE", assertIs<SyncGatewayResult.Failed>(offline).code)
+    }
+
+    @Test
+    fun sync_mutation_timeout_reports_unknown_and_retries_only_with_the_same_idempotency_key() {
+        val transport = FailingSyncTransport(DeviceConnectivity.ONLINE)
+        val envelope = validEnvelope()
+        val result = runSuspendTest {
+            gateway(transport).pushWithRetry(envelope) { }
+        }
+        val failure = assertIs<SyncGatewayResult.Failed>(result)
+
+        assertEquals("SYNC_OUTCOME_UNKNOWN", failure.code)
+        assertTrue(failure.outcomeUnknown)
+        assertTrue(failure.reconciliationRequired)
+        assertTrue(failure.sameIntentReplayAllowed)
+        assertEquals(envelope.idempotencyKey, failure.idempotencyKey)
+        assertEquals(SyncRetryPolicy.MAX_RETRIES + 1, transport.requestHeaders.size)
+        assertTrue(transport.requestHeaders.all { it["Idempotency-Key"] == envelope.idempotencyKey })
+    }
+
+    @Test
     fun pull_rejects_a_response_for_a_different_requested_cursor() {
         val response = AccountHttpResponse(
             200,
@@ -238,6 +270,22 @@ private class FakeSyncTransport(
     ): AccountHttpResponse {
         requests += SyncRequestRecord(method, url, headers, body)
         return response
+    }
+}
+
+private class FailingSyncTransport(
+    override val deviceConnectivity: DeviceConnectivity,
+) : AccountHttpTransport {
+    val requestHeaders = mutableListOf<Map<String, String>>()
+
+    override suspend fun request(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String,
+    ): AccountHttpResponse {
+        requestHeaders += headers
+        error("Synthetic transport failure")
     }
 }
 

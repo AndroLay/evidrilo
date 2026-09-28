@@ -1,5 +1,11 @@
 package dev.nextgen.mobile
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -23,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +66,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
 import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
+import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.audio.AudioPlaybackState
 import dev.nextgen.mobile.audio.EvidriloAudioListenControl
@@ -78,21 +86,12 @@ internal enum class EvidriloTargetSection {
 internal fun EvidriloTargetSurface(
     selected: EvidriloTargetSection,
     onNavigate: (EvidriloTargetSection) -> Unit,
-    showProfileItem: Boolean = selected == EvidriloTargetSection.PROFILE,
     content: @Composable () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EvidriloColors.White,
-                        EvidriloColors.White,
-                        EvidriloColors.Canvas,
-                    ),
-                ),
-            ),
+            .background(EvidriloColors.Canvas),
     ) {
         Box(
             modifier = Modifier
@@ -102,11 +101,12 @@ internal fun EvidriloTargetSurface(
             TargetAmbientBackdrop()
             content()
         }
-        EvidriloTargetBottomNavigation(
-            selected = selected,
-            onNavigate = onNavigate,
-            showProfileItem = showProfileItem,
-        )
+        if (shouldShowTargetBottomNavigation(selected)) {
+            EvidriloTargetBottomNavigation(
+                selected = selected,
+                onNavigate = onNavigate,
+            )
+        }
     }
 }
 
@@ -118,8 +118,8 @@ private fun TargetAmbientBackdrop() {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        EvidriloColors.White,
-                        EvidriloColors.White,
+                        EvidriloColors.Canvas,
+                        EvidriloColors.Canvas,
                         EvidriloColors.Atmosphere,
                     ),
                 ),
@@ -166,17 +166,22 @@ private fun TargetAmbientBackdrop() {
 private fun EvidriloTargetBottomNavigation(
     selected: EvidriloTargetSection,
     onNavigate: (EvidriloTargetSection) -> Unit,
-    showProfileItem: Boolean,
 ) {
-    HorizontalDivider(color = EvidriloColors.Separator)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EvidriloColors.White)
-            .navigationBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 0.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        color = EvidriloColors.Card,
+        shadowElevation = 4.dp,
     ) {
+    Column {
+        HorizontalDivider(color = EvidriloColors.Separator)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
         EvidriloTargetNavigationItem(
             label = "Home",
             icon = if (selected == EvidriloTargetSection.HOME) {
@@ -213,20 +218,9 @@ private fun EvidriloTargetBottomNavigation(
             selected = selected == EvidriloTargetSection.ACTION,
             onClick = { onNavigate(EvidriloTargetSection.ACTION) },
         )
-        if (showProfileItem) {
-            EvidriloTargetNavigationItem(
-                label = "Profile",
-                icon = if (selected == EvidriloTargetSection.PROFILE) {
-                    EvidriloIconName.ACCOUNT_FILLED
-                } else {
-                    EvidriloIconName.ACCOUNT
-                },
-                section = EvidriloTargetSection.PROFILE,
-                selected = selected == EvidriloTargetSection.PROFILE,
-                onClick = { onNavigate(EvidriloTargetSection.PROFILE) },
-            )
         }
     }
+}
 }
 
 @Composable
@@ -235,7 +229,6 @@ private fun TargetCompactHeader(
     onBack: () -> Unit,
     backLabel: String,
     centered: Boolean = true,
-    onMore: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -256,25 +249,6 @@ private fun TargetCompactHeader(
                 androidx.compose.ui.text.style.TextAlign.Start
             },
         )
-        if (onMore != null) {
-            EvidriloIconButton(
-                icon = EvidriloIconName.MORE,
-                contentDescription = "More options for $title",
-                onClick = onMore,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "More options unavailable for $title"
-                        stateDescription = "Unavailable"
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                EvidriloIcon(EvidriloIconName.MORE, tint = EvidriloColors.Outline)
-            }
-        }
     }
 }
 
@@ -402,9 +376,11 @@ private fun TargetIconTile(
     tint: androidx.compose.ui.graphics.Color = EvidriloColors.Cobalt,
     size: androidx.compose.ui.unit.Dp = 48.dp,
 ) {
+    // Rounded, friendly icon tile with a soft blue wash — the recurring
+    // "chip" that anchors every list row and card header.
     Surface(
         modifier = Modifier.size(size),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = EvidriloColors.PaleBlue,
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -434,10 +410,25 @@ private fun RowScope.EvidriloTargetNavigationItem(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val pillColor by animateColorAsState(
+        targetValue = if (selected) EvidriloColors.PaleBlue else Color.Transparent,
+        animationSpec = tween(durationMillis = 220),
+        label = "navPill",
+    )
+    val contentTint by animateColorAsState(
+        targetValue = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
+        animationSpec = tween(durationMillis = 220),
+        label = "navTint",
+    )
+    val iconLift by animateDpAsState(
+        targetValue = if (selected) (-2).dp else 0.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "navLift",
+    )
     Column(
         modifier = Modifier
             .weight(1f)
-            .heightIn(min = 48.dp)
+            .heightIn(min = 52.dp)
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = label
@@ -445,168 +436,86 @@ private fun RowScope.EvidriloTargetNavigationItem(
                 this.selected = selected
                 stateDescription = if (selected) "Selected" else "Not selected"
             }
-            .padding(vertical = 1.dp)
-            .offset(y = EvidriloTargetLayout.NavigationVisualOffset),
+            .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        EvidriloIcon(
-            name = icon,
-            tint = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
-        )
+        Box(
+            modifier = Modifier
+                .width(56.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(50))
+                .background(pillColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            EvidriloIcon(
+                name = icon,
+                tint = contentTint,
+                modifier = Modifier.size(23.dp).offset(y = iconLift),
+            )
+        }
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
+            color = contentTint,
         )
-    }
-}
-
-@Composable
-internal fun EvidriloTargetHomeScreen(
-    case: ConclusionCase,
-    draft: ConclusionDraft,
-    history: ConclusionSessionSnapshot?,
-    storageNotice: LocalStorageNotice? = null,
-    onNavigate: (EvidriloTargetSection) -> Unit,
-    onOpenWorkspace: () -> Unit,
-    onOpenSources: () -> Unit,
-    onOpenEvidence: () -> Unit,
-    onOpenAction: () -> Unit,
-    onOpenHistory: () -> Unit,
-    onStartPractice: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenGuide: () -> Unit = {},
-    recommendation: RecommendationUiState = RecommendationUiState.Hidden,
-    onAcceptRecommendation: () -> Unit = {},
-    onDismissRecommendation: () -> Unit = {},
-    onRetryRecommendation: () -> Unit = {},
-    audioState: AudioPlaybackState? = null,
-    onListen: () -> Unit = {},
-    onPauseOrResumeAudio: () -> Unit = {},
-    onStopAudio: () -> Unit = {},
-) {
-    val metrics = targetWorkspaceMetrics(case, draft)
-    EvidriloTargetSurface(EvidriloTargetSection.HOME, onNavigate) {
-        EvidriloContentColumn {
-            TargetBrandPageHeader(onSettings = onOpenSettings)
-            Text(
-                text = "What are you trying\nto finish?",
-                style = MaterialTheme.typography.displayLarge,
-            )
-            Text(
-                text = "Turn your sources into evidence\nand make progress.",
-                style = MaterialTheme.typography.bodyLarge.copy(color = EvidriloColors.Slate),
-            )
-            storageNotice
-                ?.takeIf { it.isError }
-                ?.let { notice -> EvidriloRecoveryNotice(notice = notice) }
-            TargetProjectCard(case = case, metrics = metrics, onClick = onOpenWorkspace)
-            TargetSectionRow(
-                icon = EvidriloIconName.FOLDER_FILLED,
-                title = "My Projects",
-                subtitle = "One bundled workspace · local progress",
-                onClick = onOpenWorkspace,
-            )
-            TargetSectionRow(
-                icon = EvidriloIconName.LAYERS,
-                title = "Explore Templates",
-                subtitle = "Get a head start",
-                onClick = onOpenGuide,
-            )
-            if (history != null) {
-                TargetSectionRow(
-                    icon = EvidriloIconName.HISTORY,
-                    title = "Recent changes",
-                    subtitle = targetHistorySubtitle(history),
-                    onClick = onOpenHistory,
-                )
-            }
-            if (recommendation !is RecommendationUiState.Hidden) {
-                EvidriloRecommendationCard(
-                    state = recommendation,
-                    onAccept = onAcceptRecommendation,
-                    onDismiss = onDismissRecommendation,
-                    onRetry = onRetryRecommendation,
-                )
-            }
-            audioState?.let { state ->
-                EvidriloAudioListenControl(
-                    state = state,
-                    onListen = onListen,
-                    onPauseOrResume = onPauseOrResumeAudio,
-                    onStopAudio = onStopAudio,
-                )
-            }
-        }
     }
 }
 
 @Composable
 internal fun EvidriloTargetSourcesScreen(
     case: ConclusionCase,
+    remoteContentStatus: String,
     onNavigate: (EvidriloTargetSection) -> Unit,
     onOpenWorkspace: () -> Unit,
     onStartPractice: () -> Unit,
+    onOpenProjects: () -> Unit = onOpenWorkspace,
 ) {
-    var unavailableSource by remember { mutableStateOf<String?>(null) }
     EvidriloTargetSurface(EvidriloTargetSection.SOURCES, onNavigate) {
         EvidriloContentColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             TargetBrandPageHeader()
             TargetPageIntro(
-                title = "Give Evidrilo\nthe mess.",
-                body = "We'll find what matters.",
+                title = "Start with your\nmaterials.",
+                body = "Organize an assignment, criteria, and source notes inside a project. You decide what becomes a finding.",
                 compact = true,
             )
             Text(
-                "Upload your assignment brief, rubric and sources. Evidrilo will extract requirements, find the evidence, and show you what’s missing.",
+                EvidriloSourcesCopy.intro,
                 style = MaterialTheme.typography.bodySmall,
             )
             TargetSourcesGraphic()
-            // The target Sources surface describes the three supported input
-            // lanes. The bundled case remains the inspectable runtime fixture;
-            // these rows are intentionally input affordances, not a second
-            // projection of every fact in the case.
+            EvidriloTintPanel {
+                Text("CASE CONTENT", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
+                Text(case.title, style = MaterialTheme.typography.titleMedium)
+                Text(remoteContentStatus, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "This example stays separate from your projects and remains available offline.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             TargetSourceRow(
                 icon = EvidriloIconName.FILE,
                 title = "Assignment Brief",
-                subtitle = "PDF, DOC, or paste text",
-                onClick = { unavailableSource = "Assignment Brief" },
+                subtitle = EvidriloSourcesCopy.assignmentBriefSubtitle,
             )
             TargetSourceRow(
                 icon = EvidriloIconName.FILE,
                 title = "Rubric",
-                subtitle = "PDF, DOC, or image",
-                onClick = { unavailableSource = "Rubric" },
+                subtitle = EvidriloSourcesCopy.rubricSubtitle,
             )
             TargetSourceRow(
                 icon = EvidriloIconName.FILE,
                 title = "Sources",
-                subtitle = "PDF, links, notes, or files",
-                onClick = { unavailableSource = "Sources" },
+                subtitle = EvidriloSourcesCopy.sourcesSubtitle,
             )
-            EvidriloPrimaryButton(label = "Map my work", onClick = onOpenWorkspace)
+            EvidriloPrimaryButton(label = "Open My Projects", onClick = onOpenProjects)
+            EvidriloSecondaryButton(label = "Explore the bundled case", onClick = onOpenWorkspace)
             Text(
-                "Arbitrary document import is not configured in this submission slice.",
-                style = MaterialTheme.typography.bodySmall,
+                EvidriloSourcesCopy.importBoundary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = EvidriloColors.Slate,
             )
         }
-    }
-    unavailableSource?.let { sourceTitle ->
-        AlertDialog(
-            onDismissRequest = { unavailableSource = null },
-            title = { Text("$sourceTitle input is unavailable") },
-            text = {
-                Text(
-                    "Arbitrary document ingestion is not configured in this offline submission slice. The bundled case remains available through Evidence and Workspace.",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { unavailableSource = null }) {
-                    Text("Got it")
-                }
-            },
-        )
     }
 }
 
@@ -721,7 +630,7 @@ private fun TargetSourcesGraphic() {
                 )
             }
             TargetDocumentBadge(
-                label = "PDF",
+                label = "AIM",
                 tint = EvidriloColors.Error,
                 scale = artworkScale,
                 modifier = Modifier
@@ -730,7 +639,7 @@ private fun TargetSourcesGraphic() {
                     .rotate(-12f),
             )
             TargetDocumentBadge(
-                label = "DOC",
+                label = "FACTS",
                 tint = EvidriloColors.Cobalt,
                 scale = artworkScale,
                 modifier = Modifier
@@ -738,7 +647,7 @@ private fun TargetSourcesGraphic() {
                     .offset(y = 10.dp * artworkScale),
             )
             TargetDocumentBadge(
-                label = "TXT",
+                label = "LIMITS",
                 tint = EvidriloColors.Slate,
                 scale = artworkScale,
                 modifier = Modifier
@@ -801,7 +710,7 @@ private fun TargetDocumentBadge(
             Surface(
                 modifier = Modifier.size(width = 54.dp * scale, height = 32.dp * scale),
                 shape = RoundedCornerShape(8.dp * scale),
-                color = if (label == "TXT") {
+                color = if (label == "LIMITS") {
                     EvidriloColors.White
                 } else {
                     tint
@@ -815,7 +724,7 @@ private fun TargetDocumentBadge(
                             fontSize = MaterialTheme.typography.labelLarge.fontSize * scale,
                             lineHeight = MaterialTheme.typography.labelLarge.lineHeight * scale,
                         ),
-                        color = if (label == "TXT") tint else EvidriloColors.White,
+                        color = if (label == "LIMITS") tint else EvidriloColors.White,
                     )
                 }
             }
@@ -855,7 +764,7 @@ internal fun EvidriloTargetWorkspaceScreen(
         EvidriloContentColumn {
             TargetBrandPageHeader()
             TargetCompactHeader(
-                title = "My Projects",
+                title = EvidriloTargetWorkspaceCopy.caseHeading,
                 onBack = { onNavigate(EvidriloTargetSection.HOME) },
                 backLabel = "Home",
                 centered = false,
@@ -864,13 +773,6 @@ internal fun EvidriloTargetWorkspaceScreen(
                 title = case.title,
                 body = "Evidence-backed local workspace",
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                EvidriloIcon(EvidriloIconName.CALENDAR, tint = EvidriloColors.Slate)
-                Text("Due date not configured", style = MaterialTheme.typography.bodyMedium)
-            }
             TargetProgressCard(metrics)
             TargetMetricStrip(metrics)
             TargetCoverageSection(
@@ -886,7 +788,7 @@ internal fun EvidriloTargetWorkspaceScreen(
                 TargetCoverageRow(
                     number = "2",
                     title = "Supplied observations",
-                    status = "${metrics.selectedEvidenceCount}/${metrics.evidenceCount} selected",
+                    status = "${metrics.selectedEvidenceCount}/${metrics.suppliedObservationCount} selected",
                     tone = if (metrics.selectedEvidenceCount > 0) EvidriloStatusTone.INFO else EvidriloStatusTone.NEUTRAL,
                 )
                 TargetCoverageRow(
@@ -1008,6 +910,7 @@ internal fun EvidriloTargetEvidenceLensScreen(
             } else {
                 observations.forEach { fact ->
                     TargetEvidenceLensCard(
+                        caseTitle = case.title,
                         fact = fact,
                         selected = fact.id in selectedIds,
                     )
@@ -1027,6 +930,7 @@ internal fun EvidriloTargetEvidenceLensScreen(
 
 @Composable
 private fun TargetEvidenceLensCard(
+    caseTitle: String,
     fact: ConclusionFact,
     selected: Boolean,
 ) {
@@ -1052,6 +956,7 @@ private fun TargetEvidenceLensCard(
                         tone = if (selected) EvidriloStatusTone.SUCCESS else EvidriloStatusTone.NEUTRAL,
                     )
                 }
+                Text("Bundled case · $caseTitle", style = MaterialTheme.typography.labelMedium)
                 Text(fact.id, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
                 Text(fact.text, style = MaterialTheme.typography.bodyMedium)
             }
@@ -1063,12 +968,12 @@ private fun TargetEvidenceLensCard(
 private fun TargetMissingEvidenceCard(body: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = EvidriloColors.WarningSurface,
-        border = BorderStroke(1.dp, EvidriloColors.Warning.copy(alpha = 0.35f)),
+        border = BorderStroke(2.dp, EvidriloColors.Warning.copy(alpha = 0.35f)),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1183,26 +1088,6 @@ internal fun EvidriloTargetActionScreen(
                 trace = actionTrace,
                 onOpenVerify = onOpenVerify,
             )
-            Text("Next steps", style = MaterialTheme.typography.titleLarge)
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                TargetNextStepRow(
-                    number = "2",
-                    title = "Review the claim boundary",
-                    subtitle = "Keep the claim inside the supplied observations",
-                )
-                TargetStepConnector()
-                TargetNextStepRow(
-                    number = "3",
-                    title = "Check the evidence anchors",
-                    subtitle = "Confirm each selected fact is still available",
-                )
-                TargetStepConnector()
-                TargetNextStepRow(
-                    number = "4",
-                    title = "Revise and compare",
-                    subtitle = "Keep the before/after change visible locally",
-                )
-            }
             EvidriloSecondaryButton(label = "Review the case", onClick = onStartPractice)
         }
     }
@@ -1298,10 +1183,11 @@ internal fun EvidriloTargetClaimBoundaryScreen(
                         "Scope: ${draft.scope?.targetDisplayLabel() ?: "Not selected"}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text(
-                        "Limitation anchors: ${draft.limitationRefs.ifEmpty { listOf("None selected") }.joinToString()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    val limitationSummary = case.facts
+                        .filter { it.id in draft.limitationRefs }
+                        .joinToString { it.displayLabel ?: it.text }
+                        .ifBlank { "No limitation selected yet" }
+                    Text("Limitations: $limitationSummary", style = MaterialTheme.typography.bodyMedium)
                 }
                 EvidriloPrimaryButton(label = "Open claim review", onClick = onStartPractice)
             } else {
@@ -1324,6 +1210,7 @@ internal fun EvidriloTargetVerifyClaimScreen(
     onRevise: () -> Unit,
     onStartPractice: () -> Unit,
 ) {
+    var showVerificationDetails by remember(evaluation) { mutableStateOf(false) }
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
         EvidriloContentColumn {
             TargetCompactHeader(title = "Verify Claim", onBack = onBack, backLabel = "Action Plan")
@@ -1342,11 +1229,17 @@ internal fun EvidriloTargetVerifyClaimScreen(
                 EvidriloPrimaryButton(label = "Open claim review", onClick = onStartPractice)
             } else {
                 EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
-                EvidriloVerificationDetailCard(evaluation = evaluation)
                 if (canRevise) {
                     EvidriloPrimaryButton(label = "Revise once", onClick = onRevise)
                 } else {
                     EvidriloPrimaryButton(label = "Open claim review", onClick = onStartPractice)
+                }
+                EvidriloSecondaryButton(
+                    label = if (showVerificationDetails) "Hide verification details" else "Review verification details",
+                    onClick = { showVerificationDetails = !showVerificationDetails },
+                )
+                if (showVerificationDetails) {
+                    EvidriloVerificationDetailCard(evaluation = evaluation)
                 }
             }
             EvidriloSecondaryButton(label = "Back to action plan", onClick = onBack)
@@ -1364,6 +1257,7 @@ internal fun EvidriloTargetEvidenceDeltaScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
     onStartChallenge: () -> Unit,
+    challengeAvailable: Boolean = true,
 ) {
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
         EvidriloContentColumn {
@@ -1387,36 +1281,53 @@ internal fun EvidriloTargetEvidenceDeltaScreen(
             } ?: EvidriloTintPanel {
                 Text("Verification unavailable", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "The revision snapshot is available locally, but there is no completed evaluation to display.",
+                    "This saved comparison includes the before/after drafts but does not store a verification record.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
             EvidriloPrimaryButton(label = "Open local history", onClick = onOpenHistory)
-            EvidriloSecondaryButton(label = "Try the evidence-change challenge", onClick = onStartChallenge)
+            if (challengeAvailable) {
+                EvidriloSecondaryButton(label = "Try the evidence-change challenge", onClick = onStartChallenge)
+            }
         }
     }
 }
 
 @Composable
 internal fun EvidriloTargetProfileScreen(
+    signedIn: Boolean,
     profileSubtitle: String,
     history: ConclusionSessionSnapshot?,
+    onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
     onOpenPremium: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAccount: () -> Unit,
+    onOpenLocalProjects: () -> Unit,
+    onOpenSupport: () -> Unit,
 ) {
-    var notificationsUnavailable by remember { mutableStateOf(false) }
     EvidriloTargetSurface(EvidriloTargetSection.PROFILE, onNavigate) {
         EvidriloContentColumn {
+            EvidriloBackButton(label = "Home", onClick = onBack)
             TargetBrandPageHeader()
             TargetPageIntro(
-                title = "Your academic\nsystem.",
-                body = "Manage your profile, workspace\nsettings, and Evidrilo Pro.",
+                title = "Your workspace.",
+                body = if (TEMPORARY_GUEST_MODE_ENABLED) {
+                    "Projects, catalog, case work, and history stay on this device."
+                } else if (signedIn) {
+                    "Manage your account, projects,\nsettings, and Evidrilo Pro."
+                } else {
+                    "Your projects stay on this device."
+                },
             )
-            TargetProfileSummaryCard(profileSubtitle = profileSubtitle, history = history, onClick = onOpenAccount)
-            TargetCobaltCard(
+            TargetProfileSummaryCard(
+                signedIn = signedIn,
+                profileSubtitle = profileSubtitle,
+                history = history,
+                onClick = onOpenAccount,
+            )
+            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetCobaltCard(
                 modifier = Modifier
                     .clickable(onClick = onOpenPremium)
                     .semantics(mergeDescendants = true) {
@@ -1438,6 +1349,12 @@ internal fun EvidriloTargetProfileScreen(
                 }
             }
             TargetSettingsRow(
+                icon = EvidriloIconName.FOLDER,
+                title = "My projects",
+                subtitle = "Open projects stored on this device",
+                onClick = onOpenLocalProjects,
+            )
+            TargetSettingsRow(
                 icon = EvidriloIconName.SETTINGS,
                 title = "Workspace preferences",
                 subtitle = "Customize your workspace",
@@ -1446,10 +1363,10 @@ internal fun EvidriloTargetProfileScreen(
             TargetSettingsRow(
                 icon = EvidriloIconName.BELL,
                 title = "Notifications",
-                subtitle = "Off · not configured in this offline slice",
-                onClick = { notificationsUnavailable = true },
+                subtitle = "Off by default · local reminders",
+                onClick = onOpenSettings,
             )
-            TargetSettingsRow(
+            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetSettingsRow(
                 icon = EvidriloIconName.DATABASE,
                 title = "Export & backup",
                 subtitle = "Account export when signed in",
@@ -1461,35 +1378,25 @@ internal fun EvidriloTargetProfileScreen(
                 subtitle = "Your data, your control",
                 onClick = onOpenSettings,
             )
-            TargetSettingsRow(
+            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetSettingsRow(
                 icon = EvidriloIconName.LAYERS,
                 title = "Premium cases",
                 subtitle = "Two additional cases · monthly/yearly access",
                 onClick = onOpenPremium,
             )
             TargetSettingsRow(
-                icon = EvidriloIconName.QUESTION,
+                icon = EvidriloIconName.HISTORY,
                 title = "Local history",
                 subtitle = "Review changes on this device",
                 onClick = onOpenHistory,
             )
+            TargetSettingsRow(
+                icon = EvidriloIconName.QUESTION,
+                title = "Support",
+                subtitle = "Help and account options",
+                onClick = onOpenSupport,
+            )
         }
-    }
-    if (notificationsUnavailable) {
-        AlertDialog(
-            onDismissRequest = { notificationsUnavailable = false },
-            title = { Text("Notifications are off") },
-            text = {
-                Text(
-                    "Evidrilo does not request notification permission or schedule reminders in this offline submission slice. Your local workflow remains available without notifications.",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { notificationsUnavailable = false }) {
-                    Text("Got it")
-                }
-            },
-        )
     }
 }
 
@@ -1509,15 +1416,15 @@ private fun TargetSettingsRow(
                 contentDescription = "$title. $subtitle"
                 role = Role.Button
             },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 9.dp),
+                .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1561,7 +1468,7 @@ internal fun EvidriloTargetHistoryScreen(
                     Text("This workspace", modifier = Modifier.padding(start = 14.dp), style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TargetMetric(summary.evidenceRemoved.toString(), "gaps reviewed", EvidriloColors.White)
+                    TargetMetric(summary.evidenceRemoved.toString(), "evidence removed", EvidriloColors.White)
                     TargetMetric(summary.evidenceAdded.toString(), "evidence added", EvidriloColors.White)
                     TargetMetric(summary.actionsChanged.toString(), "actions changed", EvidriloColors.White)
                 }
@@ -1579,12 +1486,12 @@ internal fun EvidriloTargetHistoryScreen(
                 Text("Latest local comparison", style = MaterialTheme.typography.titleLarge)
                 TargetHistoryEventRow(
                     icon = EvidriloIconName.LAYERS,
-                    title = "Evidence relationship updated",
+                    title = targetHistoryEvidenceLabel(summary),
                     body = "${summary.evidenceAdded} added · ${summary.evidenceRemoved} removed",
                 )
                 TargetHistoryEventRow(
                     icon = EvidriloIconName.CHECKLIST,
-                    title = "Claim revision saved",
+                    title = targetHistoryResultLabel(history),
                     body = "The learner-authored before/after state is available locally.",
                 )
                 TargetHistoryEventRow(
@@ -1646,7 +1553,6 @@ private fun TargetHistoryEventRow(
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(body, style = MaterialTheme.typography.bodyMedium)
         }
-        EvidriloIcon(EvidriloIconName.MORE, tint = EvidriloColors.Slate)
     }
 }
 
@@ -1670,47 +1576,33 @@ private fun TargetSourceRow(
     icon: EvidriloIconName,
     title: String,
     subtitle: String,
-    onClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 72.dp)
-            .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = "$title. $subtitle"
-                role = Role.Button
             },
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TargetIconTile(icon = icon, size = 38.dp)
+            TargetIconTile(icon = icon, size = 40.dp)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-            }
-            Surface(
-                modifier = Modifier.size(34.dp),
-                shape = RoundedCornerShape(50),
-                color = EvidriloColors.PaleBlue,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    EvidriloIcon(EvidriloIconName.PLUS, tint = EvidriloColors.Cobalt)
-                }
             }
         }
     }
@@ -1761,7 +1653,7 @@ private fun TargetEvidenceRail(
             for (index in 0 until facts.lastIndex) {
                 val color = when (index) {
                     0 -> EvidriloColors.Cobalt
-                    1 -> Color(0xFF1399B1)
+                    1 -> EvidriloColors.Teal
                     else -> EvidriloColors.Success
                 }
                 drawLine(
@@ -1775,7 +1667,7 @@ private fun TargetEvidenceRail(
             facts.forEachIndexed { index, _ ->
                 val nodeColor = when (index) {
                     0 -> EvidriloColors.Cobalt
-                    1 -> Color(0xFF1399B1)
+                    1 -> EvidriloColors.Teal
                     2 -> EvidriloColors.Success
                     else -> EvidriloColors.Warning
                 }
@@ -1828,13 +1720,13 @@ private fun RowScope.TargetEvidenceRailCard(
 ) {
     Card(
         modifier = Modifier.weight(1f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1865,15 +1757,6 @@ private fun RowScope.TargetEvidenceRailCard(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
-            Surface(
-                modifier = Modifier.size(34.dp),
-                shape = RoundedCornerShape(50),
-                color = EvidriloColors.Surface,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    EvidriloIcon(EvidriloIconName.MORE, tint = EvidriloColors.Ink, modifier = Modifier.size(20.dp))
-                }
-            }
         }
     }
 }
@@ -1891,7 +1774,6 @@ private fun TargetTraceInfoCard(
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Text(body, style = MaterialTheme.typography.bodyMedium)
             }
-            EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Slate)
         }
     }
 }
@@ -1939,7 +1821,7 @@ private fun TargetTraceEvidenceRow(
             Text(fact.id, style = MaterialTheme.typography.labelMedium)
         }
         EvidriloStatusChip(
-            label = if (selected) "Anchored" else "Available",
+            label = if (selected) "Selected" else "Available",
             tone = if (selected) EvidriloStatusTone.SUCCESS else EvidriloStatusTone.NEUTRAL,
         )
     }
@@ -1955,13 +1837,13 @@ private fun TargetActionHero(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator.copy(alpha = 0.72f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1981,10 +1863,10 @@ private fun TargetActionHero(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     TargetIconTile(icon = EvidriloIconName.EVIDENCE_GRAPH, size = 34.dp)
-                    Text("${metrics.selectedEvidenceCount} supported", style = MaterialTheme.typography.bodyMedium)
+                    Text(metrics.selectedEvidenceSummary, style = MaterialTheme.typography.bodyMedium)
                     Text("·", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                     Text(
-                        "${metrics.evidenceCount - metrics.selectedEvidenceCount} missing",
+                        "${metrics.suppliedObservationCount - metrics.selectedEvidenceCount} not selected",
                         style = MaterialTheme.typography.bodyMedium,
                         color = EvidriloColors.Warning,
                     )
@@ -2006,44 +1888,6 @@ private fun TargetActionHero(
 }
 
 @Composable
-private fun TargetStepConnector() {
-    Box(
-        modifier = Modifier
-            .padding(start = 17.dp)
-            .size(width = 2.dp, height = 18.dp)
-            .background(EvidriloColors.Cobalt.copy(alpha = 0.55f)),
-    )
-}
-
-@Composable
-private fun TargetNextStepRow(
-    number: String,
-    title: String,
-    subtitle: String,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier.size(40.dp),
-            shape = RoundedCornerShape(50),
-            color = EvidriloColors.PaleBlue,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(number, style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Cobalt)
-            }
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
-        }
-        EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Slate)
-    }
-}
-
-@Composable
 private fun TargetCoverageSection(
     title: String,
     onOpen: () -> Unit,
@@ -2051,12 +1895,12 @@ private fun TargetCoverageSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                 Row(
@@ -2120,11 +1964,11 @@ private fun TargetAttentionRow(
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TargetIconTile(
                 icon = when (tone) {
                     EvidriloStatusTone.SUCCESS -> EvidriloIconName.CHECK
@@ -2152,42 +1996,52 @@ private fun TargetAttentionRow(
 
 @Composable
 private fun TargetProfileSummaryCard(
+    signedIn: Boolean,
     profileSubtitle: String,
     history: ConclusionSessionSnapshot?,
     onClick: () -> Unit,
 ) {
     val summary = targetHistorySummary(history)
+    val interactive = !TEMPORARY_GUEST_MODE_ENABLED || signedIn
     EvidriloTargetCard(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                contentDescription = "Open local learner profile"
-                role = Role.Button
-            },
+        modifier = if (interactive) {
+            Modifier
+                .clickable(onClick = onClick)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = if (signedIn) "Open student account" else "Open account options"
+                    role = Role.Button
+                }
+        } else {
+            Modifier
+        },
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(modifier = Modifier.size(64.dp), shape = RoundedCornerShape(50), color = EvidriloColors.CobaltBright) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("L", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
+                    Text("S", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
                 }
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Local learner", style = MaterialTheme.typography.titleLarge)
+                Text(if (signedIn) "Student account" else "Local student", style = MaterialTheme.typography.titleLarge)
                 Text(profileSubtitle, style = MaterialTheme.typography.bodyMedium)
             }
-            EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Slate)
+            if (interactive) EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Slate)
         }
         EvidriloDivider()
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             TargetProfileMetric(
                 icon = EvidriloIconName.FILE,
-                value = "${summary.evidenceAdded + summary.evidenceRemoved}",
-                label = "evidence changes",
+                value = if (signedIn || TEMPORARY_GUEST_MODE_ENABLED) {
+                    "${summary.evidenceAdded + summary.evidenceRemoved}"
+                } else {
+                    "—"
+                },
+                label = if (signedIn || TEMPORARY_GUEST_MODE_ENABLED) "evidence changes" else "account history",
             )
             TargetProfileMetric(
                 icon = EvidriloIconName.FOLDER,
-                value = "1",
-                label = "active workspace",
+                value = "Local",
+                label = "project storage",
             )
         }
     }
@@ -2222,114 +2076,30 @@ private fun TargetEvidenceStatus.toStatusTone(): EvidriloStatusTone = when (this
 }
 
 @Composable
-private fun TargetProjectCard(
-    case: ConclusionCase,
-    metrics: TargetWorkspaceMetrics,
+private fun TargetGroupedRow(
+    icon: EvidriloIconName,
+    title: String,
+    subtitle: String,
     onClick: () -> Unit,
 ) {
-    val gapValue = metrics.gapCount?.toString() ?: "—"
-    TargetCobaltCard(
+    Row(
         modifier = Modifier
+            .fillMaxWidth()
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
-                contentDescription = "Open project ${case.title}"
+                contentDescription = "$title. $subtitle"
                 role = Role.Button
-            },
-        padding = 18.dp,
-        spacing = 7.dp,
-        backgroundStartColor = EvidriloColors.Cobalt,
-        waveAlpha = 0f,
-        ribbonAlpha = 0.09f,
-        waveOvalAlpha = 0f,
+            }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            EvidriloIcon(EvidriloIconName.FILE, tint = EvidriloColors.White)
-            Text(
-                "Current project",
-                modifier = Modifier.padding(start = 10.dp),
-                style = MaterialTheme.typography.titleSmall,
-                color = EvidriloColors.White.copy(alpha = 0.90f),
-            )
+        TargetIconTile(icon = icon, size = 44.dp)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
         }
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(end = 62.dp)) {
-                Text(case.title, style = MaterialTheme.typography.headlineMedium, color = EvidriloColors.White)
-                Text(
-                    case.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EvidriloColors.White.copy(alpha = 0.90f),
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-            }
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .size(48.dp),
-                shape = RoundedCornerShape(50),
-                color = EvidriloColors.White.copy(alpha = 0.16f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    EvidriloIcon(EvidriloIconName.ARROW_FORWARD, tint = EvidriloColors.White)
-                }
-            }
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            EvidriloIcon(EvidriloIconName.CALENDAR, tint = EvidriloColors.White.copy(alpha = 0.88f))
-            Text(
-                "Due date not configured",
-                style = MaterialTheme.typography.bodySmall,
-                color = EvidriloColors.White.copy(alpha = 0.86f),
-            )
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TargetHomeMetricTile(
-                icon = EvidriloIconName.FILE,
-                value = metrics.evidenceCount.toString(),
-                label = "Evidence",
-            )
-            TargetHomeMetricTile(
-                icon = EvidriloIconName.ALERT,
-                value = gapValue,
-                label = "Gap",
-                valueColor = if (metrics.gapCount == null) EvidriloColors.Warning else EvidriloColors.Warning,
-            )
-            TargetHomeMetricTile(
-                icon = EvidriloIconName.ARROW_FORWARD,
-                value = metrics.actionCount.toString(),
-                label = "Actions",
-            )
-        }
-    }
-}
-
-@Composable
-private fun RowScope.TargetHomeMetricTile(
-    icon: EvidriloIconName,
-    value: String,
-    label: String,
-    valueColor: Color = EvidriloColors.Ink,
-) {
-    Surface(
-        modifier = Modifier.weight(1f),
-        shape = RoundedCornerShape(16.dp),
-        color = EvidriloColors.White.copy(alpha = 0.94f),
-    ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(value, style = MaterialTheme.typography.headlineSmall, color = valueColor)
-                Spacer(Modifier.weight(1f))
-                EvidriloIcon(
-                    icon,
-                    tint = if (label == "Gap") EvidriloColors.Warning else EvidriloColors.Cobalt,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Text(label, style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Ink)
-        }
+        EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Slate)
     }
 }
 
@@ -2350,8 +2120,8 @@ private fun TargetMetricStrip(metrics: TargetWorkspaceMetrics) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TargetMetricCard(EvidriloIconName.LIST, "${metrics.requirementCount}", "requirements")
         TargetMetricCard(EvidriloIconName.FILE,
-            "${metrics.selectedEvidenceCount}/${metrics.evidenceCount}",
-            "evidence items",
+            "${metrics.selectedEvidenceCount}/${metrics.suppliedObservationCount}",
+            "selected / supplied",
         )
         TargetMetricCard(EvidriloIconName.ARROW_FORWARD, "${metrics.actionCount}", "next actions")
     }
@@ -2361,23 +2131,22 @@ private fun TargetMetricStrip(metrics: TargetWorkspaceMetrics) {
 private fun RowScope.TargetMetricCard(icon: EvidriloIconName, value: String, label: String) {
     Card(
         modifier = Modifier.weight(1f),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    modifier = Modifier.size(30.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = EvidriloColors.PaleBlue,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        EvidriloIcon(icon, tint = EvidriloColors.Cobalt, modifier = Modifier.size(19.dp))
-                    }
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Surface(
+                modifier = Modifier.size(34.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = EvidriloColors.PaleBlue,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    EvidriloIcon(icon, tint = EvidriloColors.Cobalt, modifier = Modifier.size(20.dp))
                 }
-                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(label, style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -2406,18 +2175,18 @@ private fun TargetSectionRow(
                 contentDescription = "$title. $subtitle"
                 role = Role.Button
             },
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.White),
-        border = BorderStroke(1.dp, EvidriloColors.Separator),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
+        border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(46.dp),
                 shape = RoundedCornerShape(16.dp),
                 color = EvidriloColors.PaleBlue,
             ) {

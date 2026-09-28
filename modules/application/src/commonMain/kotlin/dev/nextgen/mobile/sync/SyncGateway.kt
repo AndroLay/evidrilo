@@ -4,6 +4,12 @@ import dev.nextgen.mobile.account.AccountHttpResponse
 import dev.nextgen.mobile.account.AccountHttpTransport
 import dev.nextgen.mobile.account.createAccountClientConfiguration
 import dev.nextgen.mobile.account.createAccountHttpTransport
+import dev.nextgen.mobile.account.isAllowedApiBaseUrl
+import dev.nextgen.mobile.network.DeviceConnectivity
+import dev.nextgen.mobile.network.RemoteFailureKind
+import dev.nextgen.mobile.network.RemoteFailureState
+import dev.nextgen.mobile.network.RemoteOperationKind
+import dev.nextgen.mobile.network.resolveRemoteFailure
 import dev.nextgen.mobile.security.SecureSessionStore
 import dev.nextgen.mobile.security.SecureSessionStoreFactory
 import kotlinx.serialization.json.Json
@@ -30,14 +36,7 @@ data class SyncClientConfiguration(
     val isConfigured: Boolean
         get() {
             val normalized = normalizedApiBaseUrl
-            if (!normalized.startsWith("https://", ignoreCase = true)) return false
-            val authority = normalized
-                .substringAfter("//", "")
-                .substringBeforeAny('/', '?', '#')
-            return authority.isNotBlank() &&
-                !authority.contains('@') &&
-                !authority.any(Char::isWhitespace) &&
-                (authority.contains('.') || authority == "localhost")
+            return isAllowedApiBaseUrl(normalized)
         }
 
     private fun String.substringBeforeAny(vararg delimiters: Char): String {
@@ -94,6 +93,10 @@ sealed interface SyncGatewayResult {
         val code: String,
         val message: String,
         val retryable: Boolean,
+        val outcomeUnknown: Boolean = false,
+        val reconciliationRequired: Boolean = false,
+        val sameIntentReplayAllowed: Boolean = false,
+        val idempotencyKey: String? = null,
     ) : SyncGatewayResult
 }
 
@@ -229,10 +232,13 @@ class SyncGateway(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
-            return SyncGatewayResult.Failed(
-                code = "OFFLINE",
-                message = "Sync is unavailable offline.",
-                retryable = true,
+            return failedTransportResult(
+                operation = if (method == "POST") {
+                    RemoteOperationKind.IDEMPOTENT_MUTATION
+                } else {
+                    RemoteOperationKind.READ_ONLY
+                },
+                idempotencyKey = headers["Idempotency-Key"],
             )
         }
         return when {
@@ -240,11 +246,19 @@ class SyncGateway(
                 SyncGatewayResult.Deferred(SyncDeferralReason.AUTH_REQUIRED)
 
             response.statusCode == 408 || response.statusCode == 425 || response.statusCode == 429 ||
-                response.statusCode in 500..599 -> SyncGatewayResult.Failed(
-                code = "SYNC_UNAVAILABLE",
-                message = "Sync is temporarily unavailable.",
-                retryable = true,
-            )
+                response.statusCode in 500..599 -> if (method == "POST") {
+                failedTransportResult(
+                    operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
+                    idempotencyKey = headers["Idempotency-Key"],
+                    failure = RemoteFailureKind.TRANSIENT_HTTP,
+                )
+            } else {
+                SyncGatewayResult.Failed(
+                    code = "SYNC_UNAVAILABLE",
+                    message = "Sync is temporarily unavailable.",
+                    retryable = true,
+                )
+            }
 
             response.statusCode !in 200..299 -> SyncGatewayResult.Failed(
                 code = "SYNC_REQUEST_REJECTED",
@@ -254,6 +268,43 @@ class SyncGateway(
 
             else -> parse(response)
         }
+    }
+
+    private fun failedTransportResult(
+        operation: RemoteOperationKind,
+        idempotencyKey: String?,
+        failure: RemoteFailureKind = RemoteFailureKind.TRANSPORT,
+    ): SyncGatewayResult.Failed {
+        val resolution = resolveRemoteFailure(
+            connectivity = transport.deviceConnectivity,
+            operation = operation,
+            failure = failure,
+            requestWasDispatched = true,
+            idempotencyKey = idempotencyKey,
+        )
+        val code = when (resolution.state) {
+            RemoteFailureState.OFFLINE -> "OFFLINE"
+            RemoteFailureState.OUTCOME_UNKNOWN -> "SYNC_OUTCOME_UNKNOWN"
+            RemoteFailureState.SERVICE_UNAVAILABLE -> "SYNC_UNAVAILABLE"
+            RemoteFailureState.REJECTED -> "SYNC_REQUEST_REJECTED"
+            RemoteFailureState.CANCELLED -> "SYNC_CANCELLED"
+        }
+        val message = when (resolution.state) {
+            RemoteFailureState.OFFLINE -> "Sync is unavailable offline."
+            RemoteFailureState.OUTCOME_UNKNOWN -> "The sync result is not confirmed; the same request identity is retained for safe reconciliation."
+            RemoteFailureState.SERVICE_UNAVAILABLE -> "The sync service is unavailable."
+            RemoteFailureState.REJECTED -> "The sync request was rejected."
+            RemoteFailureState.CANCELLED -> "The sync request was cancelled."
+        }
+        return SyncGatewayResult.Failed(
+            code = code,
+            message = message,
+            retryable = resolution.retryAllowed || resolution.sameIntentReplayAllowed,
+            outcomeUnknown = resolution.state == RemoteFailureState.OUTCOME_UNKNOWN,
+            reconciliationRequired = resolution.reconciliationRequired,
+            sameIntentReplayAllowed = resolution.sameIntentReplayAllowed,
+            idempotencyKey = idempotencyKey.takeIf { resolution.sameIntentReplayAllowed },
+        )
     }
 
     private fun buildPushBody(envelope: SyncPushEnvelope): String = buildJsonObject {

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/student-project.v1.json",
+  "title": "Evidrilo student project detail response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "projectId", "projectVersion", "project", "createdAt", "updatedAt", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.student-project" },
+    "version": { "const": "1" },
+    "projectId": { "type": "string", "format": "uuid" },
+    "projectVersion": { "type": "integer", "minimum": 1 },
+    "project": { "$ref": "#/$defs/projectDocument" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  },
+  "$defs": {
+    "projectDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "taskBrief", "question", "method", "hypothesis", "criteria", "evidenceItems", "criterionEvidenceLinks", "analysis", "claim", "claimEvidenceIds", "limitations", "nextAction", "claims", "claimEvidenceLinks"],
+      "properties": {
+        "title": { "type": "string" },
+        "taskBrief": { "type": "string" },
+        "question": { "type": "string" },
+        "method": { "type": "string" },
+        "hypothesis": { "type": ["string", "null"] },
+        "criteria": { "type": "array", "items": { "$ref": "#/$defs/criterion" } },
+        "evidenceItems": { "type": "array", "items": { "$ref": "#/$defs/evidenceItem" } },
+        "criterionEvidenceLinks": { "type": "array", "items": { "$ref": "#/$defs/criterionEvidenceLink" } },
+        "analysis": { "type": ["string", "null"] },
+        "claim": { "type": ["string", "null"] },
+        "claimEvidenceIds": { "type": "array", "items": { "type": "string" } },
+        "limitations": { "type": "array", "items": { "$ref": "#/$defs/limitation" } },
+        "nextAction": { "type": ["string", "null"] },
+        "claims": { "type": ["array", "null"], "maxItems": 100, "items": { "$ref": "#/$defs/claim" } },
+        "claimEvidenceLinks": { "type": ["array", "null"], "maxItems": 500, "items": { "$ref": "#/$defs/claimEvidenceLink" } }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": { "id": { "type": "string" }, "text": { "type": "string" } }
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "summary", "origin"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["source", "data", "observation"] },
+        "label": { "type": "string" },
+        "summary": { "type": ["string", "null"] },
+        "origin": { "type": ["string", "null"] }
+      }
+    },
+    "criterionEvidenceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterionId", "evidenceItemId"],
+      "properties": { "criterionId": { "type": "string" }, "evidenceItemId": { "type": "string" } }
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": { "id": { "type": "string" }, "text": { "type": "string" } }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "scopeNote", "limitationsNote", "reviewStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "scopeNote": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "limitationsNote": { "type": ["string", "null"], "maxLength": 2000 },
+        "reviewStatus": { "enum": ["draft", "ready_for_review", "needs_revision"] }
+      }
+    },
+    "claimEvidenceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "evidenceItemId", "relationship", "rationale"],
+      "properties": {
+        "claimId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+        "evidenceItemId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+        "relationship": { "enum": ["supports", "contradicts", "provides_context"] },
+        "rationale": { "type": ["string", "null"], "maxLength": 2000 }
+      }
+    }
+  }
+}

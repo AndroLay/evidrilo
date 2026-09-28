@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class BillingRaceAndRecoveryTest {
     private val reducer = PremiumPracticeReducer()
-    private val offer = BillingOffer("monthly", "Evidrilo Premium", "$1.00")
+    private val offer = BillingOffer("monthly", "Evidrilo Premium", "$1.99")
 
     @Test
     fun billing_request_from_previous_account_is_rejected_after_identity_invalidation() {

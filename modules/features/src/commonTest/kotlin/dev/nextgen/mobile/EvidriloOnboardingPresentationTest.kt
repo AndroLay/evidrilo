@@ -1,56 +1,35 @@
 package dev.nextgen.mobile
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class EvidriloOnboardingPresentationTest {
     @Test
-    fun first_run_explains_the_free_core_before_premium() {
-        val presentation = evidriloOnboardingPresentation(
-            completed = false,
-            hasSavedPractice = false,
-        )
-
-        assertTrue(presentation.isVisible)
-        assertEquals("Learn from the evidence, one bounded case at a time.", presentation.title)
-        assertEquals("Try the free case", presentation.primaryLabel)
-        assertEquals("Skip introduction", presentation.secondaryLabel)
-        assertTrue(presentation.freeBenefits.any { it.contains("unlimited", ignoreCase = true) })
-        assertTrue(presentation.freeBenefits.any { it.contains("feedback", ignoreCase = true) })
+    fun fresh_install_does_not_open_the_optional_guide_automatically() {
+        assertFalse(evidriloOnboardingPresentation().isVisible)
     }
 
     @Test
-    fun onboarding_is_not_shown_after_completion_or_when_saved_practice_exists() {
+    fun explicit_guide_request_opens_the_preview() {
+        assertTrue(evidriloOnboardingPresentation(forceShow = true).isVisible)
+    }
+
+    @Test
+    fun guide_copy_keeps_synthetic_demo_and_accountless_local_projects_distinct() {
+        val presentation = evidriloOnboardingPresentation(forceShow = true)
+
+        assertTrue(presentation.body.contains("synthetic", ignoreCase = true))
+        assertTrue(presentation.body.contains("does not create a project", ignoreCase = true))
+        assertTrue(
+            presentation.freeBenefits.any {
+                it.contains("local projects without an account", ignoreCase = true)
+            },
+        )
         assertFalse(
-            evidriloOnboardingPresentation(completed = true, hasSavedPractice = false).isVisible,
+            presentation.freeBenefits.any {
+                it.contains("account is required for real projects", ignoreCase = true)
+            },
         )
-        assertFalse(
-            evidriloOnboardingPresentation(completed = false, hasSavedPractice = true).isVisible,
-        )
-    }
-
-    @Test
-    fun guide_can_reopen_onboarding_without_erasing_saved_practice() {
-        val presentation = evidriloOnboardingPresentation(
-            completed = true,
-            hasSavedPractice = true,
-            forceShow = true,
-        )
-
-        assertTrue(presentation.isVisible)
-    }
-
-    @Test
-    fun free_learning_policy_keeps_the_core_comfortable_without_a_usage_cap() {
-        val policy = EVIDRILO_FREE_LEARNING_POLICY
-
-        assertEquals(1, policy.caseCount)
-        assertTrue(policy.localReplayUnlimited)
-        assertTrue(policy.completeFeedback)
-        assertEquals(1, policy.revisionsPerSession)
-        assertTrue(policy.evidenceChallenge)
-        assertTrue(policy.beforeAfterComparison)
     }
 }

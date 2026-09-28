@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-template-operation.v1.json",
+  "title": "Evidrilo project template authoring operation response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "outcome", "templateId", "templateVersion", "state", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-template-operation" },
+    "version": { "const": "1" },
+    "outcome": { "enum": ["accepted"] },
+    "templateId": { "type": "string", "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$", "maxLength": 96 },
+    "templateVersion": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["draft", "review", "approved", "published", "retired"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

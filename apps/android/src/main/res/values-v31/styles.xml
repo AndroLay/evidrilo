@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Evidrilo" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/evidrilo_loading_background</item>
+        <item name="android:windowSplashScreenBackground">@color/evidrilo_loading_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/evidrilo_splash_placeholder</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/evidrilo_loading_background</item>
+        <item name="android:navigationBarColor">@color/evidrilo_loading_background</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

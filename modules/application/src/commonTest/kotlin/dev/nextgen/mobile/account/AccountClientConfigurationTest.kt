@@ -43,6 +43,23 @@ class AccountClientConfigurationTest {
     }
 
     @Test
+    fun only_explicit_local_http_hosts_are_allowed_for_local_api_development() {
+        val emulator = AccountClientConfiguration(
+            supabaseUrl = "https://example.supabase.co",
+            publishableKey = "sb_publishable_synthetic",
+            apiBaseUrl = "http://10.0.2.2:5080",
+        )
+        val remote = AccountClientConfiguration(
+            supabaseUrl = "https://example.supabase.co",
+            publishableKey = "sb_publishable_synthetic",
+            apiBaseUrl = "http://api.example.test:5080",
+        )
+
+        assertTrue(emulator.apiConfigured)
+        assertFalse(remote.apiConfigured)
+    }
+
+    @Test
     fun redirect_url_is_fixed_to_the_registered_mobile_callback() {
         val configuration = AccountClientConfiguration(
             supabaseUrl = "https://example.supabase.co",

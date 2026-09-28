@@ -1,275 +1,172 @@
 # Evidrilo
 
-Evidrilo is a local-first evidence workspace that helps learners turn bounded
-observations into clear, appropriately scoped conclusions.
+**From a research task to a claim whose evidence and limits stay in view.**
 
-~~~text
-Requirement → Evidence → Claim → Boundary → Action → Revision → Verification
-~~~
+Evidrilo is a student research workspace. It connects a project brief, sources,
+evidence notes, findings, claims, limitations, and next steps so students can
+inspect the reasoning behind their work.
 
-The product evaluates the relationship between a learner's input and the facts
-provided by a case. It is not a scientific-truth grader, plagiarism checker,
-academic marking system, safety advisor, or general-purpose AI answer generator.
+Students can organize their own local project or practice separately with a
+bundled synthetic case. The case is not a project template and does not fill in
+a student's research.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
-[![Android](https://img.shields.io/badge/Android-API%2035-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
-[![iOS](https://img.shields.io/badge/iOS-SwiftUI-000000?logo=apple&logoColor=white)](https://developer.apple.com/xcode/swiftui/)
-[![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-.NET%2010-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/apps/aspnet)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![RevenueCat](https://img.shields.io/badge/RevenueCat-KMP%203.7.0-00AEEF)](https://www.revenuecat.com/)
-[![License](https://img.shields.io/badge/License-MIT-2f855a)](./LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
 
-## At a glance
+[Features](#features) · [Landing page](apps/landing/README.md) · [Quick start](#quick-start) ·
+[Architecture](docs/architecture/repository-structure.md) · [System flows](docs/architecture/system-execution-flows.md) ·
+[Workflows](docs/product/workflows.md) · [Documentation](docs/README.md)
 
-| Area | Decision |
-| --- | --- |
-| Product | Evidence-grounded academic execution workspace with transparent feedback |
-| Free core | Bundled case, local persistence, one revision, and evidence-change challenge |
-| Mobile | Kotlin Multiplatform and Compose Multiplatform for Android and iOS |
-| Platform | ASP.NET Core API, PostgreSQL, migrations, and a bounded worker lane |
-| Monetization | RevenueCat evidrilo_pro entitlement with monthly/yearly products |
-| Connectivity | Offline-first free workflow; connected content and sync are optional |
-| Repository license | MIT; see the single root [LICENSE](LICENSE) file |
+## Why Evidrilo
 
-## What is implemented
+Academic work is spread across assignment instructions, source notes, analysis,
+and the final conclusion. Evidrilo keeps the path visible: what the task asks,
+which material supports a finding, how far a claim can go, what remains
+uncertain, and what to do next.
 
-The repository contains the current product direction:
+Students choose and assess their own sources and write their own conclusions.
+Evidrilo is not a source-discovery service, citation verifier, plagiarism
+checker, academic grader, or scientific-truth oracle.
 
-- target home, sources, workspace, evidence, claim trace, verification,
-  action-plan, profile, history, and evidence-change surfaces;
-- an Evidence Lens that distinguishes learner-selected anchors from other
-  supplied observations without inferring proof;
-- a Verification Detail projection that exposes non-passing deterministic
-  checks, their anchors, explanation, and next action; a true conflict is only
-  shown when supplied evidence materially disagrees;
-- an Evidence Delta projection that carries evidence changes through claim
-  assessment, open-gap state, claim-boundary changes, and action staleness;
-- a deterministic conclusion engine with anchored feedback and explicit
-  CANNOT_ASSESS behavior;
-- local session persistence, one-revision history, and an evidence-change
-  challenge;
-- ASP.NET Core API, PostgreSQL migrations, published-case contracts,
-  authoring boundaries, evidence graph, sync, analytics, billing projection,
-  and worker boundaries;
-- RevenueCat monthly/yearly access, restore, retry, pending, cancellation, and
-  fail-closed states.
+## Features
 
-The bundled case is the reliable local-first starting point. The published-case
-API is a separate content boundary; the mobile free core does not require it.
-Repository code and local tests are not proof of a live managed service,
-provider purchase, or runtime on every supported platform. The Next Gen
-submission does not require an App Store or Google Play listing, but it does
-require a public open-source repository with a license and a working-app demo
-video under two minutes. See [Testing](docs/testing.md) and
-[Release readiness](docs/release.md) for reproducible checks and submission
-gates.
+### Student Project Workspace
 
-## Core experience
+Start with a blank project and your brief. Add sources, evidence notes, and
+findings; connect them to synthesis themes and claims, then record limits and
+next steps. This first path focuses on directed literature synthesis and stays
+local; signing in does not upload or merge project data.
 
-~~~mermaid
-flowchart LR
-    A[Open case] --> B[Read requirement and facts]
-    B --> C[Open Evidence Lens]
-    C --> D[Write claim and scope]
-    D --> E[State limits and next action]
-    E --> F{Deterministic evaluation}
-    F -->|Anchors are sufficient| G[Prioritized feedback + Verification Detail]
-    F -->|Missing or ambiguous anchor| H[CANNOT_ASSESS]
-    G --> I[One guided revision]
-    H --> I
-    I --> J[Compare before and after]
-    J --> K[Evidence Delta: support, gap, and action]
-    K --> L[Local history and next review]
-~~~
+[Project workflow and lifecycle →](docs/product/workflows.md)
 
-Every feedback item should make three things visible:
+### Guided Case Practice
 
-1. what the learner wrote;
-2. which fact or rule supports the feedback; and
-3. the smallest useful next change.
+These Android screenshots show the separate, sign-in-gated M0 tablet-dissolution
+case. Its supplied observations are synthetic, not student projects or research
+submissions. Feedback is deterministic and bounded to the case.
 
-The evaluator abstains when those relationships cannot be established from the
-active case. It never invents a positive result because a response looks
-plausible.
+<table>
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <strong>Evidence Lens</strong><br>
+      <a href="apps/landing/assets/evidence-lens.webp"><img src="apps/landing/assets/evidence-lens.webp" width="165" alt="Evidence Lens listing the supplied warm, room-temperature, and cold-water observations"></a>
+      <p>Inspect the three supplied observations and select which ones support the comparison you want to make.</p>
+      <a href="docs/product/workflows.md">Case workflow →</a>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <strong>Requirement Trace</strong><br>
+      <a href="apps/landing/assets/requirement-trace.webp"><img src="apps/landing/assets/requirement-trace.webp" width="165" alt="Requirement Trace connecting the synthetic case requirement to supplied evidence"></a>
+      <p>Follow the task from its requirement to the observations that can support it.</p>
+      <a href="docs/product/workflows.md">Case workflow →</a>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <strong>Claim Boundary</strong><br>
+      <a href="apps/landing/assets/claim-boundary.webp"><img src="apps/landing/assets/claim-boundary.webp" width="165" alt="Claim Boundary before assessment, showing the claim, scope, and limitations to review"></a>
+      <p>Keep a learner-written claim, its scope, and its limitations visible before verification.</p>
+      <a href="docs/product/workflows.md">Case workflow →</a>
+    </td>
+  </tr>
+</table>
 
-### End-to-end evidence-review flow
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <strong>Evidence Map</strong><br>
+      <a href="apps/landing/assets/evidence-map.webp"><img src="apps/landing/assets/evidence-map.webp" width="165" alt="Evidence Map connecting the case requirement to three observations and flagging missing evidence"></a>
+      <p>See how supplied facts connect to a requirement and where support is still missing.</p>
+      <a href="docs/product/workflows.md">Evidence mapping →</a>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <strong>Evidence Delta · What Changed?</strong><br>
+      <a href="apps/landing/assets/what-changed.webp"><img src="apps/landing/assets/what-changed.webp" width="165" alt="What Changed screen comparing supplied evidence and a learner-authored revision"></a>
+      <p>Compare the original with one learner-authored revision and inspect what changed.</p>
+      <a href="docs/product/workflows.md">Revision workflow →</a>
+    </td>
+  </tr>
+</table>
 
-This is the complete path for one evidence-review session, including the boundary
-between the offline learning core and optional connected capabilities.
+### Project Files and Portability
 
-~~~mermaid
-flowchart TD
-    Start[Select a case] --> Load[Load immutable CaseVersion]
-    Load --> Input[Review Evidence Lens and write a scoped conclusion]
-    Input --> Evaluate[Run deterministic evaluation locally]
-    Evaluate --> Decision{Can the active facts and rules support feedback?}
-    Decision -->|No| Abstain[CANNOT_ASSESS with a missing-anchor explanation]
-    Decision -->|Yes| Feedback[Show prioritized feedback and all check details]
-    Abstain --> Revise[Make one guided revision]
-    Feedback --> Revise
-    Revise --> Compare[Compare the initial and revised reasoning]
-    Compare --> Propagate[Propagate evidence, claim, gap, and action changes]
-    Propagate --> Save[Save bounded history locally]
-    Save --> Optional{Need an optional connected capability?}
-    Optional -->|No| Done[Continue offline or finish]
-    Optional -->|Premium content| Entitlement[Check active RevenueCat entitlement]
-    Optional -->|Consent to sync| Sync[Send bounded metadata to the ASP.NET Core API]
-    Entitlement --> Done
-    Sync --> Done
-~~~
+Generate Markdown, PDF, DOCX, and structured CSV reports, or exchange a versioned
+`.evproj` archive with validation and preview before writing. Source and test
+coverage exists; device save/reopen and picker acceptance remain open.
 
-## Architecture
+[Project and file workflows →](docs/product/workflows.md)
 
-Evidrilo uses a local-first, ports-and-adapters architecture. Shared Kotlin
-code owns the case model, evaluator, reducers, session state, persistence
-contracts, and most of the UI. Android and iOS hosts provide platform
-capabilities. The optional platform lane owns authenticated content, consented
-metadata, billing projections, analytics, and editorial workflows.
+### Project Lifecycle and History
 
-~~~mermaid
-flowchart TB
-    Learner((Learner)) --> Host[Android or iOS host]
+Autosave and revision checkpoints help preserve a student's work while they
+develop it. Projects can be completed, archived, moved to Trash, or restored;
+Free/Pro active-project limits are applied per installation.
 
-    subgraph Mobile[Kotlin Multiplatform client]
-        UI[Compose UI]
-        App[Application coordination]
-        Domain[Case model and deterministic evaluator]
-        Local[(Local session and history)]
-        Ports[HTTP, auth, audio, secure storage, billing ports]
-        UI --> App --> Domain
-        App --> Local
-        App --> Ports
-    end
+[Project lifecycle and history →](docs/product/workflows.md)
 
-    Host --> UI
-    Ports -. optional .-> API[ASP.NET Core API]
-    API --> DB[(PostgreSQL)]
-    Worker[.NET worker] --> DB
-    Billing[RevenueCat] -. CustomerInfo and signed webhooks .-> Ports
-    Billing -. signed event .-> API
-~~~
+### Deadlines and Local Reminders
 
-The trust direction is fixed:
+Add a due date and schedule a local reminder to keep the next step visible.
+Permission and cancellation flows are in source; delivery across restarts and
+project/account changes still needs device acceptance.
 
-~~~text
-Case facts and versioned rules → deterministic evaluator → learner-visible feedback
-~~~
+[Reminder and notification flows →](docs/product/workflows.md)
 
-Network services, RevenueCat, and future AI assistance may enrich the product,
-but they must not silently replace that chain.
+### Reviewed Template Catalog
 
-### Runtime modes
+The API and authoring workflow support draft, review, approval, and publication.
+Students only see selectable content after it has passed human/domain review;
+there is currently no reviewed template available in the catalog.
 
-| Mode | Behavior |
-| --- | --- |
-| Offline free core | Bundled content, local drafts, local history, and deterministic evaluation. No account or network is required. |
-| Connected content | Published immutable case after schema, identifier, hash, and evaluator-version checks. Invalid content falls back locally. |
-| Premium | Active evidrilo_pro entitlement from RevenueCat. Only monthly and yearly products are accepted. |
-| Sync | Explicit consent and verified account required. The competition scope syncs bounded progress metadata, not learner-authored draft text. |
-| AI assistance | Planned optional bounded extension; 10 one-time free credits or 100 credits per active entitlement month, opt-in, redacted, non-grading, and unable to determine truth or premium access. |
+[Catalog workstream →](docs/roadmap.md)
 
-### RevenueCat boundary
+### Bounded AI Assistance
 
-RevenueCat is an adapter, not part of the evaluator. The client uses active
-CustomerInfo entitlement state; the server accepts only verified, ordered, and
-idempotent webhook projections. Purchase, restore, pending, cancellation,
-revocation, expiry, unknown-product, and provider-outage states keep the free
-core available and fail closed for premium access.
+AI is designed to offer contextual suggestions for student review. Provider,
+privacy, and credit gates remain closed, so live project generation is disabled;
+deterministic checks retain authority over case feedback.
 
-See the [RevenueCat architecture](docs/architecture/revenuecat.md) and the
-[RevenueCat operations documentation](docs/operations/README.md).
+[AI assistance boundary →](docs/decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)
 
-## Tech stack
+### Accounts and Evidrilo Pro
 
-| Layer | Technology | Responsibility |
-| --- | --- | --- |
-| Shared mobile | Kotlin Multiplatform 2.3.20 | Domain, evaluator, state, persistence contracts, networking boundary, and shared UI |
-| UI | Compose Multiplatform 1.11.1 | Android/iOS presentation and JVM walkthrough |
-| Hosts | Android SDK/API 35 and SwiftUI/Xcode | Native lifecycle, secure storage, audio, HTTP, and packaging |
-| Billing | RevenueCat KMP 3.7.0 | Offerings, purchase, restore, entitlement, Paywall, Customer Center, and webhook boundary |
-| API | ASP.NET Core/.NET 10 | Versioned REST boundary, auth validation, policy, rate limits, and health checks |
-| Data | PostgreSQL 16 and Npgsql 10 | Content, accounts, sync, billing projections, analytics, and audit data |
-| Worker | .NET 10 hosted worker | Lease-bound projections, retries, and bounded rebuilds |
-| Local operations | Docker Compose and migration ledger | Reproducible API/worker/PostgreSQL development stack |
+Local project work does not require sign-in and is not uploaded when a user
+signs in. Account and entitlement handling are in source; identity-provider
+runtime and RevenueCat purchase, cancellation, restore, revoke, and expiry need
+provider/device verification.
 
-## Repository map
+[RevenueCat architecture →](docs/architecture/revenuecat.md)
 
-| Path | Responsibility |
-| --- | --- |
-| `modules/domain` | Framework-neutral case model, evaluator, reducers, and feedback |
-| modules/application | Account/session, consent, sync, analytics, and recommendation orchestration |
-| modules/data | Persistence contracts, codecs, recovery, and storage adapters |
-| modules/design-system | Shared visual tokens, components, icons, fonts, and reviewed assets |
-| modules/features | Feature presentation contracts and user-facing state |
-| apps/mobile-shared | Compose screens, coordinator, content/audio/billing adapters, and shared tests |
-| apps/android | Android host and platform configuration |
-| apps/ios | Xcode host, SwiftUI entry point, and iOS configuration |
-| contracts | Versioned JSON schemas, route manifests, and fixtures |
-| platform | ASP.NET Core API, worker, database integration, and tests |
-| infra | Local Compose, Dockerfiles, and deployment handoff boundaries |
-| scripts | Verification, safety, packaging, asset, and architecture checks |
-| docs | Public product, architecture, development, testing, release, and operations documentation |
-| internal | Ignored/private research, design, audit, and agent context; never part of the public package |
+### API and Background Worker
 
-## Contracts and safety rules
+The ASP.NET Core API, PostgreSQL migrations, and bounded .NET worker provide a
+local platform foundation for versioned contracts and account-bound services.
+RevenueCat billing events use idempotent webhook projections; these local
+contracts do not establish a live provider transaction or managed deployment.
+Local integration is separate from a hosted production deployment.
 
-These rules are product invariants:
+[Platform architecture →](docs/architecture/repository-structure.md) · [API docs →](docs/api/README.md)
 
-- A session evaluates exactly one identified CaseVersion.
-- Published case versions are immutable; content changes create a new version,
-  hash, and compatibility boundary.
-- Determinate feedback must reference facts or rules in the active case.
-- Unknown, stale, contradictory, or ambiguous anchors produce rejection or
-  CANNOT_ASSESS, never an invented answer.
-- The same case version and input produce the same evaluator result; AI is not
-  on the truth decision path.
-- The competition flow records one initial response and one guided revision.
-- Caller-supplied account IDs never establish identity; the API uses verified
-  provider claims.
-- Sync requires consent, bounded commands, an idempotency key, and a cursor.
-- Learner-authored drafts remain local within the current competition boundary.
-- Passwords, access tokens, provider payloads, private research, reviewer data,
-  secrets, and generated output do not belong in the public repository.
+### Static Landing Page
 
-Detailed records live in [docs/decisions.md](docs/decisions.md), the
-[product contract](docs/product/m0-product-contract.md), and the
-[architecture documentation](docs/architecture/).
-
-## Public repository boundary
-
-The public package contains reproducible source, contracts, synthetic fixtures,
-tests, scripts, and public documentation. It excludes private research,
-participant/reviewer data, design working files, provider credentials, database
-secrets, signing material, generated output, caches, and private media.
-
-Before preparing a public package, run:
-
-~~~bash
-bash scripts/github/export-public-package.sh . /path/to/empty-candidate
-bash scripts/verification/check-public-package.sh /path/to/empty-candidate
-bash scripts/security/check-github-safety.sh .
-~~~
-
-The exporter is stricter than a normal source checkout. A clean local workspace
-is not evidence that a public package, provider transaction, or production
-deployment has been verified.
+Responsive vanilla HTML/CSS/JavaScript site with a project-first story, an interactive synthetic-case walkthrough, and a five-question FAQ. [Landing guide →](apps/landing/README.md)
+Preview with `python3 -m http.server 8000 --directory apps/landing`; replace the README screenshot gallery with a WebM walkthrough when the demo is recorded.
 
 ## Quick start
 
 ### Requirements
 
-- JDK 21 with java and javac;
+- JDK 21 with `java` and `javac`;
 - Android SDK for Android builds;
-- .NET 10 SDK for API and worker work;
+- .NET 10 SDK and Node.js for API, worker, and contract checks;
 - Docker Compose for the local platform stack;
-- macOS and Xcode for the iOS host.
+- macOS and Xcode for running the iOS host.
 
 The Gradle Wrapper is included; a global Gradle installation is not required.
 
 ### Mobile and shared tests
 
-~~~bash
+```bash
 git clone https://github.com/AndroLay/evidrilo.git
 cd evidrilo
 cp local.properties.example local.properties
@@ -277,82 +174,134 @@ cp local.properties.example local.properties
 
 ./gradlew :composeApp:jvmTest :composeApp:compileKotlinJvm
 ./gradlew :androidApp:assembleDebug
-~~~
+```
 
 ### API, worker, and contracts
 
-~~~bash
+```bash
 dotnet test platform/api.Tests/Evidrilo.Api.Tests.csproj
 dotnet test platform/worker.Tests/Evidrilo.Worker.Tests.csproj --configuration Release
 node --test contracts/contracts.test.mjs
 node --test platform/database/migrations/migrations.test.mjs
-~~~
+```
 
 ### Local platform stack
 
-~~~bash
+```bash
 bash scripts/verification/check-deployment.sh .
 docker compose -f infra/environments/local/docker-compose.yml up --build -d
 curl --fail http://127.0.0.1:5080/health/live
 docker compose -f infra/environments/local/docker-compose.yml down
-~~~
+```
 
-The local PostgreSQL trust mode is isolated to development and must not be used
-for staging or production. For source-only checkouts, keep SDKs, caches, NuGet
-packages, generated output, and private media outside the repository. See the
-[development guide](docs/development/README.md) for machine-local overrides.
+The local PostgreSQL trust mode is development-only. Keep SDKs, caches, NuGet
+packages, generated output, and private media outside a source-only checkout.
+For iOS, open `apps/ios/iosApp.xcodeproj` in Xcode on macOS; Linux compilation
+does not prove simulator/device behavior. See the [development guide](docs/development/README.md)
+for overrides and more checks.
 
-For iOS, open apps/ios/iosApp.xcodeproj in Xcode on macOS. Linux compilation
-does not prove that the iOS host launches or renders on a simulator/device.
+## Verification: what each check proves
 
-## Verification
-
-Use the smallest relevant check during development, then run the complete local
-verification script for a release candidate:
-
-~~~bash
-bash scripts/ci/verify-local.sh
-~~~
-
-| Evidence | Proves | Does not prove |
+| Check | Proves | Does not prove |
 | --- | --- | --- |
-| commonTest and JVM tests | Deterministic domain, reducer, persistence, and billing-state behavior for executed tests | Android/iOS rendering or device behavior |
-| Android build | Configured Android source compiles and packages | Visual quality, accessibility, signing, or store upload |
-| .NET and database tests | API, worker, migration, and integration contracts for executed environments | Managed provider or production traffic |
-| Architecture, safety, and package checks | Public boundary, dependency rules, and forbidden artifact protection | Human review or final publication |
-| Android emulator/iOS simulator and accessibility review | Runtime interaction on tested targets | Untested devices and future provider configurations |
-| RevenueCat Test Store and managed staging | Offering, purchase, restore, revoke, auth, and deployment behavior in those environments | Long-term revenue, retention, or scale |
-| Human validation | Whether intended learners understand the flow and feedback | A guarantee of learning outcomes or competition results |
+| Common/JVM tests | Behavior covered by the tests that ran | Android/iOS rendering or device behavior |
+| Android build | Android sources compile and package | Visual quality, accessibility, signing, or store upload |
+| .NET, contract, database tests | API/worker/migration contracts in tested environments | Managed provider or production traffic |
+| Architecture and package checks | Public boundary, dependency rules, and artifact protection | Human review or final publication |
+| Emulator/simulator and accessibility review | Runtime on the tested targets | Untested devices and provider configurations |
+| RevenueCat Test Store and staging | Behavior observed in those environments | Long-term revenue, retention, or scale |
+| Human validation | Learner understanding of the flow and feedback | Guaranteed learning outcomes or competition results |
 
-The repository uses evidence language deliberately: **implemented** means code and
-focused checks exist; **verified** means the named command or environment was
-actually run; **open** means an external gate remains.
+Use focused checks during development and run the full local verification
+script for a release candidate:
 
-## Documentation
+```bash
+bash scripts/ci/verify-local.sh
+```
 
-- [Product contract](docs/product/m0-product-contract.md)
-- [Architecture decision](docs/architecture/platform-decision.md)
-- [Repository structure](docs/architecture/repository-structure.md)
+## Tech stack
+
+The mobile app is built with Kotlin Multiplatform and Compose Multiplatform;
+the optional platform API uses ASP.NET Core/.NET 10 with PostgreSQL.
+
+| Layer | Technology | Responsibility |
+| --- | --- | --- |
+| Shared mobile | Kotlin Multiplatform 2.3.20 | Domain, evaluator, state, persistence contracts, and network boundary |
+| Shared UI | Compose Multiplatform 1.11.1 | Android/iOS presentation and JVM walkthrough |
+| Native hosts | Android SDK/API 35; SwiftUI/Xcode | Lifecycle, secure storage, audio, HTTP, and packaging |
+| Billing | RevenueCat KMP 3.7.0 | Offerings, purchase/restore boundary, entitlements, and paywall integration |
+| API | ASP.NET Core / .NET 10 | Versioned REST, verified-auth policy, rate limits, and health checks |
+| Data | PostgreSQL 16 / Npgsql 10.0 | Content, accounts, projections, and audit persistence |
+| Worker | .NET 10 hosted worker | Bounded background processing, retries, and projections |
+| Local operations | Docker Compose and migration ledger | Reproducible local API/worker/PostgreSQL stack |
+| Landing page | Vanilla HTML/CSS/JavaScript | Responsive static site and interactive synthetic-case walkthrough |
+
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `apps/mobile-shared` | Compose screens, coordinator, content/audio/billing adapters, shared tests |
+| `apps/android` | Android host, manifest, and platform configuration |
+| `apps/ios` | Xcode host, SwiftUI entry point, and iOS configuration |
+| `apps/landing` | Static landing page and curated synthetic-case screenshots |
+| `modules/core` | Cross-cutting shared primitives |
+| `modules/domain` | Framework-neutral case/project models, evaluator, reducers, feedback |
+| `modules/application` | Account/session, consent, sync, analytics, recommendation, AI orchestration |
+| `modules/data` | Persistence contracts, codecs, recovery, storage adapters |
+| `modules/features` | Feature presentation contracts and user-facing state |
+| `modules/design-system` | Visual tokens, components, icons, fonts, reviewed assets |
+| `contracts` | Versioned JSON schemas, route manifests, synthetic fixtures |
+| `platform/api` | ASP.NET Core API, authentication, authorization, server operations |
+| `platform/worker` | Bounded .NET background processing |
+| `platform/database` | PostgreSQL migrations and local database integration |
+| `platform/integration` | Local API/worker integration harness |
+| `infra` | Docker Compose, Dockerfiles, deployment handoff boundaries |
+| `scripts` | Verification, safety, packaging, asset, architecture checks |
+| `tests` / `tooling` | Cross-boundary test assets and repository tools/configuration |
+| `docs` | Product, workflow, architecture, development, testing, release guides |
+| `examples` | Synthetic examples only |
+| `internal` / `audit` | Owner-local research and evidence; private and excluded from public packages |
+
+## Contracts and safety rules
+
+- A session evaluates one identified `CaseVersion`; published versions are immutable.
+- Feedback anchors active-case facts or rules; stale or ambiguous inputs reject or return `CANNOT_ASSESS`.
+- The same case version and input produce the same result. AI never decides truth; M0 allows one revision.
+- Verified provider claims establish API identity; client-supplied account IDs do not.
+- Sync requires consent, bounded commands, idempotency, and a cursor; sign-in alone does not upload projects.
+- Keep credentials, provider payloads, private research/reviewer data, and generated output out of the public repo.
+
+See the [product contract](docs/product/m0-product-contract.md),
+[architecture](docs/architecture/repository-structure.md), and
+[decisions](docs/decisions.md) for the detailed rules.
+
+## Public repository boundary
+
+The public package contains source, contracts, synthetic fixtures, tests,
+scripts, and public documentation. It excludes private research/reviewer data,
+design files, credentials, database secrets, signing material, generated output,
+caches, and private media.
+
+```bash
+bash scripts/github/export-public-package.sh . /path/to/empty-candidate
+bash scripts/verification/check-public-package.sh /path/to/empty-candidate
+bash scripts/security/check-github-safety.sh .
+```
+
+A clean workspace does not prove that a public package, provider transaction,
+or production deployment has been verified.
+
+## Documentation, contribution, and license
+
+- [Product workflows and diagrams](docs/product/workflows.md)
+- [Architecture and repository structure](docs/architecture/repository-structure.md)
+- [System execution flows and diagrams](docs/architecture/system-execution-flows.md)
 - [RevenueCat architecture](docs/architecture/revenuecat.md)
-- [AI assistance architecture](docs/architecture/ai-assistance.md)
-- [Development guide](docs/development/README.md)
-- [Testing guide](docs/testing.md)
-- [Release guide](docs/release.md)
-- [Roadmap](docs/roadmap.md)
-- [Decisions](docs/decisions.md)
-- [API documentation](docs/api/README.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [AI assistance architecture](docs/decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)
+- [Development](docs/development/README.md) · [Testing](docs/testing.md) · [Release](docs/release.md)
+- [Roadmap](docs/roadmap.md) · [Decisions](docs/decisions.md) · [API docs](docs/api/README.md)
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Changes should preserve the free core,
-privacy boundaries, deterministic evaluator, fail-closed entitlement behavior,
-backward-compatible migrations, and tests appropriate to the changed boundary.
-
-## License
-
-Evidrilo source is released under the [MIT License](LICENSE).
-
-Third-party notices are recorded in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). They do not replace or add a
-second root project license.
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute. For public review,
+publish this as a public open-source repository with a license; this source
+uses the [MIT License](LICENSE), and third-party notices are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

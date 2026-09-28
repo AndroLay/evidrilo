@@ -24,10 +24,7 @@ class AudioNarrationCopyTest {
 
     @Test
     fun onboarding_narration_contains_every_benefit() {
-        val presentation = evidriloOnboardingPresentation(
-            completed = false,
-            hasSavedPractice = false,
-        )
+        val presentation = evidriloOnboardingPresentation()
 
         val narration = AudioNarrationCopy.onboarding(presentation)
 

@@ -7,6 +7,8 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
+import dev.nextgen.mobile.domain.project.StudentProjectDraft
+import dev.nextgen.mobile.domain.project.StudentProjectStatus
 import dev.nextgen.mobile.recommendation.RecommendationCaseRegistry
 import dev.nextgen.mobile.recommendation.RecommendationLifecycleKey
 import dev.nextgen.mobile.recommendation.RecommendationPayload
@@ -20,6 +22,26 @@ import kotlin.test.assertFalse
 class EvidriloHomePresentationTest {
     private val draft = ConclusionDraft(caseId = "case.test")
     private val evaluation = ConclusionEvaluation(checks = emptyList())
+
+    @Test
+    fun home_project_summary_selects_only_the_most_recent_active_project() {
+        val older = project("older", "Older project", updatedAt = 10L)
+        val latest = project("latest", "Latest project", updatedAt = 30L)
+        val completed = project("completed", "Completed project", updatedAt = 40L, status = StudentProjectStatus.COMPLETED)
+
+        val summary = homeProjectOverview(listOf(older, completed, latest))
+
+        assertEquals(latest, summary.primaryProject)
+        assertEquals(2, summary.activeProjectCount)
+    }
+
+    @Test
+    fun empty_home_project_summary_has_no_primary_project() {
+        val summary = homeProjectOverview(emptyList())
+
+        assertEquals(null, summary.primaryProject)
+        assertEquals(0, summary.activeProjectCount)
+    }
 
     @Test
     fun recommendation_surface_is_additive_and_hides_unsafe_states() {
@@ -212,4 +234,20 @@ class EvidriloHomePresentationTest {
         assertEquals(EvidriloHomeObservationLayout.FIT, homeObservationLayout(3))
         assertEquals(EvidriloHomeObservationLayout.HORIZONTAL_SCROLL, homeObservationLayout(8))
     }
+
+    private fun project(
+        id: String,
+        title: String,
+        updatedAt: Long,
+        status: StudentProjectStatus = StudentProjectStatus.DRAFT,
+    ) = StudentProjectDraft(
+        id = id,
+        templateSnapshot = null,
+        title = title,
+        fieldValues = emptyMap(),
+        revision = 1,
+        createdAtEpochMillis = updatedAt,
+        updatedAtEpochMillis = updatedAt,
+        status = status,
+    )
 }

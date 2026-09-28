@@ -46,6 +46,8 @@ public sealed class DatabaseReadinessTests
                 connectionSucceeded: true,
                 migrationLedgerExists: true,
                 currentMigrationApplied: true));
-        Assert.Equal("030_sync_published_case_boundary", DatabaseSchemaReadiness.CurrentMigrationVersion);
+        Assert.Equal(
+            "049_project_ai_activity_history",
+            DatabaseSchemaReadiness.CurrentMigrationVersion);
     }
 }

@@ -58,21 +58,24 @@ object SecureSessionRecordCodec {
         session.material.expiresAtEpochSeconds.toString(),
         session.material.accessToken,
         session.material.refreshToken.orEmpty(),
+        session.account.googleLinked?.toString().orEmpty(),
     ).joinToString(".") { hex(it) }
 
     fun decode(value: String): StoredAccountSession? = runCatching {
         val fields = value.split('.')
-        if (fields.size != 4 && fields.size != 5) return@runCatching null
+        if (fields.size !in 4..6) return@runCatching null
 
         val decoded = fields.map { unhex(it) ?: return@runCatching null }
         val accountId = decoded[0].takeIf(::isSafeAccountId) ?: return@runCatching null
         val verified = decoded[1].toBooleanStrictOrNull() ?: return@runCatching null
         val expiry = decoded[2].toLongOrNull() ?: return@runCatching null
         val accessToken = decoded[3].takeIf { it.isNotBlank() } ?: return@runCatching null
-        val refreshToken = if (fields.size == 5) decoded[4].takeIf { it.isNotBlank() } else null
+        val googleLinked = if (fields.size == 6) decoded[5].toBooleanStrictOrNull() else null
+        if (fields.size == 6 && googleLinked == null && decoded[5].isNotBlank()) return@runCatching null
+        val sessionRefreshToken = if (fields.size >= 5) decoded[4].takeIf { it.isNotBlank() } else null
         StoredAccountSession(
-            account = AccountSummary(accountId, verified),
-            material = SecureSessionMaterial(accessToken, expiry, refreshToken),
+            account = AccountSummary(accountId, verified, googleLinked),
+            material = SecureSessionMaterial(accessToken, expiry, sessionRefreshToken),
         )
     }.getOrNull()
 
