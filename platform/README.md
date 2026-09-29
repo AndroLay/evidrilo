@@ -30,10 +30,11 @@ distinct process and execution lifecycle.
   workflow depend on background processing.
 - AI assistance is optional and non-grading; provider output cannot replace
   deterministic evaluator results.
-- The AI credit ledger is server-owned: 10 one-time credits for a
-  verified free account and 100 credits per active `evidrilo_pro` entitlement
-  month. Reservations are released on failed assists, and the client cannot
-  grant or mutate credits.
+- D-126 sets server-owned AI grant targets of 20 credits once for a verified
+  Free account and 200 credits per active `evidrilo_pro` entitlement month.
+  The base migration caps each grant at 100; forward migration 050 raises it to
+  200 but still needs fresh/upgrade database acceptance. Failed assists release
+  reservations; the client cannot grant or mutate credits.
 - Missing configuration produces an explicit unavailable/degraded result,
   never a fabricated successful write or entitlement.
 

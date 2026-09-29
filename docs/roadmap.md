@@ -151,8 +151,9 @@ portable outputs are PDF/DOCX/Markdown, CSV for tabular data, and validated
 unavailable.
 
 Rilis 1.1 is the optional server-side AI extension, not a dependency of local
-work: a scaffold costs 3 credits and a standard assist costs 1 only when
-applied. The provider remains disabled until owner privacy/retention/cost
+work. API credits settle from validated uncached-input, cached-input,
+cache-write-input, and output token usage; a generated project preview is charged whether it is applied or
+dismissed. The provider remains disabled until owner privacy/retention/cost
 approval and provider-backed acceptance pass. Rilis 2 is opt-in cloud
 continuity and requires account-wide atomic quota, conflict/revision recovery,
 and deletion propagation. These target decisions do not assert that any of
@@ -446,13 +447,20 @@ AI is a deliberately narrow premium extension described in
 deterministic feedback item, ask a reflection question, or suggest a
 meaning-preserving language alternative.
 
-- A verified free account receives 10 AI credits once after explicit consent.
-- An active `evidrilo_pro` account receives 100 credits per entitlement month;
+- A verified free account receives 20 AI credits once after explicit consent.
+- An active `evidrilo_pro` account receives 200 credits per entitlement month;
   yearly subscriptions receive the same monthly grant while active.
 - Credits do not roll over. Lifetime allowances and paid top-ups are not part
   of the initial plan.
-- One accepted standard assist costs one credit; failed, cancelled, timed-out,
-  malformed, rejected, or unavailable requests release the reservation.
+- Credits are based on token usage at the pinned model rates: uncached input,
+  cached input, cache-write input, and output are priced separately. Reasoning
+  tokens are included in output and are not counted twice.
+- One credit represents $0.001 of provider cost, rounded up per successful
+  request. The API reserves a conservative maximum before dispatch and charges
+  actual usage after a valid response, releasing the remainder.
+- Failed, cancelled, timed-out, malformed, invalid-usage, or stale-before-preview
+  requests release the user reservation; a generated project preview remains
+  charged if the student later dismisses it.
 - The server ledger and verified RevenueCat entitlement are authoritative. The
   client cannot grant or mutate credits.
 - Explicit context selection, redaction, schema validation, timeout,

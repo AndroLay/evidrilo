@@ -59,6 +59,7 @@ create table if not exists public.project_ai_activity (
                         or (requested_settlement_outcome is not null and settlement_hash is not null))
             )
         )
+        )
         or (
             mode = 'GENERAL'
             and project_id is null
@@ -78,7 +79,7 @@ create table if not exists public.project_ai_activity (
             )
         )
     )
-);
+));
 
 create index if not exists project_ai_activity_installation_history_idx
     on public.project_ai_activity (account_id, installation_id, created_at desc, activity_id desc);

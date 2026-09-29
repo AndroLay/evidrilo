@@ -64,6 +64,8 @@ internal fun EvidriloSettingsScreen(
     onSyncNow: () -> Unit,
     onOpenPremium: () -> Unit,
     onOpenGuide: () -> Unit,
+    onOpenGuidedCase: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenSupport: () -> Unit,
     accountSubtitle: String,
@@ -197,10 +199,26 @@ internal fun EvidriloSettingsScreen(
             EvidriloDivider()
             EvidriloSettingsRow(
                 icon = EvidriloIconName.BOOK,
-                title = "Evidence guide",
-                subtitle = "Evidence · claim · limits · revision",
+                title = "How Evidrilo works",
+                subtitle = "Evidence · claims · limits · revision",
                 onClick = onOpenGuide,
             )
+            EvidriloDivider()
+            EvidriloSettingsRow(
+                icon = EvidriloIconName.LIGHTNING,
+                title = "Try a guided case",
+                subtitle = "A separate worked example",
+                onClick = onOpenGuidedCase,
+            )
+            if (historyAvailable) {
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.HISTORY,
+                    title = "Recent case changes",
+                    subtitle = "Review what changed between revisions",
+                    onClick = onOpenHistory,
+                )
+            }
             EvidriloDivider()
             EvidriloSettingsRow(
                 icon = EvidriloIconName.LAYERS,
@@ -653,7 +671,7 @@ private fun EvidriloThemeChoiceChip(
                 label,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
                 style = MaterialTheme.typography.titleSmall,
-                color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
+                color = if (selected) EvidriloColors.Ink else EvidriloColors.Slate,
                 textAlign = TextAlign.Center,
             )
         }

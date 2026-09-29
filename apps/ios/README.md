@@ -28,14 +28,18 @@ The repository also provides `.github/workflows/ios-simulator.yml`. It uses a
 GitHub-hosted macOS runner and runs only when iOS/Kotlin build inputs change or
 when an owner starts it with `workflow_dispatch`.
 
-The lane performs the following steps:
+The lane selects Xcode 26.0.1 on the `macos-15` runner to match the Compose
+Multiplatform framework's required Apple SDK, then performs these steps:
 
 1. Records the Xcode and available simulator inventory.
 2. Builds the unsigned `Release` host for an iOS simulator.
 3. Selects an available iPhone simulator with `simctl`.
 4. Boots the simulator, installs Evidrilo, launches it, and captures a PNG.
-5. Uploads the screenshot, launch output, simulator log, toolchain inventory,
-   and Xcode build log as the `ios-simulator-evidence` artifact.
+5. Runs the XCUITest guest flow: skips first-run onboarding when shown, opens
+   My Projects, starts a manual project, and verifies Project Basics appears.
+6. Uploads the screenshot, UI-test result bundle and log, launch output,
+   simulator log, toolchain inventory, and Xcode build log as the
+   `ios-simulator-evidence` artifact.
 
 From Linux, the workflow can be started after the workflow file is pushed:
 
@@ -44,10 +48,12 @@ gh workflow run ios-simulator.yml --ref main
 gh run list --workflow ios-simulator.yml --limit 1
 ```
 
-The artifact proves a macOS simulator build and launch for that exact commit;
-it is not a physical-iPhone performance or device-feature claim. The Android
-runtime remains the primary local test surface when no Apple hardware is
-available.
+The artifact proves a macOS simulator build, launch, and one guest UI route for
+that exact commit; it is not a physical-iPhone performance or device-feature
+claim. File exchange, scheduled notification delivery, purchase recovery,
+VoiceOver, and larger Dynamic Type settings still need dedicated device/runtime
+checks. The Android runtime remains the primary local test surface when no
+Apple hardware is available.
 
 ## Release candidate on macOS
 

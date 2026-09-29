@@ -74,10 +74,10 @@ deduction for using Test Store is published; the meaningful risk is an
 incomplete, mocked, or misleading purchase flow.
 
 RevenueCat also authorizes the optional AI allowance; it does not store or
-directly mutate the AI credit balance. The approved policy is 10 one-time
-credits for a verified free account and 100 credits per active entitlement
+directly mutate the AI credit balance. D-126 sets the target policy at 20 one-time
+credits for a verified free account and 200 credits per active entitlement
 month for both monthly and yearly `evidrilo_pro`. Credits do not roll over, and
-failed AI requests release their reservation. See [D-106](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance).
+failed AI requests release their reservation. See [D-126](../decisions.md#d-126-increase-the-free-and-pro-ai-credit-allowances) for current target amounts and [D-106](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance) for the assistance boundary.
 
 ## Mobile access flow
 
@@ -117,15 +117,18 @@ server-enforced access.
 
 ```text
 verified account + explicit AI consent
-        → one-time free grant of 10, or active evidrilo_pro period grant of 100
-        → server credit ledger reservation
+        → one-time free grant of 20, or active evidrilo_pro period grant of 200
+        → reserve estimated maximum token cost
         → bounded server-side AI assist
-        → consume on accepted response / release on failure
+        → settle actual uncached/cached/cache-write input and output usage / release unused reserve
 ```
 
-Monthly and yearly packages use the same 100-credit grant for each active
-entitlement month. A yearly entitlement does not receive a single 1,200-credit
-balance, and unused credits do not roll over. Entitlement-period grants must be
+Monthly and yearly packages use the same 200-credit grant for each active
+entitlement month. A yearly entitlement does not receive a single 2,400-credit
+balance, and unused credits do not roll over. AI cost is priced by uncached,
+cached, and cache-write input plus output token categories and rounded up at
+the approved credit-to-dollar rate. Reasoning tokens are included in output.
+Entitlement-period grants must be
 created from verified provider state or an idempotent server projection; a
 client success flag, webhook replay, restore callback, or duplicate request
 must not create credits twice. The mobile client can display a balance but
@@ -133,9 +136,10 @@ cannot grant, transfer, or edit it.
 
 The AI ledger is separate from premium case access. A billing outage or disabled
 AI provider must leave the free case and deterministic verification usable. A
-provider timeout, cancellation, malformed response, policy rejection, or
+provider timeout, cancellation, malformed response, invalid usage, or
 unavailable configuration releases the reserved credit and returns a truthful
-fallback.
+fallback. A valid generated preview is charged even if the student later
+dismisses it.
 
 ## Thoughtful usage acceptance
 

@@ -546,13 +546,18 @@ public static class EntryPoint
             RequireStatus(balance, HttpStatusCode.OK, "AI credit balance after opt-in");
             var body = await ReadJsonAsync(balance);
             RequireString(body, "schema", "evidrilo.ai-credits");
-            RequireNumber(body, "available", 110);
+            RequireNumber(body, "available", 220);
             var grants = body.GetProperty("grants");
+            var freeGrant = grants.EnumerateArray().SingleOrDefault(grant =>
+                grant.GetProperty("grantKind").GetString() == "free_once");
             var subscriptionGrant = grants.EnumerateArray().SingleOrDefault(grant =>
                 grant.GetProperty("grantKind").GetString() == "subscription_month");
             if (!body.GetProperty("consentRecorded").GetBoolean()
                 || grants.GetArrayLength() != 2
+                || freeGrant.ValueKind != JsonValueKind.Object
+                || freeGrant.GetProperty("granted").GetInt32() != 20
                 || subscriptionGrant.ValueKind != JsonValueKind.Object
+                || subscriptionGrant.GetProperty("granted").GetInt32() != 200
                 || subscriptionGrant.GetProperty("expiresAt").GetDateTimeOffset()
                     != AiEntitlementPeriodStart.AddMonths(1))
             {
@@ -571,7 +576,7 @@ public static class EntryPoint
         {
             RequireStatus(recoveredBalance, HttpStatusCode.OK, "AI balance after stale reservation recovery");
             var body = await ReadJsonAsync(recoveredBalance);
-            RequireNumber(body, "available", 110);
+            RequireNumber(body, "available", 220);
         }
 
         await RequireExpiredAiReservationReleasedAsync(databaseConnectionString, AccountId);
@@ -1700,11 +1705,36 @@ public static class EntryPoint
                     request.RequestId,
                     actualCostUsd: 0.10m,
                     inputTokens: 10,
+                    cachedInputTokens: 2,
+                    cacheWriteInputTokens: 3,
                     outputTokens: 20,
+                    reasoningTokens: 5,
                     uncertain: false,
                     released: false,
                     CancellationToken.None))
                 throw new InvalidOperationException("Provider spend usage could not be settled.");
+        }
+
+        await using (var connection = new NpgsqlConnection(databaseConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var usage = connection.CreateCommand();
+            usage.CommandText = """
+                select input_tokens, cached_input_tokens, cache_write_input_tokens,
+                       output_tokens, reasoning_tokens
+                  from public.ai_provider_spend_reservations
+                 where provider = 'openai' and account_id = @account_id and request_id = @request_id;
+                """;
+            usage.Parameters.AddWithValue("account_id", acceptedRequests[0].AccountId);
+            usage.Parameters.AddWithValue("request_id", acceptedRequests[0].RequestId);
+            await using var reader = await usage.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()
+                || reader.GetInt32(0) != 10
+                || reader.GetInt32(1) != 2
+                || reader.GetInt32(2) != 3
+                || reader.GetInt32(3) != 20
+                || reader.GetInt32(4) != 5)
+                throw new InvalidOperationException("Provider token categories were not persisted exactly.");
         }
 
         var replay = await store.TryReserveAsync(acceptedRequests[0], CancellationToken.None);
@@ -1727,7 +1757,10 @@ public static class EntryPoint
                     request.RequestId,
                     actualCostUsd: 0.05m,
                     inputTokens: 5,
+                    cachedInputTokens: 0,
+                    cacheWriteInputTokens: 0,
                     outputTokens: 5,
+                    reasoningTokens: 0,
                     uncertain: false,
                     released: false,
                     CancellationToken.None))
@@ -1743,7 +1776,10 @@ public static class EntryPoint
                 releasedRequest.RequestId,
                 actualCostUsd: 0,
                 inputTokens: null,
+                cachedInputTokens: null,
+                cacheWriteInputTokens: null,
                 outputTokens: null,
+                reasoningTokens: null,
                 uncertain: false,
                 released: true,
                 CancellationToken.None))
@@ -3156,19 +3192,25 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
 
 internal sealed class E2eConversationProvider : IAiProvider
 {
+    public int EstimateMaximumCreditCost(AiProviderRequest request) => 10;
+
     public async Task<AiProviderResponse?> CompleteAsync(
         AiProviderRequest request,
         CancellationToken cancellationToken)
     {
         await Task.Delay(TimeSpan.FromMilliseconds(80), cancellationToken);
         if (request.Purpose != AiAssistPurpose.LanguageAlternative)
-            return new AiProviderResponse("language_alternative", "Use wording bounded to this observed comparison.", ["OBS-E2E-01"]);
+            return new AiProviderResponse("language_alternative", "Use wording bounded to this observed comparison.", ["OBS-E2E-01"])
+            {
+                Usage = new AiProviderTokenUsage(10_000, 0, 0, 1_000, 0),
+            };
 
         return new AiProviderResponse(
             "draft_proposal",
             "Narrow the scope to the observed comparison only.",
             ["OBS-E2E-01"])
         {
+            Usage = new AiProviderTokenUsage(10_000, 0, 0, 1_000, 0),
             Proposal = new AiDraftProposal(
                 "claim_scope",
                 "LIMITED_COMPARISON",

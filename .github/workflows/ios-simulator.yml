@@ -44,7 +44,7 @@ jobs:
   ios-host:
     name: Build and smoke-test iOS Simulator
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -57,6 +57,16 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Select Xcode 26.0.1
+        run: |
+          set -Eeuo pipefail
+          xcode_path=/Applications/Xcode_26.0.1.app
+          if [[ ! -d "$xcode_path" ]]; then
+            printf 'Required Xcode is not installed on this runner: %s\n' "$xcode_path" >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$xcode_path"
 
       - name: Record Apple toolchain and simulator inventory
         run: |
@@ -84,7 +94,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/xcodebuild.log"
+            build 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/xcodebuild.log" | \
+            awk '/(^|[[:space:]])error:|warning:|BUILD (SUCCEEDED|FAILED)/ { print; fflush() }'
 
       - name: Run iOS Simulator launch smoke
         run: |
@@ -93,6 +104,29 @@ jobs:
             "$RUNNER_TEMP/evidrilo-derived-data/Build/Products/Release-iphonesimulator/Evidrilo.app" \
             dev.nextgen.mobile.ios \
             "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
+
+      - name: Run iOS guest project flow UI test
+        run: |
+          set -Eeuo pipefail
+          set -o pipefail
+          simulator_udid=$(awk -F= '$1 == "simulator_udid" { print $2; exit }' \
+            "$RUNNER_TEMP/evidrilo-ios-simulator-evidence/run-metadata.txt")
+          if [[ -z "$simulator_udid" ]]; then
+            printf '%s\n' 'The launch smoke test did not record a simulator UDID' >&2
+            exit 1
+          fi
+          xcodebuild \
+            -project apps/ios/iosApp.xcodeproj \
+            -scheme Evidrilo \
+            -configuration Release \
+            -destination "platform=iOS Simulator,id=$simulator_udid" \
+            -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data" \
+            -resultBundlePath "$RUNNER_TEMP/evidrilo-ios-build/ios-ui-tests.xcresult" \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/xcodebuild-ui-tests.log" | \
+            awk '/(^|[[:space:]])error:|warning:|Test Suite|Test Case|Executed [0-9]+ tests?|TEST (SUCCEEDED|FAILED)|Testing (failed|cancelled)/ { print; fflush() }'
 
       - name: Collect final simulator diagnostics
         if: always()

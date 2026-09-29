@@ -194,7 +194,7 @@ flowchart TD
     Archive --> LocalHistory
     Trash --> Restore{Restore within retention and capacity?}
     Restore -->|Yes| Save
-    Restore -->|No| Expired[Keep unavailable; purge Trash after 30 days]
+    Restore -->|No| Expired[Keep unavailable, purge Trash after 30 days]
 ~~~
 
 **Recommended project interaction (target; not implemented yet):** Use a project
@@ -400,7 +400,7 @@ flowchart TD
     Settings --> Protected[Choose account-bound action]
     AccountAction --> Gate{Verified session available?}
     Protected --> Gate
-    Gate -->|No| Auth[Sign in; keep requested destination]
+    Gate -->|No| Auth[Sign in, keep requested destination]
     Auth --> AuthResult{Provider succeeds?}
     AuthResult -->|No, cancelled, or expired| Return[Keep local data and show recovery path]
     AuthResult -->|Yes| Destination[Return to requested account action]
@@ -471,13 +471,13 @@ AI request leaves the case draft and deterministic feedback unchanged.
 flowchart TD
     Case[Open AI in an authenticated M0 case] --> Consent[Review shown context and consent for this request]
     Consent --> Send[Submit bounded case question]
-    Send --> API[Rebuild active case context; check account, session, and anchors]
+    Send --> API[Rebuild active case context, check account, session, and anchors]
     API --> Provider{Provider enabled?}
-    Provider -->|No: current configuration| Unavailable[Show unavailable; keep draft and deterministic feedback]
+    Provider -->|No: current configuration| Unavailable[Show unavailable, keep draft and deterministic feedback]
     Provider -->|Only after approval| Response[Return validated explanation, question, or proposal]
     Response --> Kind{Typed proposal?}
-    Kind -->|No| Explain[Show explanation or reflection question; draft unchanged]
-    Kind -->|Yes| Preview[Show before/after proposal; do not auto-apply]
+    Kind -->|No| Explain[Show explanation or reflection question, draft unchanged]
+    Kind -->|Yes| Preview[Show before/after proposal, do not auto-apply]
     Preview --> Choice{Student action}
     Choice -->|Dismiss| Unchanged[Keep draft unchanged]
     Choice -->|Apply supported claim, scope, or limitation| Reducer[Apply through Conclusion reducer]
@@ -538,7 +538,7 @@ flowchart TD
     General --> Policy[Review separate General-chat policy and cost]
     Context --> Consent{Consent, account, template, and credits valid?}
     Policy --> Consent
-    Consent -->|No or current provider disabled| Manual[Keep AI unavailable; continue manual work]
+    Consent -->|No or current provider disabled| Manual[Keep AI unavailable, continue manual work]
     Consent -->|Approved future configuration| Generate[Request bounded typed response]
     Generate --> Validate[Validate schema, anchors, scope, and base revision]
     Validate --> Proposal[Show editable proposal and AI provenance]
@@ -564,7 +564,7 @@ student can understand a method, keep their own work, or retrieve their data.
 | Catalog | Browse all five family guides; preview every published version; start a reviewed baseline template whenever that family has one | May start optional reviewed specialist templates introduced later; no family is Pro-only |
 | Projects | Blank/manual projects, full core workflow, five active projects per installation | Fifty active projects per installation while entitlement is verified |
 | Case practice | Complete Free learning loop | Two additional approved premium cases |
-| AI allowance | Ten one-time credits for an eligible verified account after consent | One hundred credits per active entitlement month; yearly plans receive the same monthly grant |
+| AI allowance | 20 one-time credits for an eligible verified account after consent | 200 credits per active entitlement month; yearly plans receive the same monthly grant |
 | Reports and data | Essential report export and complete project-data portability | No paid-only lock on existing project data or recovery/export |
 
 Template publication and Pro access are separate decisions: only a reviewed,
@@ -603,12 +603,12 @@ flowchart TD
     Action -->|Restore| Restore[Start a user-initiated restore]
     Action -->|Close| FreeFallback
     Offer --> Offers{Offerings available?}
-    Offers -->|No or error| FreeFallback[Keep Free work available; show retry or unavailable]
+    Offers -->|No or error| FreeFallback[Keep Free work available, show retry or unavailable]
     Offers -->|Yes| Choice[Select a package and review renewal terms]
     Choice --> Purchase[Start RevenueCat purchase]
     Purchase --> Outcome{Provider outcome}
-    Outcome -->|User cancels purchase| Cancelled[Return to paywall; entitlement unchanged]
-    Outcome -->|Pending| Pending[Show pending; wait for verified provider state]
+    Outcome -->|User cancels purchase| Cancelled[Return to paywall, entitlement unchanged]
+    Outcome -->|Pending| Pending[Show pending, wait for verified provider state]
     Outcome -->|Failure| Failed[Show failure and retry option]
     Outcome -->|Verified active entitlement| Active[Unlock Pro benefits]
     Pending --> Reconcile[Refresh or await verified CustomerInfo]

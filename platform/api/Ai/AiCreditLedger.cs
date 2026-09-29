@@ -35,6 +35,7 @@ public interface IProjectAiCreditSettlementLedger
         AiCreditReservation reservation,
         string requestHash,
         int creditCost,
+        int settledCreditCost,
         CancellationToken cancellationToken);
 
     Task<ProjectAiCreditSettlementResult> SettleProjectAiAsync(
@@ -70,6 +71,7 @@ public sealed class DatabaseUnavailableAiCreditLedger : IAiCreditLedger, IProjec
         Guid accountId,
         AiCreditReservation reservation,
         bool accepted,
+        int settledCreditCost,
         CancellationToken cancellationToken) => throw NotConfigured();
 
     public Task<AiCreditBalance> GetBalanceAsync(
@@ -88,6 +90,7 @@ public sealed class DatabaseUnavailableAiCreditLedger : IAiCreditLedger, IProjec
         AiCreditReservation reservation,
         string requestHash,
         int creditCost,
+        int settledCreditCost,
         CancellationToken cancellationToken) => throw NotConfigured();
 
     public Task<ProjectAiCreditSettlementResult> SettleProjectAiAsync(
@@ -109,15 +112,15 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
     private const string SubscriptionGrantKind = "subscription_month";
     private const string Entitlement = "evidrilo_pro";
     private static readonly string LegacyRequestHash = new('0', 64);
-    private const int FreeGrantCredits = 10;
-    private const int SubscriptionGrantCredits = 100;
+    private const int FreeGrantCredits = 20;
+    private const int SubscriptionGrantCredits = 200;
     private const string ProjectAiDispatchingMarkerPrefix = "project-ai-dispatching:v1:";
     private const string ProjectAiPreviewMarkerPrefix = "project-ai-preview:v1:";
     private const string ProjectAiSettledMarkerPrefix = "project-ai-settled:v1:";
+    private const string ProjectAiSettledOutcomeMarkerPrefix = "project-ai-settled:v2:";
     private static readonly TimeSpan ReservationLease = TimeSpan.FromMinutes(2);
     // Keep a successful preview's hold alive while the student reviews it;
     // ordinary in-flight provider reservations retain the shorter lease.
-    private static readonly TimeSpan ProjectPreviewLease = TimeSpan.FromHours(24);
     private readonly NpgsqlDataSource dataSource;
 
     public NpgsqlAiCreditLedger(string connectionString)
@@ -227,7 +230,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         int creditCost,
         CancellationToken cancellationToken)
     {
-        if (creditCost is < 1 or > 100)
+        if (creditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
             throw new ApiException(
                 StatusCodes.Status400BadRequest,
                 "INVALID_AI_CREDIT_COST",
@@ -279,10 +282,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             // request_hash and retains the original scaffold digest in its
             // project-ai-settled marker, preventing a replay from dispatching.
             var originalHashHasProjectAiSettlementReceipt = existingStatus is "consumed" or "released"
-                && string.Equals(
-                    existingReleaseReason,
-                    ProjectAiSettledRequestMarker(requestHash),
-                    StringComparison.Ordinal);
+                && IsProjectAiSettlementReceiptForRequest(existingReleaseReason, requestHash);
             if (existingStatus is not null
                 && (existingCreditCost != creditCost
                     || (!string.Equals(existingHash, LegacyRequestHash, StringComparison.Ordinal)
@@ -380,8 +380,16 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         Guid accountId,
         AiCreditReservation reservation,
         bool accepted,
+        int settledCreditCost,
         CancellationToken cancellationToken)
     {
+        if (settledCreditCost is < 0 or > AiCreditPricing.MaximumCreditsPerRequest
+            || (!accepted && settledCreditCost != 0))
+            throw new ApiException(
+                StatusCodes.Status400BadRequest,
+                "INVALID_AI_CREDIT_SETTLEMENT",
+                "The AI credit settlement is invalid.");
+
         try
         {
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -392,11 +400,12 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
 
             Guid? grantId = null;
             string? status = null;
+            int reservedCreditCost = 0;
             await using (var reservationCommand = connection.CreateCommand())
             {
                 reservationCommand.Transaction = transaction;
                 reservationCommand.CommandText = """
-                    select grant_id, status
+                    select grant_id, status, credit_cost
                     from public.ai_credit_reservations
                     where account_id = @account_id and request_id = @request_id
                     for update;
@@ -408,6 +417,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 {
                     grantId = reader.GetGuid(0);
                     status = reader.GetString(1);
+                    reservedCreditCost = reader.GetInt32(2);
                 }
             }
 
@@ -416,15 +426,23 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
+            if (accepted && settledCreditCost > reservedCreditCost)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return false;
+            }
 
             Guid? settledGrantId = null;
-            int settledCreditCost = 0;
+            int updatedReservedCost = 0;
             await using (var reservationCommand = connection.CreateCommand())
             {
                 reservationCommand.Transaction = transaction;
                 reservationCommand.CommandText = """
                     update public.ai_credit_reservations
-                    set status = @status, completed_at = now(), release_reason = null
+                    set status = @status,
+                        settled_credit_cost = @settled_credit_cost,
+                        completed_at = now(),
+                        release_reason = null
                     where account_id = @account_id
                       and request_id = @request_id
                       and status = 'reserved'
@@ -435,13 +453,17 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                     "status",
                     NpgsqlDbType.Text,
                     accepted ? "consumed" : "released");
+                reservationCommand.Parameters.AddWithValue(
+                    "settled_credit_cost",
+                    NpgsqlDbType.Integer,
+                    accepted ? settledCreditCost : 0);
                 reservationCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
                 reservationCommand.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, reservation.RequestId);
                 await using var reader = await reservationCommand.ExecuteReaderAsync(cancellationToken);
                 if (await reader.ReadAsync(cancellationToken))
                 {
                     settledGrantId = reader.GetGuid(0);
-                    settledCreditCost = reader.GetInt32(1);
+                    updatedReservedCost = reader.GetInt32(1);
                 }
             }
 
@@ -455,20 +477,18 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             await using (var grantCommand = connection.CreateCommand())
             {
                 grantCommand.Transaction = transaction;
-                grantCommand.CommandText = accepted
-                    ? """
-                      update public.ai_credit_grants
-                      set reserved_credits = reserved_credits - @credit_cost,
-                          consumed_credits = consumed_credits + @credit_cost
-                      where grant_id = @grant_id and reserved_credits >= @credit_cost;
-                      """
-                    : """
-                      update public.ai_credit_grants
-                      set reserved_credits = reserved_credits - @credit_cost
-                      where grant_id = @grant_id and reserved_credits >= @credit_cost;
-                      """;
+                grantCommand.CommandText = """
+                    update public.ai_credit_grants
+                    set reserved_credits = reserved_credits - @reserved_credit_cost,
+                        consumed_credits = consumed_credits + @settled_credit_cost
+                    where grant_id = @grant_id and reserved_credits >= @reserved_credit_cost;
+                    """;
                 grantCommand.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId.Value);
-                grantCommand.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, settledCreditCost);
+                grantCommand.Parameters.AddWithValue("reserved_credit_cost", NpgsqlDbType.Integer, updatedReservedCost);
+                grantCommand.Parameters.AddWithValue(
+                    "settled_credit_cost",
+                    NpgsqlDbType.Integer,
+                    accepted ? settledCreditCost : 0);
                 if (await grantCommand.ExecuteNonQueryAsync(cancellationToken) != 1)
                     throw new ApiException(
                         StatusCodes.Status503ServiceUnavailable,
@@ -502,7 +522,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
     {
         if (accountId == Guid.Empty
             || !IsHash(requestHash)
-            || creditCost is not (1 or 3)
+            || creditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest
             || !IsValidRequestId(reservation.RequestId))
         {
             throw new ApiException(
@@ -601,11 +621,14 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         AiCreditReservation reservation,
         string requestHash,
         int creditCost,
+        int settledCreditCost,
         CancellationToken cancellationToken)
     {
         if (accountId == Guid.Empty
             || !IsHash(requestHash)
-            || creditCost is not (1 or 3)
+            || creditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest
+            || settledCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest
+            || settledCreditCost > creditCost
             || !IsValidRequestId(reservation.RequestId))
         {
             throw new ApiException(
@@ -626,11 +649,12 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             string? status = null;
             string? releaseReason = null;
             int storedCreditCost = 0;
+            int? storedSettledCreditCost = null;
             await using (var read = connection.CreateCommand())
             {
                 read.Transaction = transaction;
                 read.CommandText = """
-                    select request_hash, status, credit_cost, release_reason
+                    select request_hash, status, credit_cost, settled_credit_cost, release_reason
                     from public.ai_credit_reservations
                     where account_id = @account_id and request_id = @request_id
                     for update;
@@ -643,12 +667,22 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                     storedHash = reader.GetString(0);
                     status = reader.GetString(1);
                     storedCreditCost = reader.GetInt32(2);
-                    releaseReason = reader.IsDBNull(3) ? null : reader.GetString(3);
+                    storedSettledCreditCost = reader.IsDBNull(3) ? null : reader.GetInt32(3);
+                    releaseReason = reader.IsDBNull(4) ? null : reader.GetString(4);
                 }
             }
 
             var dispatchingMarker = ProjectAiDispatchingMarker(requestHash);
             var previewMarker = ProjectAiPreviewMarker(requestHash);
+            if (status == "consumed"
+                && storedCreditCost == creditCost
+                && storedSettledCreditCost == settledCreditCost
+                && string.Equals(storedHash, requestHash, StringComparison.Ordinal)
+                && releaseReason == previewMarker)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return true;
+            }
             if (status != "reserved"
                 || storedCreditCost != creditCost
                 || !string.Equals(storedHash, requestHash, StringComparison.Ordinal)
@@ -659,30 +693,64 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             }
 
             var expectedMarker = releaseReason == previewMarker ? previewMarker : dispatchingMarker;
-            await using var update = connection.CreateCommand();
-            update.Transaction = transaction;
-            update.CommandText = """
+            Guid? settledGrantId = null;
+            await using (var updateReservation = connection.CreateCommand())
+            {
+                updateReservation.Transaction = transaction;
+                updateReservation.CommandText = """
                 update public.ai_credit_reservations
-                set release_reason = @preview_marker,
-                    lease_expires_at = clock_timestamp() + @preview_lease
+                set status = 'consumed',
+                    settled_credit_cost = @settled_credit_cost,
+                    completed_at = clock_timestamp(),
+                    release_reason = @preview_marker
                 where account_id = @account_id
                   and request_id = @request_id
                   and request_hash = @request_hash
                   and credit_cost = @credit_cost
                   and status = 'reserved'
                   and release_reason = @expected_marker
-                  and lease_expires_at > clock_timestamp();
+                  and lease_expires_at > clock_timestamp()
+                returning grant_id;
                 """;
-            update.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, previewMarker);
-            update.Parameters.AddWithValue("preview_lease", NpgsqlDbType.Interval, ProjectPreviewLease);
-            update.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
-            update.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, reservation.RequestId);
-            update.Parameters.AddWithValue("request_hash", NpgsqlDbType.Text, requestHash);
-            update.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
-            update.Parameters.AddWithValue("expected_marker", NpgsqlDbType.Text, expectedMarker);
-            var marked = await update.ExecuteNonQueryAsync(cancellationToken) == 1;
+                updateReservation.Parameters.AddWithValue("settled_credit_cost", NpgsqlDbType.Integer, settledCreditCost);
+                updateReservation.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, previewMarker);
+                updateReservation.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+                updateReservation.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, reservation.RequestId);
+                updateReservation.Parameters.AddWithValue("request_hash", NpgsqlDbType.Text, requestHash);
+                updateReservation.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
+                updateReservation.Parameters.AddWithValue("expected_marker", NpgsqlDbType.Text, expectedMarker);
+                var value = await updateReservation.ExecuteScalarAsync(cancellationToken);
+                settledGrantId = value is Guid id ? id : null;
+            }
+
+            if (settledGrantId is null)
+            {
+                await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return false;
+            }
+
+            await using (var updateGrant = connection.CreateCommand())
+            {
+                updateGrant.Transaction = transaction;
+                updateGrant.CommandText = """
+                    update public.ai_credit_grants
+                    set reserved_credits = reserved_credits - @reserved_credit_cost,
+                        consumed_credits = consumed_credits + @settled_credit_cost
+                    where grant_id = @grant_id and reserved_credits >= @reserved_credit_cost;
+                    """;
+                updateGrant.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId.Value);
+                updateGrant.Parameters.AddWithValue("reserved_credit_cost", NpgsqlDbType.Integer, creditCost);
+                updateGrant.Parameters.AddWithValue("settled_credit_cost", NpgsqlDbType.Integer, settledCreditCost);
+                if (await updateGrant.ExecuteNonQueryAsync(cancellationToken) != 1)
+                    throw new ApiException(
+                        StatusCodes.Status503ServiceUnavailable,
+                        "AI_CREDIT_LEDGER_CORRUPT",
+                        "The project-AI reservation could not be settled.");
+            }
+
             await transaction.CommitAsync(cancellationToken);
-            return marked;
+            return true;
         }
         catch (OperationCanceledException)
         {
@@ -728,11 +796,12 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             string? status = null;
             string? releaseReason = null;
             int creditCost = 0;
+            int? settledCreditCost = null;
             await using (var read = connection.CreateCommand())
             {
                 read.Transaction = transaction;
                 read.CommandText = """
-                    select grant_id, request_hash, status, credit_cost, release_reason
+                    select grant_id, request_hash, status, credit_cost, settled_credit_cost, release_reason
                     from public.ai_credit_reservations
                     where account_id = @account_id and request_id = @request_id
                     for update;
@@ -746,7 +815,8 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                     requestHash = reader.GetString(1);
                     status = reader.GetString(2);
                     creditCost = reader.GetInt32(3);
-                    releaseReason = reader.IsDBNull(4) ? null : reader.GetString(4);
+                    settledCreditCost = reader.IsDBNull(4) ? null : reader.GetInt32(4);
+                    releaseReason = reader.IsDBNull(5) ? null : reader.GetString(5);
                 }
             }
 
@@ -756,84 +826,110 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.NotFound);
             }
 
-            var finalStatus = apply ? "consumed" : "released";
+            if (status == "consumed"
+                && settledCreditCost is > 0
+                && releaseReason == ProjectAiPreviewMarker(requestHash))
+            {
+                await using var updatePreview = connection.CreateCommand();
+                updatePreview.Transaction = transaction;
+                updatePreview.CommandText = """
+                    update public.ai_credit_reservations
+                    set request_hash = @settlement_hash,
+                        release_reason = @settled_marker
+                    where account_id = @account_id
+                      and request_id = @request_id
+                      and request_hash = @original_request_hash
+                      and status = 'consumed'
+                      and release_reason = @preview_marker;
+                    """;
+                updatePreview.Parameters.AddWithValue("settlement_hash", NpgsqlDbType.Text, settlementHash);
+                updatePreview.Parameters.AddWithValue("settled_marker", NpgsqlDbType.Text, ProjectAiSettledRequestMarker(requestHash, apply));
+                updatePreview.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+                updatePreview.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
+                updatePreview.Parameters.AddWithValue("original_request_hash", NpgsqlDbType.Text, requestHash);
+                updatePreview.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, ProjectAiPreviewMarker(requestHash));
+                if (await updatePreview.ExecuteNonQueryAsync(cancellationToken) != 1)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return new ProjectAiCreditSettlementResult(
+                    apply ? ProjectAiCreditSettlementStatus.Applied : ProjectAiCreditSettlementStatus.Dismissed,
+                    settledCreditCost.Value);
+            }
+
             if (status is "consumed" or "released")
             {
-                var sameSettlement = status == finalStatus
-                    && string.Equals(requestHash, settlementHash, StringComparison.Ordinal)
-                    && IsProjectAiSettledRequestMarker(releaseReason);
+                var sameSettlement = string.Equals(requestHash, settlementHash, StringComparison.Ordinal)
+                    && ((status == (apply ? "consumed" : "released")
+                            && IsProjectAiSettledRequestMarker(releaseReason))
+                        || (status == "consumed"
+                            && IsProjectAiSettledOutcomeMarker(releaseReason, apply)));
                 await transaction.CommitAsync(cancellationToken);
                 return sameSettlement
                     ? new ProjectAiCreditSettlementResult(
                         apply ? ProjectAiCreditSettlementStatus.Applied : ProjectAiCreditSettlementStatus.Dismissed,
-                        creditCost)
+                        settledCreditCost ?? creditCost)
                     : new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
             }
 
-            if (status != "reserved"
-                || releaseReason != ProjectAiPreviewMarker(requestHash)
-                || creditCost is not (1 or 3))
+            if (creditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
             {
                 await transaction.CommitAsync(cancellationToken);
                 return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
             }
 
-            Guid? settledGrantId = null;
+            // Finish a preview created before token-based settlement was
+            // deployed. New previews are already charged before they are sent.
+            if (status != "reserved" || releaseReason != ProjectAiPreviewMarker(requestHash))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
+            }
+
             await using (var updateReservation = connection.CreateCommand())
             {
                 updateReservation.Transaction = transaction;
                 updateReservation.CommandText = """
                     update public.ai_credit_reservations
-                    set status = @status,
+                    set status = 'consumed',
+                        settled_credit_cost = credit_cost,
                         request_hash = @settlement_hash,
                         completed_at = clock_timestamp(),
-                        release_reason = @request_marker
+                        release_reason = @settled_marker
                     where account_id = @account_id
                       and request_id = @request_id
                       and status = 'reserved'
+                      and request_hash = @original_request_hash
                       and release_reason = @preview_marker
                       and lease_expires_at > clock_timestamp()
                     returning grant_id;
                     """;
-                updateReservation.Parameters.AddWithValue("status", NpgsqlDbType.Text, finalStatus);
                 updateReservation.Parameters.AddWithValue("settlement_hash", NpgsqlDbType.Text, settlementHash);
-                updateReservation.Parameters.AddWithValue(
-                    "request_marker",
-                    NpgsqlDbType.Text,
-                    ProjectAiSettledRequestMarker(requestHash));
+                updateReservation.Parameters.AddWithValue("settled_marker", NpgsqlDbType.Text, ProjectAiSettledRequestMarker(requestHash, apply));
                 updateReservation.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
                 updateReservation.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
-                updateReservation.Parameters.AddWithValue(
-                    "preview_marker",
-                    NpgsqlDbType.Text,
-                    ProjectAiPreviewMarker(requestHash));
+                updateReservation.Parameters.AddWithValue("original_request_hash", NpgsqlDbType.Text, requestHash);
+                updateReservation.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, ProjectAiPreviewMarker(requestHash));
                 var value = await updateReservation.ExecuteScalarAsync(cancellationToken);
-                settledGrantId = value is Guid id ? id : null;
-            }
+                if (value is not Guid settledGrantId)
+                {
+                    await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
+                }
 
-            if (settledGrantId is null)
-            {
-                await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
-            }
-
-            await using (var updateGrant = connection.CreateCommand())
-            {
+                await using var updateGrant = connection.CreateCommand();
                 updateGrant.Transaction = transaction;
-                updateGrant.CommandText = apply
-                    ? """
-                      update public.ai_credit_grants
-                      set reserved_credits = reserved_credits - @credit_cost,
-                          consumed_credits = consumed_credits + @credit_cost
-                      where grant_id = @grant_id and reserved_credits >= @credit_cost;
-                      """
-                    : """
-                      update public.ai_credit_grants
-                      set reserved_credits = reserved_credits - @credit_cost
-                      where grant_id = @grant_id and reserved_credits >= @credit_cost;
-                      """;
-                updateGrant.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId.Value);
+                updateGrant.CommandText = """
+                    update public.ai_credit_grants
+                    set reserved_credits = reserved_credits - @credit_cost,
+                        consumed_credits = consumed_credits + @credit_cost
+                    where grant_id = @grant_id and reserved_credits >= @credit_cost;
+                    """;
+                updateGrant.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId);
                 updateGrant.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
                 if (await updateGrant.ExecuteNonQueryAsync(cancellationToken) != 1)
                     throw new ApiException(
@@ -1071,10 +1167,32 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
     private static string ProjectAiSettledRequestMarker(string originalRequestHash) =>
         ProjectAiSettledMarkerPrefix + originalRequestHash;
 
+    private static string ProjectAiSettledRequestMarker(string originalRequestHash, bool applied) =>
+        ProjectAiSettledOutcomeMarkerPrefix
+        + originalRequestHash
+        + (applied ? ":applied" : ":dismissed");
+
     private static bool IsProjectAiSettledRequestMarker(string? marker) =>
         marker is not null
         && marker.StartsWith(ProjectAiSettledMarkerPrefix, StringComparison.Ordinal)
         && IsHash(marker[ProjectAiSettledMarkerPrefix.Length..]);
+
+    private static bool IsProjectAiSettledOutcomeMarker(string? marker, bool applied)
+    {
+        var outcomeSuffix = applied ? ":applied" : ":dismissed";
+        return marker is not null
+            && marker.StartsWith(ProjectAiSettledOutcomeMarkerPrefix, StringComparison.Ordinal)
+            && marker.Length == ProjectAiSettledOutcomeMarkerPrefix.Length + 64 + outcomeSuffix.Length
+            && marker.EndsWith(outcomeSuffix, StringComparison.Ordinal)
+            && IsHash(marker[
+                ProjectAiSettledOutcomeMarkerPrefix.Length..
+                    (ProjectAiSettledOutcomeMarkerPrefix.Length + 64)]);
+    }
+
+    private static bool IsProjectAiSettlementReceiptForRequest(string? marker, string requestHash) =>
+        string.Equals(marker, ProjectAiSettledRequestMarker(requestHash), StringComparison.Ordinal)
+        || string.Equals(marker, ProjectAiSettledRequestMarker(requestHash, applied: true), StringComparison.Ordinal)
+        || string.Equals(marker, ProjectAiSettledRequestMarker(requestHash, applied: false), StringComparison.Ordinal);
 
     private static async Task<DateTimeOffset> GetDatabaseTimeAsync(
         NpgsqlConnection connection,
@@ -1116,6 +1234,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             released as (
                 update public.ai_credit_reservations reservation
                 set status = 'released',
+                    settled_credit_cost = 0,
                     completed_at = clock_timestamp(),
                     release_reason = 'lease_expired'
                 from expired

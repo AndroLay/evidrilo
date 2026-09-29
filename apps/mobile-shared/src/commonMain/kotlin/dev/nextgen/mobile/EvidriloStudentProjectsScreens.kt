@@ -16,6 +16,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +93,47 @@ internal sealed interface StudentProjectListUiState {
     data object StorageUnavailable : StudentProjectListUiState
     data object StorageCorrupt : StudentProjectListUiState
     data object StorageFailed : StudentProjectListUiState
+}
+
+internal enum class StudentProjectCardAction(val label: String) {
+    CONTINUE("Continue project"),
+    OPEN("Open project"),
+    MARK_COMPLETE("Mark complete"),
+    ARCHIVE("Archive project"),
+    MOVE_TO_TRASH("Move to Trash"),
+    RESTORE_ACTIVE("Restore to active"),
+    RESTORE_ARCHIVED("Restore as archived"),
+    DELETE_PERMANENTLY("Delete permanently"),
+}
+
+internal fun studentProjectPrimaryAction(status: StudentProjectStatus): StudentProjectCardAction = when (status) {
+    StudentProjectStatus.DRAFT,
+    StudentProjectStatus.ACTIVE,
+    -> StudentProjectCardAction.CONTINUE
+    StudentProjectStatus.COMPLETED,
+    StudentProjectStatus.ARCHIVED,
+    -> StudentProjectCardAction.OPEN
+    StudentProjectStatus.TRASHED -> StudentProjectCardAction.RESTORE_ACTIVE
+}
+
+internal fun studentProjectSecondaryActions(status: StudentProjectStatus): List<StudentProjectCardAction> = when (status) {
+    StudentProjectStatus.DRAFT,
+    StudentProjectStatus.ACTIVE,
+    -> listOf(
+        StudentProjectCardAction.MARK_COMPLETE,
+        StudentProjectCardAction.ARCHIVE,
+        StudentProjectCardAction.MOVE_TO_TRASH,
+    )
+    StudentProjectStatus.COMPLETED,
+    StudentProjectStatus.ARCHIVED,
+    -> listOf(
+        StudentProjectCardAction.RESTORE_ACTIVE,
+        StudentProjectCardAction.MOVE_TO_TRASH,
+    )
+    StudentProjectStatus.TRASHED -> listOf(
+        StudentProjectCardAction.RESTORE_ARCHIVED,
+        StudentProjectCardAction.DELETE_PERMANENTLY,
+    )
 }
 
 private sealed interface StudentProjectAttachmentPreviewLoad {
@@ -873,6 +916,7 @@ private fun StudentProjectCard(
     onRestoreArchived: () -> Unit,
     onPermanentlyDelete: () -> Unit,
 ) {
+    var actionsExpanded by remember(project.id) { mutableStateOf(false) }
     val progress = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.requiredFieldProgress(project)
     EvidriloTargetCard {
         Text(project.title, style = MaterialTheme.typography.titleLarge)
@@ -887,26 +931,42 @@ private fun StudentProjectCard(
             style = MaterialTheme.typography.labelLarge,
             color = EvidriloColors.Cobalt,
         )
-        when (project.status) {
-            StudentProjectStatus.DRAFT,
-            StudentProjectStatus.ACTIVE,
-            -> {
-                EvidriloPrimaryButton(label = "Continue project", onClick = onResume)
-                EvidriloSecondaryButton(label = "Mark complete", onClick = onMarkCompleted)
-                EvidriloSecondaryButton(label = "Archive project", onClick = onArchive)
-                EvidriloSecondaryButton(label = "Move to Trash", onClick = onMoveToTrash)
-            }
-            StudentProjectStatus.COMPLETED,
-            StudentProjectStatus.ARCHIVED,
-            -> {
-                EvidriloPrimaryButton(label = "Open project", onClick = onResume)
-                EvidriloSecondaryButton(label = "Restore to active", onClick = onRestore)
-                EvidriloSecondaryButton(label = "Move to Trash", onClick = onMoveToTrash)
-            }
-            StudentProjectStatus.TRASHED -> {
-                EvidriloPrimaryButton(label = "Restore to active", onClick = onRestore)
-                EvidriloSecondaryButton(label = "Restore as archived", onClick = onRestoreArchived)
-                EvidriloSecondaryButton(label = "Delete permanently", onClick = onPermanentlyDelete)
+        val primaryAction = studentProjectPrimaryAction(project.status)
+        EvidriloPrimaryButton(
+            label = primaryAction.label,
+            onClick = when (primaryAction) {
+                StudentProjectCardAction.CONTINUE,
+                StudentProjectCardAction.OPEN,
+                -> onResume
+                StudentProjectCardAction.RESTORE_ACTIVE -> onRestore
+                else -> onResume
+            },
+        )
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            TextButton(onClick = { actionsExpanded = true }) { Text("More actions") }
+            DropdownMenu(
+                expanded = actionsExpanded,
+                onDismissRequest = { actionsExpanded = false },
+            ) {
+                studentProjectSecondaryActions(project.status).forEach { action ->
+                    DropdownMenuItem(
+                        text = { Text(action.label) },
+                        onClick = {
+                            actionsExpanded = false
+                            when (action) {
+                                StudentProjectCardAction.MARK_COMPLETE -> onMarkCompleted()
+                                StudentProjectCardAction.ARCHIVE -> onArchive()
+                                StudentProjectCardAction.MOVE_TO_TRASH -> onMoveToTrash()
+                                StudentProjectCardAction.RESTORE_ACTIVE -> onRestore()
+                                StudentProjectCardAction.RESTORE_ARCHIVED -> onRestoreArchived()
+                                StudentProjectCardAction.DELETE_PERMANENTLY -> onPermanentlyDelete()
+                                StudentProjectCardAction.CONTINUE,
+                                StudentProjectCardAction.OPEN,
+                                -> Unit
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -1476,7 +1536,7 @@ internal fun EvidriloStudentProjectEditorScreen(
                 },
             )
             Text(
-                "${activeEditorSectionIndex + 1} of ${editorSections.size} sections · Structural progress only",
+                "Section progress · Not a grade",
                 style = MaterialTheme.typography.labelMedium,
                 color = EvidriloColors.Slate,
             )

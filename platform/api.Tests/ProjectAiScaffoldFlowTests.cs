@@ -19,7 +19,7 @@ public sealed class ProjectAiScaffoldFlowTests
     private static readonly Guid ExistingProjectId = Guid.Parse("11111111-1111-4111-8111-111111111111");
 
     [Fact]
-    public async Task New_project_scaffold_holds_three_credits_and_preview_does_not_consume()
+    public async Task New_project_scaffold_reserves_a_maximum_and_settles_actual_token_cost_on_preview()
     {
         using var host = new TestHost();
 
@@ -32,13 +32,13 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("projectId").ValueKind);
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("baseProjectRevision").ValueKind);
         Assert.Equal(3, body.RootElement.GetProperty("creditCost").GetInt32());
-        Assert.Equal(3, host.Credits.ReservedFor(AccountA, "project-ai-flow-0001"));
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, "project-ai-flow-0001"));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, "project-ai-flow-0001"));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, "project-ai-flow-0001"));
         Assert.Equal(1, host.Generator.Calls);
     }
 
     [Fact]
-    public async Task In_project_assist_holds_one_credit()
+    public async Task In_project_assist_settles_actual_token_cost_on_preview()
     {
         using var host = new TestHost();
 
@@ -56,8 +56,8 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal("11111111-1111-4111-8111-111111111111", body.RootElement.GetProperty("projectId").GetString());
         Assert.Equal(7, body.RootElement.GetProperty("baseProjectRevision").GetInt32());
         Assert.Equal(1, body.RootElement.GetProperty("creditCost").GetInt32());
-        Assert.Equal(1, host.Credits.ReservedFor(AccountA, "project-ai-flow-0002"));
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, "project-ai-flow-0002"));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, "project-ai-flow-0002"));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, "project-ai-flow-0002"));
     }
 
     [Fact]
@@ -74,12 +74,162 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(ExistingProjectId.ToString(), body.RootElement.GetProperty("projectId").GetString());
         Assert.Equal("frame", body.RootElement.GetProperty("stageId").GetString());
         Assert.Equal("explain_template_step", body.RootElement.GetProperty("operationId").GetString());
-        Assert.Equal(1, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
         Assert.Equal(3, host.StudentProjects.ReadCount);
         Assert.Equal(1, host.Generator.Calls);
-        Assert.Equal("frame", host.Generator.LastRequest?.StageId);
-        Assert.Equal("explain_template_step", host.Generator.LastRequest?.StageOperationId);
-        Assert.Equal(new[] { "question" }, host.Generator.LastRequest?.AllowedOutputFieldIds);
+        Assert.Equal("frame", host.Generator.LastStageRequest?.StageId);
+        Assert.Equal("explain_template_step", host.Generator.LastStageRequest?.OperationId);
+        Assert.Equal(new[] { "question" }, host.Generator.LastStageRequest?.AllowedOutputFieldIds);
+        Assert.Equal(new[] { "question" }, host.Generator.LastStageRequest?.SelectedFields.Select(field => field.Id));
+        Assert.Empty(host.Generator.LastStageRequest?.SelectedEvidence ?? []);
+    }
+
+    [Fact]
+    public async Task Stage_assist_returns_typed_content_and_a_server_built_evaluation_preview()
+    {
+        using var host = new TestHost();
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            "project-ai-stage-typed-01",
+            ValidStageAssistRequest());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(body.RootElement.TryGetProperty("assist", out var assist), "The stage response must use the typed assist contract.");
+        var items = assist.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Contains(items, item => item.GetProperty("kind").GetString() == "EXPLANATION");
+        var proposal = Assert.Single(items, item => item.GetProperty("kind").GetString() == "PROPOSAL");
+        Assert.Equal("question", proposal.GetProperty("targetFieldId").GetString());
+        Assert.Equal("How does the reported outcome vary?", proposal.GetProperty("beforeValue").GetString());
+        Assert.NotEqual(proposal.GetProperty("beforeValue").GetString(), proposal.GetProperty("afterValue").GetString());
+
+        var evaluation = body.RootElement.GetProperty("evaluationPreview");
+        Assert.Equal("NOT_ASSESSED", evaluation.GetProperty("assessmentStatus").GetString());
+        Assert.Contains("proposal-question", evaluation.GetProperty("proposalsWithoutReferences").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("A narrower scope may make comparison easier.", evaluation.GetProperty("reportedAssumptions").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("A manual source review is still required.", evaluation.GetProperty("reportedKnownLimits").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("Do not claim causation from association alone.", evaluation.GetProperty("templateLimits").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("ACADEMIC_TRUTH", evaluation.GetProperty("checksUnavailable").EnumerateArray().Select(item => item.GetString()));
+    }
+
+    [Fact]
+    public async Task Stage_assist_sends_redacted_context_and_binds_the_original_before_value_in_the_preview()
+    {
+        const string selectedText = "Contact learner@example.org before comparing sources.";
+        using var host = new TestHost(projects: new RecordingStudentProjectStore(projectQuestion: selectedText));
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            "project-ai-stage-redaction-01",
+            ValidStageAssistRequest());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var providerField = Assert.Single(host.Generator.LastStageRequest!.SelectedFields);
+        Assert.Equal("Contact [REDACTED_EMAIL] before comparing sources.", providerField.Value);
+        var proposal = Assert.Single(body.RootElement.GetProperty("assist").GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("kind").GetString() == "PROPOSAL");
+        Assert.Equal(selectedText, proposal.GetProperty("beforeValue").GetString());
+
+        using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        Assert.DoesNotContain("learner@example.org", await history.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Stage_assist_accepts_an_existing_evidence_item_explicitly_selected_for_the_operation()
+    {
+        using var host = new TestHost();
+        host.Generator.StageOutput = host.Generator.StageOutput with
+        {
+            Items = host.Generator.StageOutput.Items.Select(item => item.Kind == "PROPOSAL"
+                ? item with { ReferenceIds = ["source-1"] }
+                : item).ToArray(),
+        };
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            "project-ai-stage-selected-evidence",
+            ValidStageAssistRequest(selectedEvidenceIds: ["source-1"]));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("source-1", Assert.Single(host.Generator.LastStageRequest!.SelectedEvidence).Id);
+        var supportingItem = Assert.Single(body.RootElement.GetProperty("evaluationPreview").GetProperty("supportingItems").EnumerateArray());
+        Assert.Equal("source-1", supportingItem.GetProperty("id").GetString());
+        Assert.Equal("Selected source", supportingItem.GetProperty("label").GetString());
+    }
+
+    [Fact]
+    public async Task Stage_assist_rejects_a_reference_to_evidence_the_student_did_not_select()
+    {
+        using var host = new TestHost();
+        host.Generator.StageOutput = host.Generator.StageOutput with
+        {
+            Items = host.Generator.StageOutput.Items.Select(item => item.Kind == "PROPOSAL"
+                ? item with { ReferenceIds = ["source-1"] }
+                : item).ToArray(),
+        };
+        const string requestId = "project-ai-stage-unselected-source";
+
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
+    }
+
+    [Fact]
+    public async Task Stage_assist_rejects_an_evidence_id_missing_from_the_owned_project()
+    {
+        using var host = new TestHost();
+        const string requestId = "project-ai-stage-missing-source";
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            requestId,
+            ValidStageAssistRequest(selectedEvidenceIds: ["not-in-project"]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.Calls);
+    }
+
+    [Fact]
+    public async Task Stage_assist_rejects_a_proposal_whose_before_value_is_not_the_selected_value()
+    {
+        using var host = new TestHost();
+        host.Generator.StageOutput = host.Generator.StageOutput with
+        {
+            Items = host.Generator.StageOutput.Items.Select(item => item.Kind == "PROPOSAL"
+                ? item with { BeforeValue = "A different saved question" }
+                : item).ToArray(),
+        };
+        const string requestId = "project-ai-stage-stale-before";
+
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
+    }
+
+    [Fact]
+    public async Task Stage_assist_rejects_a_proposal_for_a_field_outside_the_operation_output_allowlist()
+    {
+        using var host = new TestHost();
+        host.Generator.StageOutput = host.Generator.StageOutput with
+        {
+            Items = host.Generator.StageOutput.Items.Select(item => item.Kind == "PROPOSAL"
+                ? item with { TargetFieldId = "source" }
+                : item).ToArray(),
+        };
+        const string requestId = "project-ai-stage-output-field-denied";
+
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -107,13 +257,62 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(selectedFields: new Dictionary<string, string>
-            {
-                ["unrelated_field"] = "Must not be sent to this stage.",
-            }));
+            ValidStageAssistRequest(selectedFieldIds: ["unrelated_field"]));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("PROJECT_AI_FIELD_NOT_ALLOWED_FOR_OPERATION", body.RootElement.GetProperty("code").GetString());
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(0, host.Generator.Calls);
+    }
+
+    [Fact]
+    public async Task Stage_assist_rejects_client_supplied_field_values_instead_of_reading_the_saved_project()
+    {
+        using var host = new TestHost();
+        const string requestId = "project-ai-stage-client-text-denied";
+        var request = JsonSerializer.Serialize(new
+        {
+            schema = "evidrilo.project-ai-stage-assist",
+            version = "1",
+            mode = "PROJECT",
+            installationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            projectId = ExistingProjectId,
+            templateId = "reviewed-template",
+            templateVersion = 1,
+            baseProjectRevision = 7,
+            stageId = "frame",
+            operationId = "explain_template_step",
+            selectedFieldIds = new[] { "question" },
+            selectedFields = new Dictionary<string, string> { ["question"] = "Text from another project." },
+            selectedEvidenceIds = Array.Empty<string>(),
+            locale = "en",
+        });
+
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, request);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("INVALID_PROJECT_AI_STAGE_ASSIST", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.Calls);
+    }
+
+    [Fact]
+    public async Task Stage_assist_requires_evidence_items_to_be_selected_by_item_id()
+    {
+        using var host = new TestHost();
+        const string requestId = "project-ai-stage-source-as-field";
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            requestId,
+            ValidStageAssistRequest(selectedFieldIds: ["source"]));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("PROJECT_AI_EVIDENCE_SELECTION_REQUIRES_IDS", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ReservationCount);
         Assert.Equal(0, host.Generator.Calls);
     }
 
@@ -238,7 +437,7 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
-    public async Task Stage_assist_settlement_marks_an_unsaved_result_stale_and_releases_credit()
+    public async Task Stage_assist_settlement_marks_an_unsaved_result_stale_after_charging_generation()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-02";
@@ -253,7 +452,8 @@ public sealed class ProjectAiScaffoldFlowTests
             resultProjectRevision: 8);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -263,7 +463,7 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
-    public async Task Stale_stage_assist_settlement_records_stale_and_releases_credit()
+    public async Task Stale_stage_assist_settlement_records_stale_without_refunding_generation()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-03";
@@ -274,7 +474,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageSettlementAsync(AccountA, requestId, "STALE");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -284,7 +485,7 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
-    public async Task Dismissed_stage_assist_settlement_releases_credit_and_keeps_history()
+    public async Task Dismissed_stage_assist_settlement_keeps_generation_charge_and_history()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-dismiss";
@@ -294,7 +495,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageSettlementAsync(AccountA, requestId, "DISMISSED");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
         using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
@@ -319,7 +521,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var clearBody = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(1, clearBody.RootElement.GetProperty("clearedCount").GetInt32());
         Assert.Equal(3, host.StudentProjects.ReadCount);
-        Assert.Equal(1, host.Credits.ReservedFor(AccountA, projectRequestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, projectRequestId));
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, projectRequestId));
         Assert.Equal(1, host.Generator.Calls);
         using var sameInstallation = await host.GetProjectAiActivityAsync(
             AccountA,
@@ -525,8 +728,8 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(HttpStatusCode.Conflict, replay.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, changedPayload.StatusCode);
         Assert.Equal(1, host.Generator.Calls);
-        Assert.Equal(3, host.Credits.ReservedFor(AccountA, requestId));
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -559,7 +762,7 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
-    public async Task Dismiss_releases_without_consuming_and_retry_is_idempotent()
+    public async Task Dismiss_keeps_the_generation_charge_and_retry_is_idempotent()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0004";
@@ -571,9 +774,9 @@ public sealed class ProjectAiScaffoldFlowTests
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, requestId));
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
-        Assert.Equal(3, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -591,8 +794,8 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(HttpStatusCode.Conflict, changedKey.StatusCode);
         Assert.Equal(HttpStatusCode.OK, firstDecision.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, changedDecision.StatusCode);
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
-        Assert.Equal(3, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -606,8 +809,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var otherAccount = await host.PostSettlementAsync(AccountB, requestId, "apply", requestId);
 
         Assert.Equal(HttpStatusCode.NotFound, otherAccount.StatusCode);
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
-        Assert.Equal(3, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -627,8 +830,8 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(HttpStatusCode.Conflict, earlyApply.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, earlyDismiss.StatusCode);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
-        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
-        Assert.Equal(3, host.Credits.ReservedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
     }
 
     [Fact]
@@ -756,7 +959,8 @@ public sealed class ProjectAiScaffoldFlowTests
         int baseProjectRevision = 7,
         string? stageId = "frame",
         string? operationId = "explain_template_step",
-        IReadOnlyDictionary<string, string>? selectedFields = null)
+        IReadOnlyList<string>? selectedFieldIds = null,
+        IReadOnlyList<string>? selectedEvidenceIds = null)
     {
         if (mode == "GENERAL")
         {
@@ -782,10 +986,8 @@ public sealed class ProjectAiScaffoldFlowTests
             baseProjectRevision,
             stageId,
             operationId,
-            selectedFields = selectedFields ?? new Dictionary<string, string>
-            {
-                ["question"] = "How does the reported outcome vary?",
-            },
+            selectedFieldIds = selectedFieldIds ?? ["question"],
+            selectedEvidenceIds = selectedEvidenceIds ?? Array.Empty<string>(),
             locale = "en",
         });
     }
@@ -812,6 +1014,8 @@ public sealed class ProjectAiScaffoldFlowTests
                 services.AddSingleton<IProjectTemplateStore>(new PublishedTemplateStore());
                 services.RemoveAll<IProjectAiScaffoldGenerator>();
                 services.AddSingleton<IProjectAiScaffoldGenerator>(Generator);
+                services.RemoveAll<IProjectAiStageAssistGenerator>();
+                services.AddSingleton<IProjectAiStageAssistGenerator>(Generator);
                 services.RemoveAll<IAiCreditLedger>();
                 services.AddSingleton<IAiCreditLedger>(Credits);
                 services.RemoveAll<IStudentProjectStore>();
@@ -925,20 +1129,36 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     private sealed class RecordingStudentProjectStore(
-        Func<Guid, Guid, int, StudentProjectRecord?>? readOwn = null) : IStudentProjectStore
+        Func<Guid, Guid, int, StudentProjectRecord?>? readOwn = null,
+        string projectQuestion = "How does the reported outcome vary?") : IStudentProjectStore
     {
         private int currentVersion = 7;
         private int readCount;
         public int ReadCount => Volatile.Read(ref readCount);
         public void SetVersion(int version) => Volatile.Write(ref currentVersion, version);
 
-        public static StudentProjectRecord Record(int version)
+        public static StudentProjectRecord Record(int version, string projectQuestion = "How does the reported outcome vary?")
         {
             var now = DateTimeOffset.Parse("2026-09-29T00:00:00Z");
             return new StudentProjectRecord(
                 ExistingProjectId,
                 version,
-                new StudentProjectDocument("Saved project", null, null, null, null, [], [], [], null, null, [], [], null, [], []),
+                new StudentProjectDocument(
+                    "Saved project",
+                    null,
+                    projectQuestion,
+                    null,
+                    null,
+                    [],
+                    [new StudentProjectEvidenceItem("source-1", StudentProjectEvidenceKind.Source, "Selected source", "A reviewed abstract.", "Synthetic fixture")],
+                    [],
+                    null,
+                    null,
+                    [],
+                    [],
+                    null,
+                    [],
+                    []),
                 now,
                 now);
         }
@@ -956,7 +1176,7 @@ public sealed class ProjectAiScaffoldFlowTests
         {
             var count = Interlocked.Increment(ref readCount);
             return Task.FromResult(readOwn is null
-                ? accountId == AccountA && projectId == ExistingProjectId ? Record(Volatile.Read(ref currentVersion)) : null
+                ? accountId == AccountA && projectId == ExistingProjectId ? Record(Volatile.Read(ref currentVersion), projectQuestion) : null
                 : readOwn(accountId, projectId, count));
         }
 
@@ -1168,12 +1388,15 @@ public sealed class ProjectAiScaffoldFlowTests
                 "Reviewed literature synthesis",
                 "A bounded structure for student synthesis.",
                 "A student-authored synthesis plan.",
-                [new ProjectTemplateInputField("question", ProjectTemplateInputKind.ResearchQuestion, "Question", true)],
+                [
+                    new ProjectTemplateInputField("question", ProjectTemplateInputKind.ResearchQuestion, "Question", true),
+                    new ProjectTemplateInputField("source", ProjectTemplateInputKind.Source, "Source", false),
+                ],
                 [new ProjectTemplateStep(
                     "frame",
                     "Frame the question",
-                    ["question"],
-                    [new ProjectTemplateAiOperationCapability("explain_template_step", ["question"], ["question"])])],
+                    ["question", "source"],
+                    [new ProjectTemplateAiOperationCapability("explain_template_step", ["question", "source"], ["question"])])],
                 ["Do not claim causation from association alone."],
                 ["Record source provenance."],
                 ["Use text labels in addition to color."],
@@ -1199,13 +1422,14 @@ public sealed class ProjectAiScaffoldFlowTests
             throw new NotSupportedException();
     }
 
-    private sealed class RecordingScaffoldGenerator(bool enabled) : IProjectAiScaffoldGenerator
+    private sealed class RecordingScaffoldGenerator(bool enabled) : IProjectAiScaffoldGenerator, IProjectAiStageAssistGenerator
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool IsEnabled { get; } = enabled;
         public int Calls { get; private set; }
         public ProjectAiScaffoldProviderRequest? LastRequest { get; private set; }
+        public ProjectAiStageAssistProviderRequest? LastStageRequest { get; private set; }
         public bool WaitUntilCancelled { get; set; }
         public bool WaitUntilReleased { get; set; }
         public Action? OnGenerate { get; set; }
@@ -1218,37 +1442,74 @@ public sealed class ProjectAiScaffoldFlowTests
             [new ProjectAiFieldSuggestion("question", "How does the reported outcome vary?")],
             ["Which inclusion rule will you use?"],
             ["What result would change your current interpretation?"]);
+        public ProjectAiStageAssistOutput StageOutput { get; set; } = new(
+            "reviewed-template",
+            1,
+            ProjectAiStageAssistValidator.PromptVersion,
+            [
+                new ProjectAiStageAssistItem("explanation-1", "EXPLANATION", "Check how each source relates to the research question.", null, null, null, [], [], [], []),
+                new ProjectAiStageAssistItem("proposal-question", "PROPOSAL", null, "question", null, "How does the reported outcome vary across the selected sources?", [], ["A narrower scope may make comparison easier."], ["The selected sources may not represent all available evidence."], ["A manual source review is still required."]),
+            ],
+            [],
+            []);
+
+        public int EstimateMaximumCreditCost(ProjectAiScaffoldProviderRequest request) =>
+            request.Operation == ProjectAiScaffoldValidator.CreateOperation ? 3 : 1;
+
+        public int EstimateMaximumCreditCost(ProjectAiStageAssistProviderRequest request) => 1;
 
         public Task<ProjectAiScaffoldOutput?> GenerateAsync(ProjectAiScaffoldProviderRequest request, CancellationToken cancellationToken)
         {
             Calls++;
             LastRequest = request;
+            PrepareCall();
+            var output = Output is null ? null : Output with
+            {
+                Usage = request.Operation == ProjectAiScaffoldValidator.CreateOperation
+                    ? new AiProviderTokenUsage(27_000, 0, 0, 512, 0)
+                    : new AiProviderTokenUsage(5_000, 0, 0, 512, 0),
+            };
+            if (WaitUntilCancelled) return WaitForCancellationAsync(output, cancellationToken);
+            if (WaitUntilReleased) return WaitForReleaseAsync(output, cancellationToken);
+            return Task.FromResult(output);
+        }
+
+        public Task<ProjectAiStageAssistOutput?> GenerateAsync(ProjectAiStageAssistProviderRequest request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            LastStageRequest = request;
+            PrepareCall();
+            var output = StageOutput with { Usage = new AiProviderTokenUsage(5_000, 0, 0, 512, 0) };
+            if (WaitUntilCancelled) return WaitForCancellationAsync(output, cancellationToken);
+            if (WaitUntilReleased) return WaitForReleaseAsync(output, cancellationToken);
+            return Task.FromResult<ProjectAiStageAssistOutput?>(output);
+        }
+
+        private void PrepareCall()
+        {
             OnGenerate?.Invoke();
             var failure = Failure;
             if (failure is not null) throw failure;
             if (WaitUntilCancelled)
             {
                 Started.TrySetResult();
-                return WaitForCancellationAsync(cancellationToken);
             }
             if (WaitUntilReleased)
             {
                 Started.TrySetResult();
-                return WaitForReleaseAsync(cancellationToken);
             }
-            return Task.FromResult(Output);
         }
 
-        private async Task<ProjectAiScaffoldOutput?> WaitForCancellationAsync(CancellationToken cancellationToken)
+        private async Task<T?> WaitForCancellationAsync<T>(T? output, CancellationToken cancellationToken)
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            return Output;
+            return output;
         }
 
-        private async Task<ProjectAiScaffoldOutput?> WaitForReleaseAsync(CancellationToken cancellationToken)
+        private async Task<T?> WaitForReleaseAsync<T>(T? output, CancellationToken cancellationToken)
         {
             await Release.Task.WaitAsync(cancellationToken);
-            return Output;
+            return output;
         }
     }
 
@@ -1283,13 +1544,19 @@ public sealed class ProjectAiScaffoldFlowTests
             }
         }
 
-        public Task<bool> CompleteAsync(Guid accountId, AiCreditReservation reservation, bool accepted, CancellationToken cancellationToken)
+        public Task<bool> CompleteAsync(
+            Guid accountId,
+            AiCreditReservation reservation,
+            bool accepted,
+            int settledCreditCost,
+            CancellationToken cancellationToken)
         {
             lock (sync)
             {
                 if (!reservations.TryGetValue((accountId, reservation.RequestId), out var state) || state.Status != "reserved")
                     return Task.FromResult(false);
                 state.Status = accepted ? "consumed" : "released";
+                state.SettledCreditCost = accepted ? settledCreditCost : 0;
                 return Task.FromResult(true);
             }
         }
@@ -1318,16 +1585,20 @@ public sealed class ProjectAiScaffoldFlowTests
             AiCreditReservation reservation,
             string requestHash,
             int creditCost,
+            int settledCreditCost,
             CancellationToken cancellationToken)
         {
             lock (sync)
             {
                 if (!reservations.TryGetValue((accountId, reservation.RequestId), out var state)
-                    || state.Status != "reserved"
+                    || (state.Status != "reserved" && !(state.Status == "consumed" && state.ProjectAiPreview))
                     || state.RequestHash != requestHash
                     || state.CreditCost != creditCost
+                    || state.SettledCreditCost is not null
                     || !state.BoundForDispatch)
                     return Task.FromResult(false);
+                state.Status = "consumed";
+                state.SettledCreditCost = settledCreditCost;
                 state.ProjectAiPreview = true;
                 return Task.FromResult(true);
             }
@@ -1345,24 +1616,25 @@ public sealed class ProjectAiScaffoldFlowTests
                 if (!reservations.TryGetValue((accountId, requestId), out var state))
                     return Task.FromResult(new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.NotFound));
 
-                var expectedStatus = apply ? "consumed" : "released";
-                if (state.Status is "consumed" or "released")
+                if (state.SettlementHash is not null)
                 {
-                    if (state.Status == expectedStatus && state.SettlementHash == settlementHash)
+                    if (state.Status == "consumed"
+                        && state.SettlementHash == settlementHash
+                        && state.SettlementApplied == apply)
                         return Task.FromResult(new ProjectAiCreditSettlementResult(
                             apply ? ProjectAiCreditSettlementStatus.Applied : ProjectAiCreditSettlementStatus.Dismissed,
-                            state.CreditCost));
+                            state.SettledCreditCost ?? 0));
                     return Task.FromResult(new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict));
                 }
 
-                if (state.Status != "reserved" || !state.ProjectAiPreview)
+                if (state.Status != "consumed" || !state.ProjectAiPreview)
                     return Task.FromResult(new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict));
 
-                state.Status = expectedStatus;
                 state.SettlementHash = settlementHash;
+                state.SettlementApplied = apply;
                 return Task.FromResult(new ProjectAiCreditSettlementResult(
                     apply ? ProjectAiCreditSettlementStatus.Applied : ProjectAiCreditSettlementStatus.Dismissed,
-                    state.CreditCost));
+                    state.SettledCreditCost ?? 0));
             }
         }
 
@@ -1376,7 +1648,7 @@ public sealed class ProjectAiScaffoldFlowTests
 
         public int ConsumedFor(Guid accountId, string requestId)
         {
-            lock (sync) return reservations.TryGetValue((accountId, requestId), out var value) && value.Status == "consumed" ? value.CreditCost : 0;
+            lock (sync) return reservations.TryGetValue((accountId, requestId), out var value) && value.Status == "consumed" ? value.SettledCreditCost ?? 0 : 0;
         }
 
         public int ReleasedFor(Guid accountId, string requestId)
@@ -1392,6 +1664,8 @@ public sealed class ProjectAiScaffoldFlowTests
             public bool BoundForDispatch { get; set; }
             public bool ProjectAiPreview { get; set; }
             public string? SettlementHash { get; set; }
+            public bool? SettlementApplied { get; set; }
+            public int? SettledCreditCost { get; set; }
         }
     }
 }

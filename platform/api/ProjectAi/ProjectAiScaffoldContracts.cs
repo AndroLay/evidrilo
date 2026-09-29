@@ -37,7 +37,11 @@ public sealed record ProjectAiScaffoldOutput(
     [property: JsonPropertyName("guidanceText")] string GuidanceText,
     [property: JsonPropertyName("fieldSuggestions")] IReadOnlyList<ProjectAiFieldSuggestion> FieldSuggestions,
     [property: JsonPropertyName("clarificationQuestions")] IReadOnlyList<string> ClarificationQuestions,
-    [property: JsonPropertyName("recommendedNextPrompts")] IReadOnlyList<string> RecommendedNextPrompts);
+    [property: JsonPropertyName("recommendedNextPrompts")] IReadOnlyList<string> RecommendedNextPrompts)
+{
+    [JsonIgnore]
+    public AiProviderTokenUsage? Usage { get; init; }
+}
 
 public sealed record ProjectAiScaffoldResponse(
     [property: JsonPropertyName("schema")] string Schema,

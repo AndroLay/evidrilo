@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,16 +29,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +71,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
 import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
+import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.audio.AudioPlaybackState
@@ -271,7 +277,7 @@ private fun TargetCobaltCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = EvidriloColors.Cobalt,
+        color = EvidriloColors.PrimaryAction,
         contentColor = EvidriloColors.White,
     ) {
         Box {
@@ -280,8 +286,8 @@ private fun TargetCobaltCard(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             backgroundStartColor,
-                            EvidriloColors.Cobalt,
-                            EvidriloColors.CobaltBright,
+                            EvidriloColors.PrimaryAction,
+                            EvidriloColors.CobaltPressed,
                         ),
                         start = Offset(size.width * 0.08f, size.height),
                         end = Offset(size.width * 0.98f, 0f),
@@ -667,7 +673,7 @@ private fun TargetSourcesGraphic() {
                     Surface(
                         modifier = Modifier.size(width = 168.dp * artworkScale, height = 72.dp * artworkScale),
                         shape = RoundedCornerShape(24.dp),
-                        color = EvidriloColors.Cobalt,
+                        color = EvidriloColors.PrimaryAction,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             EvidriloLogoMark(
@@ -873,7 +879,10 @@ internal fun EvidriloTargetEvidenceScreen(
                     },
                 )
             }
-            EvidriloPrimaryButton(label = "Find the missing evidence", onClick = onOpenClaimTrace)
+            EvidriloPrimaryButton(
+                label = targetEvidencePrimaryActionLabel(metrics.evidenceStatus),
+                onClick = onOpenClaimTrace,
+            )
             EvidriloSecondaryButton(label = "Open evidence lens", onClick = onOpenEvidenceLens)
         }
     }
@@ -887,8 +896,8 @@ internal fun EvidriloTargetEvidenceLensScreen(
     onBack: () -> Unit,
     onOpenClaimTrace: () -> Unit,
 ) {
-    val observations = case.facts.filter { it.type == ConclusionFactType.OBSERVATION }
-    val selectedIds = draft.evidenceRefs.toSet()
+    val lens = evidenceLensFor(case, draft)
+    var selectedFactId by remember(case.id) { mutableStateOf<String?>(null) }
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
         EvidriloContentColumn {
             TargetCompactHeader(
@@ -901,18 +910,19 @@ internal fun EvidriloTargetEvidenceLensScreen(
                 body = "Inspect the supplied observations before deciding what your claim can support.",
                 compact = true,
             )
-            if (observations.isEmpty()) {
+            if (lens.entries.isEmpty()) {
                 TargetPageStatePanel(
                     state = TargetPageState.EMPTY,
                     title = "No supplied observations",
                     body = "This case has no observation facts available for the evidence lens.",
                 )
             } else {
-                observations.forEach { fact ->
+                lens.entries.forEach { entry ->
+                    val detail = targetEvidenceLensDetail(case, draft, entry.factId)
                     TargetEvidenceLensCard(
-                        caseTitle = case.title,
-                        fact = fact,
-                        selected = fact.id in selectedIds,
+                        detail = detail,
+                        fallbackText = entry.text,
+                        onClick = { selectedFactId = entry.factId },
                     )
                 }
             }
@@ -926,42 +936,260 @@ internal fun EvidriloTargetEvidenceLensScreen(
             EvidriloPrimaryButton(label = "Trace this requirement", onClick = onOpenClaimTrace)
         }
     }
+    selectedFactId?.let { factId ->
+        TargetEvidenceDetailSheet(
+            case = case,
+            draft = draft,
+            factId = factId,
+            onDismiss = { selectedFactId = null },
+        )
+    }
 }
 
 @Composable
 private fun TargetEvidenceLensCard(
-    caseTitle: String,
-    fact: ConclusionFact,
-    selected: Boolean,
+    detail: TargetEvidenceLensDetail,
+    fallbackText: String,
+    onClick: () -> Unit,
 ) {
-    EvidriloTargetCard {
+    val fact = detail.fact
+    val label = fact?.displayLabel ?: when (detail.availability) {
+        TargetFactAvailability.AVAILABLE -> "Supplied observation"
+        TargetFactAvailability.UNAVAILABLE -> "Unavailable reference"
+        TargetFactAvailability.INCOMPATIBLE_TYPE -> "Not an observation"
+    }
+    val status = when (detail.availability) {
+        TargetFactAvailability.UNAVAILABLE -> "Unavailable"
+        TargetFactAvailability.INCOMPATIBLE_TYPE -> "Not an observation"
+        TargetFactAvailability.AVAILABLE -> if (detail.selected) "Selected" else "Available"
+    }
+    EvidriloTargetCard(
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Inspect $label, ${detail.factId}. $status."
+            },
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TargetIconTile(
-                icon = if (selected) EvidriloIconName.CHECK else EvidriloIconName.FILE,
-                tint = if (selected) EvidriloColors.Success else EvidriloColors.Cobalt,
+                icon = if (detail.selected && detail.availability == TargetFactAvailability.AVAILABLE) {
+                    EvidriloIconName.CHECK
+                } else {
+                    EvidriloIconName.FILE
+                },
+                tint = if (detail.selected && detail.availability == TargetFactAvailability.AVAILABLE) {
+                    EvidriloColors.Success
+                } else {
+                    EvidriloColors.Cobalt
+                },
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        fact.displayLabel ?: "Supplied observation",
+                        label,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     EvidriloStatusChip(
-                        label = if (selected) "Selected" else "Available",
-                        tone = if (selected) EvidriloStatusTone.SUCCESS else EvidriloStatusTone.NEUTRAL,
+                        label = status,
+                        tone = when (detail.availability) {
+                            TargetFactAvailability.UNAVAILABLE,
+                            TargetFactAvailability.INCOMPATIBLE_TYPE,
+                            -> EvidriloStatusTone.WARNING
+                            TargetFactAvailability.AVAILABLE -> if (detail.selected) {
+                                EvidriloStatusTone.SUCCESS
+                            } else {
+                                EvidriloStatusTone.NEUTRAL
+                            }
+                        },
                     )
                 }
-                Text("Bundled case · $caseTitle", style = MaterialTheme.typography.labelMedium)
-                Text(fact.id, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
-                Text(fact.text, style = MaterialTheme.typography.bodyMedium)
+                Text("Bundled case · ${detail.caseTitle}", style = MaterialTheme.typography.labelMedium)
+                Text(detail.factId, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
+                Text(fact?.text ?: fallbackText, style = MaterialTheme.typography.bodyMedium)
+                Text("Tap to inspect source and usage", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
             }
         }
     }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun TargetEvidenceDetailSheet(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+    factId: String,
+    onDismiss: () -> Unit,
+) {
+    val detail = targetEvidenceLensDetail(case, draft, factId)
+    val fact = detail.fact
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 620.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Evidence detail", style = MaterialTheme.typography.headlineSmall)
+            Text(detail.caseTitle, style = MaterialTheme.typography.titleMedium)
+            TargetDetailLine("Origin", "Bundled case record")
+            TargetDetailLine("Case ID", detail.caseId)
+            TargetDetailLine("Case version", detail.caseVersionId ?: "Not provided by this case")
+            TargetDetailLine("Fact ID", detail.factId)
+            TargetDetailLine("Availability", detail.availability.targetDisplayLabel())
+            when (detail.availability) {
+                TargetFactAvailability.AVAILABLE -> {
+                    TargetDetailLine("Record type", fact!!.type.targetDisplayLabel())
+                    TargetDetailLine(
+                        "Relationship to this draft",
+                        if (detail.selected) {
+                            "Selected by you as an evidence anchor; support is assessed separately."
+                        } else {
+                            "Available in the case, but not selected in this draft."
+                        },
+                    )
+                    fact.displayValue?.let { TargetDetailLine("Recorded value", it) }
+                    TargetDetailLine("Supplied text", fact.text)
+                    TargetDetailLine(
+                        "Interpretation boundary",
+                        "Selection records your choice; it does not by itself establish that this observation supports the claim.",
+                    )
+                }
+                TargetFactAvailability.UNAVAILABLE -> {
+                    TargetDetailLine(
+                        "Draft reference",
+                        if (detail.selected) "This draft references this ID, but its target is unavailable."
+                        else "This ID is not referenced by the current draft.",
+                    )
+                    TargetDetailLine(
+                        "What is known",
+                        "This reference is not present in the active case version. No substitute observation is shown.",
+                    )
+                }
+                TargetFactAvailability.INCOMPATIBLE_TYPE -> {
+                    TargetDetailLine("Record type", fact!!.type.targetDisplayLabel())
+                    TargetDetailLine(
+                        "Draft reference",
+                        if (detail.selected) {
+                            "This draft contains the ID, but it is not counted as a selected observation."
+                        } else {
+                            "This case fact is not selected as evidence."
+                        },
+                    )
+                    TargetDetailLine("Supplied text", fact.text)
+                }
+            }
+            TargetDetailLine("Source locator", "Page or section locator is not supplied in this case.")
+            EvidriloSecondaryButton(label = "Close", onClick = onDismiss)
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun TargetRequirementDetailSheet(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+    onDismiss: () -> Unit,
+) {
+    val detail = targetRequirementTraceDetail(case, draft)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 660.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Requirement trace", style = MaterialTheme.typography.headlineSmall)
+            Text(detail.caseTitle, style = MaterialTheme.typography.titleMedium)
+            TargetDetailLine("Origin", "Requirement supplied with this case")
+            TargetDetailLine("Case ID", detail.caseId)
+            TargetDetailLine("Case version", detail.caseVersionId ?: "Not provided by this case")
+            detail.requirement?.let { requirement ->
+                TargetDetailLine("Requirement ID", requirement.id)
+                TargetDetailLine("Requirement text", requirement.text)
+            } ?: TargetDetailLine("Requirement", "No requirement fact is supplied in the active case.")
+
+            Text("Selected evidence in this draft", style = MaterialTheme.typography.titleMedium)
+            if (detail.selectedEvidence.isEmpty()) {
+                Text("No supplied observations are selected.", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                detail.selectedEvidence.forEach { fact ->
+                    TargetDetailLine(fact.displayLabel ?: fact.id, "${fact.id}\n${fact.text}")
+                }
+            }
+            detail.unavailableEvidenceIds.forEach { id ->
+                TargetDetailLine(
+                    "Unavailable reference",
+                    "This draft references $id, but it is not present in the active case version; no substitute is used.",
+                )
+            }
+            detail.incompatibleEvidenceIds.forEach { id ->
+                TargetDetailLine("Not an observation", "$id exists in the case but is not treated as selected evidence.")
+            }
+
+            Text("Recorded relationship", style = MaterialTheme.typography.titleMedium)
+            TargetDetailLine(
+                "Student-recorded relation",
+                detail.studentRecordedRelation?.targetDisplayLabel()
+                    ?: "No relationship has been recorded by you.",
+            )
+            TargetDetailLine("Evidence assessment", detail.supportStatus.targetDisplayLabel())
+            Text(
+                "This bounded case check explains the current draft against supplied rules; it does not establish universal scientific truth.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Text("Claim boundary", style = MaterialTheme.typography.titleMedium)
+            detail.boundary?.let { boundary ->
+                TargetDetailLine(boundary.id, boundary.text)
+            } ?: Text("No claim-boundary fact is supplied in the active case.", style = MaterialTheme.typography.bodyMedium)
+            EvidriloSecondaryButton(label = "Close", onClick = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun TargetDetailLine(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Slate)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun TargetFactAvailability.targetDisplayLabel(): String = when (this) {
+    TargetFactAvailability.AVAILABLE -> "Available in active case"
+    TargetFactAvailability.UNAVAILABLE -> "Unavailable in active case"
+    TargetFactAvailability.INCOMPATIBLE_TYPE -> "Present, but not an observation"
+}
+
+private fun ConclusionFactType.targetDisplayLabel(): String = when (this) {
+    ConclusionFactType.AIM -> "Requirement"
+    ConclusionFactType.CONTEXT -> "Case context"
+    ConclusionFactType.OBSERVATION -> "Supplied observation"
+    ConclusionFactType.LIMITATION -> "Stated limitation"
+    ConclusionFactType.BOUNDARY -> "Claim boundary"
+}
+
+private fun ConclusionRelation.targetDisplayLabel(): String = when (this) {
+    ConclusionRelation.OBSERVED_DIFFERENCE -> "Observed difference"
+    ConclusionRelation.LIMITED_OBSERVATION -> "Limited observation"
+    ConclusionRelation.CANNOT_CONCLUDE_FROM_CASE -> "Cannot conclude from this case"
+    ConclusionRelation.UNSUPPORTED -> "Unmapped relation"
 }
 
 @Composable
@@ -1109,6 +1337,8 @@ internal fun EvidriloTargetClaimTraceScreen(
     onOpenAction: () -> Unit,
     onStartPractice: () -> Unit,
 ) {
+    var isRequirementDetailOpen by remember(case.id) { mutableStateOf(false) }
+    var selectedEvidenceFactId by remember(case.id) { mutableStateOf<String?>(null) }
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
         EvidriloContentColumn {
             TargetCompactHeader(
@@ -1122,14 +1352,22 @@ internal fun EvidriloTargetClaimTraceScreen(
             )
             val metrics = targetWorkspaceMetrics(case, draft)
             case.facts.firstOrNull { it.type == ConclusionFactType.AIM }?.let { requirement ->
-                TargetRequirementCard(fact = requirement, status = metrics.evidenceStatus)
+                TargetRequirementCard(
+                    fact = requirement,
+                    status = metrics.evidenceStatus,
+                    onClick = { isRequirementDetailOpen = true },
+                )
             }
             TargetTraceInfoCard(
                 title = "Why this is required",
                 body = "This requirement is part of the supplied case brief. Evidrilo keeps the requirement, evidence anchors, and claim boundary visible together.",
                 icon = EvidriloIconName.FILE,
             )
-            TargetSupportingEvidenceCard(case = case, draft = draft)
+            TargetSupportingEvidenceCard(
+                case = case,
+                draft = draft,
+                onInspectFact = { selectedEvidenceFactId = it },
+            )
             EvidriloTintPanel {
                 Text("Offline source locator", style = MaterialTheme.typography.titleSmall)
                 Text(
@@ -1141,6 +1379,21 @@ internal fun EvidriloTargetClaimTraceScreen(
             EvidriloSecondaryButton(label = "Continue to action plan", onClick = onOpenAction)
             EvidriloSecondaryButton(label = "Open claim review", onClick = onStartPractice)
         }
+    }
+    if (isRequirementDetailOpen) {
+        TargetRequirementDetailSheet(
+            case = case,
+            draft = draft,
+            onDismiss = { isRequirementDetailOpen = false },
+        )
+    }
+    selectedEvidenceFactId?.let { factId ->
+        TargetEvidenceDetailSheet(
+            case = case,
+            draft = draft,
+            factId = factId,
+            onDismiss = { selectedEvidenceFactId = null },
+        )
     }
 }
 
@@ -1462,18 +1715,7 @@ internal fun EvidriloTargetHistoryScreen(
             storageNotice
                 ?.takeIf { it.isError }
                 ?.let { notice -> EvidriloRecoveryNotice(notice = notice) }
-            TargetCobaltCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TargetIconTile(icon = EvidriloIconName.HISTORY, tint = EvidriloColors.White)
-                    Text("This workspace", modifier = Modifier.padding(start = 14.dp), style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TargetMetric(summary.evidenceRemoved.toString(), "evidence removed", EvidriloColors.White)
-                    TargetMetric(summary.evidenceAdded.toString(), "evidence added", EvidriloColors.White)
-                    TargetMetric(summary.actionsChanged.toString(), "actions changed", EvidriloColors.White)
-                }
-            }
-            if (history == null) {
+            if (history == null || summary == null) {
                 EvidriloTargetCard {
                     Text("No comparison saved yet", style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -1483,6 +1725,17 @@ internal fun EvidriloTargetHistoryScreen(
                 }
                 EvidriloPrimaryButton(label = "Start evidence review", onClick = onStartPractice)
             } else {
+                TargetCobaltCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TargetIconTile(icon = EvidriloIconName.HISTORY, tint = EvidriloColors.White)
+                        Text("This workspace", modifier = Modifier.padding(start = 14.dp), style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TargetMetric(summary.evidenceRemoved.toString(), "evidence removed", EvidriloColors.White)
+                        TargetMetric(summary.evidenceAdded.toString(), "evidence added", EvidriloColors.White)
+                        TargetMetric(summary.actionsChanged.toString(), "actions changed", EvidriloColors.White)
+                    }
+                }
                 Text("Latest local comparison", style = MaterialTheme.typography.titleLarge)
                 TargetHistoryEventRow(
                     icon = EvidriloIconName.LAYERS,
@@ -1615,8 +1868,18 @@ private fun TargetRequirementCard(
     facts: List<ConclusionFact> = emptyList(),
     selectedIds: Set<String> = emptySet(),
     missingBody: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
-    EvidriloTargetCard {
+    val cardModifier = if (onClick == null) {
+        Modifier
+    } else {
+        Modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Inspect requirement ${fact.id}. ${status.targetDisplayLabel()}."
+            }
+    }
+    EvidriloTargetCard(modifier = cardModifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1627,6 +1890,9 @@ private fun TargetRequirementCard(
             TargetStatusChip(status)
         }
         Text(fact.text, style = MaterialTheme.typography.bodyLarge)
+        if (onClick != null) {
+            Text("Tap to inspect requirement origin and links", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
+        }
         if (facts.isNotEmpty()) {
             TargetEvidenceRail(facts = facts, selectedIds = selectedIds)
         }
@@ -1782,47 +2048,83 @@ private fun TargetTraceInfoCard(
 private fun TargetSupportingEvidenceCard(
     case: ConclusionCase,
     draft: ConclusionDraft,
+    onInspectFact: (String) -> Unit,
 ) {
     EvidriloTargetCard {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             TargetIconTile(icon = EvidriloIconName.LINK)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Supporting evidence", style = MaterialTheme.typography.titleLarge)
-                Text("Supplied observations connected to this requirement.", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        case.facts
-            .filter { it.type == ConclusionFactType.OBSERVATION }
-            .forEach { fact ->
-                TargetTraceEvidenceRow(
-                    fact = fact,
-                    selected = fact.id in draft.evidenceRefs,
+                Text("Evidence linked to this requirement", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Available observations are listed; selected anchors are marked. Selection alone is not a support verdict.",
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
+        }
+        evidenceLensFor(case, draft).entries.forEach { entry ->
+            val detail = targetEvidenceLensDetail(case, draft, entry.factId)
+                TargetTraceEvidenceRow(
+                    detail = detail,
+                    onClick = { onInspectFact(detail.factId) },
+                )
+        }
     }
 }
 
 @Composable
 private fun TargetTraceEvidenceRow(
-    fact: ConclusionFact,
-    selected: Boolean,
+    detail: TargetEvidenceLensDetail,
+    onClick: () -> Unit,
 ) {
+    val fact = detail.fact
+    val status = when (detail.availability) {
+        TargetFactAvailability.UNAVAILABLE -> "Unavailable"
+        TargetFactAvailability.INCOMPATIBLE_TYPE -> "Not an observation"
+        TargetFactAvailability.AVAILABLE -> if (detail.selected) "Selected" else "Available"
+    }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Inspect evidence ${detail.factId}. $status."
+            }
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TargetIconTile(
             icon = EvidriloIconName.FILE,
-            tint = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate,
+            tint = if (detail.selected && detail.availability == TargetFactAvailability.AVAILABLE) {
+                EvidriloColors.Cobalt
+            } else {
+                EvidriloColors.Slate
+            },
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(fact.displayLabel ?: "Observation", style = MaterialTheme.typography.titleMedium)
-            Text(fact.id, style = MaterialTheme.typography.labelMedium)
+            Text(
+                fact?.displayLabel ?: when (detail.availability) {
+                    TargetFactAvailability.AVAILABLE -> "Observation"
+                    TargetFactAvailability.UNAVAILABLE -> "Unavailable reference"
+                    TargetFactAvailability.INCOMPATIBLE_TYPE -> "Other case fact"
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(detail.factId, style = MaterialTheme.typography.labelMedium)
         }
         EvidriloStatusChip(
-            label = if (selected) "Selected" else "Available",
-            tone = if (selected) EvidriloStatusTone.SUCCESS else EvidriloStatusTone.NEUTRAL,
+            label = status,
+            tone = when (detail.availability) {
+                TargetFactAvailability.UNAVAILABLE,
+                TargetFactAvailability.INCOMPATIBLE_TYPE,
+                -> EvidriloStatusTone.WARNING
+                TargetFactAvailability.AVAILABLE -> if (detail.selected) {
+                    EvidriloStatusTone.SUCCESS
+                } else {
+                    EvidriloStatusTone.NEUTRAL
+                }
+            },
         )
     }
 }
@@ -2016,7 +2318,7 @@ private fun TargetProfileSummaryCard(
         },
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(modifier = Modifier.size(64.dp), shape = RoundedCornerShape(50), color = EvidriloColors.CobaltBright) {
+            Surface(modifier = Modifier.size(64.dp), shape = RoundedCornerShape(50), color = EvidriloColors.PrimaryAction) {
                 Box(contentAlignment = Alignment.Center) {
                     Text("S", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.White)
                 }
@@ -2032,11 +2334,15 @@ private fun TargetProfileSummaryCard(
             TargetProfileMetric(
                 icon = EvidriloIconName.FILE,
                 value = if (signedIn || TEMPORARY_GUEST_MODE_ENABLED) {
-                    "${summary.evidenceAdded + summary.evidenceRemoved}"
+                    summary?.let { "${it.evidenceAdded + it.evidenceRemoved}" } ?: "—"
                 } else {
                     "—"
                 },
-                label = if (signedIn || TEMPORARY_GUEST_MODE_ENABLED) "evidence changes" else "account history",
+                label = when {
+                    !signedIn && !TEMPORARY_GUEST_MODE_ENABLED -> "account history"
+                    summary == null -> "no saved comparison"
+                    else -> "evidence changes"
+                },
             )
             TargetProfileMetric(
                 icon = EvidriloIconName.FOLDER,

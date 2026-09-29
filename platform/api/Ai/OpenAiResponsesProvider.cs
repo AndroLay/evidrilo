@@ -46,6 +46,30 @@ public sealed class OpenAiResponsesProvider : IAiProvider
         this.spendBudgetStore = spendBudgetStore;
     }
 
+    public int EstimateMaximumCreditCost(AiProviderRequest request)
+    {
+        ValidateRequest(request);
+        if (options.InputUsdPerMillionTokens is null
+            || options.CachedInputUsdPerMillionTokens is null
+            || options.CacheWriteInputUsdPerMillionTokens is null
+            || options.OutputUsdPerMillionTokens is null
+            || options.MaxRequestCostUsd is null)
+            throw new AiProviderFailureException("AI_PROVIDER_UNAVAILABLE", "provider_disabled");
+
+        var inputBytes = Encoding.UTF8.GetByteCount(BuildRequestJson(request));
+        var maximumCost = options.EstimateMaximumRequestCostUsd(inputBytes);
+        if (maximumCost <= 0 || maximumCost > options.MaxRequestCostUsd.Value)
+            throw new AiProviderFailureException("AI_PROVIDER_COST_LIMIT", "request_cost_limit");
+        try
+        {
+            return AiCreditPricing.CreditsForCostUsd(maximumCost);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            throw new AiProviderFailureException("AI_PROVIDER_COST_LIMIT", "request_cost_limit");
+        }
+    }
+
     public async Task<AiProviderResponse?> CompleteAsync(
         AiProviderRequest request,
         CancellationToken cancellationToken)
@@ -56,6 +80,10 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             || options.ApiKey is null
             || options.Model is null
             || options.MaxRequestCostUsd is null
+            || options.InputUsdPerMillionTokens is null
+            || options.CachedInputUsdPerMillionTokens is null
+            || options.CacheWriteInputUsdPerMillionTokens is null
+            || options.OutputUsdPerMillionTokens is null
             || options.MonthlySpendLimitUsd is null)
             throw new AiProviderFailureException("AI_PROVIDER_UNAVAILABLE", "provider_disabled");
 
@@ -119,7 +147,12 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             ParsedProviderResponse parsed;
             try
             {
-                parsed = ParseResponse(body);
+                parsed = ParseResponse(
+                    body,
+                    requireDistinctInputCategories: options.CachedInputUsdPerMillionTokens!.Value
+                            != options.InputUsdPerMillionTokens!.Value
+                        || options.CacheWriteInputUsdPerMillionTokens!.Value
+                            != options.InputUsdPerMillionTokens.Value);
             }
             catch (JsonException)
             {
@@ -136,7 +169,7 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             }
 
             var usage = parsed.Usage;
-            var actualCost = options.EstimateActualCostUsd(usage.InputTokens, usage.OutputTokens);
+            var actualCost = options.EstimateActualCostUsd(usage);
             var withinRequestBounds = usage.InputTokens <= inputBytes
                 && usage.OutputTokens <= options.MaxOutputTokens
                 && actualCost <= reservation.ReservedCostUsd
@@ -146,7 +179,10 @@ public sealed class OpenAiResponsesProvider : IAiProvider
                 request.RequestId,
                 actualCost,
                 usage.InputTokens,
+                usage.CachedInputTokens,
+                usage.CacheWriteInputTokens,
                 usage.OutputTokens,
+                usage.ReasoningTokens,
                 uncertain: false,
                 released: false,
                 CancellationToken.None);
@@ -191,6 +227,7 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             return new AiProviderResponse(output.Kind, output.Text, output.ReferencedAnchorIds)
             {
                 Proposal = proposal,
+                Usage = usage,
             };
         }
         catch
@@ -207,7 +244,10 @@ public sealed class OpenAiResponsesProvider : IAiProvider
                             request.RequestId,
                             actualCostUsd: 0,
                             inputTokens: null,
+                            cachedInputTokens: null,
+                            cacheWriteInputTokens: null,
                             outputTokens: null,
+                            reasoningTokens: null,
                             uncertain: false,
                             released: true,
                             CancellationToken.None);
@@ -316,7 +356,10 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             request.RequestId,
             actualCostUsd: null,
             inputTokens: null,
+            cachedInputTokens: null,
+            cacheWriteInputTokens: null,
             outputTokens: null,
+            reasoningTokens: null,
             uncertain: true,
             released: false,
             CancellationToken.None);
@@ -343,7 +386,7 @@ public sealed class OpenAiResponsesProvider : IAiProvider
         return buffer.ToArray();
     }
 
-    private static ParsedProviderResponse ParseResponse(byte[] responseBytes)
+    private static ParsedProviderResponse ParseResponse(byte[] responseBytes, bool requireDistinctInputCategories)
     {
         using var document = JsonDocument.Parse(responseBytes);
         var root = document.RootElement;
@@ -353,12 +396,38 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             && statusElement.ValueKind == JsonValueKind.String
                 ? statusElement.GetString()
                 : null;
-        ProviderUsage? usage = null;
+        AiProviderTokenUsage? usage = null;
         if (root.TryGetProperty("usage", out var usageElement)
             && usageElement.ValueKind == JsonValueKind.Object
             && TryReadTokenCount(usageElement, "input_tokens", out var inputTokens)
-            && TryReadTokenCount(usageElement, "output_tokens", out var outputTokens))
-            usage = new ProviderUsage(inputTokens, outputTokens);
+            && TryReadTokenCount(usageElement, "output_tokens", out var outputTokens)
+            && TryReadDetailTokenCount(
+                usageElement,
+                "input_tokens_details",
+                "cached_tokens",
+                out var cachedInputTokens,
+                required: requireDistinctInputCategories)
+            && TryReadDetailTokenCount(
+                usageElement,
+                "input_tokens_details",
+                "cache_write_tokens",
+                out var cacheWriteInputTokens,
+                required: requireDistinctInputCategories)
+            && TryReadOptionalDetailTokenCount(usageElement, "output_tokens_details", "reasoning_tokens", out var reasoningTokens)
+            && (!usageElement.TryGetProperty("total_tokens", out var totalTokens)
+                || (totalTokens.ValueKind == JsonValueKind.Number
+                    && totalTokens.TryGetInt32(out var reportedTotal)
+                    && reportedTotal == inputTokens + outputTokens)))
+        {
+            var parsedUsage = new AiProviderTokenUsage(
+                inputTokens,
+                cachedInputTokens,
+                cacheWriteInputTokens,
+                outputTokens,
+                reasoningTokens);
+            if (parsedUsage.IsValid)
+                usage = parsedUsage;
+        }
 
         if (!root.TryGetProperty("output", out var outputItems)
             || outputItems.ValueKind != JsonValueKind.Array)
@@ -404,6 +473,29 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             && count is >= 0 and <= MaximumReportedTokens;
     }
 
+    private static bool TryReadOptionalDetailTokenCount(
+        JsonElement usage,
+        string detailsProperty,
+        string countProperty,
+        out int count) => TryReadDetailTokenCount(usage, detailsProperty, countProperty, out count, required: false);
+
+    private static bool TryReadDetailTokenCount(
+        JsonElement usage,
+        string detailsProperty,
+        string countProperty,
+        out int count,
+        bool required)
+    {
+        count = 0;
+        if (!usage.TryGetProperty(detailsProperty, out var details))
+            return !required;
+        if (details.ValueKind != JsonValueKind.Object)
+            return false;
+        if (!details.TryGetProperty(countProperty, out _))
+            return !required;
+        return TryReadTokenCount(details, countProperty, out count);
+    }
+
     private static bool HasStringProperty(JsonElement element, string name, string expected) =>
         element.ValueKind == JsonValueKind.Object
         && element.TryGetProperty(name, out var value)
@@ -435,11 +527,9 @@ public sealed class OpenAiResponsesProvider : IAiProvider
 
     private sealed record ParsedProviderResponse(
         string? Status,
-        ProviderUsage? Usage,
+        AiProviderTokenUsage? Usage,
         string? OutputText,
         bool Refused);
-
-    private sealed record ProviderUsage(int InputTokens, int OutputTokens);
 
     private sealed record StructuredProviderOutput(
         [property: JsonRequired] string Kind,

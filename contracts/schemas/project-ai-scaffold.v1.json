@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidrilo.dev/contracts/project-ai-scaffold.v1.json",
   "title": "Evidrilo project AI scaffold preview response v1",
-  "description": "A successful preview is returned only while its server-side credit reservation is held. The declared operation is validated against the project ID and base revision: create_project costs 3 credits; assist_project costs 1 credit. The local project ID and revision are echoed for client-side stale-context rejection; local project content is not persisted by this endpoint.",
+  "description": "A successful preview reports the credits charged from validated token usage. The server reserves the maximum possible request cost before provider dispatch and settles the actual cost after generation, regardless of whether the student later applies or dismisses the preview. The local project ID and revision are echoed for stale-context rejection; local project content is not persisted by this endpoint.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "version", "status", "scaffold", "operation", "projectId", "baseProjectRevision", "reasonCode", "requestId", "creditCost"],
@@ -26,7 +26,7 @@
     },
     "reasonCode": { "type": "null" },
     "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
-    "creditCost": { "enum": [1, 3] }
+    "creditCost": { "type": "integer", "minimum": 1, "maximum": 200 }
   },
   "allOf": [
     {
@@ -34,8 +34,7 @@
       "then": {
         "properties": {
           "projectId": { "type": "null" },
-          "baseProjectRevision": { "type": "null" },
-          "creditCost": { "const": 3 }
+          "baseProjectRevision": { "type": "null" }
         }
       }
     },
@@ -44,8 +43,7 @@
       "then": {
         "properties": {
           "projectId": { "type": "string", "format": "uuid" },
-          "baseProjectRevision": { "type": "integer", "minimum": 1 },
-          "creditCost": { "const": 1 }
+          "baseProjectRevision": { "type": "integer", "minimum": 1 }
         }
       }
     }

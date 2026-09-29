@@ -22,6 +22,7 @@ import platform.UserNotifications.UNNotificationTrigger
 import platform.UserNotifications.UNUserNotificationCenter
 import platform.UserNotifications.UNCalendarNotificationTrigger
 import kotlin.coroutines.resume
+import kotlin.coroutines.cancellation.CancellationException
 
 private const val CONTINUE_IDENTIFIER = "evidrilo.local.continue_unfinished"
 private const val REVIEW_IDENTIFIER = "evidrilo.local.review_completed"
@@ -84,14 +85,22 @@ private class IosLocalNotificationScheduler : LocalNotificationScheduler {
         val categories = preferences.activeCategories(hasUnfinishedCase, hasCompletedCase)
         cancelAll()
         if (categories.isEmpty()) return LocalNotificationScheduleResult.Scheduled(emptyList())
-        val scheduled = categories.map { category ->
-            addRequest(preferences, category)
+        val scheduled = try {
+            categories.map { category ->
+                addRequest(preferences, category)
+            }
+        } catch (cancelled: CancellationException) {
+            cancelAll()
+            throw cancelled
+        } catch (_: Exception) {
+            cancelAll()
+            return LocalNotificationScheduleResult.Failed("One or more reminders could not be scheduled.")
         }
-        return if (scheduled.all { it }) {
-            LocalNotificationScheduleResult.Scheduled(categories)
-        } else {
-            LocalNotificationScheduleResult.Failed("One or more reminders could not be scheduled.")
+        if (scheduled.all { it }) {
+            return LocalNotificationScheduleResult.Scheduled(categories)
         }
+        cancelAll()
+        return LocalNotificationScheduleResult.Failed("One or more reminders could not be scheduled.")
     }
 
     override fun cancelAll() {

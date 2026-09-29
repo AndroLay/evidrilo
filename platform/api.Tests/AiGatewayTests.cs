@@ -26,8 +26,9 @@ public sealed class AiGatewayTests
 
         Assert.Equal("success", result.Status);
         Assert.True(ledger.ConsentEnsured);
-        Assert.Equal([1], ledger.ReservedCreditCosts);
+        Assert.Equal([10], ledger.ReservedCreditCosts);
         Assert.Equal([true], ledger.Completions);
+        Assert.Equal([4], ledger.SettledCreditCosts);
         Assert.DoesNotContain("user@example.com", provider.Request!.RedactedInput);
         Assert.DoesNotContain("123e4567-e89b-42d3-a456-426614174000", provider.Request.RedactedInput);
         Assert.DoesNotContain("bearer abc.def", provider.Request.RedactedInput, StringComparison.OrdinalIgnoreCase);
@@ -151,6 +152,8 @@ public sealed class AiGatewayTests
 
         public List<int> ReservedCreditCosts { get; } = [];
 
+        public List<int> SettledCreditCosts { get; } = [];
+
         public Task EnsureConsentAsync(
             Guid accountId,
             string consentVersion,
@@ -185,9 +188,11 @@ public sealed class AiGatewayTests
             Guid accountId,
             AiCreditReservation reservation,
             bool accepted,
+            int settledCreditCost,
             CancellationToken cancellationToken)
         {
             Completions.Add(accepted);
+            SettledCreditCosts.Add(settledCreditCost);
             return Task.FromResult(completionResult);
         }
 
@@ -223,6 +228,7 @@ public sealed class AiGatewayTests
             Guid accountId,
             AiCreditReservation reservation,
             bool accepted,
+            int settledCreditCost,
             CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task<AiCreditBalance> GetBalanceAsync(
@@ -237,10 +243,14 @@ public sealed class AiGatewayTests
 
         public RecordingProvider(AiProviderResponse response)
         {
-            this.response = response;
+            this.response = response.Usage is null
+                ? response with { Usage = new AiProviderTokenUsage(10_000, 0, 0, 5_000, 0) }
+                : response;
         }
 
         public AiProviderRequest? Request { get; private set; }
+
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 10;
 
         public Task<AiProviderResponse?> CompleteAsync(AiProviderRequest request, CancellationToken cancellationToken)
         {
@@ -251,6 +261,8 @@ public sealed class AiGatewayTests
 
     private sealed class DelayedProvider : IAiProvider
     {
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 1;
+
         public async Task<AiProviderResponse?> CompleteAsync(AiProviderRequest request, CancellationToken cancellationToken)
         {
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
@@ -260,12 +272,16 @@ public sealed class AiGatewayTests
 
     private sealed class NullProvider : IAiProvider
     {
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 1;
+
         public Task<AiProviderResponse?> CompleteAsync(AiProviderRequest request, CancellationToken cancellationToken) =>
             Task.FromResult<AiProviderResponse?>(null);
     }
 
     private sealed class CancellationProvider : IAiProvider
     {
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 1;
+
         public Task<AiProviderResponse?> CompleteAsync(AiProviderRequest request, CancellationToken cancellationToken) =>
             Task.FromCanceled<AiProviderResponse?>(cancellationToken);
     }

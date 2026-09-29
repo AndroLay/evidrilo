@@ -9,7 +9,7 @@
     "schema": { "const": "evidrilo.ai-credits" },
     "version": { "const": "1" },
     "consentRecorded": { "type": "boolean" },
-    "available": { "type": "integer", "minimum": 0, "maximum": 110 },
+    "available": { "type": "integer", "minimum": 0, "maximum": 220 },
     "grants": {
       "type": "array",
       "items": {
@@ -19,12 +19,22 @@
         "properties": {
           "grantKind": { "enum": ["free_once", "subscription_month"] },
           "grantKey": { "type": "string", "minLength": 1, "maxLength": 64 },
-          "granted": { "type": "integer", "minimum": 1, "maximum": 100 },
-          "reserved": { "type": "integer", "minimum": 0, "maximum": 100 },
-          "consumed": { "type": "integer", "minimum": 0, "maximum": 100 },
-          "available": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "granted": { "type": "integer", "minimum": 1, "maximum": 200 },
+          "reserved": { "type": "integer", "minimum": 0, "maximum": 200 },
+          "consumed": { "type": "integer", "minimum": 0, "maximum": 200 },
+          "available": { "type": "integer", "minimum": 0, "maximum": 200 },
           "expiresAt": { "type": ["string", "null"], "format": "date-time" }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "grantKind": { "const": "free_once" } }, "required": ["grantKind"] },
+            "then": { "properties": { "granted": { "const": 20 } } }
+          },
+          {
+            "if": { "properties": { "grantKind": { "const": "subscription_month" } }, "required": ["grantKind"] },
+            "then": { "properties": { "granted": { "const": 200 } } }
+          }
+        ]
       }
     },
     "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }

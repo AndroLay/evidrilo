@@ -12,6 +12,8 @@ public sealed class AiProviderOptions
         string? apiKey,
         string? model,
         decimal? inputUsdPerMillionTokens,
+        decimal? cachedInputUsdPerMillionTokens,
+        decimal? cacheWriteInputUsdPerMillionTokens,
         decimal? outputUsdPerMillionTokens,
         decimal? maxRequestCostUsd,
         decimal? monthlySpendLimitUsd,
@@ -23,6 +25,8 @@ public sealed class AiProviderOptions
         ApiKey = apiKey;
         Model = model;
         InputUsdPerMillionTokens = inputUsdPerMillionTokens;
+        CachedInputUsdPerMillionTokens = cachedInputUsdPerMillionTokens;
+        CacheWriteInputUsdPerMillionTokens = cacheWriteInputUsdPerMillionTokens;
         OutputUsdPerMillionTokens = outputUsdPerMillionTokens;
         MaxRequestCostUsd = maxRequestCostUsd;
         MonthlySpendLimitUsd = monthlySpendLimitUsd;
@@ -40,6 +44,10 @@ public sealed class AiProviderOptions
 
     public decimal? InputUsdPerMillionTokens { get; }
 
+    public decimal? CachedInputUsdPerMillionTokens { get; }
+
+    public decimal? CacheWriteInputUsdPerMillionTokens { get; }
+
     public decimal? OutputUsdPerMillionTokens { get; }
 
     public decimal? MaxRequestCostUsd { get; }
@@ -50,25 +58,28 @@ public sealed class AiProviderOptions
 
     public TimeSpan Timeout { get; }
 
+    public static AiProviderOptions DefaultPricing { get; } = new(
+        false,
+        false,
+        null,
+        null,
+        0.10m,
+        0.01m,
+        0.125m,
+        0.50m,
+        null,
+        null,
+        512,
+        TimeSpan.FromSeconds(5));
+
     public static AiProviderOptions From(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        var enabled = ReadBoolean(configuration, "AI_PROVIDER_ENABLED", defaultValue: false);
-        if (!enabled)
+        if (!ReadBoolean(configuration, "AI_PROVIDER_ENABLED", defaultValue: false))
         {
-            // Do not even retain an accidentally supplied key while the kill
-            // switch is off. The default is safe in every environment.
-            return new AiProviderOptions(
-                false,
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                512,
-                TimeSpan.FromSeconds(5));
+            // Pricing remains available to gateways for usage settlement, but
+            // provider credentials and activation settings are discarded.
+            return DefaultPricing;
         }
 
         if (!ReadBoolean(configuration, "AI_PROVIDER_ACTIVATION_APPROVED", defaultValue: false))
@@ -80,6 +91,8 @@ public sealed class AiProviderOptions
         var apiKey = RequiredSecret(configuration, "OPENAI_API_KEY", maximumLength: 1024);
         var model = RequiredModel(configuration, "AI_OPENAI_MODEL");
         var inputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_INPUT_USD_PER_MILLION_TOKENS");
+        var cachedInputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_CACHED_INPUT_USD_PER_MILLION_TOKENS");
+        var cacheWriteInputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_CACHE_WRITE_INPUT_USD_PER_MILLION_TOKENS");
         var outputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_OUTPUT_USD_PER_MILLION_TOKENS");
         var requestCeiling = RequiredPositiveDecimal(configuration, "AI_MAX_REQUEST_COST_USD");
         var monthlyCeiling = RequiredPositiveDecimal(configuration, "AI_MONTHLY_SPEND_LIMIT_USD");
@@ -87,6 +100,11 @@ public sealed class AiProviderOptions
         {
             throw new PlatformConfigurationException(
                 "AI_MAX_REQUEST_COST_USD cannot exceed AI_MONTHLY_SPEND_LIMIT_USD.");
+        }
+        if (requestCeiling > AiCreditPricing.MaximumCreditsPerRequest * AiCreditPricing.UsdPerCredit)
+        {
+            throw new PlatformConfigurationException(
+                "AI_MAX_REQUEST_COST_USD cannot exceed the 200-credit per-request limit.");
         }
 
         var maxOutputTokens = ReadInteger(configuration, "AI_MAX_OUTPUT_TOKENS", 512, 64, 512);
@@ -97,6 +115,8 @@ public sealed class AiProviderOptions
             apiKey,
             model,
             inputRate,
+            cachedInputRate,
+            cacheWriteInputRate,
             outputRate,
             requestCeiling,
             monthlyCeiling,
@@ -106,31 +126,40 @@ public sealed class AiProviderOptions
 
     public decimal EstimateMaximumRequestCostUsd(int inputUtf8ByteCount)
     {
-        if (!Enabled
-            || inputUtf8ByteCount < 0
+        if (inputUtf8ByteCount < 0
             || InputUsdPerMillionTokens is null
+            || CachedInputUsdPerMillionTokens is null
+            || CacheWriteInputUsdPerMillionTokens is null
             || OutputUsdPerMillionTokens is null)
             throw new InvalidOperationException("AI provider cost estimation is unavailable.");
 
-        // UTF-8 bytes are used as a conservative upper bound for input tokens.
-        // Owner-configured rates must be the highest applicable rates for the
-        // pinned model, including any reasoning/output token category.
-        var rawCost = ((inputUtf8ByteCount * InputUsdPerMillionTokens.Value)
+        // UTF-8 bytes bound input tokens conservatively. Price all reserved
+        // input as uncached and include the complete output cap.
+        var maximumInputRate = Math.Max(
+            Math.Max(InputUsdPerMillionTokens.Value, CachedInputUsdPerMillionTokens.Value),
+            CacheWriteInputUsdPerMillionTokens.Value);
+        var rawCost = ((inputUtf8ByteCount * maximumInputRate)
             + (MaxOutputTokens * OutputUsdPerMillionTokens.Value)) / 1_000_000m;
         return RoundUsdUp(rawCost);
     }
 
-    public decimal EstimateActualCostUsd(int inputTokens, int outputTokens)
+    public decimal EstimateActualCostUsd(AiProviderTokenUsage usage)
     {
-        if (!Enabled
-            || inputTokens < 0
-            || outputTokens < 0
+        ArgumentNullException.ThrowIfNull(usage);
+        if (!usage.IsValid
             || InputUsdPerMillionTokens is null
+            || CachedInputUsdPerMillionTokens is null
+            || CacheWriteInputUsdPerMillionTokens is null
             || OutputUsdPerMillionTokens is null)
-            throw new InvalidOperationException("AI provider cost estimation is unavailable.");
+            throw new InvalidOperationException("AI provider usage or pricing is invalid.");
 
-        var rawCost = ((inputTokens * InputUsdPerMillionTokens.Value)
-            + (outputTokens * OutputUsdPerMillionTokens.Value)) / 1_000_000m;
+        var uncachedInputTokens = usage.InputTokens
+            - usage.CachedInputTokens
+            - usage.CacheWriteInputTokens;
+        var rawCost = ((uncachedInputTokens * InputUsdPerMillionTokens.Value)
+            + (usage.CachedInputTokens * CachedInputUsdPerMillionTokens.Value)
+            + (usage.CacheWriteInputTokens * CacheWriteInputUsdPerMillionTokens.Value)
+            + (usage.OutputTokens * OutputUsdPerMillionTokens.Value)) / 1_000_000m;
         return RoundUsdUp(rawCost);
     }
 

@@ -1525,3 +1525,67 @@ D-124 supplements D-099, D-100, D-114, D-117, D-120, and D-123. It is a product
 policy target, not evidence that reviewed templates, Pro template entitlements,
 RevenueCat transactions, account-wide quotas, cloud sync, or device acceptance
 are implemented.
+
+## D-126 — Increase the Free and Pro AI credit allowances
+
+Owner-directed target, 29 September 2026: raise the optional AI credit allowance
+to 20 credits once for a verified Free account after explicit consent, and 200
+credits per active `evidrilo_pro` entitlement month. Monthly and yearly
+subscriptions receive the same monthly grant while active; a yearly plan does
+not receive the full annual amount up front. Unused credits do not roll over.
+
+D-126 changes only the grant quantities. It does not change supported AI
+purposes, account verification, consent, RevenueCat entitlement checks, the
+server-owned ledger, reservation/release behavior, or operation costs: a new
+project scaffold remains 3 credits and a standard assist remains 1 credit when
+applied. General-chat allowance remains unresolved; this decision does not
+activate a provider, authorize spend, or make AI available to guest users.
+The adopted operation-cost target remains the existing 3-credit scaffold and
+1-credit standard/project assist policy. In-progress source now includes
+provider-token-based settlement; that implementation is not an approved change
+to operation pricing and must be reconciled before acceptance.
+
+The current checkout's ledger constants now specify 20/200, but end-to-end
+support is not established: migration `031_ai_credit_ledger` limits each grant
+to 100 credits. A forward migration 050 is now present in the checkout to raise
+that bound, but fresh/upgraded database and ledger acceptance have not been
+verified. The mobile pre-consent message still says “10 available”; the mobile
+balance/copy must reflect the account's actual allowance. API, migration,
+replay, balance, and entitlement-period tests must prove the new quantities
+before they are described as implemented. Keep the per-request cost bound
+separate from the grant maximum. Until that work and the independent
+provider/privacy gates pass, 20/200 is the adopted product target, not evidence
+of live credit availability.
+
+D-126 supersedes the Free/Pro grant amounts recorded in D-099, D-100, D-114,
+D-115, D-117, and D-124. Those entries remain unchanged as historical decision
+records; all current product and implementation guidance follows D-126.
+
+## D-127 — Charge AI credits from token usage
+
+Owner-directed policy, 29 September 2026: use the verified provider-reported
+token usage for every successful AI request, including case assistance,
+conversation/chat, and project previews. These requests draw from the same
+account AI credit balance; chat does not have a separate allowance.
+
+For the selected GPT-6 Luna standard-context rates, price uncached input at
+$0.10, cached input at $0.01, cache-write input at $0.125, and output at $0.50
+per one million tokens. Reasoning tokens are a subset of output tokens and must
+not be charged twice. The server holds the maximum estimated credit cost before
+provider dispatch, then settles validated usage after an accepted response.
+One credit represents $0.001 of provider cost, rounded up per successful
+request. The maximum charge for one request is 200 credits; provider monthly
+spend limits remain a separate server-side control.
+
+Failures, malformed or missing usage, rejected output, cancellation, timeout,
+and requests that become stale before a valid preview release the user's
+reservation. A valid project preview is charged when generated, whether the
+student later applies or dismisses it. There are no separate fixed credit
+prices per operation.
+
+This policy supplements D-126's 20 one-time Free and 200-per-active-Pro-month
+grants and supersedes its earlier fixed operation-cost rule. Model rates must
+remain owner-configured and match the pinned model and applicable pricing tier.
+The provider remains disabled unless its separate privacy, retention, cost,
+consent, and runtime gates are approved. This decision does not authorize
+provider activation, spend, deployment, or a live-AI claim.

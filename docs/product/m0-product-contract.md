@@ -164,12 +164,19 @@ meaning-preserving language alternative. It may not assess scientific truth,
 invent facts/evidence/sources, accept a requirement, replace learner reasoning,
 or change evaluator status, anchors, priority, or abstention.
 
-The approved allowance is 10 AI credits once for a verified free account after
-explicit consent, and 100 credits per active `evidrilo_pro` entitlement month
+The current target allowance under D-126 is 20 AI credits once for a verified
+free account after explicit consent, and 200 credits per active `evidrilo_pro` entitlement month
 for monthly or yearly subscribers. Credits do not roll over; lifetime
-allowances and top-ups are not initially supported. One accepted standard assist
-costs one credit. Timeout, cancellation, provider failure, malformed output,
-policy rejection, and unavailable-provider results release the reservation.
+allowances and top-ups are not initially supported. API charges are based on
+validated uncached-input, cached-input, cache-write-input, and output token use
+at the pinned model rates; reasoning tokens are included in output. For GPT-6
+Luna standard context, rates are $0.10, $0.01, $0.125, and $0.50 per million
+tokens. One credit represents $0.001 of provider cost, rounded up per
+successful generation. The API reserves the maximum before dispatch and
+settles actual use afterward. All successful modes, including General chat,
+share one account balance. Timeout, cancellation, provider failure, malformed
+output, invalid usage, and unavailable-provider results release the
+reservation. A valid project preview is charged even if it is later dismissed.
 
 The server ledger and verified entitlement are authoritative. The learner
 selects the context to share; the client must not silently upload the whole

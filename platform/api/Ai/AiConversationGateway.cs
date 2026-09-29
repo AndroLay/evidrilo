@@ -22,15 +22,18 @@ public sealed class AiConversationGateway
 
     private readonly IAiProvider provider;
     private readonly IAiCreditLedger creditLedger;
+    private readonly AiProviderOptions pricing;
     private readonly TimeSpan timeout;
 
     public AiConversationGateway(
         IAiProvider provider,
         IAiCreditLedger creditLedger,
-        TimeSpan? timeout = null)
+        TimeSpan? timeout = null,
+        AiProviderOptions? pricing = null)
     {
         this.provider = provider;
         this.creditLedger = creditLedger;
+        this.pricing = pricing ?? AiProviderOptions.DefaultPricing;
         this.timeout = timeout ?? TimeSpan.FromSeconds(5);
     }
 
@@ -52,8 +55,36 @@ public sealed class AiConversationGateway
 
         var redacted = AiRedactor.Redact(request.Prompt);
         var requestHash = AiConversationFingerprint.RequestHash(request.Purpose, request.Locale, redacted);
+        var providerRequest = new AiProviderRequest(
+            accountId,
+            requestId,
+            request.Purpose,
+            redacted,
+            request.Locale,
+            PromptVersion,
+            request.AllowedAnchorIds.ToHashSet(StringComparer.Ordinal));
+        int maximumCreditCost;
+        try
+        {
+            maximumCreditCost = provider.EstimateMaximumCreditCost(providerRequest);
+            if (maximumCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
+                throw new AiProviderFailureException("AI_PROVIDER_COST_LIMIT", "request_cost_limit");
+        }
+        catch (AiProviderFailureException exception)
+        {
+            return Fallback(exception.ReasonCode, exception.Outcome, requestHash);
+        }
+        catch (Exception)
+        {
+            return Fallback("AI_PROVIDER_COST_LIMIT", "request_cost_limit", requestHash);
+        }
         await creditLedger.EnsureConsentAsync(accountId, AiGateway.ConsentVersion, cancellationToken);
-        var reservation = await creditLedger.TryReserveAsync(accountId, requestId, requestHash, cancellationToken);
+        var reservation = await creditLedger.TryReserveAsync(
+            accountId,
+            requestId,
+            requestHash,
+            maximumCreditCost,
+            cancellationToken);
         if (reservation is null)
             return Fallback("AI_QUOTA_EXCEEDED", "quota_exceeded", requestHash);
         if (reservation.IsReplay)
@@ -70,14 +101,7 @@ public sealed class AiConversationGateway
         try
         {
             response = await provider.CompleteAsync(
-                new AiProviderRequest(
-                    accountId,
-                    requestId,
-                    request.Purpose,
-                    redacted,
-                    request.Locale,
-                    PromptVersion,
-                    request.AllowedAnchorIds.ToHashSet(StringComparer.Ordinal)),
+                providerRequest,
                 timeoutSource.Token);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -119,7 +143,42 @@ public sealed class AiConversationGateway
                 "invalid_response",
                 requestHash);
 
-        if (!await creditLedger.CompleteAsync(accountId, reservation, accepted: true, cancellationToken))
+        if (response.Usage is null || !response.Usage.IsValid)
+            return await ReleaseAndFallbackAsync(
+                accountId,
+                reservation,
+                "AI_PROVIDER_INVALID_USAGE",
+                "usage_invalid",
+                requestHash);
+
+        int actualCreditCost;
+        try
+        {
+            actualCreditCost = AiCreditPricing.CreditsForCostUsd(pricing.EstimateActualCostUsd(response.Usage));
+        }
+        catch (Exception)
+        {
+            return await ReleaseAndFallbackAsync(
+                accountId,
+                reservation,
+                "AI_PROVIDER_INVALID_USAGE",
+                "usage_invalid",
+                requestHash);
+        }
+        if (actualCreditCost > maximumCreditCost)
+            return await ReleaseAndFallbackAsync(
+                accountId,
+                reservation,
+                "AI_PROVIDER_COST_LIMIT",
+                "provider_usage_exceeded_reservation",
+                requestHash);
+
+        if (!await creditLedger.CompleteAsync(
+                accountId,
+                reservation,
+                accepted: true,
+                actualCreditCost,
+                cancellationToken))
             return Fallback("AI_RESERVATION_EXPIRED", "reservation_expired", requestHash);
 
         return new AiConversationGatewayResult(
@@ -144,7 +203,12 @@ public sealed class AiConversationGateway
     }
 
     private Task ReleaseAsync(Guid accountId, AiCreditReservation reservation) =>
-        creditLedger.CompleteAsync(accountId, reservation, accepted: false, CancellationToken.None);
+        creditLedger.CompleteAsync(
+            accountId,
+            reservation,
+            accepted: false,
+            settledCreditCost: 0,
+            CancellationToken.None);
 
     private static bool IsValidRequestId(string value) =>
         value.Length is >= 8 and <= 128

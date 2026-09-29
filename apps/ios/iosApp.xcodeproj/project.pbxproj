@@ -10,19 +10,29 @@
 		058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557BA273AAA24004C7B11 /* Assets.xcassets */; };
 		058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */; };
 		2152FB042600AC8F00CF470E /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iosApp.swift */; };
+		CA5AEC262E9F438FA3E6300F /* EvidriloUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B58A22C041246988C547AD3 /* EvidriloUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		058557BA273AAA24004C7B11 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		2152FB032600AC8F00CF470E /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
+		6B58A22C041246988C547AD3 /* EvidriloUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidriloUITests.swift; sourceTree = "<group>"; };
 		7555FF7B242A565900829871 /* Evidrilo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Evidrilo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		617C6EF4D88C4465ACA1D8AE /* EvidriloUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EvidriloUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		B92378962B6B1156000C7307 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A2315528EF149EF867A22A9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -52,6 +62,7 @@
 			children = (
 				AB1DB47929225F7C00F7AF9C /* Configuration */,
 				7555FF7D242A565900829871 /* iosApp */,
+				8DA1A6530DF844D6ACE11566 /* iosAppUITests */,
 				7555FF7C242A565900829871 /* Products */,
 				42799AB246E5F90AF97AA0EF /* Frameworks */,
 			);
@@ -61,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				7555FF7B242A565900829871 /* Evidrilo.app */,
+				617C6EF4D88C4465ACA1D8AE /* EvidriloUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,6 +86,14 @@
 				058557D7273AAEEB004C7B11 /* Preview Content */,
 			);
 			path = iosApp;
+			sourceTree = "<group>";
+		};
+		8DA1A6530DF844D6ACE11566 /* iosAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				6B58A22C041246988C547AD3 /* EvidriloUITests.swift */,
+			);
+			path = iosAppUITests;
 			sourceTree = "<group>";
 		};
 		AB1DB47929225F7C00F7AF9C /* Configuration */ = {
@@ -107,7 +127,45 @@
 			productReference = 7555FF7B242A565900829871 /* Evidrilo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7BE0F4E897C4497DBC1ECD71 /* EvidriloUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C8875E5D34164F86844B4712 /* Build configuration list for PBXNativeTarget "EvidriloUITests" */;
+			buildPhases = (
+				788D9E2B49CD4C978C6EC6B7 /* Sources */,
+				6A2315528EF149EF867A22A9 /* Frameworks */,
+				F43B5500F69246A18AEBE569 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5D6A1EBA70664975A1E60AFC /* PBXTargetDependency */,
+			);
+			name = EvidriloUITests;
+			packageProductDependencies = (
+			);
+			productName = EvidriloUITests;
+			productReference = 617C6EF4D88C4465ACA1D8AE /* EvidriloUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		E44264E6322B4B8184D7D492 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7555FF73242A565900829871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7555FF7A242A565900829871;
+			remoteInfo = Evidrilo;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		5D6A1EBA70664975A1E60AFC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7555FF7A242A565900829871 /* Evidrilo */;
+			targetProxy = E44264E6322B4B8184D7D492 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		7555FF73242A565900829871 /* Project object */ = {
@@ -119,6 +177,10 @@
 				TargetAttributes = {
 					7555FF7A242A565900829871 = {
 						CreatedOnToolsVersion = 11.3.1;
+					};
+					7BE0F4E897C4497DBC1ECD71 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 7555FF7A242A565900829871;
 					};
 				};
 			};
@@ -138,6 +200,7 @@
 			projectRoot = "";
 			targets = (
 				7555FF7A242A565900829871 /* Evidrilo */,
+				7BE0F4E897C4497DBC1ECD71 /* EvidriloUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -149,6 +212,13 @@
 			files = (
 				058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */,
 				058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F43B5500F69246A18AEBE569 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,6 +251,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				2152FB042600AC8F00CF470E /* iosApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		788D9E2B49CD4C978C6EC6B7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CA5AEC262E9F438FA3E6300F /* EvidriloUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -367,6 +445,34 @@
 			};
 			name = Release;
 		};
+		6A7A900124CF4EBB954F1C9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.3;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.nextgen.mobile.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Evidrilo;
+			};
+			name = Debug;
+		};
+		13D725E6E4084611B632D84A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.3;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.nextgen.mobile.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Evidrilo;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -384,6 +490,15 @@
 			buildConfigurations = (
 				7555FFA6242A565B00829871 /* Debug */,
 				7555FFA7242A565B00829871 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C8875E5D34164F86844B4712 /* Build configuration list for PBXNativeTarget "EvidriloUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A7A900124CF4EBB954F1C9D /* Debug */,
+				13D725E6E4084611B632D84A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

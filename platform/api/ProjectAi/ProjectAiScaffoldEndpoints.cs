@@ -37,6 +37,8 @@ public interface IProjectAiScaffoldGenerator
 {
     bool IsEnabled { get; }
 
+    int EstimateMaximumCreditCost(ProjectAiScaffoldProviderRequest request);
+
     Task<ProjectAiScaffoldOutput?> GenerateAsync(
         ProjectAiScaffoldProviderRequest request,
         CancellationToken cancellationToken);
@@ -45,6 +47,8 @@ public interface IProjectAiScaffoldGenerator
 public sealed class DisabledProjectAiScaffoldGenerator : IProjectAiScaffoldGenerator
 {
     public bool IsEnabled => false;
+
+    public int EstimateMaximumCreditCost(ProjectAiScaffoldProviderRequest request) => 1;
 
     public Task<ProjectAiScaffoldOutput?> GenerateAsync(
         ProjectAiScaffoldProviderRequest request,
@@ -73,6 +77,7 @@ public static class ProjectAiScaffoldEndpoints
             async (
                 HttpContext context,
                 IProjectAiScaffoldGenerator generator,
+                AiProviderOptions pricing,
                 IAiCreditLedger creditLedger,
                 IProjectTemplateStore templateStore,
                 IProjectAiConsentStore consentStore,
@@ -175,17 +180,41 @@ public static class ProjectAiScaffoldEndpoints
                             "Project AI consent changed before this request could be sent."),
                         statusCode: StatusCodes.Status403Forbidden);
 
+                var providerRequest = new ProjectAiScaffoldProviderRequest(
+                    accountId,
+                    requestId,
+                    operation,
+                    template!,
+                    validRequest.BaseProjectRevision,
+                    AiRedactor.Redact(validRequest.AssignmentBrief!),
+                    validRequest.ResearchQuestion is null ? null : AiRedactor.Redact(validRequest.ResearchQuestion),
+                    validRequest.StudentQuestion is null ? null : AiRedactor.Redact(validRequest.StudentQuestion),
+                    (validRequest.CurrentFields ?? new Dictionary<string, string>())
+                        .ToDictionary(pair => pair.Key, pair => AiRedactor.Redact(pair.Value), StringComparer.Ordinal),
+                    (validRequest.Constraints ?? Array.Empty<string>()).Select(AiRedactor.Redact).ToArray(),
+                    validRequest.Locale!);
+                int maximumCreditCost;
+                try
+                {
+                    maximumCreditCost = generator.EstimateMaximumCreditCost(providerRequest);
+                    if (maximumCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
+                        return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+                catch (Exception)
+                {
+                    return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+
                 // The project-data consent above remains authoritative for
                 // dispatch. The shared ledger's consent version only seeds
                 // account-scoped credit grants after that separate decision.
                 await creditLedger.EnsureConsentAsync(accountId, AiGateway.ConsentVersion, cancellationToken);
-                var creditCost = operation == ProjectAiScaffoldValidator.CreateOperation ? 3 : 1;
-                var requestHash = ComputeScaffoldRequestHash(validRequest, creditCost);
+                var requestHash = ComputeScaffoldRequestHash(validRequest, maximumCreditCost);
                 var reservation = await creditLedger.TryReserveAsync(
                     accountId,
                     requestId,
                     requestHash,
-                    creditCost,
+                    maximumCreditCost,
                     cancellationToken);
                 if (reservation is null)
                     return Results.Json(
@@ -215,7 +244,7 @@ public static class ProjectAiScaffoldEndpoints
                         accountId,
                         reservation,
                         requestHash,
-                        creditCost,
+                        maximumCreditCost,
                         cancellationToken);
                 }
                 catch
@@ -279,20 +308,6 @@ public static class ProjectAiScaffoldEndpoints
                     }
                 }
 
-                var providerRequest = new ProjectAiScaffoldProviderRequest(
-                    accountId,
-                    requestId,
-                    operation,
-                    template!,
-                    validRequest.BaseProjectRevision,
-                    AiRedactor.Redact(validRequest.AssignmentBrief!),
-                    validRequest.ResearchQuestion is null ? null : AiRedactor.Redact(validRequest.ResearchQuestion),
-                    validRequest.StudentQuestion is null ? null : AiRedactor.Redact(validRequest.StudentQuestion),
-                    (validRequest.CurrentFields ?? new Dictionary<string, string>())
-                        .ToDictionary(pair => pair.Key, pair => AiRedactor.Redact(pair.Value), StringComparer.Ordinal),
-                    (validRequest.Constraints ?? Array.Empty<string>()).Select(AiRedactor.Redact).ToArray(),
-                    validRequest.Locale!);
-
                 ProjectAiScaffoldOutput? output;
                 try
                 {
@@ -327,6 +342,29 @@ public static class ProjectAiScaffoldEndpoints
                         statusCode: StatusCodes.Status502BadGateway);
                 }
 
+                int settledCreditCost;
+                try
+                {
+                    if (output.Usage is null || !output.Usage.IsValid)
+                        throw new InvalidOperationException("The project-AI usage report is invalid.");
+                    settledCreditCost = AiCreditPricing.CreditsForCostUsd(
+                        pricing.EstimateActualCostUsd(output.Usage));
+                }
+                catch (Exception)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Results.Json(
+                        ApiErrors.Create(context, "PROJECT_AI_INVALID_USAGE", "The project-AI token usage could not be verified."),
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+                if (settledCreditCost > maximumCreditCost)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Results.Json(
+                        ApiErrors.Create(context, "PROJECT_AI_COST_LIMIT", "Project AI usage exceeded the reserved credit amount."),
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+
                 bool reservationStillHeld;
                 try
                 {
@@ -334,7 +372,8 @@ public static class ProjectAiScaffoldEndpoints
                         accountId,
                         reservation,
                         requestHash,
-                        creditCost,
+                        maximumCreditCost,
+                        settledCreditCost,
                         cancellationToken);
                 }
                 catch
@@ -359,7 +398,7 @@ public static class ProjectAiScaffoldEndpoints
                         validRequest.BaseProjectRevision,
                         null,
                         requestId,
-                        creditCost,
+                        settledCreditCost,
                         operation,
                         validRequest.ProjectId),
                     options: ResponseJsonOptions);
@@ -489,7 +528,12 @@ public static class ProjectAiScaffoldEndpoints
         IAiCreditLedger creditLedger,
         Guid accountId,
         AiCreditReservation reservation) =>
-        creditLedger.CompleteAsync(accountId, reservation, accepted: false, CancellationToken.None);
+        creditLedger.CompleteAsync(
+            accountId,
+            reservation,
+            accepted: false,
+            settledCreditCost: 0,
+            CancellationToken.None);
 
     private static IResult Invalid(HttpContext context, string code) => Results.Json(
         ApiErrors.Create(context, code, "The project-AI request is invalid."),

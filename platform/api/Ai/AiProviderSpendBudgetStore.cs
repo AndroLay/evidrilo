@@ -31,7 +31,10 @@ public interface IAiProviderSpendBudgetStore
         string requestId,
         decimal? actualCostUsd,
         int? inputTokens,
+        int? cachedInputTokens,
+        int? cacheWriteInputTokens,
         int? outputTokens,
+        int? reasoningTokens,
         bool uncertain,
         bool released,
         CancellationToken cancellationToken);
@@ -51,7 +54,10 @@ public sealed class DatabaseUnavailableAiProviderSpendBudgetStore : IAiProviderS
         string requestId,
         decimal? actualCostUsd,
         int? inputTokens,
+        int? cachedInputTokens,
+        int? cacheWriteInputTokens,
         int? outputTokens,
+        int? reasoningTokens,
         bool uncertain,
         bool released,
         CancellationToken cancellationToken) => throw new ApiException(
@@ -170,7 +176,10 @@ public sealed class NpgsqlAiProviderSpendBudgetStore : IAiProviderSpendBudgetSto
         string requestId,
         decimal? actualCostUsd,
         int? inputTokens,
+        int? cachedInputTokens,
+        int? cacheWriteInputTokens,
         int? outputTokens,
+        int? reasoningTokens,
         bool uncertain,
         bool released,
         CancellationToken cancellationToken)
@@ -179,11 +188,20 @@ public sealed class NpgsqlAiProviderSpendBudgetStore : IAiProviderSpendBudgetSto
             || !IsValidRequestId(requestId)
             || actualCostUsd is < 0
             || inputTokens is < 0
+            || cachedInputTokens is < 0
+            || cacheWriteInputTokens is < 0
             || outputTokens is < 0
+            || reasoningTokens is < 0
             || (inputTokens.HasValue != outputTokens.HasValue)
-            || (uncertain && (actualCostUsd.HasValue || released))
+            || (inputTokens.HasValue != cachedInputTokens.HasValue)
+            || (inputTokens.HasValue != cacheWriteInputTokens.HasValue)
+            || (inputTokens.HasValue != reasoningTokens.HasValue)
+            || (cachedInputTokens.HasValue
+                && (long)cachedInputTokens.Value + cacheWriteInputTokens!.Value > inputTokens!.Value)
+            || (reasoningTokens.HasValue && reasoningTokens.Value > outputTokens!.Value)
+            || (uncertain && (actualCostUsd.HasValue || released || inputTokens.HasValue))
             || (released && (!actualCostUsd.HasValue || actualCostUsd.Value != 0 || inputTokens.HasValue))
-            || (!uncertain && !released && !actualCostUsd.HasValue))
+            || (!uncertain && !released && (!actualCostUsd.HasValue || !inputTokens.HasValue)))
             throw new ArgumentException("AI provider spend settlement is invalid.");
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -240,7 +258,10 @@ public sealed class NpgsqlAiProviderSpendBudgetStore : IAiProviderSpendBudgetSto
                     update public.ai_provider_spend_reservations
                     set actual_cost_usd = @actual_cost_usd,
                         input_tokens = @input_tokens,
+                        cached_input_tokens = @cached_input_tokens,
+                        cache_write_input_tokens = @cache_write_input_tokens,
                         output_tokens = @output_tokens,
+                        reasoning_tokens = @reasoning_tokens,
                         status = @status,
                         settled_at = now()
                     where provider = @provider and period_start = @period_start
@@ -249,7 +270,10 @@ public sealed class NpgsqlAiProviderSpendBudgetStore : IAiProviderSpendBudgetSto
                     """;
                 updateReservation.Parameters.AddWithValue("actual_cost_usd", NpgsqlDbType.Numeric, settledCost);
                 updateReservation.Parameters.AddWithValue("input_tokens", NpgsqlDbType.Integer, (object?)inputTokens ?? DBNull.Value);
+                updateReservation.Parameters.AddWithValue("cached_input_tokens", NpgsqlDbType.Integer, (object?)cachedInputTokens ?? DBNull.Value);
+                updateReservation.Parameters.AddWithValue("cache_write_input_tokens", NpgsqlDbType.Integer, (object?)cacheWriteInputTokens ?? DBNull.Value);
                 updateReservation.Parameters.AddWithValue("output_tokens", NpgsqlDbType.Integer, (object?)outputTokens ?? DBNull.Value);
+                updateReservation.Parameters.AddWithValue("reasoning_tokens", NpgsqlDbType.Integer, (object?)reasoningTokens ?? DBNull.Value);
                 updateReservation.Parameters.AddWithValue("status", NpgsqlDbType.Text, status);
                 updateReservation.Parameters.AddWithValue("provider", NpgsqlDbType.Text, Provider);
                 updateReservation.Parameters.AddWithValue("period_start", NpgsqlDbType.Date, period.Value);

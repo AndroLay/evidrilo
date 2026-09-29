@@ -1,4 +1,4 @@
--- Runtime assertions for migrations 045-049. This file runs only against the
+-- Runtime assertions for migrations 045-050. This file runs only against the
 -- disposable PostgreSQL database created by run-local-postgres-smoke.sh.
 
 insert into auth.users (id) values
@@ -118,7 +118,7 @@ insert into public.project_ai_activity (
     stage_id, operation_id, base_project_revision, consent_generation, outcome
 ) values
     ('d1490000-0000-4000-8000-000000000003', 'd1450000-0000-4000-8000-000000000003', 'a1490000-0000-4000-8000-000000000003', 'activity-account-delete-01', 'PROJECT', 'd1490000-0000-4000-8000-000000000003', 'frame', 'explain_template_step', 1, 1, 'PENDING'),
-    ('d1490000-0000-4000-8000-000000000004', 'd1450000-0000-4000-8000-000000000003', 'a1490000-0000-4000-8000-000000000003', 'activity-account-delete-02', 'GENERAL', 'PENDING');
+    ('d1490000-0000-4000-8000-000000000004', 'd1450000-0000-4000-8000-000000000003', 'a1490000-0000-4000-8000-000000000003', 'activity-account-delete-02', 'GENERAL', null, null, null, null, null, 'PENDING');
 update public.account_deletion_requests
    set status = 'completed', completed_at = now()
  where account_id = 'd1450000-0000-4000-8000-000000000003';
@@ -141,9 +141,9 @@ declare
     default_cost integer;
 begin
     insert into public.ai_credit_grants (
-        account_id, grant_kind, grant_key, credits, starts_at
+        account_id, grant_kind, grant_key, credits, starts_at, expires_at
     ) values (
-        'd1470000-0000-4000-8000-000000000001', 'free_once', 'project-cost-smoke', 100, now()
+        'd1470000-0000-4000-8000-000000000001', 'subscription_month', 'project-cost-smoke', 200, now(), now() + interval '1 month'
     ) returning ai_credit_grants.grant_id into grant_id;
 
     insert into public.ai_credit_reservations (
@@ -162,7 +162,7 @@ begin
         account_id, request_id, grant_id, status, request_hash, credit_cost
     ) values (
         'd1470000-0000-4000-8000-000000000001',
-        'credit-cost-maximum-001', grant_id, 'reserved', repeat('b', 64), 100
+        'credit-cost-maximum-001', grant_id, 'reserved', repeat('b', 64), 200
     );
 
     begin
@@ -181,7 +181,7 @@ begin
             account_id, request_id, grant_id, status, request_hash, credit_cost
         ) values (
             'd1470000-0000-4000-8000-000000000001',
-            'credit-cost-overmax-001', grant_id, 'reserved', repeat('d', 64), 101
+            'credit-cost-overmax-001', grant_id, 'reserved', repeat('d', 64), 201
         );
         raise exception 'over-limit AI reservation cost was allowed';
     exception when check_violation then

@@ -34,6 +34,8 @@ public sealed class AiProviderOptionsTests
             ("OPENAI_API_KEY", "synthetic-secret"),
             ("AI_OPENAI_MODEL", "gpt-test-snapshot"),
             ("AI_OPENAI_INPUT_USD_PER_MILLION_TOKENS", "1"),
+            ("AI_OPENAI_CACHED_INPUT_USD_PER_MILLION_TOKENS", "0.5"),
+            ("AI_OPENAI_CACHE_WRITE_INPUT_USD_PER_MILLION_TOKENS", "1.25"),
             ("AI_OPENAI_OUTPUT_USD_PER_MILLION_TOKENS", "2"),
             ("AI_MAX_REQUEST_COST_USD", "0.01"));
 
@@ -54,6 +56,8 @@ public sealed class AiProviderOptionsTests
         Assert.Equal(5, options.Timeout.TotalSeconds);
         Assert.Equal(0.01m, options.MaxRequestCostUsd);
         Assert.Equal(2m, options.MonthlySpendLimitUsd);
+        Assert.Equal(0.01m, options.CachedInputUsdPerMillionTokens);
+        Assert.Equal(1.25m, options.CacheWriteInputUsdPerMillionTokens);
         Assert.DoesNotContain("synthetic-secret", options.ToSafeString(), StringComparison.Ordinal);
     }
 
@@ -87,6 +91,8 @@ public sealed class AiProviderOptionsTests
             ["OPENAI_API_KEY"] = "synthetic-secret",
             ["AI_OPENAI_MODEL"] = "gpt-test-snapshot",
             ["AI_OPENAI_INPUT_USD_PER_MILLION_TOKENS"] = "1",
+            ["AI_OPENAI_CACHED_INPUT_USD_PER_MILLION_TOKENS"] = "0.01",
+            ["AI_OPENAI_CACHE_WRITE_INPUT_USD_PER_MILLION_TOKENS"] = "1.25",
             ["AI_OPENAI_OUTPUT_USD_PER_MILLION_TOKENS"] = "2",
             ["AI_MAX_REQUEST_COST_USD"] = "0.01",
             ["AI_MONTHLY_SPEND_LIMIT_USD"] = "2",

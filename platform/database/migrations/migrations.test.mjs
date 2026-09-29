@@ -800,6 +800,43 @@ test('049 adds metadata-only per-installation Project AI history with deletion c
   assert.doesNotMatch(sql, /truncate|drop table|service[_ -]?role|password\s*=/i);
 });
 
+test('050 aligns AI grants and records token usage categories for credit settlement', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '050_ai_token_pricing_and_credit_grants.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '050 must be a new forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /check\s*\(credits between 1 and 200\)/i);
+  assert.match(sql, /when 'free_once' then 20[\s\S]*?when 'subscription_month' then 200/i);
+  assert.match(sql, /where grant_kind = 'free_once'[\s\S]*?grant_kind = 'subscription_month'[\s\S]*?expires_at > now\(\)/i);
+  assert.match(sql, /add column if not exists settled_credit_cost integer/i);
+  assert.match(sql, /status = 'reserved'[\s\S]*?settled_credit_cost is null[\s\S]*?status = 'consumed'[\s\S]*?settled_credit_cost is not null[\s\S]*?settled_credit_cost between 0 and credit_cost[\s\S]*?status = 'released'[\s\S]*?settled_credit_cost is not null[\s\S]*?settled_credit_cost = 0/i);
+  assert.match(sql, /cached_input_tokens integer/i);
+  assert.match(sql, /cache_write_input_tokens integer/i);
+  assert.match(sql, /reasoning_tokens integer/i);
+  assert.match(sql, /cached_input_tokens \+ cache_write_input_tokens <= input_tokens/i);
+  assert.match(sql, /reasoning_tokens <= output_tokens/i);
+  assert.match(sql, /drop constraint if exists ai_provider_spend_token_pair_check,[\s\S]*?drop constraint if exists ai_provider_spend_settlement_check/i);
+  assert.match(sql, /add constraint ai_provider_spend_token_categories_check/i);
+  assert.doesNotMatch(sql, /drop table|drop column|truncate|delete from|service[_ -]?role|password\s*=/i);
+});
+
+test('settled token-priced Project AI previews can record apply or dismiss outcomes', () => {
+  const ledger = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'api', 'Ai', 'AiCreditLedger.cs'),
+    'utf8',
+  );
+  const methodStart = ledger.indexOf('public async Task<ProjectAiCreditSettlementResult> SettleProjectAiAsync(');
+  const methodEnd = ledger.indexOf('public async Task<AiCreditBalance> GetBalanceAsync(', methodStart);
+  const method = ledger.slice(methodStart, methodEnd);
+  const previewSettlement = method.indexOf('releaseReason == ProjectAiPreviewMarker(requestHash)');
+  const terminalReplay = method.indexOf('if (status is "consumed" or "released")');
+
+  assert.ok(methodStart >= 0 && methodEnd > methodStart, 'ledger settlement method must be present');
+  assert.ok(previewSettlement >= 0 && previewSettlement < terminalReplay,
+    'new previews are charged before review, so their first apply/dismiss must be handled before terminal replays');
+  assert.match(method, /set request_hash = @settlement_hash,[\s\S]*?release_reason = @settled_marker[\s\S]*?status = 'consumed'/i);
+});
+
 test('Project AI consent, activity, credit cost, and document budgets have disposable PostgreSQL runtime coverage', () => {
   const integrationDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'integration');
   const smokePath = path.join(integrationDir, 'project-ai-budget-smoke.sql');

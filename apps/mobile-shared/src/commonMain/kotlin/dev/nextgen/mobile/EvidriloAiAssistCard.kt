@@ -768,7 +768,7 @@ private fun EvidriloAiUserBubble(text: String) {
         Surface(
             modifier = Modifier.widthIn(max = 300.dp),
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomEnd = 6.dp, bottomStart = 20.dp),
-            color = EvidriloColors.Cobalt,
+            color = EvidriloColors.PrimaryAction,
             contentColor = EvidriloColors.White,
         ) {
             Text(
@@ -922,7 +922,7 @@ private fun EvidriloAiPromptChip(
                 role = Role.Button
             },
         shape = RoundedCornerShape(50),
-        color = if (enabled) EvidriloColors.White else EvidriloColors.Surface,
+        color = EvidriloColors.Card,
         border = BorderStroke(2.dp, if (enabled) EvidriloColors.Cobalt else EvidriloColors.Separator),
     ) {
         Row(
@@ -932,13 +932,13 @@ private fun EvidriloAiPromptChip(
         ) {
             EvidriloIcon(
                 name = EvidriloIconName.SPARK,
-                tint = if (enabled) EvidriloColors.Cobalt else EvidriloColors.Outline,
+                tint = if (enabled) EvidriloColors.Cobalt else EvidriloColors.Slate,
                 modifier = Modifier.size(16.dp),
             )
             Text(
                 action.label,
                 style = MaterialTheme.typography.titleSmall,
-                color = if (enabled) EvidriloColors.Cobalt else EvidriloColors.Outline,
+                color = if (enabled) EvidriloColors.Cobalt else EvidriloColors.Slate,
                 textAlign = TextAlign.Center,
             )
         }

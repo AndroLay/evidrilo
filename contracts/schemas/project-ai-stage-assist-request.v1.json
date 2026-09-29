@@ -17,7 +17,8 @@
     "stageId": {},
     "operationId": {},
     "baseProjectRevision": {},
-    "selectedFields": {}
+    "selectedFieldIds": {},
+    "selectedEvidenceIds": {}
   },
   "oneOf": [
     { "$ref": "#/$defs/projectRequest" },
@@ -53,14 +54,20 @@
             "stageId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
             "operationId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 },
             "baseProjectRevision": { "type": "integer", "minimum": 1 },
-            "selectedFields": {
-              "type": "object",
-              "maxProperties": 32,
-              "propertyNames": { "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
-              "additionalProperties": { "type": "string", "maxLength": 8000 }
+            "selectedFieldIds": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 80 }
+            },
+            "selectedEvidenceIds": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
             }
           },
-          "required": ["schema", "version", "mode", "installationId", "locale", "projectId", "templateId", "templateVersion", "stageId", "operationId", "baseProjectRevision", "selectedFields"]
+          "required": ["schema", "version", "mode", "installationId", "locale", "projectId", "templateId", "templateVersion", "stageId", "operationId", "baseProjectRevision", "selectedFieldIds", "selectedEvidenceIds"]
         }
       ]
     },
@@ -75,7 +82,9 @@
             "version": { "const": "1" },
             "mode": { "const": "GENERAL" },
             "installationId": { "type": "string", "format": "uuid" },
-            "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 }
+            "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 32 },
+            "selectedFieldIds": { "type": "array", "maxItems": 0 },
+            "selectedEvidenceIds": { "type": "array", "maxItems": 0 }
           },
           "required": ["schema", "version", "mode", "installationId", "locale"]
         }

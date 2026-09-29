@@ -158,6 +158,7 @@ builder.Services.AddSingleton<AiConversationGateway>();
 // Project AI remains deliberately unavailable until its independent provider,
 // privacy/consent, and variable credit-cost gates are approved and verified.
 builder.Services.AddSingleton<IProjectAiScaffoldGenerator, DisabledProjectAiScaffoldGenerator>();
+builder.Services.AddSingleton<IProjectAiStageAssistGenerator, DisabledProjectAiStageAssistGenerator>();
 if (platformOptions.DatabaseConfigured)
 {
     builder.Services.AddSingleton<IProjectAiConsentStore>(_ =>

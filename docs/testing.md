@@ -123,8 +123,13 @@ Tests for the conclusion workflow should cover:
 
 AI and credit tests must additionally cover:
 
-- one-time 10-credit free grant only for a verified, consented account;
-- 100-credit monthly grant for both monthly and yearly active entitlements;
+- one-time 20-credit free grant only for a verified, consented account;
+- 200-credit monthly grant for both monthly and yearly active entitlements;
+- a forward database migration that permits a 200-credit grant while keeping
+  per-request cost validation independent of grant size;
+- consent and balance UI copy that matches the verified account's current grant;
+- operation settlement that matches the adopted 3-credit scaffold / 1-credit
+  standard-assist policy unless a separate owner decision changes those costs;
 - no rollover, lifetime allowance, anonymous grant, or paid top-up;
 - RevenueCat period/webhook replay idempotency and grant expiry;
 - concurrent reservation cannot overspend or double-charge an account;

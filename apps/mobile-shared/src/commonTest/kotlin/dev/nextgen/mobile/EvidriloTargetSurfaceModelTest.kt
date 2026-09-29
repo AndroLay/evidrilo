@@ -6,6 +6,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvent
+import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionReducer
@@ -63,6 +64,15 @@ class EvidriloTargetSurfaceModelTest {
     }
 
     @Test
+    fun evidence_map_primary_action_matches_the_actual_support_state() {
+        assertEquals("Review requirement trace", targetEvidencePrimaryActionLabel(TargetEvidenceStatus.NOT_ASSESSED))
+        assertEquals("Review the evidence gap", targetEvidencePrimaryActionLabel(TargetEvidenceStatus.PARTIALLY_SUPPORTED))
+        assertEquals("Review evidence links", targetEvidencePrimaryActionLabel(TargetEvidenceStatus.SUPPORTED))
+        assertEquals("Check unavailable evidence", targetEvidencePrimaryActionLabel(TargetEvidenceStatus.UNAVAILABLE))
+        assertEquals("See why this cannot be assessed", targetEvidencePrimaryActionLabel(TargetEvidenceStatus.CANNOT_ASSESS))
+    }
+
+    @Test
     fun target_visual_palette_keeps_the_reference_blue_atmosphere() {
         assertEquals(Color(0xFFEFF6FF), EvidriloColors.Atmosphere)
         assertEquals(Color(0xFFBFD7FF), EvidriloColors.PatternBlue)
@@ -73,7 +83,7 @@ class EvidriloTargetSurfaceModelTest {
     fun target_visual_layout_keeps_the_reference_scale_and_spacing() {
         assertEquals(50.dp, EvidriloTargetLayout.BrandLogoSize)
         assertEquals(52.dp, EvidriloTargetLayout.SourcesLogoSize)
-        assertEquals(158.dp, EvidriloTargetLayout.SourcesGraphicHeight)
+        assertEquals(146.dp, EvidriloTargetLayout.SourcesGraphicHeight)
         assertEquals(4.dp, EvidriloTargetLayout.NavigationVisualOffset)
         assertEquals(28.dp, EvidriloTargetLayout.ContentTopPadding)
     }
@@ -90,6 +100,10 @@ class EvidriloTargetSurfaceModelTest {
     @Test
     fun sources_copy_describes_the_bundled_case_without_claiming_import_support() {
         assertFalse(EvidriloSourcesCopy.intro.contains("Upload", ignoreCase = true))
+        assertTrue(
+            EvidriloSourcesCopy.intro.length <= 45,
+            "Sources' supporting intro should stay short enough to keep the primary action visible on compact screens",
+        )
         assertFalse(EvidriloSourcesCopy.assignmentBriefSubtitle.contains("PDF", ignoreCase = true))
         assertFalse(EvidriloSourcesCopy.rubricSubtitle.contains("PDF", ignoreCase = true))
         assertFalse(EvidriloSourcesCopy.sourcesSubtitle.contains("files", ignoreCase = true))
@@ -195,7 +209,7 @@ class EvidriloTargetSurfaceModelTest {
             ),
             targetHistorySummary(snapshot),
         )
-        assertEquals(TargetHistorySummary.EMPTY, targetHistorySummary(null))
+        assertNull(targetHistorySummary(null))
     }
 
     @Test
@@ -439,6 +453,69 @@ class EvidriloTargetSurfaceModelTest {
         )
 
         assertEquals(TargetEvidenceStatus.UNAVAILABLE, targetEvidenceStatus(challenge, draft))
+    }
+
+    @Test
+    fun evidence_lens_detail_resolves_only_the_exact_active_case_observation() {
+        val case = ConclusionCases.M0_T2
+        val draft = ConclusionDraft(
+            caseId = case.id,
+            evidenceRefs = listOf("OBS-WARM-01"),
+        )
+
+        val detail = targetEvidenceLensDetail(case, draft, "OBS-WARM-01")
+
+        assertEquals(case.id, detail.caseId)
+        assertEquals(case.title, detail.caseTitle)
+        assertEquals("M0_T2:1", detail.caseVersionId)
+        assertEquals("OBS-WARM-01", detail.factId)
+        assertEquals(case.fact("OBS-WARM-01"), detail.fact)
+        assertEquals(TargetFactAvailability.AVAILABLE, detail.availability)
+        assertTrue(detail.selected)
+    }
+
+    @Test
+    fun evidence_lens_detail_keeps_missing_anchor_unavailable_without_substitution() {
+        val case = ConclusionCases.EVIDENCE_CHANGE
+        val draft = ConclusionDraft(
+            caseId = case.id,
+            evidenceRefs = listOf("OBS-COLD-01"),
+        )
+
+        val detail = targetEvidenceLensDetail(case, draft, "OBS-COLD-01")
+
+        assertNull(detail.fact)
+        assertEquals("OBS-COLD-01", detail.factId)
+        assertEquals(TargetFactAvailability.UNAVAILABLE, detail.availability)
+        assertTrue(detail.selected)
+
+        val incompatibleDetail = targetEvidenceLensDetail(
+            case,
+            draft,
+            case.facts.first { it.type == ConclusionFactType.LIMITATION }.id,
+        )
+        assertEquals(TargetFactAvailability.INCOMPATIBLE_TYPE, incompatibleDetail.availability)
+        assertFalse(incompatibleDetail.selected)
+    }
+
+    @Test
+    fun requirement_trace_distinguishes_selected_available_invalid_and_missing_facts() {
+        val case = ConclusionCases.M0_T2
+        val draft = completeTargetDraft(case).copy(
+            evidenceRefs = listOf("OBS-WARM-01", "LIMIT-TRIAL-01", "OBS-REMOVED-99"),
+            relation = ConclusionRelation.OBSERVED_DIFFERENCE,
+        )
+
+        val trace = targetRequirementTraceDetail(case, draft)
+
+        assertEquals(case.fact("AIM-01"), trace.requirement)
+        assertEquals(listOf(case.fact("OBS-WARM-01")), trace.selectedEvidence)
+        assertEquals(listOf("OBS-REMOVED-99"), trace.unavailableEvidenceIds)
+        assertEquals(listOf("LIMIT-TRIAL-01"), trace.incompatibleEvidenceIds)
+        assertEquals(ConclusionRelation.OBSERVED_DIFFERENCE, trace.studentRecordedRelation)
+        assertEquals(TargetEvidenceStatus.UNAVAILABLE, trace.supportStatus)
+        assertEquals(case.fact(case.boundaryFactId()), trace.boundary)
+        assertEquals(case.remoteCaseVersionId, trace.caseVersionId)
     }
 
     @Test

@@ -191,7 +191,7 @@ internal fun EvidriloFloatingAssistant(
             ) {
                 Box(
                     modifier = Modifier.background(
-                        Brush.linearGradient(listOf(EvidriloColors.Cobalt, EvidriloColors.CobaltBright)),
+                        Brush.linearGradient(listOf(EvidriloColors.PrimaryAction, EvidriloColors.CobaltPressed)),
                     ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -612,7 +612,7 @@ private fun GuideLearnerBubble(text: String, attachments: List<ChatAttachment>) 
         Surface(
             modifier = Modifier.widthIn(max = 300.dp),
             shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 5.dp, bottomStart = 18.dp),
-            color = EvidriloColors.Cobalt,
+            color = EvidriloColors.PrimaryAction,
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.White)

@@ -4,9 +4,11 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionEvaluation
+import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.domain.conclusion.ConclusionReducer
+import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
 import dev.nextgen.mobile.domain.conclusion.ConclusionState
@@ -22,6 +24,78 @@ internal enum class TargetEvidenceStatus {
     CANNOT_ASSESS,
 }
 
+internal enum class TargetFactAvailability {
+    AVAILABLE,
+    UNAVAILABLE,
+    INCOMPATIBLE_TYPE,
+}
+
+internal data class TargetEvidenceLensDetail(
+    val caseId: String,
+    val caseTitle: String,
+    val caseVersionId: String?,
+    val factId: String,
+    val fact: ConclusionFact?,
+    val availability: TargetFactAvailability,
+    val selected: Boolean,
+)
+
+internal data class TargetRequirementTraceDetail(
+    val caseId: String,
+    val caseTitle: String,
+    val caseVersionId: String?,
+    val requirement: ConclusionFact?,
+    val selectedEvidence: List<ConclusionFact>,
+    val unavailableEvidenceIds: List<String>,
+    val incompatibleEvidenceIds: List<String>,
+    val studentRecordedRelation: ConclusionRelation?,
+    val supportStatus: TargetEvidenceStatus,
+    val boundary: ConclusionFact?,
+)
+
+internal fun targetEvidenceLensDetail(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+    factId: String,
+): TargetEvidenceLensDetail {
+    val fact = case.fact(factId)
+    return TargetEvidenceLensDetail(
+        caseId = case.id,
+        caseTitle = case.title,
+        caseVersionId = case.remoteCaseVersionId,
+        factId = factId,
+        fact = fact,
+        availability = when {
+            fact == null -> TargetFactAvailability.UNAVAILABLE
+            fact.type != ConclusionFactType.OBSERVATION -> TargetFactAvailability.INCOMPATIBLE_TYPE
+            else -> TargetFactAvailability.AVAILABLE
+        },
+        selected = factId in draft.evidenceRefs,
+    )
+}
+
+internal fun targetRequirementTraceDetail(
+    case: ConclusionCase,
+    draft: ConclusionDraft,
+): TargetRequirementTraceDetail {
+    val observationById = case.factsOfType(ConclusionFactType.OBSERVATION).associateBy { it.id }
+    val referencedIds = draft.evidenceRefs.distinct()
+    return TargetRequirementTraceDetail(
+        caseId = case.id,
+        caseTitle = case.title,
+        caseVersionId = case.remoteCaseVersionId,
+        requirement = case.facts.firstOrNull { it.type == ConclusionFactType.AIM },
+        selectedEvidence = referencedIds.mapNotNull(observationById::get),
+        unavailableEvidenceIds = referencedIds.filter { case.fact(it) == null },
+        incompatibleEvidenceIds = referencedIds.filter { id ->
+            case.fact(id)?.type?.let { it != ConclusionFactType.OBSERVATION } == true
+        },
+        studentRecordedRelation = draft.relation,
+        supportStatus = targetEvidenceStatus(case, draft),
+        boundary = case.facts.firstOrNull { it.type == ConclusionFactType.BOUNDARY },
+    )
+}
+
 internal enum class TargetPageState {
     CONTENT,
     NOT_ASSESSED,
@@ -35,7 +109,7 @@ internal enum class TargetPageState {
 }
 
 internal object EvidriloSourcesCopy {
-    const val intro = "The bundled example is available offline. For your own work, open My Projects and add materials there."
+    const val intro = "Offline case · add your work in My Projects."
     const val assignmentBriefSubtitle = "Requirement supplied with this case"
     const val rubricSubtitle = "Bounded checks for this case"
     const val sourcesSubtitle = "Bundled observations and stated limits"
@@ -112,10 +186,18 @@ internal fun TargetEvidenceStatus.targetDisplayLabel(): String = when (this) {
     TargetEvidenceStatus.CANNOT_ASSESS -> "Cannot assess"
 }
 
+internal fun targetEvidencePrimaryActionLabel(status: TargetEvidenceStatus): String = when (status) {
+    TargetEvidenceStatus.NOT_ASSESSED -> "Review requirement trace"
+    TargetEvidenceStatus.PARTIALLY_SUPPORTED -> "Review the evidence gap"
+    TargetEvidenceStatus.SUPPORTED -> "Review evidence links"
+    TargetEvidenceStatus.UNAVAILABLE -> "Check unavailable evidence"
+    TargetEvidenceStatus.CANNOT_ASSESS -> "See why this cannot be assessed"
+}
+
 internal fun targetHistorySummary(
     history: ConclusionSessionSnapshot?,
-): TargetHistorySummary {
-    if (history == null) return TargetHistorySummary.EMPTY
+): TargetHistorySummary? {
+    if (history == null) return null
 
     val before = history.initialDraft.evidenceRefs.distinct().toSet()
     val after = history.currentDraft.evidenceRefs.distinct().toSet()

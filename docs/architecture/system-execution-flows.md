@@ -276,7 +276,7 @@ sequenceDiagram
     Store->>DB: Check current consent, owner, and version
     DB-->>Store: Reject revoked consent or conflicting owner/version
     Store-->>API: Typed authorization or conflict error
-    API-->>Client: Reject write; preserve device-local project
+    API-->>Client: Reject write, preserve device-local project
 ```
 
 The API routes are `PUT /v1/projects/cloud-consent`, `POST /v1/projects`, and
@@ -312,7 +312,7 @@ sequenceDiagram
     Auth-->>API: Verified account
     API->>Consent: Read current consent
     Consent-->>API: Current consent policy accepted
-    API->>API: Validate idempotency key; parse and validate bounded request
+    API->>API: Validate idempotency key, parse and validate bounded request
     API->>Generator: Check whether generation is enabled
     Generator-->>API: Disabled
     API-->>Caller: PROJECT_AI_NOT_READY
@@ -342,13 +342,13 @@ sequenceDiagram
     Auth-->>API: Verified account
     API->>Consent: Read and validate current Project AI consent
     Consent-->>API: Current consent policy accepted
-    API->>API: Parse and validate request; confirm generator enabled
+    API->>API: Parse and validate request, confirm generator enabled
     API->>Template: Load exact published version and validate fields
     Template-->>API: Reviewed compatible template
     API->>Consent: Recheck consent before reserving credits
     Consent-->>API: Still authorized or revoked
     alt Consent still authorized before reservation
-        API->>Credits: Ensure grant; reserve 3 create or 1 assist credit
+        API->>Credits: Ensure grant, reserve 3 create or 1 assist credit
         Credits-->>API: Request-bound reservation or rejection
         alt Credit reservation succeeded
             API->>Consent: Recheck consent immediately before dispatch
@@ -361,26 +361,26 @@ sequenceDiagram
                 Generator-->>API: Output or typed failure
                 API->>API: Validate version, field allowlist, size, and credentials
                 alt Output is valid and reservation remains held
-                    API->>Credits: Mark preview ready; keep reservation for student decision
+                    API->>Credits: Mark preview ready, keep reservation for student decision
                     Credits-->>API: Preview reservation confirmed
                     API-->>UI: Show preview without changing project
                 else Provider fails, output is invalid, or reservation expires
                     API->>Credits: Release reservation
                     Credits-->>API: Reservation released
-                    API-->>UI: Typed failure; keep project unchanged
+                    API-->>UI: Typed failure, keep project unchanged
                 end
             else Consent revoked before dispatch
                 Consent-->>API: Dispatch no longer authorized
                 API->>Credits: Release held reservation
                 Credits-->>API: Reservation released
-                API-->>UI: Consent error; keep project unchanged
+                API-->>UI: Consent error, keep project unchanged
             end
         else Credit reservation rejected
-            API-->>UI: Insufficient credit or replay error; no provider dispatch
+            API-->>UI: Insufficient credit or replay error, no provider dispatch
         end
     else Consent revoked before reservation
         Consent-->>API: Consent no longer authorizes request
-        API-->>UI: Consent error; no credit reservation or provider dispatch
+        API-->>UI: Consent error, no credit reservation or provider dispatch
     end
 ```
 
@@ -399,7 +399,7 @@ sequenceDiagram
     Gates-->>API: A required gate rejects the request
     API->>Credits: Release reservation if one was created
     Credits-->>API: Reservation released
-    API-->>Caller: Return typed error; keep project unchanged
+    API-->>Caller: Return typed error, keep project unchanged
 ```
 
 #### Future response: student review and settlement
@@ -566,7 +566,7 @@ sequenceDiagram
     UI->>Picker: Request destination
     Student->>Picker: Choose destination or cancel
     Picker-->>UI: Write result, cancel, or error
-    UI-->>Student: Show truthful result; keep project local
+    UI-->>Student: Show truthful result, keep project local
 ```
 
 #### Export stopped because the local save failed
@@ -584,7 +584,7 @@ sequenceDiagram
     Flow->>Store: Persist local snapshot
     Store-->>Flow: Write failure
     Flow-->>UI: Save failed
-    UI-->>Student: Do not create a file; keep project on device
+    UI-->>Student: Do not create a file, keep project on device
 ```
 
 #### Import a `.evproj` archive: preflight and staging
@@ -643,7 +643,7 @@ sequenceDiagram
     Flow->>Store: Commit project and attachment references
     Store-->>Flow: Commit fails
     Flow->>Store: Roll back staged bytes where possible
-    Flow-->>UI: Failure; preserve existing project
+    Flow-->>UI: Failure, preserve existing project
     UI-->>UI: Offer retry without changing existing projects
 ```
 
@@ -710,15 +710,15 @@ sequenceDiagram
         Server->>Credits: Check ledger consent and reserve one credit
         alt Credit reservation denied or replayed
             Credits-->>Server: No new reservation
-            Server-->>API: Quota or idempotency fallback; do not call provider
+            Server-->>API: Quota or idempotency fallback, do not call provider
         else Credit reserved
             Credits-->>Server: Request-bound reservation
             Server->>Provider: Invoke configured adapter (disabled in current build)
             alt Provider disabled or unavailable
                 Provider-->>Server: No generated response or provider failure
                 Server->>Credits: Release reserved credit
-                Credits-->>Server: Released; no credit consumed
-                Server-->>API: Typed fallback; draft unchanged
+                Credits-->>Server: Released, no credit consumed
+                Server-->>API: Typed fallback, draft unchanged
             else Future approved provider returns a response
                 Provider-->>Server: Candidate explanation, question, or typed proposal
                 Server->>Server: Validate purpose, anchors, schema, and proposal before-value
@@ -728,8 +728,8 @@ sequenceDiagram
                     Server-->>API: Validated typed response or settlement fallback
                 else Response is invalid or stale
                     Server->>Credits: Release reserved credit
-                    Credits-->>Server: Released; no credit consumed
-                    Server-->>API: Typed fallback; draft unchanged
+                    Credits-->>Server: Released, no credit consumed
+                    Server-->>API: Typed fallback, draft unchanged
                 end
             end
         end
@@ -740,14 +740,14 @@ sequenceDiagram
         Client->>Client: Validate response purpose, session, turn, anchors, and before-values
         Client-->>App: Valid result or bounded failure
         alt Valid typed response
-            App-->>UI: Show response or before/after preview; do not auto-apply
+            App-->>UI: Show response or before/after preview, do not auto-apply
             opt Student applies a supported proposal
                 Student->>UI: Choose Apply to draft
                 UI->>App: Apply proposal
                 App->>App: Check field allowlist and current before-value
                 App->>Reducer: ConclusionEvent.UpdateDraft
                 Reducer-->>App: Updated learner draft
-                App-->>UI: Draft changed; not yet re-evaluated
+                App-->>UI: Draft changed, not yet re-evaluated
                 Student->>UI: Submit the revised draft
                 UI->>Reducer: ConclusionEvent.Submit
                 Reducer->>Evaluator: Re-evaluate the active case deterministically
@@ -757,7 +757,7 @@ sequenceDiagram
             App-->>UI: Keep the draft and case result unchanged
         end
     else Turn replayed, in progress, stale, or over limit
-        API-->>Client: Typed API error; do not generate
+        API-->>Client: Typed API error, do not generate
         Client-->>App: Bounded failure
         App-->>UI: Keep the draft and case result unchanged
     end
@@ -778,7 +778,7 @@ sequenceDiagram
         Credits-->>API: Current balance
         API-->>Client: Balance result
         Client-->>App: Balance or refresh failure
-        App-->>UI: Show ready/unavailable state; keep local transcript cleared
+        App-->>UI: Show ready/unavailable state, keep local transcript cleared
     end
 ```
 

@@ -44,6 +44,85 @@ public sealed class OpenAiResponsesProviderTests
         Assert.Equal(0.00008m, budget.ActualCostUsd);
         Assert.Equal(40, budget.InputTokens);
         Assert.Equal(20, budget.OutputTokens);
+        Assert.Equal(0, budget.CachedInputTokens);
+        Assert.Equal(0, budget.CacheWriteInputTokens);
+        Assert.Equal(0, budget.ReasoningTokens);
+    }
+
+    [Fact]
+    public async Task Cached_input_and_reasoning_usage_are_parsed_and_priced_without_double_counting()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(CompletedResponse(
+            """{"kind":"explanation","text":"A safe explanation.","referencedAnchorIds":["OBS-01"],"proposal":null}""",
+            inputTokens: 10_000,
+            outputTokens: 500,
+            cachedInputTokens: 4_000,
+            cacheWriteInputTokens: 1_000,
+            reasoningTokens: 300)));
+        var budget = new RecordingSpendBudget();
+        using var client = new HttpClient(handler);
+        var provider = CreateProvider(
+            client,
+            budget,
+            maxRequestCostUsd: 0.05m,
+            inputRate: 0.10m,
+            outputRate: 0.50m,
+            cachedInputRate: 0.01m,
+            cacheWriteInputRate: 0.125m);
+
+        var response = await provider.CompleteAsync(
+            Request(prompt: new string('p', 10_000)),
+            CancellationToken.None);
+
+        Assert.NotNull(response);
+        Assert.Equal(new AiProviderTokenUsage(10_000, 4_000, 1_000, 500, 300), response.Usage);
+        Assert.Equal(0.000915m, budget.ActualCostUsd);
+        Assert.Equal(10_000, budget.InputTokens);
+        Assert.Equal(4_000, budget.CachedInputTokens);
+        Assert.Equal(1_000, budget.CacheWriteInputTokens);
+        Assert.Equal(500, budget.OutputTokens);
+        Assert.Equal(300, budget.ReasoningTokens);
+    }
+
+    [Fact]
+    public async Task Overlapping_cache_usage_categories_are_rejected_and_spend_is_marked_uncertain()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(CompletedResponse(
+            """{"kind":"explanation","text":"A safe explanation.","referencedAnchorIds":["OBS-01"],"proposal":null}""",
+            inputTokens: 10_000,
+            outputTokens: 5_000,
+            cachedInputTokens: 6_000,
+            cacheWriteInputTokens: 4_001)));
+        var budget = new RecordingSpendBudget();
+        using var client = new HttpClient(handler);
+        var provider = CreateProvider(client, budget);
+
+        var exception = await Assert.ThrowsAsync<AiProviderFailureException>(
+            () => provider.CompleteAsync(Request(), CancellationToken.None));
+
+        Assert.Equal("AI_PROVIDER_INVALID_OUTPUT", exception.ReasonCode);
+        Assert.True(budget.Uncertain);
+        Assert.Null(budget.ActualCostUsd);
+    }
+
+    [Fact]
+    public async Task Missing_required_cache_write_usage_is_not_underbilled()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(CompletedResponse(
+            """{"kind":"explanation","text":"A safe explanation.","referencedAnchorIds":["OBS-01"],"proposal":null}""",
+            inputTokens: 2_000,
+            outputTokens: 200,
+            includeCacheWriteInputTokens: false)));
+        var budget = new RecordingSpendBudget();
+        using var client = new HttpClient(handler);
+        var provider = CreateProvider(client, budget);
+
+        var exception = await Assert.ThrowsAsync<AiProviderFailureException>(
+            () => provider.CompleteAsync(Request(), CancellationToken.None));
+
+        Assert.Equal("AI_PROVIDER_INVALID_OUTPUT", exception.ReasonCode);
+        Assert.True(budget.Uncertain);
+        Assert.Null(budget.ActualCostUsd);
     }
 
     [Fact]
@@ -212,7 +291,9 @@ public sealed class OpenAiResponsesProviderTests
         RecordingSpendBudget budget,
         decimal maxRequestCostUsd = 0.01m,
         decimal inputRate = 1m,
-        decimal outputRate = 2m)
+        decimal outputRate = 2m,
+        decimal cachedInputRate = 0.01m,
+        decimal cacheWriteInputRate = 1.25m)
     {
         var values = new Dictionary<string, string?>
         {
@@ -221,6 +302,8 @@ public sealed class OpenAiResponsesProviderTests
             ["OPENAI_API_KEY"] = "synthetic-secret",
             ["AI_OPENAI_MODEL"] = "gpt-test-snapshot",
             ["AI_OPENAI_INPUT_USD_PER_MILLION_TOKENS"] = inputRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["AI_OPENAI_CACHED_INPUT_USD_PER_MILLION_TOKENS"] = cachedInputRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["AI_OPENAI_CACHE_WRITE_INPUT_USD_PER_MILLION_TOKENS"] = cacheWriteInputRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["AI_OPENAI_OUTPUT_USD_PER_MILLION_TOKENS"] = outputRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["AI_MAX_REQUEST_COST_USD"] = maxRequestCostUsd.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["AI_MONTHLY_SPEND_LIMIT_USD"] = "2",
@@ -241,11 +324,18 @@ public sealed class OpenAiResponsesProviderTests
         int inputTokens,
         int outputTokens,
         string status = "completed",
-        string? refusal = null)
+        string? refusal = null,
+        int cachedInputTokens = 0,
+        int cacheWriteInputTokens = 0,
+        int reasoningTokens = 0,
+        bool includeCacheWriteInputTokens = true)
     {
         var content = refusal is null
             ? JsonSerializer.Serialize(new[] { new { type = "output_text", text = outputText } })
             : JsonSerializer.Serialize(new[] { new { type = "refusal", refusal } });
+        var cacheWriteTokenDetail = includeCacheWriteInputTokens
+            ? $", \"cache_write_tokens\": {cacheWriteInputTokens}"
+            : string.Empty;
         return $$"""
         {
           "id": "resp_synthetic",
@@ -254,7 +344,13 @@ public sealed class OpenAiResponsesProviderTests
           "output": [
             { "type": "message", "role": "assistant", "content": {{content}} }
           ],
-          "usage": { "input_tokens": {{inputTokens}}, "output_tokens": {{outputTokens}} }
+          "usage": {
+            "input_tokens": {{inputTokens}},
+            "input_tokens_details": { "cached_tokens": {{cachedInputTokens}}{{cacheWriteTokenDetail}} },
+            "output_tokens": {{outputTokens}},
+            "output_tokens_details": { "reasoning_tokens": {{reasoningTokens}} },
+            "total_tokens": {{inputTokens + outputTokens}}
+          }
         }
         """;
     }
@@ -282,7 +378,10 @@ public sealed class OpenAiResponsesProviderTests
         public int SettleCount { get; private set; }
         public decimal? ActualCostUsd { get; private set; }
         public int? InputTokens { get; private set; }
+        public int? CachedInputTokens { get; private set; }
+        public int? CacheWriteInputTokens { get; private set; }
         public int? OutputTokens { get; private set; }
+        public int? ReasoningTokens { get; private set; }
         public bool Uncertain { get; private set; }
 
         public Task<AiProviderBudgetReservationStatus> TryReserveAsync(
@@ -298,7 +397,10 @@ public sealed class OpenAiResponsesProviderTests
             string requestId,
             decimal? actualCostUsd,
             int? inputTokens,
+            int? cachedInputTokens,
+            int? cacheWriteInputTokens,
             int? outputTokens,
+            int? reasoningTokens,
             bool uncertain,
             bool released,
             CancellationToken cancellationToken)
@@ -306,7 +408,10 @@ public sealed class OpenAiResponsesProviderTests
             SettleCount++;
             ActualCostUsd = actualCostUsd;
             InputTokens = inputTokens;
+            CachedInputTokens = cachedInputTokens;
+            CacheWriteInputTokens = cacheWriteInputTokens;
             OutputTokens = outputTokens;
+            ReasoningTokens = reasoningTokens;
             Uncertain = uncertain;
             return Task.FromResult(true);
         }

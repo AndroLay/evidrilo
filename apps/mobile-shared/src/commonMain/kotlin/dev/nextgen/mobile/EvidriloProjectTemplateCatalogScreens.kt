@@ -3,26 +3,39 @@ package dev.nextgen.mobile
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -51,8 +64,7 @@ internal sealed interface ProjectTemplateRemoteUiState<out T> {
 }
 
 internal const val projectTemplateCatalogBrowseInstructions =
-    "Swipe the row left or right, or choose a card to open its overview. " +
-        "With a screen reader, move focus through the cards and activate one."
+    "Swipe sideways or choose a type. Screen readers move focus through cards and activate one."
 
 internal fun <T> ProjectTemplateCatalogGatewayResult<T>.toRemoteUiState(): ProjectTemplateRemoteUiState<T> = when (this) {
     is ProjectTemplateCatalogGatewayResult.Loaded -> ProjectTemplateRemoteUiState.Loaded(value)
@@ -68,6 +80,35 @@ internal data class ProjectTemplateFamilyOverview(
     val workToOrganize: List<String>,
     val pointsToCheck: List<String>,
 )
+
+internal data class ProjectTemplateFamilyCardDesign(
+    val icon: EvidriloIconName,
+    val cue: String,
+)
+
+internal fun projectTemplateFamilyCardDesign(family: ProjectTemplateFamily): ProjectTemplateFamilyCardDesign =
+    when (family) {
+        ProjectTemplateFamily.EXPERIMENTAL_LABORATORY -> ProjectTemplateFamilyCardDesign(
+            EvidriloIconName.LIGHTNING,
+            "Change and measure",
+        )
+        ProjectTemplateFamily.OBSERVATIONAL_SURVEY -> ProjectTemplateFamilyCardDesign(
+            EvidriloIconName.LIST,
+            "Observe patterns",
+        )
+        ProjectTemplateFamily.LITERATURE_REVIEW -> ProjectTemplateFamilyCardDesign(
+            EvidriloIconName.BOOK,
+            "Compare sources",
+        )
+        ProjectTemplateFamily.QUALITATIVE_INTERVIEW_FIELD_STUDY -> ProjectTemplateFamilyCardDesign(
+            EvidriloIconName.CHAT_BUBBLE,
+            "Hear perspectives",
+        )
+        ProjectTemplateFamily.DESIGN_ENGINEERING -> ProjectTemplateFamilyCardDesign(
+            EvidriloIconName.CHECKLIST,
+            "Build and test",
+        )
+    }
 
 internal val projectTemplateFamilyOverviews = listOf(
     ProjectTemplateFamilyOverview(
@@ -159,25 +200,52 @@ internal fun EvidriloProjectTemplateCatalogScreen(
     onToggleQuickGuide: () -> Unit,
     onBack: () -> Unit,
     onOpenProjects: () -> Unit,
+    onStartBlankProject: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
     onSelectFamily: (ProjectTemplateFamily) -> Unit,
 ) {
+    var showCatalogHelp by remember { mutableStateOf(false) }
+    if (showCatalogHelp) {
+        AlertDialog(
+            onDismissRequest = { showCatalogHelp = false },
+            title = { Text("How to use this catalog") },
+            text = {
+                Text(
+                    "$projectTemplateCatalogBrowseInstructions An overview explains a project type; it does not choose for you.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showCatalogHelp = false }) { Text("Got it") }
+            },
+        )
+    }
+
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
         EvidriloContentColumn {
             EvidriloBrandHeader(onSettings = null)
             EvidriloBackButton(label = "Home", onClick = onBack)
-            Text("Explore project types", style = MaterialTheme.typography.headlineLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Explore project types",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineLarge,
+                )
+                IconButton(
+                    onClick = { showCatalogHelp = true },
+                    modifier = Modifier.semantics {
+                        contentDescription = "How to use this catalog"
+                    },
+                ) {
+                    EvidriloIcon(EvidriloIconName.QUESTION, tint = EvidriloColors.Cobalt)
+                }
+            }
             Text(
-                "Find an overview that may fit your assignment. Your assignment instructions and educator remain the guide.",
-                style = MaterialTheme.typography.bodyLarge,
+                "Choose an overview based on your assignment.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = EvidriloColors.Slate,
             )
-            Text(
-                projectTemplateCatalogBrowseInstructions,
-                style = MaterialTheme.typography.labelLarge,
-                color = EvidriloColors.Cobalt,
-            )
             ProjectTemplateCatalogStatus(remoteFamilies, onRetryRemoteFamilies)
+            EvidriloPrimaryButton(label = "Start a blank project", onClick = onStartBlankProject)
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 2.dp),
@@ -198,38 +266,30 @@ internal fun EvidriloProjectTemplateCatalogScreen(
                 onOpenFamily = onSelectFamily,
             )
             EvidriloSecondaryButton(label = "My projects", onClick = onOpenProjects)
-            EvidriloTargetCard {
-                Text("How to use this catalog", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "These cards are method-family overviews, not ready-made project templates or evaluators. A startable template needs its own scope, inputs, limits, and reviewed examples.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EvidriloColors.Slate,
-                )
-                Text(
-                    "If your assignment could fit more than one type, compare the approaches and confirm the choice with your instructor instead of forcing a category.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
         }
     }
 }
 
 @Composable
-private fun ProjectTemplateFamilyCard(
+internal fun ProjectTemplateFamilyCard(
     overview: ProjectTemplateFamilyOverview,
     selectableTemplateCount: Int?,
     onClick: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val cardDesign = projectTemplateFamilyCardDesign(overview.family)
     Card(
         onClick = onClick,
         modifier = Modifier
-            .width(270.dp)
-            .heightIn(min = 190.dp)
+            .width(250.dp)
+            .height(224.dp * fontScale)
             .semantics(mergeDescendants = true) {
                 contentDescription = buildString {
                     append(overview.family.displayName)
                     append(". ")
                     append(overview.summary)
+                    append(". ")
+                    append(cardDesign.cue)
                     selectableTemplateCount?.let { append(" $it published templates available to inspect.") }
                     append(" Open overview.")
                 }
@@ -241,13 +301,36 @@ private fun ProjectTemplateFamilyCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("PROJECT TYPE", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = EvidriloColors.PaleBlue,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        EvidriloIcon(
+                            cardDesign.icon,
+                            tint = EvidriloColors.Cobalt,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    cardDesign.cue,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = EvidriloColors.Cobalt,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 overview.family.displayName,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -255,7 +338,7 @@ private fun ProjectTemplateFamilyCard(
                 overview.summary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = EvidriloColors.Slate,
-                maxLines = 3,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             selectableTemplateCount?.let { count ->
@@ -265,7 +348,16 @@ private fun ProjectTemplateFamilyCard(
                     color = EvidriloColors.Cobalt,
                 )
             }
-            Text("Open overview  ›", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+            Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Open overview",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = EvidriloColors.Cobalt,
+                )
+                EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Cobalt, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
@@ -276,6 +368,7 @@ internal fun EvidriloProjectTemplateFamilyScreen(
     remoteTemplates: ProjectTemplateRemoteUiState<List<ProjectTemplateSummary>>,
     onRetryRemoteTemplates: () -> Unit,
     onInspectTemplate: (ProjectTemplateSummary) -> Unit,
+    onStartBlankProject: () -> Unit,
     onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
@@ -297,6 +390,7 @@ internal fun EvidriloProjectTemplateFamilyScreen(
                     color = EvidriloColors.Slate,
                 )
             }
+            EvidriloPrimaryButton(label = "Start a blank project", onClick = onStartBlankProject)
             ProjectTemplateFamilySection(
                 title = "When this may fit",
                 description = overview.whenItMayFit,
@@ -342,6 +436,7 @@ internal fun EvidriloProjectTemplateDetailScreen(
     onGrantProjectAiConsent: () -> Unit,
     onRevokeProjectAiConsent: () -> Unit,
     onStartProject: (ProjectTemplateDefinition) -> Unit,
+    onStartBlankProject: () -> Unit,
     onRequestProjectAi: (ProjectTemplateDefinition, String?, String, String?, Map<String, String>, Int?, Boolean) -> Unit,
     onCreateProjectWithAi: (ProjectTemplateDefinition, String, ProjectAiScaffoldProposal, Set<String>, Map<String, String>, String, Int) -> Unit,
     onDiscardProjectAiPreview: (String, Int) -> Unit,
@@ -424,7 +519,7 @@ internal fun EvidriloProjectTemplateDetailScreen(
                         EvidriloTargetCard {
                             Text("Not available for a new project", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "This legacy template can still be inspected, but its examples are not classified and reviewed for both normal and edge scenarios. It cannot start a new project or an AI scaffold. You can still create a blank project from Home.",
+                                "This legacy template can still be inspected, but its examples are not classified and reviewed for both normal and edge scenarios. It cannot start a new project or an AI scaffold.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = EvidriloColors.Slate,
                             )
@@ -432,6 +527,10 @@ internal fun EvidriloProjectTemplateDetailScreen(
                     }
                 }
             }
+            EvidriloSecondaryButton(
+                label = "Create a blank project instead",
+                onClick = onStartBlankProject,
+            )
         }
     }
 }
@@ -575,25 +674,31 @@ private fun ProjectTemplateCatalogStatus(
         ProjectTemplateRemoteUiState.NotRequested -> Unit
         ProjectTemplateRemoteUiState.Loading -> ProjectTemplateRemoteLoading("Checking published templates…")
         is ProjectTemplateRemoteUiState.Unavailable -> ProjectTemplateRemoteMessage(
-            title = "Online templates unavailable",
-            message = unavailableCatalogMessage(state.reason),
+            title = when (state.reason) {
+                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "No online templates"
+                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "You’re offline"
+            },
+            message = when (state.reason) {
+                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "You can still start a blank project."
+                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "These overviews remain available."
+            },
             retryable = state.reason == ProjectTemplateCatalogUnavailableReason.OFFLINE,
             onRetry = onRetry,
         )
         is ProjectTemplateRemoteUiState.Failed -> ProjectTemplateRemoteMessage(
-            title = "Published catalog could not be verified",
-            message = "The project-type overviews remain available. No template availability was assumed.",
+            title = "Couldn’t check templates",
+            message = "Family overviews remain available.",
             retryable = state.retryable,
             onRetry = onRetry,
         )
         is ProjectTemplateRemoteUiState.Loaded -> {
             val count = state.value.sumOf(ProjectTemplateRemoteFamily::selectableTemplateCount)
             ProjectTemplateRemoteMessage(
-                title = if (count == 0) "No published templates yet" else "$count published ${if (count == 1) "template" else "templates"} available to inspect",
+                title = if (count == 0) "No published templates yet" else "$count ${if (count == 1) "template" else "templates"} to inspect",
                 message = if (count == 0) {
-                    "You can still browse the five project-type overviews."
+                    "Browse an overview or start blank."
                 } else {
-                    "Open a project type to inspect its published templates. Suitability still depends on your assignment."
+                    "Select a type to view them."
                 },
             )
         }
@@ -637,17 +742,19 @@ private fun ProjectFamilyQuickGuide(
     onToggle: () -> Unit,
     onOpenFamily: (ProjectTemplateFamily) -> Unit,
 ) {
-    EvidriloTargetCard {
-        Text("Not sure which project type fits?", style = MaterialTheme.typography.titleLarge)
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "Start with what your assignment asks you to do. Choose the closest description to open an overview; this guide does not classify your assignment.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = EvidriloColors.Slate,
+            "Not sure which type?",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
         )
-        EvidriloSecondaryButton(
-            label = if (expanded) "Hide the guide" else "Help me choose",
+        TextButton(
             onClick = onToggle,
-        )
+            modifier = Modifier.heightIn(min = 48.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+        ) {
+            Text(if (expanded) "Hide" else "Help me choose")
+        }
     }
     if (expanded) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -681,21 +788,34 @@ private fun ProjectFamilyQuickChoice(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            EvidriloIcon(
+                projectTemplateFamilyCardDesign(overview.family).icon,
+                tint = EvidriloColors.Cobalt,
+                modifier = Modifier.size(24.dp),
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(overview.family.displayName, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    overview.selectionCue,
-                    style = MaterialTheme.typography.bodyMedium,
+                    overview.family.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    projectTemplateFamilyCardDesign(overview.family).cue,
+                    style = MaterialTheme.typography.bodySmall,
                     color = EvidriloColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text("View", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+            EvidriloIcon(EvidriloIconName.CHEVRON_RIGHT, tint = EvidriloColors.Cobalt, modifier = Modifier.size(18.dp))
         }
     }
 }

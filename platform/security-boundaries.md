@@ -117,11 +117,13 @@ issue reports.
   flag.
 - Unknown or unapproved active products fail closed. Product-less expiry or
   revocation cleanup may remove old access but cannot grant new access.
-- `evidrilo_pro` grants 100 AI credits per active entitlement month; a verified
-  free account receives a one-time 10-credit grant after consent. Yearly
-  entitlements receive monthly grants while active, with no rollover. Webhook
-  replay, restore, and concurrent requests must not duplicate a grant or spend
-  one credit twice.
+- Under D-126, `evidrilo_pro` targets 200 AI credits per active entitlement
+  month; a verified free account receives a one-time 20-credit grant after
+  consent. Yearly entitlements receive monthly grants while active, with no
+  rollover. Migration `031_ai_credit_ledger` caps a grant at 100; migration 050
+  raises that bound to 200 and requires fresh/upgrade database/API acceptance.
+  Webhook replay, restore, and concurrent requests must not duplicate a grant
+  or spend one credit twice.
 - Billing failure must not disable the local free workflow.
 
 ## Configuration and operations

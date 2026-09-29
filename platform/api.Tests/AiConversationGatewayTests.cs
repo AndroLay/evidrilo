@@ -21,6 +21,7 @@ public sealed class AiConversationGatewayTests
                     "GENERAL_CAUSAL",
                     "OBSERVED_COMPARISON_ONLY",
                     ["OBS-WARM-01"]),
+                Usage = new AiProviderTokenUsage(10_000, 0, 0, 5_000, 0),
             }),
             ledger);
 
@@ -31,8 +32,9 @@ public sealed class AiConversationGatewayTests
         Assert.Equal("GENERAL_CAUSAL", result.Proposal?.BeforeValue);
         Assert.Equal("OBSERVED_COMPARISON_ONLY", result.Proposal?.SuggestedValue);
         Assert.Equal("conversation.v1", result.Audit.PromptVersion);
-        Assert.Equal([1], ledger.ReservedCreditCosts);
+        Assert.Equal([10], ledger.ReservedCreditCosts);
         Assert.Equal([true], ledger.Settlements);
+        Assert.Equal([4], ledger.SettledCreditCosts);
     }
 
     [Fact]
@@ -115,6 +117,8 @@ public sealed class AiConversationGatewayTests
 
         public List<int> ReservedCreditCosts { get; } = [];
 
+        public List<int> SettledCreditCosts { get; } = [];
+
         public Task EnsureConsentAsync(Guid accountId, string consentVersion, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -140,9 +144,11 @@ public sealed class AiConversationGatewayTests
             Guid accountId,
             AiCreditReservation reservation,
             bool accepted,
+            int settledCreditCost,
             CancellationToken cancellationToken)
         {
             Settlements.Add(accepted);
+            SettledCreditCosts.Add(settledCreditCost);
             return Task.FromResult(true);
         }
 
@@ -152,6 +158,8 @@ public sealed class AiConversationGatewayTests
 
     private sealed class FixedProvider(AiProviderResponse? response) : IAiProvider
     {
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 10;
+
         public Task<AiProviderResponse?> CompleteAsync(AiProviderRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(response);
     }
@@ -159,6 +167,8 @@ public sealed class AiConversationGatewayTests
     private sealed class CapturingDelayedProvider : IAiProvider
     {
         public AiProviderRequest? Request { get; private set; }
+
+        public int EstimateMaximumCreditCost(AiProviderRequest request) => 10;
 
         public async Task<AiProviderResponse?> CompleteAsync(
             AiProviderRequest request,

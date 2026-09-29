@@ -9,6 +9,28 @@ using Evidrilo.Api.Projects;
 
 namespace Evidrilo.Api.ProjectAi;
 
+public interface IProjectAiStageAssistGenerator
+{
+    bool IsEnabled { get; }
+
+    int EstimateMaximumCreditCost(ProjectAiStageAssistProviderRequest request);
+
+    Task<ProjectAiStageAssistOutput?> GenerateAsync(
+        ProjectAiStageAssistProviderRequest request,
+        CancellationToken cancellationToken);
+}
+
+public sealed class DisabledProjectAiStageAssistGenerator : IProjectAiStageAssistGenerator
+{
+    public bool IsEnabled => false;
+
+    public int EstimateMaximumCreditCost(ProjectAiStageAssistProviderRequest request) => 1;
+
+    public Task<ProjectAiStageAssistOutput?> GenerateAsync(
+        ProjectAiStageAssistProviderRequest request,
+        CancellationToken cancellationToken) => Task.FromResult<ProjectAiStageAssistOutput?>(null);
+}
+
 public static class ProjectAiStageAssistEndpoints
 {
     private static readonly JsonSerializerOptions RequestJsonOptions = new(JsonSerializerDefaults.Web)
@@ -30,7 +52,8 @@ public static class ProjectAiStageAssistEndpoints
             "/v1/project-ai/stage-assist",
             async (
                 HttpContext context,
-                IProjectAiScaffoldGenerator generator,
+                IProjectAiStageAssistGenerator generator,
+                AiProviderOptions pricing,
                 IAiCreditLedger creditLedger,
                 IProjectTemplateStore templateStore,
                 IProjectAiConsentStore consentStore,
@@ -98,19 +121,80 @@ public static class ProjectAiStageAssistEndpoints
                 var savedProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
                 var projectError = ProjectContextError(context, savedProject, validRequest.BaseProjectRevision);
                 if (projectError is not null) return projectError;
+                var evidenceError = ProjectAiStageAssistValidator.ValidateSelectedEvidence(validRequest, template, savedProject);
+                if (evidenceError is not null) return Invalid(context, evidenceError);
+                var fieldContextError = ProjectAiStageAssistValidator.BuildSelectedFieldContexts(
+                    validRequest,
+                    template,
+                    savedProject,
+                    redact: false,
+                    out var selectedFieldValues);
+                if (fieldContextError is not null) return Invalid(context, fieldContextError);
+
+                var capability = ProjectAiStageAssistValidator.FindCapability(validRequest, template!);
+                var selectedFieldContext = selectedFieldValues
+                    .Select(field => field with { Value = AiRedactor.Redact(field.Value) })
+                    .ToArray();
+                var stage = template!.Template.Steps!
+                    .Single(step => string.Equals(step.Id, validRequest.StageId, StringComparison.Ordinal));
+                var evidenceById = savedProject!.Document.EvidenceItems!
+                    .ToDictionary(item => item.Id!, StringComparer.Ordinal);
+                var selectedEvidence = validRequest.SelectedEvidenceIds!
+                    .Select(id => evidenceById[id])
+                    .Select(item => new ProjectAiStageAssistEvidenceContext(
+                        item.Id!,
+                        item.Kind switch
+                        {
+                            StudentProjectEvidenceKind.Source => "SOURCE",
+                            StudentProjectEvidenceKind.Data => "DATA",
+                            StudentProjectEvidenceKind.Observation => "OBSERVATION",
+                            _ => "UNKNOWN",
+                        },
+                        AiRedactor.Redact(item.Label!),
+                        item.Summary is null ? null : AiRedactor.Redact(item.Summary),
+                        item.Origin is null ? null : AiRedactor.Redact(item.Origin)))
+                    .ToArray();
+                var providerRequest = new ProjectAiStageAssistProviderRequest(
+                    template.TemplateId,
+                    template.TemplateVersion,
+                    template.Family,
+                    template.Template.Title!,
+                    template.Template.Summary!,
+                    validRequest.StageId!,
+                    stage.Title!,
+                    validRequest.OperationId!,
+                    selectedFieldContext,
+                    selectedEvidence,
+                    capability!.OutputFieldIds!
+                        .Where(fieldId => validRequest.SelectedFieldIds!.Contains(fieldId, StringComparer.Ordinal))
+                        .ToArray(),
+                    template.Template.MethodSpecificLimitations!,
+                    template.Template.ProvenanceRequirements!,
+                    validRequest.Locale!);
 
                 var beforeReservationConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
                 if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, beforeReservationConsent))
                     return ConsentRequired(context);
 
-                const int creditCost = 1;
-                var requestHash = ComputeRequestHash(validRequest);
+                int maximumCreditCost;
+                try
+                {
+                    maximumCreditCost = generator.EstimateMaximumCreditCost(providerRequest);
+                    if (maximumCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
+                        return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+                catch (Exception)
+                {
+                    return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+
+                var requestHash = ComputeRequestHash(validRequest, maximumCreditCost);
                 await creditLedger.EnsureConsentAsync(accountId, AiGateway.ConsentVersion, cancellationToken);
                 var reservation = await creditLedger.TryReserveAsync(
                     accountId,
                     requestId,
                     requestHash,
-                    creditCost,
+                    maximumCreditCost,
                     cancellationToken);
                 if (reservation is null)
                     return Error(context, "AI_CREDITS_INSUFFICIENT", "There are not enough AI credits for this request.", StatusCodes.Status402PaymentRequired);
@@ -130,7 +214,7 @@ public static class ProjectAiStageAssistEndpoints
                         accountId,
                         reservation,
                         requestHash,
-                        creditCost,
+                        maximumCreditCost,
                         cancellationToken);
                 }
                 catch
@@ -167,6 +251,28 @@ public static class ProjectAiStageAssistEndpoints
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
                     return projectError;
                 }
+                evidenceError = ProjectAiStageAssistValidator.ValidateSelectedEvidence(validRequest, template, currentProject);
+                if (evidenceError is not null)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Invalid(context, evidenceError);
+                }
+                fieldContextError = ProjectAiStageAssistValidator.BuildSelectedFieldContexts(
+                    validRequest,
+                    template,
+                    currentProject,
+                    redact: false,
+                    out var currentFieldValues);
+                if (fieldContextError is not null)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Invalid(context, fieldContextError);
+                }
+                if (!selectedFieldValues.SequenceEqual(currentFieldValues))
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_CONTEXT_STALE", "The selected project context changed before dispatch.", StatusCodes.Status409Conflict);
+                }
 
                 bool historyCreated;
                 try
@@ -195,28 +301,7 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_REQUEST_REPLAYED", "This request key has already been used. Start a new request.", StatusCodes.Status409Conflict);
                 }
 
-                var capability = ProjectAiStageAssistValidator.FindCapability(validRequest, template!);
-                var selectedFields = validRequest.SelectedFields!
-                    .ToDictionary(pair => pair.Key, pair => AiRedactor.Redact(pair.Value), StringComparer.Ordinal);
-                var providerRequest = new ProjectAiScaffoldProviderRequest(
-                    accountId,
-                    requestId,
-                    ProjectAiScaffoldValidator.AssistOperation,
-                    template!,
-                    validRequest.BaseProjectRevision,
-                    selectedFields.GetValueOrDefault("assignment_brief") ?? string.Empty,
-                    selectedFields.GetValueOrDefault("research_question"),
-                    selectedFields.GetValueOrDefault("student_question"),
-                    selectedFields,
-                    template!.Template.MethodSpecificLimitations!,
-                    validRequest.Locale!)
-                {
-                    StageId = validRequest.StageId,
-                    StageOperationId = validRequest.OperationId,
-                    AllowedOutputFieldIds = capability!.OutputFieldIds,
-                };
-
-                ProjectAiScaffoldOutput? output;
+                ProjectAiStageAssistOutput? output;
                 try
                 {
                     output = await generator.GenerateAsync(providerRequest, cancellationToken);
@@ -300,7 +385,7 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_REFUSED", "Project AI did not return a proposal.", StatusCodes.Status422UnprocessableEntity);
                 }
 
-                if (ProjectAiStageAssistValidator.ValidateOutput(validRequest, template, output) is not null)
+                if (ProjectAiStageAssistValidator.ValidateOutput(validRequest, template, afterProviderProject, output) is not null)
                 {
                     await CompleteActivityAsync(
                         logger,
@@ -314,6 +399,58 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
                 }
 
+                var rawSelectedFields = selectedFieldValues
+                    .ToDictionary(field => field.Id, field => field.Value, StringComparer.Ordinal);
+                var responseOutput = ProjectAiStageAssistValidator.BindBeforeValues(rawSelectedFields, output);
+                if (!ProjectAiStageAssistValidator.IsBoundResponseWithinLimits(responseOutput))
+                {
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Failed,
+                        null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
+                }
+
+                int settledCreditCost;
+                try
+                {
+                    if (output.Usage is null || !output.Usage.IsValid)
+                        throw new InvalidOperationException("The project-AI usage report is invalid.");
+                    settledCreditCost = AiCreditPricing.CreditsForCostUsd(
+                        pricing.EstimateActualCostUsd(output.Usage));
+                }
+                catch (Exception)
+                {
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Failed,
+                        null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_INVALID_USAGE", "The project-AI token usage could not be verified.", StatusCodes.Status502BadGateway);
+                }
+                if (settledCreditCost > maximumCreditCost)
+                {
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Failed,
+                        null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_COST_LIMIT", "Project AI usage exceeded the reserved credit amount.", StatusCodes.Status502BadGateway);
+                }
+
                 bool previewReady;
                 try
                 {
@@ -321,7 +458,8 @@ public static class ProjectAiStageAssistEndpoints
                         accountId,
                         reservation,
                         requestHash,
-                        creditCost,
+                        maximumCreditCost,
+                        settledCreditCost,
                         cancellationToken);
                 }
                 catch
@@ -353,9 +491,14 @@ public static class ProjectAiStageAssistEndpoints
                         validRequest.BaseProjectRevision!.Value,
                         validRequest.StageId!,
                         validRequest.OperationId!,
-                        output,
+                        responseOutput,
+                        ProjectAiStageAssistValidator.CreateEvaluationPreview(
+                            validRequest,
+                            template!,
+                            afterProviderProject!,
+                        responseOutput),
                         requestId,
-                        creditCost),
+                        settledCreditCost),
                     options: ResponseJsonOptions);
             })
             .RequireAuthorization()
@@ -370,20 +513,22 @@ public static class ProjectAiStageAssistEndpoints
         return ProjectAiScaffoldValidator.IsValidRequestId(requestId);
     }
 
-    private static string ComputeRequestHash(ProjectAiStageAssistRequest request)
+    private static string ComputeRequestHash(ProjectAiStageAssistRequest request, int maximumCreditCost)
     {
         var canonical = request with
         {
-            SelectedFields = request.SelectedFields is null
+            SelectedFieldIds = request.SelectedFieldIds is null
                 ? null
-                : request.SelectedFields
-                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                : request.SelectedFieldIds.OrderBy(fieldId => fieldId, StringComparer.Ordinal).ToArray(),
+            SelectedEvidenceIds = request.SelectedEvidenceIds is null
+                ? null
+                : request.SelectedEvidenceIds.OrderBy(evidenceId => evidenceId, StringComparer.Ordinal).ToArray(),
         };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(new
         {
             Operation = "project-ai-stage-assist:v1",
             Request = canonical,
+            MaximumCreditCost = maximumCreditCost,
         }, FingerprintJsonOptions);
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
@@ -404,7 +549,12 @@ public static class ProjectAiStageAssistEndpoints
         IAiCreditLedger creditLedger,
         Guid accountId,
         AiCreditReservation reservation) =>
-        creditLedger.CompleteAsync(accountId, reservation, accepted: false, CancellationToken.None);
+        creditLedger.CompleteAsync(
+            accountId,
+            reservation,
+            accepted: false,
+            settledCreditCost: 0,
+            CancellationToken.None);
 
     private static async Task CompleteActivityAsync(
         ILogger logger,

@@ -252,15 +252,18 @@ test('Project AI preview and settlement contracts expose server-held cost and id
   const settlementResponse = readSchema('project-ai-scaffold-settlement.v1.json');
 
   assert.equal(preview.required.includes('creditCost'), true);
-  assert.deepEqual(preview.properties.creditCost.enum, [1, 3]);
+  assert.deepEqual(
+    [preview.properties.creditCost.type, preview.properties.creditCost.minimum, preview.properties.creditCost.maximum],
+    ['integer', 1, 200],
+  );
   assert.deepEqual(preview.properties.operation.enum, ['create_project', 'assist_project']);
   assert.equal(previewRequest.required.includes('operation'), true);
   assert.equal(previewRequest.required.includes('projectId'), true);
   assert.equal(previewRequest.required.includes('baseProjectRevision'), true);
   assert.equal(previewRequest.allOf.length, 2);
   assert.equal(preview.allOf.length, 2);
-  assert.equal(preview.allOf[0].then.properties.creditCost.const, 3);
-  assert.equal(preview.allOf[1].then.properties.creditCost.const, 1);
+  assert.equal(Object.hasOwn(preview.allOf[0].then.properties, 'creditCost'), false);
+  assert.equal(Object.hasOwn(preview.allOf[1].then.properties, 'creditCost'), false);
   assert.deepEqual(settlementRequest.required, ['schema', 'version', 'requestId', 'decision']);
   assert.deepEqual(settlementRequest.properties.decision.enum, ['apply', 'dismiss']);
   assert.equal(settlementRequest.description.includes('Idempotency-Key'), true);
@@ -269,6 +272,18 @@ test('Project AI preview and settlement contracts expose server-held cost and id
     ['schema', 'version', 'status', 'requestId', 'creditCost'],
   );
   assert.deepEqual(settlementResponse.properties.status.enum, ['applied', 'dismissed']);
+});
+
+test('AI credit contract bounds the one-time Free and monthly Pro grants', () => {
+  const credits = readSchema('ai-credits.v1.json');
+  const grant = credits.properties.grants.items;
+
+  assert.equal(credits.properties.available.maximum, 220);
+  assert.equal(grant.properties.granted.maximum, 200);
+  assert.deepEqual(
+    grant.allOf.map((rule) => rule.then.properties.granted.const),
+    [20, 200],
+  );
 });
 
 test('D-119 stage assistance and activity contracts stay project-bound and metadata-only', () => {
@@ -280,9 +295,25 @@ test('D-119 stage assistance and activity contracts stay project-bound and metad
 
   assert.deepEqual(request.oneOf.map((entry) => entry.$ref), ['#/$defs/projectRequest', '#/$defs/generalRequest']);
   assert.equal(request.$defs.projectRequest.allOf[1].properties.projectId.format, 'uuid');
-  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedFields.maxProperties, 32);
+  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedFieldIds.maxItems, 32);
+  assert.ok(request.$defs.projectRequest.allOf[1].properties.selectedEvidenceIds, 'Project requests must identify selected evidence items.');
+  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedEvidenceIds.maxItems, 32);
+  assert.equal(request.$defs.projectRequest.allOf[1].required.includes('selectedEvidenceIds'), true);
+  assert.equal(Object.hasOwn(request.$defs.projectRequest.allOf[1].properties, 'selectedFields'), false);
   assert.equal(request.$defs.generalRequest.allOf[1].properties.mode.const, 'GENERAL');
-  assert.equal(preview.properties.creditCost.const, 1);
+  assert.equal(request.$defs.generalRequest.allOf[1].properties.selectedFieldIds.maxItems, 0);
+  assert.equal(request.$defs.generalRequest.allOf[1].properties.selectedEvidenceIds.maxItems, 0);
+  assert.equal(preview.required.includes('assist'), true);
+  assert.equal(preview.required.includes('evaluationPreview'), true);
+  assert.equal(preview.$defs.assist.properties.items.items.$ref, '#/$defs/assistItem');
+  assert.equal(preview.$defs.assistItem.properties.kind.enum.includes('PROPOSAL'), true);
+  assert.equal(preview.$defs.evaluationPreview.properties.assessmentStatus.const, 'NOT_ASSESSED');
+  assert.ok(preview.$defs.evaluationPreview.properties.reportedKnownLimits);
+  assert.ok(preview.$defs.evaluationPreview.properties.templateLimits);
+  assert.deepEqual(
+    [preview.properties.creditCost.type, preview.properties.creditCost.minimum, preview.properties.creditCost.maximum],
+    ['integer', 1, 200],
+  );
   assert.deepEqual(settlement.properties.outcome.enum, ['APPLIED', 'EDITED', 'DISMISSED', 'STALE']);
   assert.equal(activity.properties.activities.items.properties.projectId.oneOf[1].type, 'null');
   assert.equal(activity.properties.activities.items.properties.outcome.enum.includes('FAILED'), true);

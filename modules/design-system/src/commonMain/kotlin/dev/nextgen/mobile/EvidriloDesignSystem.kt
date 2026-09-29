@@ -100,13 +100,15 @@ import org.jetbrains.compose.resources.painterResource
  * Role meaning:
  * - [canvas] page background; [card] the primary card surface; [surface] a
  *   subtle elevated fill; [white] literal on-accent white that stays white in
- *   both themes (used only on the Cobalt hero and gradients).
+ *   both themes; [primaryAction] is the filled action surface paired with
+ *   white content in both themes.
  */
 public data class EvidriloColorScheme(
     val deepNavy: Color,
     val cobalt: Color,
     val cobaltBright: Color,
     val cobaltPressed: Color,
+    val primaryAction: Color,
     val white: Color,
     val canvas: Color,
     val card: Color,
@@ -134,6 +136,7 @@ public val EvidriloLightColors: EvidriloColorScheme = EvidriloColorScheme(
     cobalt = Color(0xFF1558E8),
     cobaltBright = Color(0xFF2C86FF),
     cobaltPressed = Color(0xFF103EB4),
+    primaryAction = Color(0xFF1558E8),
     white = Color(0xFFFFFFFF),
     // A clean white canvas with blue accents, matching the logo. Cards separate
     // from the canvas through 2dp borders and a pressable lip, not shadows.
@@ -164,9 +167,10 @@ public val EvidriloLightColors: EvidriloColorScheme = EvidriloColorScheme(
 // desaturated so they read as tinted-dark rather than bright pastel.
 public val EvidriloDarkColors: EvidriloColorScheme = EvidriloColorScheme(
     deepNavy = Color(0xFF0B1056),
-    cobalt = Color(0xFF5B8DEF),
-    cobaltBright = Color(0xFF7AA6F5),
+    cobalt = Color(0xFF7AA6F5),
+    cobaltBright = Color(0xFF91B5FA),
     cobaltPressed = Color(0xFF3D6BC4),
+    primaryAction = Color(0xFF4773CC),
     white = Color(0xFFFFFFFF),
     canvas = Color(0xFF0E1220),
     card = Color(0xFF1A2036),
@@ -199,6 +203,7 @@ public object EvidriloColors {
     val Cobalt: Color get() = evidriloActiveColors.cobalt
     val CobaltBright: Color get() = evidriloActiveColors.cobaltBright
     val CobaltPressed: Color get() = evidriloActiveColors.cobaltPressed
+    val PrimaryAction: Color get() = evidriloActiveColors.primaryAction
     val White: Color get() = evidriloActiveColors.white
     val Canvas: Color get() = evidriloActiveColors.canvas
     val Card: Color get() = evidriloActiveColors.card
@@ -221,6 +226,19 @@ public object EvidriloColors {
     val WarningSurface: Color get() = evidriloActiveColors.warningSurface
 }
 
+/** Theme-aware foreground and surface roles for selectable answer/plan cards. */
+public data class EvidriloChoiceColors(
+    val container: Color,
+    val content: Color,
+    val border: Color,
+)
+
+public fun evidriloChoiceColors(selected: Boolean): EvidriloChoiceColors = EvidriloChoiceColors(
+    container = if (selected) EvidriloColors.Tint else EvidriloColors.Card,
+    content = EvidriloColors.Ink,
+    border = if (selected) EvidriloColors.Cobalt else EvidriloColors.Separator,
+)
+
 /** Shared geometry tokens for the current target shell. */
 public object EvidriloTargetLayout {
     val ContentTopPadding = 28.dp
@@ -229,7 +247,7 @@ public object EvidriloTargetLayout {
     // The source artwork is intentionally compact enough to keep all three
     // input lanes discoverable on a normal phone viewport. The page remains
     // scrollable, but the primary action should not be hidden below the fold.
-    val SourcesGraphicHeight = 158.dp
+    val SourcesGraphicHeight = 146.dp
     val NavigationVisualOffset = 4.dp
 }
 
@@ -374,7 +392,7 @@ public fun EvidriloTheme(
     evidriloActiveColors = scheme
     val material = if (dark) {
         darkColorScheme(
-            primary = scheme.cobalt,
+            primary = scheme.primaryAction,
             onPrimary = scheme.white,
             primaryContainer = scheme.tint,
             onPrimaryContainer = scheme.ink,
@@ -396,7 +414,7 @@ public fun EvidriloTheme(
         )
     } else {
         lightColorScheme(
-            primary = scheme.cobalt,
+            primary = scheme.primaryAction,
             onPrimary = scheme.white,
             primaryContainer = scheme.tint,
             onPrimaryContainer = scheme.ink,
@@ -534,7 +552,7 @@ private fun EvidriloAvatarButton(
             onClick = null,
             interactionSource = interactionSource,
             modifier = Modifier.size(width = 40.dp, height = 43.dp),
-            faceColor = if (available) EvidriloColors.Cobalt else EvidriloColors.Separator,
+            faceColor = if (available) EvidriloColors.PrimaryAction else EvidriloColors.Separator,
             lipColor = if (available) EvidriloColors.CobaltPressed else EvidriloColors.Separator,
             borderColor = null,
             shape = CircleShape,
@@ -698,7 +716,7 @@ public fun EvidriloPrimaryButton(
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = label },
-        faceColor = if (enabled) EvidriloColors.Cobalt else EvidriloColors.Separator,
+        faceColor = if (enabled) EvidriloColors.PrimaryAction else EvidriloColors.Separator,
         lipColor = if (enabled) EvidriloColors.CobaltPressed else EvidriloColors.Separator,
         borderColor = null,
         shape = EvidriloButtonShape,
@@ -1042,7 +1060,7 @@ public fun EvidriloCobaltCard(
     EvidriloPressableSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        faceColor = EvidriloColors.Cobalt,
+        faceColor = EvidriloColors.PrimaryAction,
         lipColor = EvidriloColors.CobaltPressed,
         borderColor = null,
         shape = RoundedCornerShape(24.dp),
@@ -1140,7 +1158,7 @@ public fun EvidriloSettingsRow(
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (selected) EvidriloColors.Cobalt else EvidriloColors.PaleBlue),
+                .background(if (selected) EvidriloColors.PrimaryAction else EvidriloColors.PaleBlue),
             contentAlignment = Alignment.Center,
         ) {
             EvidriloIcon(

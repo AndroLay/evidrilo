@@ -40,6 +40,7 @@ import dev.nextgen.mobile.EvidriloStatusChip
 import dev.nextgen.mobile.EvidriloStatusTone
 import dev.nextgen.mobile.EvidriloTargetCard
 import dev.nextgen.mobile.EvidriloTintPanel
+import dev.nextgen.mobile.evidriloChoiceColors
 
 @Composable
 internal fun EvidriloPremiumPaywall(
@@ -177,6 +178,7 @@ private fun PremiumOfferChoice(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val choiceColors = evidriloChoiceColors(selected)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -195,11 +197,12 @@ private fun PremiumOfferChoice(
             },
         shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) EvidriloColors.Tint else EvidriloColors.White,
+            containerColor = choiceColors.container,
+            contentColor = choiceColors.content,
         ),
         border = BorderStroke(
             width = if (selected) 2.dp else 1.dp,
-            color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Separator,
+            color = choiceColors.border,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {

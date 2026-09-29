@@ -110,8 +110,8 @@ internal fun EvidriloLoadingScreen(
                 Brush.verticalGradient(
                     colors = listOf(
                         EvidriloColors.CobaltPressed,
-                        EvidriloColors.Cobalt,
-                        EvidriloColors.CobaltBright,
+                        EvidriloColors.PrimaryAction,
+                        EvidriloColors.CobaltPressed,
                     ),
                 ),
             )

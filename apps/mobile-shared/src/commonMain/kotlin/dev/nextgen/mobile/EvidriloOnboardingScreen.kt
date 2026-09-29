@@ -7,16 +7,27 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.onboarding.GetStartedTourState
@@ -32,27 +43,75 @@ internal fun EvidriloOnboardingScreen(
     onStartProject: () -> Unit,
     storageNotice: LocalStorageNotice? = null,
 ) {
+    var preview by remember { mutableStateOf(GetStartedTemporaryPreview()) }
+    val content = getStartedPreviewFor(tourState.step, preview)
+    val stepTitle = when (tourState.step) {
+        GetStartedTourStep.WELCOME -> "Start with what you have"
+        GetStartedTourStep.ORGANIZE -> "Choose what to add first"
+        GetStartedTourStep.REVIEW -> "Choose what to review"
+    }
+
     EvidriloContentColumn {
         EvidriloBrandHeader(onSettings = null)
         Text("Start with your work", style = MaterialTheme.typography.displayLarge)
         Text(
-            "Bring an assignment, research question, or a blank page. Evidrilo helps you keep the reasoning connected as your work develops.",
+            "Choose a starting point. You can change it later.",
             style = MaterialTheme.typography.bodyLarge,
         )
         storageNotice?.takeIf { it.isError }?.let { notice -> EvidriloRecoveryNotice(notice) }
         GetStartedProgress(tourState.step)
-        EvidriloTintPanel {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val (heading, detail) = when (tourState.step) {
-                    GetStartedTourStep.WELCOME -> "Begin with a question" to
-                        "Use your own assignment or research question. If you are not ready, start with a blank project and add details later."
-                    GetStartedTourStep.ORGANIZE -> "Keep each part distinct" to
-                        "Record source material, observations, your interpretation, limitations, and next actions separately. Nothing is treated as evidence until you choose and record it."
-                    GetStartedTourStep.REVIEW -> "Review the reasoning" to
-                        "Trace a claim to the evidence you selected, see what remains uncertain, and revise when the record changes. Evidrilo does not decide scientific truth."
+        Text(stepTitle, style = MaterialTheme.typography.headlineSmall)
+        when (tourState.step) {
+            GetStartedTourStep.WELCOME -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                GetStartedOnboardingChoice(
+                    label = GetStartedStartingPoint.ASSIGNMENT.label,
+                    selected = preview.startingPoint == GetStartedStartingPoint.ASSIGNMENT,
+                    onSelect = { preview = preview.copy(startingPoint = GetStartedStartingPoint.ASSIGNMENT) },
+                )
+                GetStartedOnboardingChoice(
+                    label = GetStartedStartingPoint.QUESTION.label,
+                    selected = preview.startingPoint == GetStartedStartingPoint.QUESTION,
+                    onSelect = { preview = preview.copy(startingPoint = GetStartedStartingPoint.QUESTION) },
+                )
+                GetStartedOnboardingChoice(
+                    label = GetStartedStartingPoint.BLANK.label,
+                    selected = preview.startingPoint == GetStartedStartingPoint.BLANK,
+                    onSelect = { preview = preview.copy(startingPoint = GetStartedStartingPoint.BLANK) },
+                )
+            }
+            GetStartedTourStep.ORGANIZE -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(
+                    GetStartedFirstMaterial.SOURCES,
+                    GetStartedFirstMaterial.OBSERVATIONS,
+                    GetStartedFirstMaterial.NOT_SURE,
+                ).forEach { option ->
+                    GetStartedOnboardingChoice(
+                        label = option.label,
+                        selected = preview.firstMaterial == option,
+                        onSelect = { preview = preview.copy(firstMaterial = option) },
+                    )
                 }
-                Text(heading, style = MaterialTheme.typography.titleLarge)
-                Text(detail, style = MaterialTheme.typography.bodyMedium)
+            }
+            GetStartedTourStep.REVIEW -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(
+                    GetStartedReviewFocus.TRACE,
+                    GetStartedReviewFocus.LIMITATIONS,
+                    GetStartedReviewFocus.CHANGES,
+                ).forEach { option ->
+                    GetStartedOnboardingChoice(
+                        label = option.label,
+                        selected = preview.reviewFocus == option,
+                        onSelect = { preview = preview.copy(reviewFocus = option) },
+                    )
+                }
+            }
+        }
+        EvidriloTintPanel {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Preview", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                Text(content.title, style = MaterialTheme.typography.titleLarge)
+                Text(content.detail, style = MaterialTheme.typography.bodyMedium)
+                Text(content.disclaimer, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
             }
         }
 
@@ -68,6 +127,33 @@ internal fun EvidriloOnboardingScreen(
             label = "Skip for now",
             onClick = onSkip,
         )
+    }
+}
+
+@Composable
+private fun GetStartedOnboardingChoice(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    val choiceColors = evidriloChoiceColors(selected)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .selectable(selected = selected, onClick = onSelect, role = Role.RadioButton),
+        shape = RoundedCornerShape(14.dp),
+        color = choiceColors.container,
+        contentColor = choiceColors.content,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = selected, onClick = null)
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 

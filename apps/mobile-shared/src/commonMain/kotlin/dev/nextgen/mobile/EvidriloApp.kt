@@ -2787,6 +2787,7 @@ internal fun EvidriloApp(
                 studentProjectNotice = null
                 navigationState = navigationState.open(EvidriloDestination.PROJECTS)
             },
+            onStartBlankProject = ::beginManualProjectFromHome,
             onNavigate = openTargetSection,
             onSelectFamily = { family ->
                 selectedProjectTemplateFamily = family
@@ -2804,6 +2805,7 @@ internal fun EvidriloApp(
                 projectTemplateDetailState = ProjectTemplateRemoteUiState.NotRequested
                 navigationState = navigationState.open(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
             },
+            onStartBlankProject = ::beginManualProjectFromHome,
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
         )
@@ -2820,6 +2822,7 @@ internal fun EvidriloApp(
             onGrantProjectAiConsent = ::grantProjectAiConsent,
             onRevokeProjectAiConsent = ::revokeProjectAiConsent,
             onStartProject = ::startStudentProject,
+            onStartBlankProject = ::beginManualProjectFromHome,
             onRequestProjectAi = { template, projectId, brief, question, fields, revision, consent ->
                 requestProjectAiScaffold(template, brief, question, fields, projectId, revision, consent)
             },
@@ -3241,6 +3244,8 @@ internal fun EvidriloApp(
             onSyncNow = ::syncNow,
             onOpenPremium = openPremium,
             onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
+            onOpenGuidedCase = startTargetPractice,
+            onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
             onOpenSupport = { navigationState = navigationState.open(EvidriloDestination.SUPPORT) },
             accountSubtitle = accountSession.toSettingsSubtitle(),
@@ -3289,72 +3294,58 @@ internal fun EvidriloApp(
         )
     } else if (navigationState.current == EvidriloDestination.HOME) {
         EvidriloTargetHomeScreen(
-            case = case,
-            draft = targetDraft,
-            history = historySnapshot,
             storageNotice = storageNotice,
             onNavigate = openTargetSection,
-            onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
-            onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
-            onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
-            onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
-            onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
             onOpenProjectCatalog = {
                 navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
+            },
+            onSelectProjectFamily = { family ->
+                selectedProjectTemplateFamily = family
+                navigationState = navigationState.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
             },
             projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
             projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
             projectsLoadError = studentProjectListState.toHomeErrorMessage(),
+            activeProjectLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
+                projectProEntitlementActive.value,
+            ),
             onRetryProjects = { studentProjectListReload += 1 },
             onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
             onCreateProject = ::beginManualProjectFromHome,
             onResumeProject = { project -> resumeStudentProject(project.id) },
-            onStartPractice = startTargetPractice,
             onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
-            onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
             onDismissRecommendation = ::dismissRecommendation,
             onRetryRecommendation = ::retryRecommendation,
-            audioState = audioState,
-            onListen = { playNarration(AudioNarrationId.CASE_OBJECTIVE, AudioNarrationCopy.case(case)) },
-            onPauseOrResumeAudio = pauseOrResumeAudio,
-            onStopAudio = stopAudio,
         )
     } else {
         when (val current = state) {
             ConclusionState.Intro -> EvidriloTargetHomeScreen(
-                case = case,
-                draft = targetDraft,
-                history = historySnapshot,
                 storageNotice = storageNotice,
                 onNavigate = openTargetSection,
-                onOpenWorkspace = { navigationState = navigationState.open(EvidriloDestination.WORKSPACE) },
-                onOpenSources = { openTargetSection(EvidriloTargetSection.SOURCES) },
-                onOpenEvidence = { openTargetSection(EvidriloTargetSection.EVIDENCE) },
-                onOpenAction = { openTargetSection(EvidriloTargetSection.ACTION) },
-                onOpenHistory = { navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY) },
                 onOpenProjectCatalog = {
                     navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
+                },
+                onSelectProjectFamily = { family ->
+                    selectedProjectTemplateFamily = family
+                    navigationState = navigationState.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
                 },
                 projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
                 projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
                 projectsLoadError = studentProjectListState.toHomeErrorMessage(),
+                activeProjectLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
+                    projectProEntitlementActive.value,
+                ),
                 onRetryProjects = { studentProjectListReload += 1 },
                 onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
                 onCreateProject = ::beginManualProjectFromHome,
                 onResumeProject = { project -> resumeStudentProject(project.id) },
-                onStartPractice = startTargetPractice,
                 onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
-                onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
                 recommendation = recommendationState,
                 onAcceptRecommendation = ::acceptRecommendation,
                 onDismissRecommendation = ::dismissRecommendation,
                 onRetryRecommendation = ::retryRecommendation,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.CASE_OBJECTIVE, AudioNarrationCopy.case(case)) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
             )
 
             is ConclusionState.Drafting -> EvidriloDraftScreen(
@@ -4387,6 +4378,7 @@ private fun EvidriloChoiceButton(
     onClick: () -> Unit,
     role: Role = Role.RadioButton,
 ) {
+    val choiceColors = evidriloChoiceColors(selected)
     val interactionModifier = when (role) {
         Role.Checkbox -> Modifier.toggleable(
             value = selected,
@@ -4409,12 +4401,10 @@ private fun EvidriloChoiceButton(
             },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) EvidriloColors.Tint else EvidriloColors.White,
+            containerColor = choiceColors.container,
+            contentColor = choiceColors.content,
         ),
-        border = BorderStroke(
-            width = 2.dp,
-            color = if (selected) EvidriloColors.Cobalt else EvidriloColors.Separator,
-        ),
+        border = BorderStroke(width = 2.dp, color = choiceColors.border),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Text(
