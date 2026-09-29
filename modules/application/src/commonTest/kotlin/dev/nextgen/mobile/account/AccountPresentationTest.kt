@@ -7,15 +7,20 @@ import kotlin.test.assertTrue
 
 class AccountPresentationTest {
     @Test
-    fun signed_out_uses_clear_local_guest_copy_without_claiming_server_access() {
+    fun auth_heading_tracks_the_selected_email_form_mode() {
+        assertEquals("Welcome back", accountAuthHeading(AccountAuthMode.SIGN_IN))
+        assertEquals("Create your account", accountAuthHeading(AccountAuthMode.CREATE_ACCOUNT))
+        assertEquals("Reset your password", accountAuthHeading(AccountAuthMode.RESET_PASSWORD))
+    }
+
+    @Test
+    fun signed_out_explains_optional_account_sign_in_without_claiming_upload_or_service_access() {
         val presentation = AccountSession.SignedOut.toPresentation()
 
-        assertEquals("Guest mode", presentation.title)
-        assertTrue(presentation.body.contains("Projects and case work stay on this device"))
-        assertTrue(presentation.body.contains("temporarily unavailable"))
-        assertTrue(presentation.body.contains("No project content is uploaded"))
-        assertFalse(presentation.body.contains("Sign in"))
-        assertFalse(presentation.body.contains("Sign in or create a free account to use Evidrilo's projects"))
+        assertEquals("Sign in or create an account", presentation.title)
+        assertTrue(presentation.body.contains("Local projects stay on this device"))
+        assertTrue(presentation.body.contains("does not upload projects"))
+        assertTrue(presentation.body.contains("Pro requires a signed-in account"))
         assertEquals(null, presentation.actionLabel)
         assertEquals(AccountPresentationAction.NONE, presentation.action)
         assertFalse(presentation.isBusy)
@@ -64,7 +69,7 @@ class AccountPresentationTest {
         ).toPresentation()
 
         assertEquals("Account connected", presentation.title)
-        assertTrue(presentation.body.contains("Online sync stays off unless you choose it separately"))
+        assertTrue(presentation.body.contains("cloud sync remains paused in local mode"))
         assertEquals("Sign out", presentation.actionLabel)
         assertEquals(AccountPresentationAction.SIGN_OUT, presentation.action)
         assertFalse(presentation.isBusy)
@@ -73,9 +78,9 @@ class AccountPresentationTest {
 
     @Test
     fun settings_subtitle_reflects_the_account_state_without_identity_data() {
-        assertEquals("Guest mode · Local only", AccountSession.SignedOut.toSettingsSubtitle())
+        assertEquals("Local only · Sign-in optional", AccountSession.SignedOut.toSettingsSubtitle())
         assertEquals(
-            "Finish Google sign-in",
+            "Finish sign-in",
             AccountSession.AwaitingOAuthCallback.toSettingsSubtitle(),
         )
         assertEquals(
@@ -83,17 +88,17 @@ class AccountPresentationTest {
             AccountSession.SignedIn(AccountSummary("account-id", true)).toSettingsSubtitle(),
         )
         assertEquals(
-            "Guest mode · Local only",
+            "Sign-in unavailable · Local projects stay here",
             AccountSession.Unavailable(AccountUnavailableReason.NOT_CONFIGURED).toSettingsSubtitle(),
         )
     }
 
     @Test
-    fun account_sign_in_form_is_hidden_during_temporary_guest_mode() {
+    fun optional_account_sign_in_remains_available_while_local_guest_work_stays_enabled() {
         assertFalse(shouldShowAccountAuthForm(AccountSession.SignedOut, accountConfigured = false))
         assertFalse(shouldShowAccountAuthForm(AccountSession.Unavailable(AccountUnavailableReason.NOT_CONFIGURED), accountConfigured = false))
-        assertFalse(shouldShowAccountAuthForm(AccountSession.SignedOut, accountConfigured = true))
-        assertFalse(
+        assertTrue(shouldShowAccountAuthForm(AccountSession.SignedOut, accountConfigured = true))
+        assertTrue(
             shouldShowAccountAuthForm(
                 AccountSession.Unavailable(AccountUnavailableReason.SERVICE_UNAVAILABLE),
                 accountConfigured = true,
@@ -105,12 +110,21 @@ class AccountPresentationTest {
     }
 
     @Test
-    fun unconfigured_account_state_uses_guest_copy_without_internal_adapter_language() {
+    fun restored_account_identity_is_shown_in_profile_while_local_guest_work_remains_enabled() {
+        val signedIn = AccountSession.SignedIn(AccountSummary("account-id", true))
+
+        assertTrue(shouldShowSignedInAccountInProfile(signedIn, accountAuthRestoreComplete = true))
+        assertFalse(shouldShowSignedInAccountInProfile(signedIn, accountAuthRestoreComplete = false))
+        assertFalse(shouldShowSignedInAccountInProfile(AccountSession.SignedOut, accountAuthRestoreComplete = true))
+    }
+
+    @Test
+    fun unconfigured_account_state_explains_sign_in_unavailability_without_internal_terms() {
         val presentation = AccountSession.Unavailable(AccountUnavailableReason.NOT_CONFIGURED).toPresentation()
 
         assertFalse(presentation.body.contains("adapter"))
-        assertTrue(presentation.body.contains("Projects and case work stay on this device"))
-        assertEquals("Guest mode", presentation.title)
+        assertTrue(presentation.body.contains("Local projects remain available"))
+        assertEquals("Sign-in unavailable", presentation.title)
     }
 
     @Test

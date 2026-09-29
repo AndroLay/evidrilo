@@ -1,5 +1,8 @@
 package dev.nextgen.mobile.billing
 
+/** Pro can be presented independently from the local guest-mode feature gates. */
+const val REVENUECAT_PRO_FEATURE_ENABLED = true
+
 /**
  * Non-secret RevenueCat identifiers supplied by a local build configuration.
  *

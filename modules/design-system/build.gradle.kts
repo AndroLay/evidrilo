@@ -2,13 +2,18 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
 }
 
 kotlin {
     jvmToolchain(21)
     jvm()
-    androidTarget()
+    android {
+        namespace = "dev.nextgen.mobile.designsystem"
+        compileSdk = 37
+        minSdk = 26
+        androidResources.enable = true
+    }
 
     listOf(
         iosArm64(),
@@ -24,11 +29,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.resources)
         }
 
         commonTest.dependencies {
@@ -36,7 +41,7 @@ kotlin {
         }
 
         jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
+            implementation(libs.compose.desktop.jvm)
         }
     }
 }
@@ -44,9 +49,4 @@ kotlin {
 compose.resources {
     publicResClass = true
     packageOfResClass = "dev.nextgen.mobile.design.resources"
-}
-
-android {
-    namespace = "dev.nextgen.mobile.designsystem"
-    compileSdk = 35
 }

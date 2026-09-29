@@ -289,6 +289,71 @@ class AccountSessionTest {
         assertEquals(current, store.value)
     }
 
+    @Test
+    fun apple_identity_link_result_cannot_switch_the_signed_in_account() {
+        val current = sampleStoredSession()
+        val other = sampleStoredSession().copy(
+            account = AccountSummary(
+                "223e4567-e89b-42d3-a456-426614174000",
+                emailVerified = true,
+                appleLinked = true,
+            ),
+        )
+        val store = MemorySecureSessionStore(current)
+        val controller = AccountSessionController(store) { 100L }
+        controller.restore()
+
+        assertEquals(
+            AccountSession.SignedIn(current.account, appleLinkOutcome = IdentityLinkOutcome.FAILED),
+            controller.acceptGatewayResult(
+                AccountGatewayResult.AppleIdentityLink(IdentityLinkOutcome.LINKED, other),
+            ),
+        )
+        assertEquals(current, store.value)
+    }
+
+    @Test
+    fun apple_identity_link_requires_the_same_verified_account_and_preserves_its_email() {
+        val current = sampleStoredSession().copy(
+            account = sampleStoredSession().account.copy(
+                email = "student@example.test",
+                appleLinked = false,
+            ),
+        )
+        val store = MemorySecureSessionStore(current)
+        val controller = AccountSessionController(store) { 100L }
+        controller.acceptVerifiedSession(current)
+        val linked = current.copy(account = current.account.copy(appleLinked = true))
+
+        assertEquals(
+            AccountSession.SignedIn(
+                linked.account,
+                appleLinkOutcome = IdentityLinkOutcome.LINKED,
+            ),
+            controller.acceptGatewayResult(
+                AccountGatewayResult.AppleIdentityLink(IdentityLinkOutcome.LINKED, linked),
+            ),
+        )
+        assertEquals("student@example.test", store.value?.account?.email)
+
+        val other = linked.copy(
+            account = linked.account.copy(
+                accountId = "223e4567-e89b-42d3-a456-426614174000",
+                email = "other@example.test",
+            ),
+        )
+        assertEquals(
+            AccountSession.SignedIn(
+                linked.account,
+                appleLinkOutcome = IdentityLinkOutcome.FAILED,
+            ),
+            controller.acceptGatewayResult(
+                AccountGatewayResult.AppleIdentityLink(IdentityLinkOutcome.LINKED, other),
+            ),
+        )
+        assertEquals(linked, store.value)
+    }
+
     private fun sampleStoredSession(
         material: SecureSessionMaterial = SecureSessionMaterial("access", 200L),
         expiresAtEpochSeconds: Long = material.expiresAtEpochSeconds,

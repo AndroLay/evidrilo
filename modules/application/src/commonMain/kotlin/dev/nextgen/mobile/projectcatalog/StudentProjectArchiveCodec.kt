@@ -158,11 +158,16 @@ object StudentProjectArchiveCodec {
             format = format,
             docxBytes = bytes.takeIf { format.kind == AttachmentFormat.Kind.DOCX },
         )
-        scanner.update(bytes, 0, bytes.size)
-        if (scanner.finish() != null) {
-            return StudentProjectAttachmentReferenceResult.Rejected("PROJECT_ATTACHMENT_CONTENT_INVALID")
+        return try {
+            scanner.update(bytes, 0, bytes.size)
+            if (scanner.finish() != null) {
+                StudentProjectAttachmentReferenceResult.Rejected("PROJECT_ATTACHMENT_CONTENT_INVALID")
+            } else {
+                StudentProjectAttachmentReferenceResult.Ready(reference)
+            }
+        } catch (_: ProjectArchiveValidationFailure) {
+            StudentProjectAttachmentReferenceResult.Rejected("PROJECT_ATTACHMENT_CONTENT_INVALID")
         }
-        return StudentProjectAttachmentReferenceResult.Ready(reference)
     }
 
     fun encode(

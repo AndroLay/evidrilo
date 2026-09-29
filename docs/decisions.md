@@ -408,6 +408,10 @@ blocked on an optional asset.
 
 ## D-099 — Add bounded AI assistance with subscription credits
 
+Historical policy record: D-126 supersedes this decision's initial grant
+amounts, D-127 supersedes its fixed per-operation pricing, and D-130 replaces
+the no-rollover rule. Use those later decisions for current credit policy.
+
 Decision: add an optional, server-mediated AI assistance extension without
 changing the free local learning loop or the deterministic Verify Engine.
 
@@ -426,14 +430,15 @@ initial Shipaton fallback. The safe default remains `DisabledAiProvider`.
 
 Credit policy:
 
-- a verified free account receives 10 AI credits once after explicit consent;
-- an active `evidrilo_pro` entitlement receives 100 credits per entitlement
-  month;
-- yearly subscriptions receive the same 100-credit monthly grant during each
-  active annual month;
-- unused credits do not roll over; lifetime packages and paid top-ups are not
+- a verified Free account receives the one-time grant defined by D-126 after
+  explicit consent;
+- an active `evidrilo_pro` entitlement receives the monthly grant defined by
+  D-126, including yearly subscriptions;
+- unused credits did not roll over under the policy recorded at that time;
+  D-130 later supersedes this rule. Lifetime packages and paid top-ups are not
   part of the initial plan;
-- one accepted standard assist costs one credit;
+- successful AI requests are priced from verified provider-token usage under
+  D-127; there is no fixed per-answer or per-operation charge;
 - timeout, cancellation, provider failure, malformed output, policy rejection,
   and unavailable-provider results release the reservation and do not charge;
 - the server ledger is authoritative, idempotent, account-isolated, and linked
@@ -454,10 +459,11 @@ it may not introduce a new anchor or write claim status. The learner must make
 the edit manually, after which the deterministic evaluator and Evidence Delta
 remain the only sources of truth.
 
-Rationale: ten one-time free credits allow a meaningful trial without creating
-an anonymous abuse surface, while one hundred monthly credits make the premium
-extension legible and predictable. The policy creates a measurable RevenueCat
-value without paywalling evidence provenance or evaluator trust.
+Rationale: a finite Free grant allows a meaningful trial without creating an
+anonymous abuse surface, while a recurring Pro grant makes the optional
+extension legible and predictable. Current grant amounts are defined by D-126
+and usage pricing by D-127. The policy creates measurable RevenueCat value
+without paywalling evidence provenance or evaluator trust.
 
 Consequences: a PostgreSQL credit ledger, grant reconciliation, consent UI,
 provider matrix, privacy disclosure, and adversarial tests are required before
@@ -483,8 +489,8 @@ The premium value proposition must remain legible:
 
 - the free core contains one complete evidence-to-claim workflow;
 - `evidrilo_pro` adds two reviewed evidence cases;
-- an active entitlement grants 100 AI credits per entitlement month, including
-  monthly grants during an active yearly term;
+- an active entitlement receives the monthly AI grant defined by D-126,
+  including monthly grants during an active yearly term;
 - AI credits are optional assistance, not a paid truth score or a premium
   evaluator standard; and
 - the paywall must explain the case and AI value without promising grades,
@@ -1001,12 +1007,10 @@ state and atomic per-account quota enforcement on the server, with concurrency
 and downgrade-preservation tests. D-109's local API foundation alone does not
 satisfy that boundary.
 
-The AI allowance remains governed by D-099: 10 one-time credits for a verified
-Free account and 100 credits per active entitlement month for Pro, including
-monthly grants during an active annual term. D-114 does not change those
-amounts, the no-rollover rule, or the provider activation gate. Neither the
-project limits nor the AI allowance may be presented as live until their
-respective client/provider behavior is implemented and verified.
+At adoption, D-114 did not change the then-current AI grant or provider gate.
+D-126 later set the current grant targets, and D-127 set token-based pricing;
+neither project limits nor AI availability may be presented as live until
+their respective client/provider behavior is implemented and verified.
 
 ## D-115 — Define catalog-guided AI project creation and in-project assistance
 
@@ -1098,8 +1102,8 @@ submission; those remain separately owner-controlled.
 
 D-115 remains the source for allowed AI behavior and restrictions: no finished
 academic deliverable, invented/verified sources or data, automatic project
-mutation, grade, or AI evaluator. D-099 still governs credit allowances; do
-not assume that project scaffolding costs one standard credit. D-114 still
+mutation, grade, or AI evaluator. D-126 governs grant targets and D-127 governs
+token-based pricing; there is no fixed project-scaffold price. D-114 still
 governs project slots. The local-first M0 evaluator and manual workflow remain
 available independently of AI.
 
@@ -1142,16 +1146,13 @@ project and its ability to open, edit, export, or delete; it blocks only new
 projects or reactivation that would exceed the Free active cap. This does not
 promise account-wide quota or cross-device continuity; those belong to Rilis 2.
 
-Clarifications to D-099/D-115/D-116: project scaffolding costs 3 credits, and
-a standard in-project assist costs 1 credit only when the student applies the
-suggestion. Failed or dismissed work releases its reservation. Existing
-allowances remain 10 one-time credits for a verified Free account and 100
-credits per active Pro entitlement month. The AI provider remains
-server-mediated and disabled by default; owner approval of provider terms,
-retention, privacy, consent, and cost plus provider-backed verification are
-still required before activation or a live-capability claim. Project AI does
-not replace the manual/offline project workflow or deterministic, bounded
-checks.
+Clarifications to D-099/D-115/D-116 recorded the then-current fixed project-AI
+prices and grants; D-126 later superseded those grants and D-127 superseded the
+fixed prices. The AI provider remains server-mediated and disabled by default;
+owner approval of provider terms, retention, privacy, consent, and cost plus
+provider-backed verification are still required before activation or a
+live-capability claim. Project AI does not replace the manual/offline project
+workflow or deterministic, bounded checks.
 
 Release order is Rilis 1 local manual workflow and portable outputs; Rilis 1.1
 provider-gated AI; Rilis 2 opt-in cloud continuity with atomic account-wide
@@ -1289,13 +1290,12 @@ and are not implied by this decision. AI history is not project evidence or a
 project revision log.
 
 D-119 preserves D-106's existing case-AI contract and D-115's project-AI safety
-limits, with only the narrow General-chat exception stated above. It preserves
-D-117's 3-credit project scaffold and 1-credit applied-assist policy, and the
-default-disabled provider. It does not authorize provider activation, spend,
-cloud sync, or live-capability claims. General-chat pricing, credit
-limits, and retention beyond metadata are not set by D-119; General chat must
-remain unavailable or use an explicitly approved bounded policy until those
-terms are decided. This decision records target behavior; all-stage mobile
+limits, with only the narrow General-chat exception stated above. Its original
+fixed project-AI pricing was superseded by D-127's token-based policy; the
+provider remains disabled. It does not authorize provider activation, spend,
+cloud sync, or live-capability claims. General chat uses D-127's shared account
+balance, while request limits and retention beyond metadata remain separate
+gates. This decision records target behavior; all-stage mobile
 integration, project selection/history UI, new versioned API contracts, privacy
 review, method review, credit acceptance, and device evidence remain open.
 
@@ -1510,15 +1510,13 @@ the Free limit. Cloud sync or backup is not part of the current Pro promise; it
 may be considered only after the separate R2 consent, privacy, retention,
 security, quota, cost, operations, and acceptance gates pass.
 
-The existing quantities remain unchanged: Free has five active projects per
-installation and 10 one-time AI credits for an eligible verified account after
-explicit consent; active Pro has 50 active projects per installation, the two
-approved premium practice cases, and 100 AI credits per entitlement month.
-Project-AI scaffold
-cost remains three credits and standard assistance costs one credit only when
-applied. AI stays bounded by verified account, consent, server ledger, and
-cost/rate controls; Free does not mean unlimited provider use. General-chat
-allowance remains unresolved. Do not introduce paid top-ups, one-time credit
+Project limits remain five active projects per Free installation and 50 per
+active Pro installation. D-126 later set the AI grant targets at 20 one-time
+Free credits and 200 credits per active Pro entitlement month; D-127 later
+replaced fixed Project AI prices with token-based pricing shared by every AI
+mode. These later decisions do not make AI available: it remains bounded by a
+verified account, consent, the server ledger, and provider/cost gates. General
+chat has no separate allowance. Do not introduce paid top-ups, one-time credit
 packs, lifetime plans, institutional sales, or advertising in v1.
 
 D-124 supplements D-099, D-100, D-114, D-117, D-120, and D-123. It is a product
@@ -1532,34 +1530,33 @@ Owner-directed target, 29 September 2026: raise the optional AI credit allowance
 to 20 credits once for a verified Free account after explicit consent, and 200
 credits per active `evidrilo_pro` entitlement month. Monthly and yearly
 subscriptions receive the same monthly grant while active; a yearly plan does
-not receive the full annual amount up front. Unused credits do not roll over.
+not receive the full annual amount up front. Under the policy recorded on this
+date, unused credits did not roll over; D-130 later supersedes that rule.
 
-D-126 changes only the grant quantities. It does not change supported AI
-purposes, account verification, consent, RevenueCat entitlement checks, the
-server-owned ledger, reservation/release behavior, or operation costs: a new
-project scaffold remains 3 credits and a standard assist remains 1 credit when
-applied. General-chat allowance remains unresolved; this decision does not
+D-126 changed the grant quantities, not supported AI purposes, account
+verification, consent, RevenueCat entitlement checks, or the server-owned
+ledger. At the time this decision was recorded, the existing fixed operation
+prices remained in force; D-127 below supersedes those historical prices with
+token-based settlement. General-chat allowance was unresolved at D-126; D-127
+later placed chat on the same usage-based account balance. D-126 did not
 activate a provider, authorize spend, or make AI available to guest users.
-The adopted operation-cost target remains the existing 3-credit scaffold and
-1-credit standard/project assist policy. In-progress source now includes
-provider-token-based settlement; that implementation is not an approved change
-to operation pricing and must be reconciled before acceptance.
 
-The current checkout's ledger constants now specify 20/200, but end-to-end
-support is not established: migration `031_ai_credit_ledger` limits each grant
-to 100 credits. A forward migration 050 is now present in the checkout to raise
-that bound, but fresh/upgraded database and ledger acceptance have not been
-verified. The mobile pre-consent message still says “10 available”; the mobile
-balance/copy must reflect the account's actual allowance. API, migration,
-replay, balance, and entitlement-period tests must prove the new quantities
-before they are described as implemented. Keep the per-request cost bound
-separate from the grant maximum. Until that work and the independent
-provider/privacy gates pass, 20/200 is the adopted product target, not evidence
-of live credit availability.
+The decision-time observation found that migration `031_ai_credit_ledger`
+limited each grant below the updated target and that forward migration 050 was needed to
+raise the bound. The pre-consent label was also stale at that observation; the
+current UI must request consent without promising a tier-specific grant before
+the account's entitlement is known. Fresh/upgraded database acceptance and
+the independent provider/privacy gates remain separate from the 20/200 product
+target; it is not evidence of live credit availability.
+
+D-130 later supersedes D-126's no-rollover rule. Read D-126 as the historical
+record of the grant amounts; current carry-forward behavior follows D-130.
 
 D-126 supersedes the Free/Pro grant amounts recorded in D-099, D-100, D-114,
-D-115, D-117, and D-124. Those entries remain unchanged as historical decision
-records; all current product and implementation guidance follows D-126.
+D-115, D-117, and D-124. D-127 supersedes the fixed operation-pricing rules
+recorded in earlier entries. Older decisions preserve their product context
+and point to the current grant/pricing rules; current guidance follows D-126
+grant amounts, D-127 pricing, and D-130 carry-forward behavior.
 
 ## D-127 — Charge AI credits from token usage
 
@@ -1589,3 +1586,139 @@ remain owner-configured and match the pinned model and applicable pricing tier.
 The provider remains disabled unless its separate privacy, retention, cost,
 consent, and runtime gates are approved. This decision does not authorize
 provider activation, spend, deployment, or a live-AI claim.
+
+## D-128 — Add Apple sign-in without creating duplicate Evidrilo accounts
+
+Current Apple availability is governed by D-132. This entry remains a future
+product target and does not authorize Apple provider setup or enablement now.
+
+Owner-directed product target, 29 September 2026: offer **Continue with Apple**
+alongside **Continue with Google** when each provider is configured. Both
+providers must resolve to one stable internal Evidrilo account when the student
+explicitly links them from an authenticated account. This extends D-102's
+provider-neutral authentication boundary and D-110's explicit Google-linking
+rule. D-129 authorizes optional sign-in while local guest access remains active.
+
+The internal Evidrilo account ID is canonical. A provider identity is keyed by
+its issuer/provider and stable subject identifier (`sub`), not by email. Email
+is verified contact/profile data and may change or be hidden; it is not a safe
+cross-provider identity key. During Apple authorization, the student may choose
+to share a verified email or use a private relay address. The app must accept
+either choice and must not add a separate personal-email prompt just to use
+Apple sign-in. The current Supabase browser OAuth flow requests email but does
+not return Apple's full name; name collection is a separate optional profile
+flow. See Apple's
+[authentication](https://developer.apple.com/documentation/signinwithapple/authenticating-users-with-sign-in-with-apple)
+and [private relay](https://developer.apple.com/documentation/signinwithapple/communicating-using-the-private-email-relay-service)
+guidance and Google's [OpenID Connect identifier guidance](https://developers.google.com/identity/openid-connect/reference).
+
+Account linking is an explicit action available from the active authenticated
+account. Show that account's verified email when available, explain Apple's
+private relay option, authorize Apple, verify its identity, and confirm the
+result resolves to the same internal account ID before accepting the new
+session. Linking must never switch the active session or merge project,
+history, billing, or entitlement records.
+
+Supabase Auth automatically links OAuth identities that return the same
+verified email to one Supabase user. The mobile client cannot disable this
+managed-auth behavior. It does not merge separate Evidrilo records in app code,
+but it means same-email sign-in can attach an identity without the explicit
+link confirmation. For a different email, including an Apple private relay,
+the student must sign in to the account they intend to keep and link Apple from
+that account. A provider identity already linked elsewhere produces a generic
+conflict without disclosing that account. Cancellation, provider error,
+unverified callback, and conflict preserve the current session and existing
+data.
+
+The client now contains Apple OAuth, provider-identity verification, explicit
+linking, same-account-ID enforcement, and backward-compatible secure session
+fields. Provider dashboard setup, manual-link enablement, same-email managed
+Auth behavior, and Android/iOS runtime acceptance remain separate gates.
+
+## D-129 — Restore optional account sign-in while local guest access remains active
+
+Owner-directed 29 September 2026: allow email, configured Google, and
+configured Apple sign-in, session restore, auth callbacks, and explicit
+provider linking alongside the local guest workflow. This supersedes only
+D-125's mobile sign-in/session/callback pause. It does not retire guest mode.
+
+Keep server AI and credit use, Pro/RevenueCat, cloud sync, analytics
+transmission, recommendations, account-backed platform projections,
+notification-preference backup, account export, and account deletion paused
+while `TEMPORARY_GUEST_MODE_ENABLED` is true. Do not associate or upload local
+project data when a student signs in. API authorization remains unchanged.
+Expose each OAuth button only when the build enables that provider and the
+Supabase client is configured; Apple remains disabled by default until the
+Apple/Supabase project setup is complete. The mobile client never contains an
+Apple signing secret.
+
+This decision authorizes the local code change only. It does not claim that
+Apple credentials, Supabase manual linking, provider callbacks, or device
+runtime have been configured or verified.
+
+Apple activation is currently deferred by D-132; the provider and app flag stay
+disabled until the owner explicitly revisits that decision.
+
+## D-130 — Accumulate Pro AI credits without resetting the balance
+
+Owner-directed policy, 29 September 2026: after explicit AI consent, a verified
+Free account receives 20 credits once. Each earned active `evidrilo_pro`
+entitlement month adds 200 credits to the existing balance. If all 20 Free
+credits remain unspent, the first Pro grant brings the balance to 220; if some
+were used, the grant adds 200 to what remains. Each later active month adds
+another 200 instead of resetting the balance.
+
+Monthly and yearly subscriptions use the same monthly grant cadence. Yearly
+plans do not receive 2,400 credits up front. Each monthly grant is keyed to its
+verified entitlement-period start so webhook retries, balance reads, and
+restores cannot grant the same period twice. Unused earned credits do not
+expire, roll back, or disappear when Pro ends; ending Pro only stops future
+monthly grants. Free's one-time grant, token-based usage pricing, and the
+200-credit maximum charge per request remain as defined by D-126 and D-127.
+
+D-130 supersedes D-126's no-rollover rule. It does not enable the AI provider,
+authorize provider spend, deployment, or a live-AI claim.
+
+## D-131 — Keep local Free access and enable account-bound Pro independently
+
+Owner-directed 29 September 2026: keep the Free project and bundled-case
+workflow usable locally without sign-in, while enabling the Evidrilo Pro
+presentation and RevenueCat purchase/restore path independently from
+the temporary guest-mode flag. Pro requires a signed-in Evidrilo account and a
+confirmed active Evidrilo Pro entitlement from the configured RevenueCat
+provider. A missing provider configuration, network error, unknown transaction,
+or unconfirmed entitlement remains locked and uses the Free project limit; the
+client must never synthesize or cache a local Pro grant.
+
+This changes only the mobile RevenueCat Pro gate and account identity needed
+for that provider. It does not enable server AI/credit use, cloud sync,
+analytics transmission, account-backed projections, or upload local project
+data. Local projects remain on-device. API authorization is unchanged. Pro
+configuration and Test Store/runtime evidence remain separate acceptance gates.
+
+D-131 supersedes only D-129's statement that Pro/RevenueCat must remain paused
+while local guest access is active. All other D-129 pauses remain in effect.
+
+## D-132 — Defer Apple sign-in and keep Apple provider configuration empty
+
+Owner-directed decision, 30 September 2026: defer **Continue with Apple**.
+There is no Apple Developer setup available for this project, and Apple login
+is not needed for the current app or API-platform work.
+
+- Keep the Apple provider disabled in Supabase Auth and keep
+  `SUPABASE_APPLE_AUTH_ENABLED` / `supabaseAppleAuthEnabled` false in app builds.
+- Leave Apple-specific client IDs, signing keys, and generated provider secrets
+  unset. Empty Apple provider configuration is intentional; do not add
+  placeholder credentials.
+- The empty Apple configuration is not a prerequisite for the app API,
+  Supabase project operation, email sign-in, or Google sign-in when Google is
+  separately configured. Do not claim Apple sign-in is available.
+- Revisit only after the owner explicitly chooses Apple sign-in and Apple
+  Developer setup is available. Complete provider configuration and Android/iOS
+  runtime verification before enabling the provider.
+
+D-132 defers D-128's Apple sign-in product target and clarifies D-129's
+configured-provider gate. If the app later targets App Store distribution while
+using Google for its primary account login, review Apple's current
+[Guideline 4.8](https://developer.apple.com/app-store/review/guidelines/) and
+applicability before release.

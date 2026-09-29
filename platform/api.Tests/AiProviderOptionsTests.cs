@@ -61,6 +61,72 @@ public sealed class AiProviderOptionsTests
         Assert.DoesNotContain("synthetic-secret", options.ToSafeString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Enabled_provider_reads_an_owner_only_secret_file_and_allows_the_experiential_endpoint()
+    {
+        var secretPath = Path.Combine(Path.GetTempPath(), $"evidrilo-ai-key-{Guid.NewGuid():N}");
+        try
+        {
+            File.WriteAllText(secretPath, "synthetic-file-secret\n");
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(secretPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+
+            var options = AiProviderOptions.From(EnabledConfiguration(
+                ("OPENAI_API_KEY", ""),
+                ("AI_PROVIDER_API_KEY_FILE", secretPath),
+                ("AI_PROVIDER_BASE_URL", "https://api.experientiallabs.ai/v1"),
+                ("AI_OPENAI_MODEL", "gpt-6-luna")));
+
+            Assert.Equal("synthetic-file-secret", options.ApiKey);
+            Assert.Equal("gpt-6-luna", options.Model);
+            Assert.Equal("https://api.experientiallabs.ai/v1/responses", options.ResponsesEndpoint.AbsoluteUri);
+            Assert.DoesNotContain("synthetic-file-secret", options.ToSafeString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(secretPath);
+        }
+    }
+
+    [Fact]
+    public void Enabled_provider_rejects_secret_files_readable_by_group_or_others()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var secretPath = Path.Combine(Path.GetTempPath(), $"evidrilo-ai-key-{Guid.NewGuid():N}");
+        try
+        {
+            File.WriteAllText(secretPath, "synthetic-file-secret");
+            File.SetUnixFileMode(secretPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.OtherRead);
+
+            var exception = Assert.Throws<PlatformConfigurationException>(() =>
+                AiProviderOptions.From(EnabledConfiguration(
+                    ("OPENAI_API_KEY", ""),
+                    ("AI_PROVIDER_API_KEY_FILE", secretPath))));
+
+            Assert.Contains("AI_PROVIDER_API_KEY_FILE", exception.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("synthetic-file-secret", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(secretPath);
+        }
+    }
+
+    [Theory]
+    [InlineData("http://api.experientiallabs.ai/v1")]
+    [InlineData("https://example.invalid/v1")]
+    [InlineData("https://api.experientiallabs.ai/v1?redirect=elsewhere")]
+    public void Enabled_provider_rejects_untrusted_base_urls(string baseUrl)
+    {
+        var exception = Assert.Throws<PlatformConfigurationException>(() =>
+            AiProviderOptions.From(EnabledConfiguration(("AI_PROVIDER_BASE_URL", baseUrl))));
+
+        Assert.Contains("AI_PROVIDER_BASE_URL", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("NaN")]
     [InlineData("-1")]

@@ -14,7 +14,10 @@ public sealed record AiConversationGatewayResult(
     string? ReasonCode,
     IReadOnlyList<string> GroundedAnchorIds,
     AiDraftProposal? Proposal,
-    AiAuditMetadata Audit);
+    AiAuditMetadata Audit)
+{
+    public int CreditCost { get; init; }
+}
 
 public sealed class AiConversationGateway
 {
@@ -188,7 +191,10 @@ public sealed class AiConversationGateway
             null,
             validation.ReferencedAnchorIds,
             validation.Proposal,
-            new AiAuditMetadata(PromptVersion, requestHash, "configured-provider", "success"));
+            new AiAuditMetadata(PromptVersion, requestHash, "configured-provider", "success"))
+        {
+            CreditCost = actualCreditCost,
+        };
     }
 
     private async Task<AiConversationGatewayResult> ReleaseAndFallbackAsync(

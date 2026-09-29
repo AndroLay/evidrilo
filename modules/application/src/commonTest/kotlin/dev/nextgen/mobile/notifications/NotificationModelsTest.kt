@@ -3,6 +3,7 @@ package dev.nextgen.mobile.notifications
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NotificationModelsTest {
@@ -111,5 +112,48 @@ class NotificationModelsTest {
         assertEquals(null, NotificationPreferencesCodec.decode("v1|true|true|true|MONTHLY|9|0"))
         assertEquals(null, NotificationPreferencesCodec.decode("not-a-preference"))
         assertEquals(null, NotificationPreferencesCodec.decode("v1|true|true|true|DAILY|24|0"))
+    }
+
+    @Test
+    fun schedule_snapshot_restores_the_enabled_categories_after_process_death() {
+        val original = NotificationScheduleSnapshot(
+            preferences = NotificationPreferences(
+                enabled = true,
+                continueUnfinishedEnabled = true,
+                reviewCompletedEnabled = true,
+                cadence = NotificationCadence.WEEKLY,
+                hour = 18,
+                minute = 45,
+            ),
+            categories = listOf(
+                LocalNotificationCategory.CONTINUE_UNFINISHED,
+                LocalNotificationCategory.REVIEW_COMPLETED,
+            ),
+            weeklyDayOfWeek = 2,
+        )
+
+        val encoded = NotificationScheduleSnapshotCodec.encode(original)
+
+        assertEquals(original, NotificationScheduleSnapshotCodec.decode(encoded))
+    }
+
+    @Test
+    fun schedule_snapshot_rejects_disabled_or_unselected_categories() {
+        val invalid = NotificationScheduleSnapshot(
+            preferences = NotificationPreferences(
+                enabled = true,
+                continueUnfinishedEnabled = false,
+                reviewCompletedEnabled = true,
+            ),
+            categories = listOf(LocalNotificationCategory.CONTINUE_UNFINISHED),
+        )
+
+        assertNull(NotificationScheduleSnapshotCodec.encode(invalid))
+        assertNull(NotificationScheduleSnapshotCodec.decode("v1~v1|true|false|true|daily|9|0~continue_unfinished~-"))
+        assertNull(
+            NotificationScheduleSnapshotCodec.decode(
+                "v1~v1|true|false|true|weekly|9|0~review_completed~8",
+            ),
+        )
     }
 }

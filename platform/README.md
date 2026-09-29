@@ -30,11 +30,13 @@ distinct process and execution lifecycle.
   workflow depend on background processing.
 - AI assistance is optional and non-grading; provider output cannot replace
   deterministic evaluator results.
-- D-126 sets server-owned AI grant targets of 20 credits once for a verified
-  Free account and 200 credits per active `evidrilo_pro` entitlement month.
-  The base migration caps each grant at 100; forward migration 050 raises it to
-  200 but still needs fresh/upgrade database acceptance. Failed assists release
-  reservations; the client cannot grant or mutate credits.
+- D-126 and D-130 set server-owned AI grants at 20 credits once for a verified
+  Free account and an additional 200 credits for each earned active
+  `evidrilo_pro` month. Grants accumulate and do not expire after Pro ends.
+  Forward migration 051 removes the old expiry behavior and supports
+  multi-grant reservations; database/API integration acceptance remains
+  environment-dependent. Failed assists release reservations; the client
+  cannot grant or mutate credits.
 - Missing configuration produces an explicit unavailable/degraded result,
   never a fabricated successful write or entitlement.
 
@@ -115,6 +117,12 @@ bash
 dotnet run --project platform/api/Evidrilo.Api.csproj --environment Development
 ```
 
+The owner-local, Git-ignored `platform/api/appsettings.Development.json` pins
+the Experiential Labs endpoint and `gpt-6-luna`, and points to an external
+owner-only API-key file. Provider and Project AI activation remain false in
+that file; enabling them also requires the configured database and the
+separate approval gates described below.
+
 Never put real URLs, publishable keys, tokens, passwords, service-role
 credentials, webhook secrets, or production data in committed configuration,
 fixtures, logs, screenshots, or documentation.
@@ -124,23 +132,45 @@ fixtures, logs, screenshots, or documentation.
 A repository implementation or local integration test does not establish a
 managed deployment, hosted authentication configuration, provider delivery,
 email/SMS delivery, production backup, alerting, rollback, or load readiness.
-The server-only OpenAI Responses adapter is implemented behind
+The server-only OpenAI-compatible Responses adapter is implemented behind
 `AI_PROVIDER_ENABLED` and `AI_PROVIDER_ACTIVATION_APPROVED`; both default to
 false. Activation also requires a database, a server-side key, an explicitly
 configured model and reviewed rates, plus per-request and monthly spend limits.
-The adapter is covered by synthetic HTTP-handler tests and local PostgreSQL
-budget tests only; no live OpenAI request has been made.
+`AI_PROVIDER_BASE_URL` accepts only the OpenAI and Experiential Labs HTTPS v1
+endpoints. A key may be loaded from `AI_PROVIDER_API_KEY_FILE`; on Unix the file
+must be owner-readable only (for example, mode `0600`). The existing
+`OPENAI_API_KEY` setting remains supported for direct-provider deployments.
+The selected local model is `gpt-6-luna`, while the accepted internal credit
+accounting rates remain the standard GPT-6 Luna token rates. The adapter is
+covered by synthetic HTTP-handler tests and local PostgreSQL budget tests only;
+a separate synthetic request to the Experiential gateway returned HTTP 200,
+but no live request has been sent through the Evidrilo adapter. That direct
+smoke check does not verify application accounting, database settlement, or
+end-to-end API behavior.
+
+Project scaffold, stage-assist, and General chat adapters share that stateless Responses
+transport, token accounting, and provider-spend ledger. They remain off unless
+`PROJECT_AI_PROVIDER_ENABLED`, `PROJECT_AI_PROVIDER_ACTIVATION_APPROVED`, and
+`PROJECT_AI_PRIVACY_APPROVED` are all explicitly true in addition to the shared
+provider configuration. Each request still requires the account's current
+Project AI consent. General chat also requires the separate
+`PROJECT_AI_GENERAL_CHAT_POLICY_APPROVED` setting, which defaults to false.
+Its route sends only a bounded redacted message, stores no transcript, and writes
+metadata-only activity. General chat remains unavailable until its separate cost,
+limit, and retention policy is approved. These settings do not prove that
+provider terms, retention controls, privacy review, or hosted configuration
+have been approved.
 
 Opted-in requests are rehydrated from the published case and accepted output
 must cite server-approved evidence or limitation anchors before it reaches the
 client. Anchor validation establishes ID membership, not that generated prose
 is semantically entailed by the cited material. The API does not independently
 re-run the on-device KMP evaluator. The adapter sets Responses `store:false`,
-but this does not mean zero retention: OpenAI's standard abuse-monitoring logs
-may retain customer content for up to 30 days unless an eligible organization
-control is approved. Provider terms, retention controls, privacy approval, and
-live runtime evidence remain open; keep the adapter disabled until those gates
-are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
+but that does not guarantee zero retention at the gateway or upstream provider.
+Review the Experiential organization capture setting and provider route before
+using real student content. Provider terms, retention controls, privacy
+approval, and live runtime evidence remain open; keep the adapter disabled until
+those gates are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
 
 Deployment preparation and ownership boundaries are described in
 [infra/README.md](../infra/README.md).

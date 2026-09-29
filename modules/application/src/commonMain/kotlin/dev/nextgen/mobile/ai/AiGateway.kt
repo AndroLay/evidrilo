@@ -79,6 +79,7 @@ data class AiAssistResult(
     val promptVersion: String,
     val groundedAnchorIds: List<String>,
     val requestId: String,
+    val creditCost: Int? = null,
 )
 
 data class AiConversationHistoryMessage(
@@ -115,6 +116,7 @@ data class AiConversationTurn(
     val turnsRemaining: Int,
     val requestId: String,
     val autoApplied: Boolean,
+    val creditCost: Int? = null,
 )
 
 sealed interface AiConversationGatewayResult {
@@ -129,6 +131,7 @@ sealed interface AiConversationGatewayResult {
         val turnsUsed: Int? = null,
         val turnsRemaining: Int? = null,
         val requestId: String? = null,
+        val creditCost: Int? = null,
     ) : AiConversationGatewayResult
 
     data class Deferred(val reason: AiDeferralReason) : AiConversationGatewayResult
@@ -154,6 +157,7 @@ sealed interface AiGatewayResult {
         val reasonCode: String,
         val text: String? = null,
         val requestId: String? = null,
+        val creditCost: Int? = null,
     ) : AiGatewayResult
 
     data class Failed(
@@ -218,7 +222,11 @@ class AiGateway(
         val response = authorizedRequest(
             path = "/v1/ai/assist",
             method = "POST",
-            headers = mapOf("Content-Type" to "application/json", "Idempotency-Key" to idempotencyKey),
+            headers = mapOf(
+                "Accept" to "application/vnd.evidrilo.ai-assist-result.v2+json",
+                "Content-Type" to "application/json",
+                "Idempotency-Key" to idempotencyKey,
+            ),
             body = body,
             operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
             idempotencyKey = idempotencyKey,
@@ -232,7 +240,11 @@ class AiGateway(
                 parse = ::parseAssist,
             ) { parsed ->
                 if (parsed.status == "fallback") {
-                    AiGatewayResult.Fallback(parsed.reasonCode ?: "AI_UNAVAILABLE", requestId = parsed.requestId)
+                    AiGatewayResult.Fallback(
+                        parsed.reasonCode ?: "AI_UNAVAILABLE",
+                        requestId = parsed.requestId,
+                        creditCost = parsed.creditCost,
+                    )
                 } else {
                     AiGatewayResult.AssistFound(parsed)
                 }
@@ -263,7 +275,11 @@ class AiGateway(
         val response = authorizedRequest(
             path = "/v1/ai/conversations",
             method = "POST",
-            headers = mapOf("Content-Type" to "application/json", "Idempotency-Key" to idempotencyKey),
+            headers = mapOf(
+                "Accept" to "application/json",
+                "Content-Type" to "application/json",
+                "Idempotency-Key" to idempotencyKey,
+            ),
             body = body,
             operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
             idempotencyKey = idempotencyKey,
@@ -323,7 +339,11 @@ class AiGateway(
         val response = authorizedRequest(
             path = "/v1/ai/conversations/$sessionId/turns",
             method = "POST",
-            headers = mapOf("Content-Type" to "application/json", "Idempotency-Key" to idempotencyKey),
+            headers = mapOf(
+                "Accept" to "application/vnd.evidrilo.ai-conversation-turn.v2+json",
+                "Content-Type" to "application/json",
+                "Idempotency-Key" to idempotencyKey,
+            ),
             body = body,
             operation = RemoteOperationKind.IDEMPOTENT_MUTATION,
             idempotencyKey = idempotencyKey,
@@ -339,6 +359,7 @@ class AiGateway(
                             turn.turnsUsed,
                             turn.turnsRemaining,
                             turn.requestId,
+                            turn.creditCost,
                         )
                     } else {
                         AiConversationGatewayResult.TurnReceived(turn)
@@ -522,10 +543,14 @@ class AiGateway(
         require(response.statusCode in 200..299)
         require(response.body.encodeToByteArray().size <= MAX_AI_RESPONSE_BYTES)
         val root = json.parseToJsonElement(response.body) as? JsonObject ?: error("object required")
-        require(root.keys.containsAll(conversationTurnRequiredKeys))
-        require(root.keys.all { it in conversationTurnAllowedKeys })
+        val version = root.strictString("version").also { require(it == "1" || it == "2") }
+        val hasCreditCost = version == "2"
+        val requiredKeys = if (hasCreditCost) conversationTurnRequiredKeys + "creditCost" else conversationTurnRequiredKeys
+        val allowedKeys = if (hasCreditCost) conversationTurnAllowedKeys + "creditCost" else conversationTurnAllowedKeys
+        require(root.keys.containsAll(requiredKeys))
+        require(root.keys.all { it in allowedKeys })
         require(root.strictString("schema") == "evidrilo.ai-conversation-turn")
-        require(root.strictString("version") == "1")
+        val creditCost = if (hasCreditCost) root.int("creditCost").also { require(it in 0..MAX_AI_CREDIT_GRANT) } else null
         val status = root.strictString("status").also { require(it == "success" || it == "fallback") }
         val kind = root.strictOptionalString("kind")
         val text = root.strictOptionalString("text")
@@ -542,6 +567,7 @@ class AiGateway(
         val requestId = root.requestId()
 
         if (status == "success") {
+            require(creditCost == null || creditCost in 1..MAX_AI_CREDIT_GRANT)
             require(kind != null && text != null && text.isNotBlank() && text.length <= AI_CONVERSATION_MAX_MESSAGE_CHARS)
             require(reasonCode == null)
             require(groundedAnchorIds.isNotEmpty())
@@ -580,6 +606,7 @@ class AiGateway(
             turnsRemaining,
             requestId,
             autoApplied,
+            creditCost,
         )
     }.getOrNull()
 
@@ -678,7 +705,7 @@ class AiGateway(
         require(root.string("version") == "1")
         val consent = root.boolean("consentRecorded")
         val available = root.int("available")
-        require(available in 0..110)
+        require(available in 0..MAX_AI_CREDIT_BALANCE)
         val grants = root["grants"]?.jsonArray?.map { element ->
             val grant = element as? JsonObject ?: error("grant object required")
             require(grant.keys == grantKeys)
@@ -686,10 +713,12 @@ class AiGateway(
                 ?: error("grant kind required")
             val key = grant.string("grantKey")?.also { require(it.length in 1..64) }
                 ?: error("grant key required")
-            val granted = grant.int("granted").also { require(it in 1..100) }
-            val reserved = grant.int("reserved").also { require(it in 0..100) }
-            val consumed = grant.int("consumed").also { require(it in 0..100) }
-            val grantAvailable = grant.int("available").also { require(it in 0..100 && it == granted - reserved - consumed) }
+            val granted = grant.int("granted").also { require(it in 1..MAX_AI_CREDIT_GRANT) }
+            val reserved = grant.int("reserved").also { require(it in 0..MAX_AI_CREDIT_GRANT) }
+            val consumed = grant.int("consumed").also { require(it in 0..MAX_AI_CREDIT_GRANT) }
+            val grantAvailable = grant.int("available").also {
+                require(it in 0..MAX_AI_CREDIT_GRANT && it == granted - reserved - consumed)
+            }
             val expiresAt = grant.optionalString("expiresAt")?.also { require(dateTimeOffsetPattern.matches(it)) }
             AiCreditGrant(kind, key, granted, reserved, consumed, grantAvailable, expiresAt)
         } ?: error("grants required")
@@ -699,9 +728,12 @@ class AiGateway(
 
     private fun parseAssist(response: AccountHttpResponse): AiAssistResult? = runCatching {
         val root = json.parseToJsonElement(response.body) as? JsonObject ?: error("object required")
-        require(root.keys == assistKeys)
+        val version = root.string("version")?.also { require(it == "1" || it == "2") }
+            ?: error("version required")
+        val hasCreditCost = version == "2"
+        require(root.keys == if (hasCreditCost) assistKeys + "creditCost" else assistKeys)
         require(root.string("schema") == "evidrilo.ai-assist-result")
-        require(root.string("version") == "1")
+        val creditCost = if (hasCreditCost) root.int("creditCost").also { require(it in 0..MAX_AI_CREDIT_GRANT) } else null
         val status = root.string("status")?.also { require(it == "success" || it == "fallback") }
             ?: error("status required")
         val text = root.optionalString("text")
@@ -718,6 +750,7 @@ class AiGateway(
         require(groundedAnchorIds.size <= 32)
         val requestId = root.requestId()
         if (status == "success") {
+            require(creditCost == null || creditCost in 1..MAX_AI_CREDIT_GRANT)
             require(!text.isNullOrBlank() && text.length <= 2000)
             require(reason == null)
             require(groundedAnchorIds.isNotEmpty())
@@ -726,7 +759,7 @@ class AiGateway(
             require(reason != null && reasonPattern.matches(reason))
             require(groundedAnchorIds.isEmpty())
         }
-        AiAssistResult(status, text, reason, promptVersion, groundedAnchorIds, requestId)
+        AiAssistResult(status, text, reason, promptVersion, groundedAnchorIds, requestId, creditCost)
     }.getOrNull()
 
     private fun JsonObject.string(name: String): String? =
@@ -780,6 +813,8 @@ class AiGateway(
     }
 
     private companion object {
+        const val MAX_AI_CREDIT_GRANT = 200
+        const val MAX_AI_CREDIT_BALANCE = 220
         val creditsKeys = setOf("schema", "version", "consentRecorded", "available", "grants", "requestId")
         val grantKeys = setOf("grantKind", "grantKey", "granted", "reserved", "consumed", "available", "expiresAt")
         val assistKeys = setOf("schema", "version", "status", "text", "reasonCode", "promptVersion", "groundedAnchorIds", "requestId")

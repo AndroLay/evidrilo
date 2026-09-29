@@ -73,6 +73,13 @@ sealed interface AccountGatewayResult {
         override val code: String = "GOOGLE_IDENTITY_LINK_${outcome.name}"
     }
 
+    data class AppleIdentityLink(
+        val outcome: IdentityLinkOutcome,
+        val session: StoredAccountSession? = null,
+    ) : AccountGatewayResult {
+        override val code: String = "APPLE_IDENTITY_LINK_${outcome.name}"
+    }
+
     data object OAuthCancelled : AccountGatewayResult {
         override val code: String = "OAUTH_CANCELLED"
     }
@@ -122,7 +129,7 @@ enum class AccountMutationOperation {
     DELETE_ACCOUNT,
 }
 
-enum class GoogleIdentityLinkOutcome {
+enum class IdentityLinkOutcome {
     STARTED,
     LINKED,
     ALREADY_LINKED,
@@ -130,6 +137,28 @@ enum class GoogleIdentityLinkOutcome {
     CONFLICT,
     SETUP_REQUIRED,
     FAILED,
+}
+
+typealias GoogleIdentityLinkOutcome = IdentityLinkOutcome
+
+enum class AccountOAuthProvider(
+    val providerId: String,
+    val displayName: String,
+    val scopes: String,
+    val allowedOAuthHosts: Set<String>,
+) {
+    GOOGLE(
+        providerId = "google",
+        displayName = "Google",
+        scopes = "openid email profile",
+        allowedOAuthHosts = setOf("accounts.google.com"),
+    ),
+    APPLE(
+        providerId = "apple",
+        displayName = "Apple",
+        scopes = "name email",
+        allowedOAuthHosts = setOf("appleid.apple.com"),
+    ),
 }
 
 interface AccountGateway {
@@ -142,13 +171,31 @@ interface AccountGateway {
 
     suspend fun requestPasswordReset(identifier: String): AccountGatewayResult
 
-    suspend fun startGoogleSignIn(): AccountGatewayResult
+    suspend fun startProviderSignIn(provider: AccountOAuthProvider): AccountGatewayResult
 
-    /** Adds Google to the currently authenticated account; it must never create or merge accounts. */
-    suspend fun startGoogleIdentityLink(): AccountGatewayResult
+    /** Add a provider only to the active verified account; never switch or merge account IDs. */
+    suspend fun startIdentityLink(provider: AccountOAuthProvider): AccountGatewayResult
 
-    /** Clears only the pending identity-link flow and preserves the signed-in account. */
-    suspend fun cancelGoogleIdentityLink(): AccountGatewayResult
+    /** Clears only the selected pending link flow and preserves the signed-in account. */
+    suspend fun cancelIdentityLink(provider: AccountOAuthProvider): AccountGatewayResult
+
+    suspend fun startGoogleSignIn(): AccountGatewayResult =
+        startProviderSignIn(AccountOAuthProvider.GOOGLE)
+
+    suspend fun startAppleSignIn(): AccountGatewayResult =
+        startProviderSignIn(AccountOAuthProvider.APPLE)
+
+    suspend fun startGoogleIdentityLink(): AccountGatewayResult =
+        startIdentityLink(AccountOAuthProvider.GOOGLE)
+
+    suspend fun startAppleIdentityLink(): AccountGatewayResult =
+        startIdentityLink(AccountOAuthProvider.APPLE)
+
+    suspend fun cancelGoogleIdentityLink(): AccountGatewayResult =
+        cancelIdentityLink(AccountOAuthProvider.GOOGLE)
+
+    suspend fun cancelAppleIdentityLink(): AccountGatewayResult =
+        cancelIdentityLink(AccountOAuthProvider.APPLE)
 
     suspend fun completeRedirect(url: String): AccountGatewayResult
 
@@ -177,11 +224,14 @@ class UnconfiguredAccountGateway : AccountGateway {
     override suspend fun requestPasswordReset(identifier: String): AccountGatewayResult =
         AccountGatewayResult.NotConfigured
 
-    override suspend fun startGoogleSignIn(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+    override suspend fun startProviderSignIn(provider: AccountOAuthProvider): AccountGatewayResult =
+        AccountGatewayResult.NotConfigured
 
-    override suspend fun startGoogleIdentityLink(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+    override suspend fun startIdentityLink(provider: AccountOAuthProvider): AccountGatewayResult =
+        AccountGatewayResult.NotConfigured
 
-    override suspend fun cancelGoogleIdentityLink(): AccountGatewayResult = AccountGatewayResult.NotConfigured
+    override suspend fun cancelIdentityLink(provider: AccountOAuthProvider): AccountGatewayResult =
+        AccountGatewayResult.NotConfigured
 
     @Suppress("UNUSED_PARAMETER")
     override suspend fun completeRedirect(url: String): AccountGatewayResult =

@@ -135,6 +135,7 @@ public_paths=(
   gradle.properties
   build.gradle.kts
   settings.gradle.kts
+  global.json
   local.properties.example
   .dockerignore
   .github
@@ -163,6 +164,7 @@ public_paths=(
   docs/architecture/repository-structure.md
   docs/architecture/revenuecat.md
   docs/architecture/system-execution-flows.md
+  docs/architecture/apple-auth-setup.md
   docs/product/m0-product-contract.md
   docs/product/workflows.md
 )

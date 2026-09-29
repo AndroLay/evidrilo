@@ -58,7 +58,6 @@ internal fun EvidriloPremiumPaywall(
     val model = premiumPaywallModel(billing.copy(isBusy = isBusy))
 
     EvidriloContentColumn {
-        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = backLabel, onClick = onBack)
         Text(model.title, style = MaterialTheme.typography.displayLarge)
         Text(

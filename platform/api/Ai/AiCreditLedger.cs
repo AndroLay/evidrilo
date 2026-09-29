@@ -176,25 +176,12 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 expiresAt: null,
                 cancellationToken);
 
-            var entitlementPeriod = await GetActiveEntitlementPeriodAsync(
+            await ReconcileSubscriptionCreditPeriodsAsync(
                 connection,
                 transaction,
                 accountId,
+                now,
                 cancellationToken);
-            if (entitlementPeriod is not null)
-            {
-                var (periodStart, periodExpiresAt) = CurrentEntitlementMonth(entitlementPeriod);
-                await InsertGrantIfMissingAsync(
-                    connection,
-                    transaction,
-                    accountId,
-                    SubscriptionGrantKind,
-                    PeriodGrantKey(periodStart),
-                    SubscriptionGrantCredits,
-                    periodStart,
-                    periodExpiresAt,
-                    cancellationToken);
-            }
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -301,38 +288,30 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 return new AiCreditReservation(requestId, IsReplay: true, ExistingStatus: existingStatus);
             }
 
-            var entitlementPeriod = await GetActiveEntitlementPeriodAsync(
+            var grantAllocations = await SelectAvailableGrantsAsync(
                 connection,
                 transaction,
                 accountId,
-                cancellationToken);
-            var subscriptionGrantKey = entitlementPeriod is null
-                ? null
-                : PeriodGrantKey(CurrentEntitlementMonth(entitlementPeriod).StartsAt);
-            var grantId = await SelectAvailableGrantAsync(
-                connection,
-                transaction,
-                accountId,
-                subscriptionGrantKey,
                 creditCost,
                 cancellationToken);
-            if (grantId is null)
+            if (grantAllocations.Count == 0)
             {
                 await transaction.CommitAsync(cancellationToken);
                 return null;
             }
 
-            await using (var grantCommand = connection.CreateCommand())
+            foreach (var allocation in grantAllocations)
             {
+                await using var grantCommand = connection.CreateCommand();
                 grantCommand.Transaction = transaction;
                 grantCommand.CommandText = """
                     update public.ai_credit_grants
-                    set reserved_credits = reserved_credits + @credit_cost
+                    set reserved_credits = reserved_credits + @allocation_credits
                     where grant_id = @grant_id
-                      and credits >= reserved_credits + consumed_credits + @credit_cost;
+                      and credits >= reserved_credits + consumed_credits + @allocation_credits;
                     """;
-                grantCommand.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, grantId.Value);
-                grantCommand.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
+                grantCommand.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, allocation.GrantId);
+                grantCommand.Parameters.AddWithValue("allocation_credits", NpgsqlDbType.Integer, allocation.Credits);
                 if (await grantCommand.ExecuteNonQueryAsync(cancellationToken) != 1)
                     throw new ApiException(
                         StatusCodes.Status503ServiceUnavailable,
@@ -354,10 +333,32 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             insertReservation.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
             insertReservation.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
             insertReservation.Parameters.AddWithValue("request_hash", NpgsqlDbType.Text, requestHash);
-            insertReservation.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, grantId.Value);
+            insertReservation.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, grantAllocations[0].GrantId);
             insertReservation.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
             insertReservation.Parameters.AddWithValue("lease_duration", NpgsqlDbType.Interval, ReservationLease);
             await insertReservation.ExecuteNonQueryAsync(cancellationToken);
+
+            for (var index = 0; index < grantAllocations.Count; index++)
+            {
+                var allocation = grantAllocations[index];
+                await using var allocationCommand = connection.CreateCommand();
+                allocationCommand.Transaction = transaction;
+                allocationCommand.CommandText = """
+                    insert into public.ai_credit_reservation_allocations (
+                        account_id, request_id, allocation_index, grant_id,
+                        reserved_credits, settled_credits
+                    ) values (
+                        @account_id, @request_id, @allocation_index, @grant_id,
+                        @reserved_credits, null
+                    );
+                    """;
+                allocationCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+                allocationCommand.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
+                allocationCommand.Parameters.AddWithValue("allocation_index", NpgsqlDbType.Integer, index);
+                allocationCommand.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, allocation.GrantId);
+                allocationCommand.Parameters.AddWithValue("reserved_credits", NpgsqlDbType.Integer, allocation.Credits);
+                await allocationCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
 
             await transaction.CommitAsync(cancellationToken);
             return new AiCreditReservation(requestId);
@@ -432,8 +433,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 return false;
             }
 
-            Guid? settledGrantId = null;
-            int updatedReservedCost = 0;
+            int? updatedReservedCost = null;
             await using (var reservationCommand = connection.CreateCommand())
             {
                 reservationCommand.Transaction = transaction;
@@ -447,7 +447,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                       and request_id = @request_id
                       and status = 'reserved'
                       and lease_expires_at > clock_timestamp()
-                    returning grant_id, credit_cost;
+                    returning credit_cost;
                     """;
                 reservationCommand.Parameters.AddWithValue(
                     "status",
@@ -461,40 +461,24 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 reservationCommand.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, reservation.RequestId);
                 await using var reader = await reservationCommand.ExecuteReaderAsync(cancellationToken);
                 if (await reader.ReadAsync(cancellationToken))
-                {
-                    settledGrantId = reader.GetGuid(0);
-                    updatedReservedCost = reader.GetInt32(1);
-                }
+                    updatedReservedCost = reader.GetInt32(0);
             }
 
-            if (settledGrantId is null)
+            if (updatedReservedCost is null)
             {
                 await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
 
-            await using (var grantCommand = connection.CreateCommand())
-            {
-                grantCommand.Transaction = transaction;
-                grantCommand.CommandText = """
-                    update public.ai_credit_grants
-                    set reserved_credits = reserved_credits - @reserved_credit_cost,
-                        consumed_credits = consumed_credits + @settled_credit_cost
-                    where grant_id = @grant_id and reserved_credits >= @reserved_credit_cost;
-                    """;
-                grantCommand.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId.Value);
-                grantCommand.Parameters.AddWithValue("reserved_credit_cost", NpgsqlDbType.Integer, updatedReservedCost);
-                grantCommand.Parameters.AddWithValue(
-                    "settled_credit_cost",
-                    NpgsqlDbType.Integer,
-                    accepted ? settledCreditCost : 0);
-                if (await grantCommand.ExecuteNonQueryAsync(cancellationToken) != 1)
-                    throw new ApiException(
-                        StatusCodes.Status503ServiceUnavailable,
-                        "AI_CREDIT_LEDGER_CORRUPT",
-                        "The AI credit ledger could not settle the reservation.");
-            }
+            await SettleReservationAllocationsAsync(
+                connection,
+                transaction,
+                accountId,
+                reservation.RequestId,
+                updatedReservedCost.Value,
+                accepted ? settledCreditCost : 0,
+                cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return true;
@@ -693,7 +677,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             }
 
             var expectedMarker = releaseReason == previewMarker ? previewMarker : dispatchingMarker;
-            Guid? settledGrantId = null;
+            var reservationSettled = false;
             await using (var updateReservation = connection.CreateCommand())
             {
                 updateReservation.Transaction = transaction;
@@ -710,7 +694,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                   and status = 'reserved'
                   and release_reason = @expected_marker
                   and lease_expires_at > clock_timestamp()
-                returning grant_id;
+                returning request_id;
                 """;
                 updateReservation.Parameters.AddWithValue("settled_credit_cost", NpgsqlDbType.Integer, settledCreditCost);
                 updateReservation.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, previewMarker);
@@ -720,34 +704,24 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 updateReservation.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
                 updateReservation.Parameters.AddWithValue("expected_marker", NpgsqlDbType.Text, expectedMarker);
                 var value = await updateReservation.ExecuteScalarAsync(cancellationToken);
-                settledGrantId = value is Guid id ? id : null;
+                reservationSettled = value is string;
             }
 
-            if (settledGrantId is null)
+            if (!reservationSettled)
             {
                 await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
 
-            await using (var updateGrant = connection.CreateCommand())
-            {
-                updateGrant.Transaction = transaction;
-                updateGrant.CommandText = """
-                    update public.ai_credit_grants
-                    set reserved_credits = reserved_credits - @reserved_credit_cost,
-                        consumed_credits = consumed_credits + @settled_credit_cost
-                    where grant_id = @grant_id and reserved_credits >= @reserved_credit_cost;
-                    """;
-                updateGrant.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId.Value);
-                updateGrant.Parameters.AddWithValue("reserved_credit_cost", NpgsqlDbType.Integer, creditCost);
-                updateGrant.Parameters.AddWithValue("settled_credit_cost", NpgsqlDbType.Integer, settledCreditCost);
-                if (await updateGrant.ExecuteNonQueryAsync(cancellationToken) != 1)
-                    throw new ApiException(
-                        StatusCodes.Status503ServiceUnavailable,
-                        "AI_CREDIT_LEDGER_CORRUPT",
-                        "The project-AI reservation could not be settled.");
-            }
+            await SettleReservationAllocationsAsync(
+                connection,
+                transaction,
+                accountId,
+                reservation.RequestId,
+                creditCost,
+                settledCreditCost,
+                cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return true;
@@ -905,7 +879,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                       and request_hash = @original_request_hash
                       and release_reason = @preview_marker
                       and lease_expires_at > clock_timestamp()
-                    returning grant_id;
+                    returning request_id;
                     """;
                 updateReservation.Parameters.AddWithValue("settlement_hash", NpgsqlDbType.Text, settlementHash);
                 updateReservation.Parameters.AddWithValue("settled_marker", NpgsqlDbType.Text, ProjectAiSettledRequestMarker(requestHash, apply));
@@ -914,29 +888,22 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 updateReservation.Parameters.AddWithValue("original_request_hash", NpgsqlDbType.Text, requestHash);
                 updateReservation.Parameters.AddWithValue("preview_marker", NpgsqlDbType.Text, ProjectAiPreviewMarker(requestHash));
                 var value = await updateReservation.ExecuteScalarAsync(cancellationToken);
-                if (value is not Guid settledGrantId)
+                if (value is not string)
                 {
                     await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return new ProjectAiCreditSettlementResult(ProjectAiCreditSettlementStatus.Conflict);
                 }
-
-                await using var updateGrant = connection.CreateCommand();
-                updateGrant.Transaction = transaction;
-                updateGrant.CommandText = """
-                    update public.ai_credit_grants
-                    set reserved_credits = reserved_credits - @credit_cost,
-                        consumed_credits = consumed_credits + @credit_cost
-                    where grant_id = @grant_id and reserved_credits >= @credit_cost;
-                    """;
-                updateGrant.Parameters.AddWithValue("grant_id", NpgsqlDbType.Uuid, settledGrantId);
-                updateGrant.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
-                if (await updateGrant.ExecuteNonQueryAsync(cancellationToken) != 1)
-                    throw new ApiException(
-                        StatusCodes.Status503ServiceUnavailable,
-                        "AI_CREDIT_LEDGER_CORRUPT",
-                        "The project-AI reservation could not be settled.");
             }
+
+            await SettleReservationAllocationsAsync(
+                connection,
+                transaction,
+                accountId,
+                requestId,
+                creditCost,
+                creditCost,
+                cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return new ProjectAiCreditSettlementResult(
@@ -970,14 +937,6 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             await ReleaseExpiredReservationsAsync(connection, transaction, accountId, cancellationToken);
             var grants = new List<AiCreditGrantBalance>();
             var now = await GetDatabaseTimeAsync(connection, transaction, cancellationToken);
-            var entitlementPeriod = await GetActiveEntitlementPeriodAsync(
-                connection,
-                transaction,
-                accountId,
-                cancellationToken);
-            var subscriptionGrantKey = entitlementPeriod is null
-                ? null
-                : PeriodGrantKey(CurrentEntitlementMonth(entitlementPeriod).StartsAt);
             bool consentRecorded;
 
             await using (var consentCommand = connection.CreateCommand())
@@ -994,6 +953,16 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 consentRecorded = (bool)(await consentCommand.ExecuteScalarAsync(cancellationToken) ?? false);
             }
 
+            if (consentRecorded)
+            {
+                await ReconcileSubscriptionCreditPeriodsAsync(
+                    connection,
+                    transaction,
+                    accountId,
+                    now,
+                    cancellationToken);
+            }
+
             await using (var grantCommand = connection.CreateCommand())
             {
                 grantCommand.Transaction = transaction;
@@ -1004,30 +973,10 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                     where account_id = @account_id
                       and starts_at <= @now
                       and (expires_at is null or expires_at > @now)
-                      and (
-                          grant_kind = 'free_once'
-                          or (
-                              grant_kind = 'subscription_month'
-                              and grant_key = @subscription_grant_key
-                              and exists (
-                              select 1
-                              from public.entitlements entitlement
-                              where entitlement.account_id = @account_id
-                                and entitlement.entitlement = 'evidrilo_pro'
-                                and entitlement.status = 'active'
-                                and entitlement.period_started_at <= @now
-                                and entitlement.period_expires_at > @now
-                              )
-                          )
-                      )
-                    order by expires_at nulls last, grant_kind, grant_key;
+                    order by starts_at, grant_kind, grant_key;
                     """;
                 grantCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
                 grantCommand.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
-                grantCommand.Parameters.AddWithValue(
-                    "subscription_grant_key",
-                    NpgsqlDbType.Text,
-                    (object?)subscriptionGrantKey ?? DBNull.Value);
                 await using var reader = await grantCommand.ExecuteReaderAsync(cancellationToken);
                 while (await reader.ReadAsync(cancellationToken))
                 {
@@ -1091,57 +1040,135 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task<EntitlementPeriod?> GetActiveEntitlementPeriodAsync(
+    private sealed record SubscriptionEntitlementEvent(
+        string Status,
+        DateTimeOffset OccurredAt,
+        DateTimeOffset? PeriodStartedAt,
+        DateTimeOffset? PeriodExpiresAt);
+
+    private static async Task ReconcileSubscriptionCreditPeriodsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         Guid accountId,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            select entitlement.period_started_at,
-                   entitlement.period_expires_at,
-                   instant.now_at
-            from public.entitlements entitlement
-            cross join (select clock_timestamp() as now_at) instant
-            where entitlement.account_id = @account_id
-              and entitlement.entitlement = @entitlement
-              and entitlement.status = 'active'
-              and entitlement.period_started_at <= instant.now_at
-              and entitlement.period_expires_at > instant.now_at;
-            """;
-        command.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
-        command.Parameters.AddWithValue("entitlement", NpgsqlDbType.Text, Entitlement);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-            return null;
-        return new EntitlementPeriod(
-            reader.GetFieldValue<DateTimeOffset>(0),
-            reader.GetFieldValue<DateTimeOffset>(1),
-            reader.GetFieldValue<DateTimeOffset>(2));
-    }
-
-    private static (DateTimeOffset StartsAt, DateTimeOffset ExpiresAt) CurrentEntitlementMonth(
-        EntitlementPeriod entitlementPeriod)
-    {
-        var periodStart = entitlementPeriod.StartedAt.ToUniversalTime();
-        var periodExpiresAt = entitlementPeriod.ExpiresAt.ToUniversalTime();
-        var currentAt = entitlementPeriod.CurrentAt.ToUniversalTime();
-        var monthOffset = (currentAt.Year - periodStart.Year) * 12
-            + currentAt.Month - periodStart.Month;
-        var startsAt = periodStart.AddMonths(monthOffset);
-        if (startsAt > currentAt)
+        var events = new List<SubscriptionEntitlementEvent>();
+        await using (var command = connection.CreateCommand())
         {
-            monthOffset--;
-            startsAt = periodStart.AddMonths(monthOffset);
+            command.Transaction = transaction;
+            command.CommandText = """
+                select status, occurred_at, period_started_at, period_expires_at
+                from public.entitlement_events
+                where account_id = @account_id
+                  and entitlement = @entitlement
+                order by occurred_at, provider_event_id;
+                """;
+            command.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+            command.Parameters.AddWithValue("entitlement", NpgsqlDbType.Text, Entitlement);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                events.Add(new SubscriptionEntitlementEvent(
+                    reader.GetString(0),
+                    reader.GetFieldValue<DateTimeOffset>(1),
+                    reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2),
+                    reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3)));
+            }
         }
 
-        var expiresAt = periodStart.AddMonths(monthOffset + 1);
-        if (expiresAt > periodExpiresAt)
-            expiresAt = periodExpiresAt;
-        return (startsAt, expiresAt);
+        var nowUtc = now.ToUniversalTime();
+        var grantStarts = new Dictionary<long, DateTimeOffset>();
+        foreach (var activeEvent in events.Where(item =>
+                     item.Status == "active"
+                     && item.PeriodStartedAt is not null
+                     && item.PeriodExpiresAt is not null
+                     && item.OccurredAt <= nowUtc))
+        {
+            var periodStart = activeEvent.PeriodStartedAt!.Value.ToUniversalTime();
+            var periodEnd = activeEvent.PeriodExpiresAt!.Value.ToUniversalTime();
+            if (periodStart > nowUtc || periodEnd <= periodStart)
+                continue;
+
+            var activeUntil = periodEnd < nowUtc ? periodEnd : nowUtc;
+            foreach (var terminalEvent in events)
+            {
+                if (terminalEvent.Status is not ("expired" or "revoked")
+                    || terminalEvent.OccurredAt < activeEvent.OccurredAt
+                    || terminalEvent.OccurredAt >= activeUntil)
+                    continue;
+                activeUntil = terminalEvent.OccurredAt.ToUniversalTime();
+                break;
+            }
+            if (activeUntil <= periodStart)
+                continue;
+
+            var firstMonth = EntitlementMonthOffset(periodStart, activeEvent.OccurredAt.ToUniversalTime());
+            if (firstMonth > MaximumReconciledEntitlementMonths)
+                throw InvalidEntitlementCreditHistory();
+            for (var month = firstMonth; month <= MaximumReconciledEntitlementMonths; month++)
+            {
+                var grantStartsAt = periodStart.AddMonths(month);
+                if (grantStartsAt > nowUtc || grantStartsAt >= activeUntil)
+                    break;
+                grantStarts.TryAdd(grantStartsAt.ToUnixTimeMilliseconds(), grantStartsAt);
+                if (grantStarts.Count > MaximumReconciledEntitlementMonths)
+                    throw InvalidEntitlementCreditHistory();
+            }
+        }
+
+        if (grantStarts.Count == 0)
+            return;
+
+        var orderedStarts = grantStarts.Values.OrderBy(value => value).ToArray();
+        var grantKeys = orderedStarts.Select(PeriodGrantKey).ToArray();
+        await using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText = """
+            insert into public.ai_credit_grants (
+                account_id, grant_kind, grant_key, credits,
+                reserved_credits, consumed_credits, starts_at, expires_at
+            )
+            select @account_id, @grant_kind, earned.grant_key, @credits,
+                   0, 0, earned.starts_at, null
+            from unnest(@grant_keys, @starts_at) as earned(grant_key, starts_at)
+            on conflict (account_id, grant_kind, grant_key) do nothing;
+            """;
+        insert.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+        insert.Parameters.AddWithValue("grant_kind", NpgsqlDbType.Text, SubscriptionGrantKind);
+        insert.Parameters.AddWithValue("credits", NpgsqlDbType.Integer, SubscriptionGrantCredits);
+        insert.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "grant_keys",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text,
+            Value = grantKeys,
+        });
+        insert.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "starts_at",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.TimestampTz,
+            Value = orderedStarts,
+        });
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private const int MaximumReconciledEntitlementMonths = 1200;
+
+    private static int EntitlementMonthOffset(DateTimeOffset periodStart, DateTimeOffset instant)
+    {
+        if (instant <= periodStart)
+            return 0;
+
+        var month = (instant.Year - periodStart.Year) * 12 + instant.Month - periodStart.Month;
+        if (periodStart.AddMonths(month) > instant)
+            month--;
+        return Math.Max(0, month);
+    }
+
+    private static ApiException InvalidEntitlementCreditHistory() => new(
+        StatusCodes.Status503ServiceUnavailable,
+        "AI_CREDIT_LEDGER_CORRUPT",
+        "The AI credit ledger could not reconcile the entitlement history.");
 
     private static string PeriodGrantKey(DateTimeOffset periodStart) =>
         "period-" + periodStart.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
@@ -1194,6 +1221,131 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         || string.Equals(marker, ProjectAiSettledRequestMarker(requestHash, applied: true), StringComparison.Ordinal)
         || string.Equals(marker, ProjectAiSettledRequestMarker(requestHash, applied: false), StringComparison.Ordinal);
 
+    private static async Task SettleReservationAllocationsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid accountId,
+        string requestId,
+        int expectedReservedCredits,
+        int settledCredits,
+        CancellationToken cancellationToken)
+    {
+        var allocations = new List<ReservedCreditAllocation>();
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = """
+                select allocation_index, grant_id, reserved_credits, settled_credits
+                from public.ai_credit_reservation_allocations
+                where account_id = @account_id and request_id = @request_id
+                order by allocation_index
+                for update;
+                """;
+            read.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+            read.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!reader.IsDBNull(3))
+                    throw InvalidCreditLedger();
+                allocations.Add(new ReservedCreditAllocation(
+                    reader.GetInt32(0),
+                    reader.GetGuid(1),
+                    reader.GetInt32(2)));
+            }
+        }
+
+        if (allocations.Count == 0
+            || allocations.Sum(allocation => allocation.Credits) != expectedReservedCredits
+            || settledCredits < 0
+            || settledCredits > expectedReservedCredits)
+            throw InvalidCreditLedger();
+
+        var remaining = settledCredits;
+        var settledByGrant = allocations.Select(allocation =>
+        {
+            var settled = Math.Min(allocation.Credits, remaining);
+            remaining -= settled;
+            return settled;
+        }).ToArray();
+        if (remaining != 0)
+            throw InvalidCreditLedger();
+
+        await using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            with planned as (
+                select *
+                from unnest(
+                    @allocation_indices,
+                    @grant_ids,
+                    @reserved_credits,
+                    @settled_credits
+                ) as item(allocation_index, grant_id, reserved_credits, settled_credits)
+            ),
+            updated_allocations as (
+                update public.ai_credit_reservation_allocations allocation
+                set settled_credits = planned.settled_credits
+                from planned
+                where allocation.account_id = @account_id
+                  and allocation.request_id = @request_id
+                  and allocation.allocation_index = planned.allocation_index
+                  and allocation.grant_id = planned.grant_id
+                  and allocation.reserved_credits = planned.reserved_credits
+                  and allocation.settled_credits is null
+                returning allocation.grant_id, allocation.reserved_credits, allocation.settled_credits
+            ),
+            adjusted_grants as (
+                update public.ai_credit_grants credit_grant
+                set reserved_credits = credit_grant.reserved_credits - allocation.reserved_credits,
+                    consumed_credits = credit_grant.consumed_credits + allocation.settled_credits
+                from updated_allocations allocation
+                where credit_grant.grant_id = allocation.grant_id
+                  and credit_grant.reserved_credits >= allocation.reserved_credits
+                returning credit_grant.grant_id
+            )
+            select
+                (select count(*) from updated_allocations),
+                (select count(*) from adjusted_grants);
+            """;
+        update.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
+        update.Parameters.AddWithValue("request_id", NpgsqlDbType.Text, requestId);
+        update.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "allocation_indices",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Integer,
+            Value = allocations.Select(allocation => allocation.Index).ToArray(),
+        });
+        update.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "grant_ids",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+            Value = allocations.Select(allocation => allocation.GrantId).ToArray(),
+        });
+        update.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "reserved_credits",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Integer,
+            Value = allocations.Select(allocation => allocation.Credits).ToArray(),
+        });
+        update.Parameters.Add(new NpgsqlParameter
+        {
+            ParameterName = "settled_credits",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Integer,
+            Value = settledByGrant,
+        });
+        await using var result = await update.ExecuteReaderAsync(cancellationToken);
+        if (!await result.ReadAsync(cancellationToken)
+            || result.GetInt64(0) != allocations.Count
+            || result.GetInt64(1) != allocations.Count)
+            throw InvalidCreditLedger();
+    }
+
+    private static ApiException InvalidCreditLedger() => new(
+        StatusCodes.Status503ServiceUnavailable,
+        "AI_CREDIT_LEDGER_CORRUPT",
+        "The AI credit ledger could not reconcile a reservation.");
+
     private static async Task<DateTimeOffset> GetDatabaseTimeAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -1224,12 +1376,20 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         command.Transaction = transaction;
         command.CommandText = """
             with expired as materialized (
-                select account_id, request_id, grant_id, credit_cost
+                select account_id, request_id
                 from public.ai_credit_reservations
                 where account_id = @account_id
                   and status = 'reserved'
                   and lease_expires_at <= clock_timestamp()
                 for update
+            ),
+            expired_allocations as materialized (
+                select allocation.account_id, allocation.request_id,
+                       allocation.allocation_index, allocation.grant_id,
+                       allocation.reserved_credits
+                from public.ai_credit_reservation_allocations allocation
+                join expired using (account_id, request_id)
+                for update of allocation
             ),
             released as (
                 update public.ai_credit_reservations reservation
@@ -1242,11 +1402,22 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                   and reservation.request_id = expired.request_id
                   and reservation.status = 'reserved'
                   and reservation.lease_expires_at <= clock_timestamp()
-                returning reservation.grant_id, reservation.credit_cost
+                returning reservation.account_id, reservation.request_id
+            ),
+            released_allocations as (
+                update public.ai_credit_reservation_allocations allocation
+                set settled_credits = 0
+                from expired_allocations expected
+                join released using (account_id, request_id)
+                where allocation.account_id = expected.account_id
+                  and allocation.request_id = expected.request_id
+                  and allocation.allocation_index = expected.allocation_index
+                  and allocation.settled_credits is null
+                returning allocation.grant_id, allocation.reserved_credits
             ),
             grant_costs as (
-                select grant_id, sum(credit_cost)::integer as released_credit_cost
-                from released
+                select grant_id, sum(reserved_credits)::integer as released_credit_cost
+                from released_allocations
                 group by grant_id
             ),
             adjusted_grants as (
@@ -1260,6 +1431,14 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             select
                 (select count(*) from expired),
                 (select count(*) from released),
+                (select count(*) from expired_allocations),
+                (select count(*) from released_allocations),
+                (select count(*) from released
+                  where not exists (
+                      select 1 from public.ai_credit_reservation_allocations allocation
+                      where allocation.account_id = released.account_id
+                        and allocation.request_id = released.request_id
+                  )),
                 (select count(*) from grant_costs),
                 (select count(*) from adjusted_grants);
             """;
@@ -1273,65 +1452,59 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
 
         var expiredCount = reader.GetInt64(0);
         var releasedCount = reader.GetInt64(1);
-        var grantCount = reader.GetInt64(2);
-        var adjustedGrantCount = reader.GetInt64(3);
-        if (expiredCount != releasedCount || grantCount != adjustedGrantCount)
+        var expectedAllocationCount = reader.GetInt64(2);
+        var releasedAllocationCount = reader.GetInt64(3);
+        var missingReservationAllocationCount = reader.GetInt64(4);
+        var grantCount = reader.GetInt64(5);
+        var adjustedGrantCount = reader.GetInt64(6);
+        if (expiredCount != releasedCount
+            || expectedAllocationCount != releasedAllocationCount
+            || missingReservationAllocationCount != 0
+            || grantCount != adjustedGrantCount)
             throw new ApiException(
                 StatusCodes.Status503ServiceUnavailable,
                 "AI_CREDIT_LEDGER_CORRUPT",
                 "The AI credit ledger could not recover expired reservations.");
     }
 
-    private sealed record EntitlementPeriod(
-        DateTimeOffset StartedAt,
-        DateTimeOffset ExpiresAt,
-        DateTimeOffset CurrentAt);
+    private sealed record CreditGrantAllocation(Guid GrantId, int Credits);
+    private sealed record ReservedCreditAllocation(int Index, Guid GrantId, int Credits);
 
-    private static async Task<Guid?> SelectAvailableGrantAsync(
+    private static async Task<IReadOnlyList<CreditGrantAllocation>> SelectAvailableGrantsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         Guid accountId,
-        string? subscriptionGrantKey,
         int creditCost,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            select grant_id
+            select grant_id, credits - reserved_credits - consumed_credits as available_credits
             from public.ai_credit_grants
             where account_id = @account_id
               and starts_at <= now()
               and (expires_at is null or expires_at > now())
-              and credits >= reserved_credits + consumed_credits + @credit_cost
-              and (
-                  grant_kind = 'free_once'
-                  or (
-                    grant_kind = 'subscription_month'
-                    and grant_key = @subscription_grant_key
-                    and exists (
-                      select 1
-                      from public.entitlements entitlement
-                      where entitlement.account_id = @account_id
-                        and entitlement.entitlement = 'evidrilo_pro'
-                        and entitlement.status = 'active'
-                        and entitlement.period_started_at <= now()
-                        and entitlement.period_expires_at > now()
-                    )
-                  )
-              )
-            order by expires_at nulls last, grant_kind, grant_key
-            limit 1
+              and credits > reserved_credits + consumed_credits
+            order by starts_at, grant_kind, grant_key
             for update;
             """;
         command.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
-        command.Parameters.AddWithValue("credit_cost", NpgsqlDbType.Integer, creditCost);
-        command.Parameters.AddWithValue(
-            "subscription_grant_key",
-            NpgsqlDbType.Text,
-            (object?)subscriptionGrantKey ?? DBNull.Value);
-        var value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is Guid grantId ? grantId : null;
+        var allocations = new List<CreditGrantAllocation>();
+        var remaining = creditCost;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (remaining > 0 && await reader.ReadAsync(cancellationToken))
+        {
+            var grantId = reader.GetGuid(0);
+            var available = reader.GetInt32(1);
+            var reserved = Math.Min(remaining, available);
+            if (reserved <= 0)
+                continue;
+            allocations.Add(new CreditGrantAllocation(grantId, reserved));
+            remaining -= reserved;
+        }
+
+        return remaining == 0 ? allocations : Array.Empty<CreditGrantAllocation>();
     }
 
     private static async Task SetRequestAccountAsync(

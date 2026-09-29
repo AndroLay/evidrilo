@@ -164,6 +164,17 @@ class EvidriloTargetSurfaceModelTest {
     }
 
     @Test
+    fun project_family_overview_uses_one_concise_non_grade_boundary() {
+        val notice = projectTemplateFamilyEvaluationBoundaryCopy
+
+        assertTrue(notice.length <= 140, "Catalog boundary should stay concise on a phone screen")
+        assertTrue(notice.contains("not an evaluation", ignoreCase = true))
+        assertTrue(notice.contains("grade", ignoreCase = true))
+        assertTrue(notice.contains("ethics", ignoreCase = true))
+        assertTrue(notice.contains("evidence quality", ignoreCase = true))
+    }
+
+    @Test
     fun project_catalog_browse_hint_explains_screen_reader_navigation() {
         assertTrue(projectTemplateCatalogBrowseInstructions.contains("screen reader", ignoreCase = true))
         assertTrue(projectTemplateCatalogBrowseInstructions.contains("focus", ignoreCase = true))

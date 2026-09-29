@@ -8,7 +8,10 @@ sealed interface AuthRedirect {
         val state: String?,
     ) : AuthRedirect
 
-    data class ProviderError(val code: String) : AuthRedirect
+    data class ProviderError(
+        val code: String,
+        val state: String?,
+    ) : AuthRedirect
 
     class Tokens(
         val accessToken: String,
@@ -47,7 +50,10 @@ fun parseAuthRedirect(
         val safeCode = providerError
             .takeIf { it.length in 1..64 && it.all { character -> character.isLetterOrDigit() || character in "-_" } }
             ?: "provider_error"
-        return AuthRedirect.ProviderError(safeCode)
+        return AuthRedirect.ProviderError(
+            code = safeCode,
+            state = queryParameters["state"] ?: fragmentParameters["state"],
+        )
     }
 
     val code = queryParameters["code"]

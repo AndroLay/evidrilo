@@ -66,9 +66,22 @@ class ProjectAiScaffoldGatewayTest {
     }
 
     @Test
-    fun `preview rejects a credit cost that does not match the declared operation`() {
+    fun `preview accepts a bounded provider-token cost independent of operation`() {
         val transport = QueueProjectAiTransport(
-            AccountHttpResponse(200, previewJson(creditCost = 1)),
+            AccountHttpResponse(200, previewJson(creditCost = 7)),
+        )
+
+        val result = runSuspendTest {
+            gateway(transport).generatePreview(validRequest(), "project-ai-request-0001")
+        }
+
+        assertEquals(7, assertIs<ProjectAiScaffoldGatewayResult.Preview>(result).creditCost)
+    }
+
+    @Test
+    fun `preview rejects token cost outside the server bound`() {
+        val transport = QueueProjectAiTransport(
+            AccountHttpResponse(200, previewJson(creditCost = 201)),
         )
 
         val result = runSuspendTest {

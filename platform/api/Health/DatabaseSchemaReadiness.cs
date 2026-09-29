@@ -6,7 +6,7 @@ namespace Evidrilo.Api.Health;
 /// </summary>
 public static class DatabaseSchemaReadiness
 {
-    public const string CurrentMigrationVersion = "050_ai_token_pricing_and_credit_grants";
+    public const string CurrentMigrationVersion = "052_project_ai_general_completed_outcome";
 
     public static string Status(
         bool connectionSucceeded,

@@ -65,6 +65,12 @@ internal fun homeProjectSummary(
     )
 }
 
+internal fun shouldShowHomeProjectListAction(
+    summary: HomeProjectSummary,
+    isLoading: Boolean,
+    loadError: String?,
+): Boolean = summary.totalCount > 0 && !isLoading && loadError == null
+
 @Composable
 internal fun EvidriloTargetHomeScreen(
     storageNotice: LocalStorageNotice? = null,
@@ -85,9 +91,28 @@ internal fun EvidriloTargetHomeScreen(
     onDismissRecommendation: () -> Unit = {},
     onRetryRecommendation: () -> Unit = {},
 ) {
+    val projectSummary = homeProjectSummary(projects, activeProjectLimit)
     EvidriloTargetSurface(EvidriloTargetSection.HOME, onNavigate) {
-        EvidriloContentColumn(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-            EvidriloBrandHeader(onSettings = onOpenSettings)
+        EvidriloContentColumn(
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            includeBottomSafeArea = false,
+        ) {
+            EvidriloBrandHeader(
+                onSettings = onOpenSettings,
+                showBrand = false,
+                heading = "My Projects",
+                trailing = {
+                    if (shouldShowHomeProjectListAction(projectSummary, projectsLoading, projectsLoadError)) {
+                        TextButton(
+                            onClick = onOpenProjects,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) {
+                            Text("View all")
+                        }
+                    }
+                },
+            )
 
             storageNotice
                 ?.takeIf { it.isError }
@@ -99,11 +124,10 @@ internal fun EvidriloTargetHomeScreen(
             Spacer(Modifier.height(12.dp))
             HomeProjectsSection(
                 projects = projects,
+                summary = projectSummary,
                 isLoading = projectsLoading,
                 loadError = projectsLoadError,
-                activeProjectLimit = activeProjectLimit,
                 onRetry = onRetryProjects,
-                onOpenProjects = onOpenProjects,
                 onCreateProject = onCreateProject,
                 onResumeProject = onResumeProject,
             )
@@ -130,34 +154,19 @@ internal fun EvidriloTargetHomeScreen(
 @Composable
 private fun HomeProjectsSection(
     projects: List<StudentProjectDraft>,
+    summary: HomeProjectSummary,
     isLoading: Boolean,
     loadError: String?,
-    activeProjectLimit: Int,
     onRetry: () -> Unit,
-    onOpenProjects: () -> Unit,
     onCreateProject: () -> Unit,
     onResumeProject: (StudentProjectDraft) -> Unit,
 ) {
-    val summary = homeProjectSummary(projects, activeProjectLimit)
     val primaryProject = projects
         .asSequence()
         .filter { StudentProjectDraftRules.countsTowardActiveLimit(it.status) }
         .maxByOrNull(StudentProjectDraft::updatedAtEpochMillis)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("My Projects", modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
-            if (projects.isNotEmpty() && !isLoading && loadError == null) {
-                TextButton(
-                    onClick = onOpenProjects,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                ) {
-                    Text("View all")
-                }
-            }
-        }
-
         when {
             isLoading -> EvidriloTargetCard {
                 Text("Loading projects…", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)

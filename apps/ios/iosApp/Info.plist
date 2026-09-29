@@ -34,6 +34,10 @@
 	<string>$(SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>SUPABASE_AUTH_REDIRECT_URL</key>
 	<string>$(SUPABASE_AUTH_REDIRECT_URL)</string>
+	<key>SUPABASE_GOOGLE_AUTH_ENABLED</key>
+	<string>$(SUPABASE_GOOGLE_AUTH_ENABLED)</string>
+	<key>SUPABASE_APPLE_AUTH_ENABLED</key>
+	<string>$(SUPABASE_APPLE_AUTH_ENABLED)</string>
 	<key>EVIDRILO_API_BASE_URL</key>
 	<string>$(EVIDRILO_API_BASE_URL)</string>
 	<key>CFBundleURLTypes</key>

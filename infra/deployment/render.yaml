@@ -1,0 +1,31 @@
+previews:
+  generation: "off"
+
+services:
+  - type: web
+    name: evidrilo-staging-api
+    runtime: docker
+    dockerfilePath: infra/docker/api.Dockerfile
+    dockerContext: .
+    region: singapore
+    plan: free
+    branch: main
+    autoDeployTrigger: "off"
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Staging
+      - key: PORT
+        value: "5080"
+      - key: CORS_ALLOWED_ORIGINS
+        fromService:
+          name: evidrilo-staging-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

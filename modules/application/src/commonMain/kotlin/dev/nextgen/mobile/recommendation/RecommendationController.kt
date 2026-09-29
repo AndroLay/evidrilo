@@ -45,7 +45,7 @@ class RecommendationController(
     private val emitAnalytics: (AnalyticsEvent) -> Unit,
     private val onStateChanged: (RecommendationUiState) -> Unit,
     private val newInteractionId: () -> String = ::newAnalyticsEventId,
-    private val wait: suspend (Long) -> Unit = ::defaultRecommendationControllerWait,
+    private val wait: (suspend (Long) -> Unit)? = null,
 ) {
     private var activeKey: RecommendationLifecycleKey? = null
     private var loadedKey: RecommendationLifecycleKey? = null
@@ -323,7 +323,3 @@ private fun RecommendationDeferralReason.toUiState(): RecommendationUiState = wh
 
 private fun String.safeRecommendationCode(): String =
     takeIf { it.matches(Regex("^[A-Z][A-Z0-9_]{2,63}$")) } ?: "RECOMMENDATION_UNAVAILABLE"
-
-private suspend fun defaultRecommendationControllerWait(delayMillis: Long) {
-    kotlinx.coroutines.delay(delayMillis)
-}

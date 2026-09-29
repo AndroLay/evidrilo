@@ -134,14 +134,15 @@ class RecommendationGateway(
 
     suspend fun nextWithRetry(
         consent: AnalyticsConsent,
-        wait: suspend (Long) -> Unit = ::defaultRecommendationWait,
+        wait: (suspend (Long) -> Unit)? = null,
     ): RecommendationGatewayResult {
         var attempt = 0
         while (true) {
             val result = next(consent)
             val retryable = result is RecommendationGatewayResult.Failed && result.retryable
             if (!retryable || attempt >= 2) return result
-            wait(250L * (1L shl attempt))
+            val delayMillis = 250L * (1L shl attempt)
+            if (wait == null) kotlinx.coroutines.delay(delayMillis) else wait(delayMillis)
             attempt += 1
         }
     }
@@ -255,14 +256,15 @@ class RecommendationGateway(
         interaction: RecommendationInteraction,
         clientEventId: String,
         consent: AnalyticsConsent,
-        wait: suspend (Long) -> Unit = ::defaultRecommendationWait,
+        wait: (suspend (Long) -> Unit)? = null,
     ): RecommendationInteractionResult {
         var attempt = 0
         while (true) {
             val result = interact(recommendation, interaction, clientEventId, consent)
             val retryable = result is RecommendationInteractionResult.Failed && result.retryable
             if (!retryable || attempt >= 2) return result
-            wait(250L * (1L shl attempt))
+            val delayMillis = 250L * (1L shl attempt)
+            if (wait == null) kotlinx.coroutines.delay(delayMillis) else wait(delayMillis)
             attempt += 1
         }
     }
@@ -328,10 +330,6 @@ private val clientEventIdPattern = Regex(
 )
 
 private fun isValidClientEventId(value: String): Boolean = clientEventIdPattern.matches(value)
-
-private suspend fun defaultRecommendationWait(delayMillis: Long) {
-    kotlinx.coroutines.delay(delayMillis)
-}
 
 fun createPlatformRecommendationGateway(): RecommendationGateway {
     val accountConfiguration = createAccountClientConfiguration()

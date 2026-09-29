@@ -52,7 +52,6 @@ internal fun EvidriloOnboardingScreen(
     }
 
     EvidriloContentColumn {
-        EvidriloBrandHeader(onSettings = null)
         Text("Start with your work", style = MaterialTheme.typography.displayLarge)
         Text(
             "Choose a starting point. You can change it later.",

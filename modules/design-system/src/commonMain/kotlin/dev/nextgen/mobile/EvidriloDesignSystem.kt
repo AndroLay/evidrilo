@@ -22,17 +22,21 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -448,6 +452,7 @@ public fun EvidriloTheme(
 public fun EvidriloContentColumn(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
+    includeBottomSafeArea: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // Every scrollable page enters with one gentle rise-and-fade so navigating
@@ -460,6 +465,11 @@ public fun EvidriloContentColumn(
         label = "pageEnter",
     )
     LaunchedEffect(Unit) { appeared = true }
+    val contentInsets = if (includeBottomSafeArea) {
+        WindowInsets.safeDrawing
+    } else {
+        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
+    }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = modifier
@@ -470,7 +480,7 @@ public fun EvidriloContentColumn(
                     alpha = enter
                     translationY = (1f - enter) * 28f
                 }
-                .safeDrawingPadding()
+                .windowInsetsPadding(contentInsets)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
@@ -482,14 +492,17 @@ public fun EvidriloContentColumn(
 }
 
 /**
- * Compact top bar: logo + wordmark on the left, optional [trailing] status
- * (for example an honest progress pill), and the profile avatar on the right.
+ * Compact top bar: logo + wordmark or a screen [heading] on the left, optional
+ * [trailing] action, and the profile avatar on the right.
  */
 @Composable
 public fun EvidriloBrandHeader(
     onSettings: (() -> Unit)?,
     avatarLabel: String = "L",
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    showBrand: Boolean = true,
+    showAccountAction: Boolean = true,
+    heading: String? = null,
 ) {
     Row(
         modifier = Modifier
@@ -498,20 +511,32 @@ public fun EvidriloBrandHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EvidriloLogoMark(size = 36.dp)
-            Spacer(modifier = Modifier.width(8.dp))
+        if (showBrand) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EvidriloLogoMark(size = 36.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Evidrilo",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = EvidriloColors.Cobalt,
+                )
+            }
+        } else if (heading != null) {
             Text(
-                "Evidrilo",
+                heading,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineSmall,
-                color = EvidriloColors.Cobalt,
             )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
         }
         trailing?.invoke(this)
-        EvidriloAvatarButton(label = avatarLabel, onClick = onSettings)
+        if (showAccountAction) {
+            EvidriloAvatarButton(label = avatarLabel, onClick = onSettings)
+        }
     }
 }
 

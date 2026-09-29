@@ -11,6 +11,8 @@ data class AccountClientConfiguration(
     val publishableKey: String,
     val redirectUrl: String = DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
     val apiBaseUrl: String = "",
+    val googleAuthEnabled: Boolean = true,
+    val appleAuthEnabled: Boolean = false,
 ) {
     val isConfigured: Boolean
         get() = isHttpsBaseUrl(supabaseUrl) && isPublishableKey(publishableKey)
@@ -24,6 +26,14 @@ data class AccountClientConfiguration(
 
     val normalizedApiBaseUrl: String
         get() = apiBaseUrl.trim().trimEnd('/')
+
+    fun isProviderEnabled(provider: AccountOAuthProvider): Boolean = when (provider) {
+        AccountOAuthProvider.GOOGLE -> googleAuthEnabled
+        AccountOAuthProvider.APPLE -> appleAuthEnabled
+    }
+
+    fun isProviderConfigured(provider: AccountOAuthProvider): Boolean =
+        isConfigured && isProviderEnabled(provider)
 
     override fun toString(): String =
         "AccountClientConfiguration(configured=$isConfigured, apiConfigured=$apiConfigured)"

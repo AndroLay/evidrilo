@@ -21,6 +21,8 @@ google-services.json
 GoogleService-Info.plist
 service-account*.json
 credentials*.json
+/platform/api/appsettings.Development.json
+/.wrangler/
 
 # IDE, OS, and generated build output
 .idea/

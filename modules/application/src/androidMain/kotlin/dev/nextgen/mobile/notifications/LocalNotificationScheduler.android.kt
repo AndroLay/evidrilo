@@ -15,6 +15,7 @@ import android.os.Build
 import android.provider.Settings
 import java.lang.ref.WeakReference
 import java.util.Calendar
+import java.util.TimeZone
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -26,6 +27,8 @@ private const val REVIEW_NOTIFICATION_ID = 4102
 private const val CATEGORY_EXTRA = "evidrilo_notification_category"
 private const val CONTINUE_CATEGORY = "continue_unfinished"
 private const val REVIEW_CATEGORY = "review_completed"
+private const val SCHEDULE_STATE_PREFERENCES = "evidrilo_notification_schedule_v1"
+private const val SCHEDULE_STATE_KEY = "schedule"
 
 object AndroidLocalNotificationPlatform {
     private var applicationContext: Context? = null
@@ -95,6 +98,10 @@ object AndroidLocalNotificationPlatform {
     fun notificationContext(): Context? = context()
 
     fun currentActivity(): Activity? = activity()
+
+    fun restoreScheduledReminders(context: Context) {
+        AndroidLocalNotificationScheduler(context.applicationContext).restorePersistedSchedule()
+    }
 }
 
 actual fun createLocalNotificationScheduler(): LocalNotificationScheduler =
@@ -153,32 +160,86 @@ private class AndroidLocalNotificationScheduler(
         if (!preferences.isValid) {
             return LocalNotificationScheduleResult.Failed("The reminder time is invalid.")
         }
+        val categories = preferences.activeCategories(hasUnfinishedCase, hasCompletedCase)
+        if (categories.isEmpty()) {
+            cancelAll()
+            return LocalNotificationScheduleResult.Scheduled(emptyList())
+        }
         return when (permissionState()) {
             NotificationPermissionState.GRANTED -> {
-                val categories = preferences.activeCategories(hasUnfinishedCase, hasCompletedCase)
                 cancelAll()
-                if (categories.isEmpty()) {
-                    LocalNotificationScheduleResult.Scheduled(emptyList())
-                } else {
-                    runCatching {
-                        createChannel()
-                        categories.forEach { category -> scheduleCategory(preferences, category) }
-                        LocalNotificationScheduleResult.Scheduled(categories)
-                    }.getOrElse { error ->
-                        LocalNotificationScheduleResult.Failed(
-                            error.message ?: "The reminder could not be scheduled.",
-                        )
+                runCatching {
+                    createChannel()
+                    val weeklyDayOfWeek = if (preferences.cadence == NotificationCadence.WEEKLY) {
+                        Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+                    } else {
+                        null
                     }
+                    val snapshot = NotificationScheduleSnapshot(
+                        preferences = preferences,
+                        categories = categories,
+                        weeklyDayOfWeek = weeklyDayOfWeek,
+                    )
+                    val encoded = NotificationScheduleSnapshotCodec.encode(snapshot)
+                        ?: error("The local reminder schedule is invalid.")
+                    check(
+                        scheduleStateStorage().edit()
+                            .putString(SCHEDULE_STATE_KEY, encoded)
+                            .commit(),
+                    ) { "The local reminder schedule could not be saved." }
+                    categories.forEach { category -> scheduleCategory(snapshot, category) }
+                    LocalNotificationScheduleResult.Scheduled(categories)
+                }.getOrElse { error ->
+                    cancelAll()
+                    LocalNotificationScheduleResult.Failed(
+                        error.message ?: "The reminder could not be scheduled.",
+                    )
                 }
             }
-            NotificationPermissionState.DENIED -> LocalNotificationScheduleResult.PermissionDenied
+            NotificationPermissionState.DENIED -> {
+                cancelAll()
+                LocalNotificationScheduleResult.PermissionDenied
+            }
             NotificationPermissionState.UNAVAILABLE,
             NotificationPermissionState.UNKNOWN,
-            -> LocalNotificationScheduleResult.Unavailable
+            -> {
+                cancelAll()
+                LocalNotificationScheduleResult.Unavailable
+            }
         }
     }
 
     override fun cancelAll() {
+        cancelAlarmIntents()
+        scheduleStateStorage().edit().remove(SCHEDULE_STATE_KEY).commit()
+    }
+
+    fun restorePersistedSchedule() {
+        val encoded = scheduleStateStorage().getString(SCHEDULE_STATE_KEY, null) ?: return
+        val snapshot = NotificationScheduleSnapshotCodec.decode(encoded)
+        if (snapshot == null) {
+            cancelAll()
+            return
+        }
+        runCatching {
+            cancelAlarmIntents()
+            createChannel()
+            snapshot.categories.forEach { category -> scheduleCategory(snapshot, category) }
+        }.onFailure {
+            cancelAlarmIntents()
+        }
+    }
+
+    fun scheduleNextOccurrence(categoryId: String) {
+        val category = LocalNotificationCategory.entries.singleOrNull { it.id == categoryId } ?: return
+        val snapshot = scheduleStateStorage().getString(SCHEDULE_STATE_KEY, null)
+            ?.let(NotificationScheduleSnapshotCodec::decode)
+            ?: return
+        if (category !in snapshot.categories) return
+        runCatching { scheduleCategory(snapshot, category) }
+    }
+
+    private fun cancelAlarmIntents() {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
         listOf(
             CONTINUE_NOTIFICATION_ID to CONTINUE_CATEGORY,
@@ -187,6 +248,9 @@ private class AndroidLocalNotificationScheduler(
             alarmManager.cancel(pendingIntent(requestCode, category))
         }
     }
+
+    private fun scheduleStateStorage() =
+        context.getSharedPreferences(SCHEDULE_STATE_PREFERENCES, Context.MODE_PRIVATE)
 
     override fun openSystemSettings() {
         runCatching {
@@ -217,9 +281,10 @@ private class AndroidLocalNotificationScheduler(
         context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
 
     private fun scheduleCategory(
-        preferences: NotificationPreferences,
+        snapshot: NotificationScheduleSnapshot,
         category: LocalNotificationCategory,
     ) {
+        val preferences = snapshot.preferences
         val requestCode = when (category) {
             LocalNotificationCategory.CONTINUE_UNFINISHED -> CONTINUE_NOTIFICATION_ID
             LocalNotificationCategory.REVIEW_COMPLETED -> REVIEW_NOTIFICATION_ID
@@ -230,33 +295,15 @@ private class AndroidLocalNotificationScheduler(
         }
         val alarmManager = context.getSystemService(AlarmManager::class.java)
             ?: error("AlarmManager unavailable")
-        val intervalMillis = when (preferences.cadence) {
-            NotificationCadence.DAILY -> AlarmManager.INTERVAL_DAY
-            NotificationCadence.WEEKLY -> AlarmManager.INTERVAL_DAY * 7L
-        }
-        alarmManager.setInexactRepeating(
+        alarmManager.set(
             AlarmManager.RTC_WAKEUP,
-            nextTriggerMillis(preferences),
-            intervalMillis,
+            nextNotificationTriggerMillis(
+                preferences = preferences,
+                nowMillis = System.currentTimeMillis(),
+                weeklyDayOfWeek = snapshot.weeklyDayOfWeek,
+            ),
             pendingIntent(requestCode, categoryId),
         )
-    }
-
-    private fun nextTriggerMillis(preferences: NotificationPreferences): Long {
-        val now = Calendar.getInstance()
-        val trigger = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, preferences.hour)
-            set(Calendar.MINUTE, preferences.minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        if (trigger.timeInMillis <= now.timeInMillis) {
-            trigger.add(
-                Calendar.DAY_OF_YEAR,
-                if (preferences.cadence == NotificationCadence.WEEKLY) 7 else 1,
-            )
-        }
-        return trigger.timeInMillis
     }
 
     private fun pendingIntent(requestCode: Int, category: String): PendingIntent =
@@ -270,14 +317,52 @@ private class AndroidLocalNotificationScheduler(
         )
 }
 
+internal fun nextNotificationTriggerMillis(
+    preferences: NotificationPreferences,
+    nowMillis: Long,
+    timeZone: TimeZone = TimeZone.getDefault(),
+    weeklyDayOfWeek: Int? = null,
+): Long {
+    require(preferences.isValid)
+    val now = Calendar.getInstance(timeZone).apply { timeInMillis = nowMillis }
+    val trigger = Calendar.getInstance(timeZone).apply {
+        timeInMillis = nowMillis
+        set(Calendar.HOUR_OF_DAY, preferences.hour)
+        set(Calendar.MINUTE, preferences.minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    when (preferences.cadence) {
+        NotificationCadence.DAILY -> if (trigger.timeInMillis <= now.timeInMillis) {
+            trigger.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        NotificationCadence.WEEKLY -> {
+            val anchorDay = weeklyDayOfWeek ?: now.get(Calendar.DAY_OF_WEEK)
+            require(anchorDay in Calendar.SUNDAY..Calendar.SATURDAY)
+            val daysUntilAnchor = (anchorDay - now.get(Calendar.DAY_OF_WEEK) + 7) % 7
+            trigger.add(Calendar.DAY_OF_YEAR, daysUntilAnchor)
+            if (trigger.timeInMillis <= now.timeInMillis) {
+                trigger.add(Calendar.DAY_OF_YEAR, 7)
+            }
+        }
+    }
+    return trigger.timeInMillis
+}
+
+class EvidriloLocalNotificationRescheduleReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            -> runCatching { AndroidLocalNotificationPlatform.restoreScheduledReminders(context) }
+        }
+    }
+}
+
 class EvidriloLocalNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
         val category = intent.getStringExtra(CATEGORY_EXTRA) ?: return
         val (title, body) = when (category) {
             CONTINUE_CATEGORY -> "Continue your Evidrilo case" to
@@ -285,6 +370,13 @@ class EvidriloLocalNotificationReceiver : BroadcastReceiver() {
             REVIEW_CATEGORY -> "Review your Evidrilo changes" to
                 "Revisit the evidence and see what changed in your conclusion."
             else -> return
+        }
+        AndroidLocalNotificationScheduler(context.applicationContext).scheduleNextOccurrence(category)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            return
         }
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)

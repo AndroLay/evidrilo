@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +25,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.EvidriloBackButton
-import dev.nextgen.mobile.EvidriloBrandHeader
 import dev.nextgen.mobile.EvidriloColors
 import dev.nextgen.mobile.EvidriloContentColumn
 import dev.nextgen.mobile.EvidriloPrimaryButton
@@ -37,7 +37,11 @@ import dev.nextgen.mobile.storage.LocalStorageNotice
 internal fun EvidriloAccountScreen(
     session: AccountSession,
     isBusy: Boolean,
+    accountRestoreComplete: Boolean,
     accountConfigured: Boolean,
+    googleConfigured: Boolean,
+    appleConfigured: Boolean,
+    accountBoundFeaturesEnabled: Boolean,
     exportJson: String?,
     exportError: AccountUnavailableReason?,
     persistenceNotice: LocalStorageNotice? = null,
@@ -46,8 +50,11 @@ internal fun EvidriloAccountScreen(
     onSignUp: (String, String) -> Unit,
     onResetPassword: (String) -> Unit,
     onGoogleSignIn: () -> Unit,
+    onAppleSignIn: () -> Unit,
     onGoogleLink: () -> Unit,
     onCancelGoogleLink: () -> Unit,
+    onAppleLink: () -> Unit,
+    onCancelAppleLink: () -> Unit,
     onCancelOAuth: () -> Unit,
     onUpdatePassword: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -55,13 +62,12 @@ internal fun EvidriloAccountScreen(
     onExportAccount: () -> Unit,
     onDismissExport: () -> Unit,
 ) {
-    if (TEMPORARY_GUEST_MODE_ENABLED) {
+    if (!accountRestoreComplete) {
         EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
             EvidriloBackButton(label = "Back", onClick = onBack)
-            Text("Guest mode", style = MaterialTheme.typography.displayLarge)
+            Text("Checking saved account", style = MaterialTheme.typography.displayLarge)
             Text(
-                "Sign-in is temporarily turned off. Projects, the catalog, case work, and history remain available locally. Account, Pro, and server AI features are paused; no project content is uploaded.",
+                "Your local projects remain available. We are securely checking whether this device already has an account session.",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -74,6 +80,14 @@ internal fun EvidriloAccountScreen(
     var confirmation by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmDeletion by remember { mutableStateOf(false) }
+    var confirmAppleLink by remember { mutableStateOf(false) }
+    LaunchedEffect(session) {
+        val verifiedEmail = (session as? AccountSession.SignedIn)
+            ?.account
+            ?.takeIf { it.emailVerified }
+            ?.email
+        if (!verifiedEmail.isNullOrBlank()) email = verifiedEmail
+    }
     val validation = remember(mode, email, password, confirmation) {
         validateAccountForm(mode, email, password, confirmation)
     }
@@ -86,12 +100,22 @@ internal fun EvidriloAccountScreen(
         session.toPresentation()
     }
     val showAccountAuthForm = shouldShowAccountAuthForm(session, accountConfigured)
+    val showSignedOutAuthIntro = session == AccountSession.SignedOut && showAccountAuthForm
 
     EvidriloContentColumn {
-        EvidriloBrandHeader(onSettings = null)
         EvidriloBackButton(label = "Back", onClick = onBack)
-        Text(presentation.title, style = MaterialTheme.typography.displayLarge)
-        Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
+        if (showSignedOutAuthIntro) {
+            Text(accountAuthHeading(mode), style = MaterialTheme.typography.displayLarge)
+            if (mode != AccountAuthMode.RESET_PASSWORD) {
+                Text(
+                    "Sign-in is optional. Your projects stay on this device and are never uploaded by signing in.",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        } else {
+            Text(presentation.title, style = MaterialTheme.typography.displayLarge)
+            Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
+        }
         persistenceNotice?.takeIf { it.isError }?.let { notice -> EvidriloRecoveryNotice(notice) }
 
         when {
@@ -99,8 +123,14 @@ internal fun EvidriloAccountScreen(
                 SignedInAccountPanel(
                     account = session.account,
                     googleLinkOutcome = session.googleLinkOutcome,
+                    appleLinkOutcome = session.appleLinkOutcome,
+                    googleConfigured = googleConfigured,
+                    appleConfigured = appleConfigured,
+                    accountBoundFeaturesEnabled = accountBoundFeaturesEnabled,
                     onGoogleLink = onGoogleLink,
                     onCancelGoogleLink = onCancelGoogleLink,
+                    onAppleLink = { confirmAppleLink = true },
+                    onCancelAppleLink = onCancelAppleLink,
                     onSignOut = onSignOut,
                     onDelete = { confirmDeletion = true },
                     onExport = onExportAccount,
@@ -128,7 +158,7 @@ internal fun EvidriloAccountScreen(
                 EvidriloTintPanel {
                     Text("Browser sign-in is waiting", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Finish Google sign-in in your browser, then return to Evidrilo.",
+                        "Finish sign-in in your browser, then return to Evidrilo.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -189,21 +219,44 @@ internal fun EvidriloAccountScreen(
                                 confirmation = ""
                             },
                         )
-                        EvidriloSecondaryButton(
-                            label = "Continue with Google",
-                            onClick = onGoogleSignIn,
-                            enabled = !isBusy && accountConfigured,
-                        )
+                        if (googleConfigured || appleConfigured) {
+                            Text(
+                                "Or continue with",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = EvidriloColors.Slate,
+                            )
+                        }
+                        if (googleConfigured) {
+                            EvidriloSecondaryButton(
+                                label = "Continue with Google",
+                                onClick = onGoogleSignIn,
+                                enabled = !isBusy,
+                            )
+                        }
+                        if (appleConfigured) {
+                            EvidriloSecondaryButton(
+                                label = "Continue with Apple",
+                                onClick = onAppleSignIn,
+                                enabled = !isBusy,
+                            )
+                        }
+                        if (googleConfigured || appleConfigured) {
+                            Text(
+                                "Already have an account? Sign in first, then link another provider from Account. Accounts are never merged.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = EvidriloColors.Slate,
+                            )
+                        }
                     }
                 }
             }
         }
 
-        EvidriloTintPanel {
-            Text("Local projects do not require sign-in", style = MaterialTheme.typography.titleMedium)
+        if (showSignedOutAuthIntro && mode != AccountAuthMode.RESET_PASSWORD) {
             Text(
-                "Sign in for account features when available. This does not upload your projects; online sync is a separate choice. Your password is not saved by Evidrilo.",
-                style = MaterialTheme.typography.bodyMedium,
+                "Pro requires a signed-in account and confirmed entitlement. AI and cloud sync are paused in this build. Evidrilo does not save your password.",
+                style = MaterialTheme.typography.bodySmall,
+                color = EvidriloColors.Slate,
             )
         }
     }
@@ -228,6 +281,41 @@ internal fun EvidriloAccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmDeletion = false }, enabled = !isBusy) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (confirmAppleLink && session is AccountSession.SignedIn) {
+        AlertDialog(
+            onDismissRequest = { if (!isBusy) confirmAppleLink = false },
+            title = { Text("Link Apple to this account?") },
+            text = {
+                Column {
+                    Text(
+                        "Confirm you are signed into the Evidrilo account you want to keep.",
+                    )
+                    Text(
+                        session.account.email?.let { "Current account email · $it" }
+                            ?: "The saved session does not include an email address. Apple will be linked to the currently signed-in Evidrilo account.",
+                    )
+                    Text(
+                        "Apple may provide a private relay address. It will not be used to choose or switch Evidrilo accounts.",
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmAppleLink = false
+                        onAppleLink()
+                    },
+                    enabled = !isBusy,
+                ) { Text("Continue to Apple") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmAppleLink = false }, enabled = !isBusy) {
+                    Text("Cancel")
+                }
             },
         )
     }
@@ -433,8 +521,14 @@ private fun PasswordField(
 private fun SignedInAccountPanel(
     account: AccountSummary,
     googleLinkOutcome: GoogleIdentityLinkOutcome?,
+    appleLinkOutcome: IdentityLinkOutcome?,
+    googleConfigured: Boolean,
+    appleConfigured: Boolean,
+    accountBoundFeaturesEnabled: Boolean,
     onGoogleLink: () -> Unit,
     onCancelGoogleLink: () -> Unit,
+    onAppleLink: () -> Unit,
+    onCancelAppleLink: () -> Unit,
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
     onExport: () -> Unit,
@@ -445,11 +539,17 @@ private fun SignedInAccountPanel(
     EvidriloTintPanel {
         Text("You are signed in", style = MaterialTheme.typography.titleMedium)
         Text(
-            "This device is connected to your account. Your projects remain local unless you separately enable online sync.",
+            "This device is connected to your account. Projects stay local; cloud sync remains paused in local mode.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        account.email?.let { email ->
+            Text(
+                if (account.emailVerified) "Account email · $email · verified" else "Account email · $email",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
-    EvidriloTintPanel {
+    if (googleConfigured) EvidriloTintPanel {
         Text("Google sign-in", style = MaterialTheme.typography.titleMedium)
         Text(
             when {
@@ -465,7 +565,7 @@ private fun SignedInAccountPanel(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    if (account.googleLinked != true) {
+    if (googleConfigured && account.googleLinked != true) {
         val linking = googleLinkOutcome == GoogleIdentityLinkOutcome.STARTED
         EvidriloSecondaryButton(
             label = if (linking) "Cancel Google linking" else "Link Google to this account",
@@ -473,8 +573,34 @@ private fun SignedInAccountPanel(
             enabled = !isBusy,
         )
     }
-    EvidriloSecondaryButton(label = "Export account data", onClick = onExport, enabled = !isBusy)
-    exportError?.let { reason ->
+    if (appleConfigured) EvidriloTintPanel {
+        Text("Apple sign-in", style = MaterialTheme.typography.titleMedium)
+        Text(
+            when {
+                account.appleLinked == true -> "Apple is linked to this same Evidrilo account. Its relay email, if used, does not replace the verified account email above."
+                appleLinkOutcome == IdentityLinkOutcome.STARTED -> "Finish linking in your browser, then return here. Your current Evidrilo account stays active."
+                appleLinkOutcome == IdentityLinkOutcome.CANCELLED -> "Apple linking did not complete. Your current account remains active; you can retry when ready."
+                appleLinkOutcome == IdentityLinkOutcome.CONFLICT -> "This Apple identity is already associated with an account. No accounts were merged or switched. Sign in to that account before linking."
+                appleLinkOutcome == IdentityLinkOutcome.SETUP_REQUIRED -> "Apple identity linking is not enabled for this auth project. Your current account remains unchanged."
+                appleLinkOutcome == IdentityLinkOutcome.FAILED -> "We could not verify the Apple link. Your existing account and email were preserved."
+                account.appleLinked == false -> "Link Apple as another sign-in method for this same Evidrilo account. Linking never merges accounts."
+                else -> "We will verify whether Apple is already linked before changing sign-in methods."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+    if (appleConfigured && account.appleLinked != true) {
+        val linking = appleLinkOutcome == IdentityLinkOutcome.STARTED
+        EvidriloSecondaryButton(
+            label = if (linking) "Cancel Apple linking" else "Link Apple to this account",
+            onClick = if (linking) onCancelAppleLink else onAppleLink,
+            enabled = !isBusy,
+        )
+    }
+    if (accountBoundFeaturesEnabled) {
+        EvidriloSecondaryButton(label = "Export account data", onClick = onExport, enabled = !isBusy)
+    }
+    exportError?.takeIf { accountBoundFeaturesEnabled }?.let { reason ->
         val exportPresentation = AccountSession.Unavailable(reason).toPresentation()
         EvidriloTintPanel {
             Text(exportPresentation.title, style = MaterialTheme.typography.titleMedium)
@@ -485,7 +611,9 @@ private fun SignedInAccountPanel(
         }
     }
     EvidriloSecondaryButton(label = "Sign out", onClick = onSignOut, enabled = !isBusy)
-    TextButton(onClick = onDelete, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Delete account data", color = EvidriloColors.Error)
+    if (accountBoundFeaturesEnabled) {
+        TextButton(onClick = onDelete, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
+            Text("Delete account data", color = EvidriloColors.Error)
+        }
     }
 }

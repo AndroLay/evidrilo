@@ -24,7 +24,7 @@
           "operationId": { "oneOf": [{ "type": "string", "maxLength": 80 }, { "type": "null" }] },
           "baseProjectRevision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
           "resultProjectRevision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
-          "outcome": { "enum": ["PENDING", "APPLIED", "EDITED", "DISMISSED", "STALE", "FAILED"] },
+          "outcome": { "enum": ["PENDING", "APPLIED", "EDITED", "DISMISSED", "STALE", "FAILED", "COMPLETED"] },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
         }

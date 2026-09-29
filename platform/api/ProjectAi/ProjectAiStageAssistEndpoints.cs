@@ -170,7 +170,11 @@ public static class ProjectAiStageAssistEndpoints
                         .ToArray(),
                     template.Template.MethodSpecificLimitations!,
                     template.Template.ProvenanceRequirements!,
-                    validRequest.Locale!);
+                    validRequest.Locale!)
+                {
+                    AccountId = accountId,
+                    RequestId = requestId,
+                };
 
                 var beforeReservationConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
                 if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, beforeReservationConsent))
@@ -182,6 +186,15 @@ public static class ProjectAiStageAssistEndpoints
                     maximumCreditCost = generator.EstimateMaximumCreditCost(providerRequest);
                     if (maximumCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
                         return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+                catch (AiProviderFailureException exception)
+                    when (exception.ReasonCode == "PROJECT_AI_CONTEXT_TOO_LARGE")
+                {
+                    return Error(
+                        context,
+                        "PROJECT_AI_CONTEXT_TOO_LARGE",
+                        "Select less project context before requesting assistance.",
+                        StatusCodes.Status413PayloadTooLarge);
                 }
                 catch (Exception)
                 {

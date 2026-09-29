@@ -1,0 +1,10 @@
+previews:
+  generation: "off"
+
+services:
+  - type: web
+    name: evidrilo-staging-landing
+    runtime: static
+    branch: main
+    autoDeployTrigger: "off"
+    staticPublishPath: apps/landing

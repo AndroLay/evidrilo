@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Evidrilo.Api.Ai;
@@ -31,7 +32,14 @@ public sealed record AiProviderRequest(
     string RedactedInput,
     string Locale,
     string PromptVersion,
-    IReadOnlySet<string>? AllowedAnchorIds = null);
+    IReadOnlySet<string>? AllowedAnchorIds = null)
+{
+    public string? SystemInstructions { get; init; }
+
+    public string? StructuredOutputSchemaName { get; init; }
+
+    public JsonObject? StructuredOutputSchema { get; init; }
+}
 
 public sealed record AiProviderResponse(
     string Kind,
@@ -146,6 +154,8 @@ public sealed record AiGatewayResult(
     AiAuditMetadata Audit)
 {
     public IReadOnlyList<string> GroundedAnchorIds { get; init; } = Array.Empty<string>();
+
+    public int CreditCost { get; init; }
 }
 
 public static partial class AiRedactor
@@ -390,6 +400,7 @@ public sealed class AiGateway
             new AiAuditMetadata(PromptVersion, requestHash, "configured-provider", "success"))
         {
             GroundedAnchorIds = validation.ReferencedAnchorIds,
+            CreditCost = actualCreditCost,
         };
     }
 

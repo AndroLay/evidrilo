@@ -25,6 +25,7 @@ public sealed class AiGatewayTests
             CancellationToken.None);
 
         Assert.Equal("success", result.Status);
+        Assert.Equal(4, result.CreditCost);
         Assert.True(ledger.ConsentEnsured);
         Assert.Equal([10], ledger.ReservedCreditCosts);
         Assert.Equal([true], ledger.Completions);

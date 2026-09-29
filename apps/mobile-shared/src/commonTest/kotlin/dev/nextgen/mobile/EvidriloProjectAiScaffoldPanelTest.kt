@@ -1,6 +1,7 @@
 package dev.nextgen.mobile
 
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGatewayResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldDecision
 import dev.nextgen.mobile.projectcatalog.ProjectAiConsentGatewayResult
 import dev.nextgen.mobile.projectcatalog.ProjectAiConsentState
 import dev.nextgen.mobile.projectcatalog.PROJECT_AI_CONSENT_POLICY_VERSION
@@ -8,25 +9,79 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class EvidriloProjectAiScaffoldPanelTest {
     @Test
-    fun `project creation discloses scaffold credit cost and settlement rule before request`() {
-        val disclosure = projectAiCreditDisclosure(creating = true)
+    fun `project AI transient state is isolated between projects and accounts`() {
+        val projectA = projectAiScaffoldPanelStateKey(
+            templateId = "reviewed-template",
+            projectId = "project-a",
+            projectRevision = 3,
+            accountId = "account-a",
+        )
 
-        assertTrue(disclosure.contains("3 AI credits"))
-        assertTrue(disclosure.contains("only if you apply"))
-        assertTrue(disclosure.contains("dismissal or failure releases"))
+        assertNotEquals(
+            projectA,
+            projectAiScaffoldPanelStateKey("reviewed-template", "project-b", 3, "account-a"),
+        )
+        assertNotEquals(
+            projectA,
+            projectAiScaffoldPanelStateKey("reviewed-template", "project-a", 3, "account-b"),
+        )
     }
 
     @Test
-    fun `in-project assistance discloses one-credit cost and settlement rule before request`() {
+    fun `per request AI consent is consumed and must be confirmed again`() {
+        val firstRequest = ProjectAiRequestConsentState(confirmed = true).consume()
+
+        assertTrue(firstRequest.confirmedForThisRequest)
+        assertFalse(firstRequest.nextRequestState.confirmed)
+
+        val secondRequest = firstRequest.nextRequestState.consume()
+        assertFalse(secondRequest.confirmedForThisRequest)
+        assertFalse(secondRequest.nextRequestState.confirmed)
+    }
+
+    @Test
+    fun `project creation discloses token-priced credit settlement before request`() {
+        val disclosure = projectAiCreditDisclosure(creating = true)
+
+        assertTrue(disclosure.contains("verified provider token usage"))
+        assertTrue(disclosure.contains("up to 200 credits for one request"))
+        assertTrue(disclosure.contains("even if you dismiss"))
+        assertTrue(disclosure.contains("release the reservation"))
+    }
+
+    @Test
+    fun `in-project assistance uses the same token-priced settlement rule`() {
         val disclosure = projectAiCreditDisclosure(creating = false)
 
-        assertTrue(disclosure.contains("1 AI credit"))
-        assertTrue(disclosure.contains("only if you apply"))
-        assertTrue(disclosure.contains("dismissal or failure releases"))
+        assertTrue(disclosure.contains("verified provider token usage"))
+        assertTrue(disclosure.contains("up to 200 credits for one request"))
+        assertTrue(disclosure.contains("even if you dismiss"))
+        assertTrue(disclosure.contains("release the reservation"))
+    }
+
+    @Test
+    fun `applying or dismissing records the decision without implying a refund`() {
+        val applied = projectAiSettlementStatusMessage(ProjectAiScaffoldDecision.APPLY, 7)
+        val dismissed = projectAiSettlementStatusMessage(ProjectAiScaffoldDecision.DISMISS, 7)
+
+        assertTrue(applied.contains("7-credit preview charge is already settled"))
+        assertTrue(dismissed.contains("7-credit preview charge is already settled"))
+        assertFalse(applied.contains("releas"))
+        assertFalse(dismissed.contains("releas"))
+    }
+
+    @Test
+    fun `client validation rejection is honest that a valid preview was already charged`() {
+        val notice = projectAiClientValidationFailureMessage("TEMPLATE_MISMATCH", 3)
+
+        assertTrue(notice.contains("3-credit charge is already settled"))
+        assertTrue(notice.contains("no project fields were changed"))
+        assertFalse(notice.contains("releas"))
     }
 
     @Test

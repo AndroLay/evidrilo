@@ -57,7 +57,7 @@ class ProjectAiScaffoldSettlementGateway(
         decision: ProjectAiScaffoldDecision,
         expectedCreditCost: Int,
     ): ProjectAiScaffoldSettlementResult {
-        if (!requestIdPattern.matches(requestId) || expectedCreditCost !in ALLOWED_CREDIT_COSTS) {
+        if (!requestIdPattern.matches(requestId) || expectedCreditCost !in 1..PROJECT_AI_MAX_CREDITS_PER_REQUEST) {
             return ProjectAiScaffoldSettlementResult.Rejected("INVALID_PROJECT_AI_SETTLEMENT")
         }
         val session = when (val result = readSession()) {
@@ -157,7 +157,7 @@ class ProjectAiScaffoldSettlementGateway(
             ?: error("status required")
         val requestId = root.string("requestId")?.also { require(requestIdPattern.matches(it)) }
             ?: error("request id required")
-        val creditCost = root.int("creditCost").also { require(it in ALLOWED_CREDIT_COSTS) }
+        val creditCost = root.int("creditCost").also { require(it in 1..PROJECT_AI_MAX_CREDITS_PER_REQUEST) }
         ParsedSettlement(status, requestId, creditCost)
     }.getOrNull()
 
@@ -214,7 +214,6 @@ class ProjectAiScaffoldSettlementGateway(
         const val SETTLEMENT_SCHEMA = "evidrilo.project-ai-scaffold-settlement"
         const val MAX_REQUEST_BYTES = 4 * 1024
         const val MAX_RESPONSE_BYTES = 16 * 1024
-        val ALLOWED_CREDIT_COSTS = setOf(1, 3)
         val RESPONSE_KEYS = setOf("schema", "version", "status", "requestId", "creditCost")
         val requestIdPattern = Regex("^[A-Za-z0-9_-]{8,128}$")
         val reasonCodePattern = Regex("^[A-Z0-9_]{3,64}$")

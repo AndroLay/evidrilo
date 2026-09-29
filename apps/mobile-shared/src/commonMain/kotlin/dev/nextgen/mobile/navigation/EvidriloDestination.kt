@@ -25,11 +25,14 @@ internal enum class EvidriloDestination {
     HISTORY,
     ACCOUNT,
     SETTINGS,
+    WORKSPACE_PREFERENCES,
+    NOTIFICATIONS,
+    PRIVACY_DATA,
     SUPPORT,
     ABOUT,
 }
 
-/** Account routes remain guarded while D-125 exposes only explicitly local guest destinations. */
+/** Account-bound actions stay gated while local work, account entry, and settings remain guest-reachable. */
 internal fun EvidriloDestination.requiresAuthenticatedFreeAccess(): Boolean {
     if (TEMPORARY_GUEST_MODE_ENABLED && this in localGuestDestinations) return false
     return when (this) {
@@ -45,6 +48,9 @@ internal fun EvidriloDestination.requiresAuthenticatedFreeAccess(): Boolean {
         EvidriloDestination.PROJECT_EDITOR,
         EvidriloDestination.PROFILE,
         EvidriloDestination.SETTINGS,
+        EvidriloDestination.WORKSPACE_PREFERENCES,
+        EvidriloDestination.NOTIFICATIONS,
+        EvidriloDestination.PRIVACY_DATA,
         -> false
         else -> true
     }

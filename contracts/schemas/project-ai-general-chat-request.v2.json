@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-general-chat-request.v2.json",
+  "title": "Evidrilo isolated Project AI General chat request v2",
+  "description": "Standalone message only. Project identifiers, project context, and caller-supplied history are not accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "installationId", "locale", "message"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-general-chat" },
+    "version": { "const": "2" },
+    "installationId": { "type": "string", "format": "uuid" },
+    "locale": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    }
+  }
+}

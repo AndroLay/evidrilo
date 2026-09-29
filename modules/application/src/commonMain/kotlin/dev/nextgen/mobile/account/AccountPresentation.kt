@@ -8,6 +8,9 @@ enum class AccountPresentationAction {
 /** Temporary client-only release switch. It does not change or bypass API authorization. */
 const val TEMPORARY_GUEST_MODE_ENABLED = true
 
+/** Account identity remains optional and available while local guest work is enabled. */
+const val ACCOUNT_AUTH_ENABLED = true
+
 data class AccountPresentation(
     val title: String,
     val body: String,
@@ -17,23 +20,10 @@ data class AccountPresentation(
 )
 
 fun AccountSession.toPresentation(): AccountPresentation {
-    if (TEMPORARY_GUEST_MODE_ENABLED &&
-        (this == AccountSession.SignedOut ||
-            (this is AccountSession.Unavailable && reason == AccountUnavailableReason.NOT_CONFIGURED))
-    ) {
-        return AccountPresentation(
-            title = "Guest mode",
-            body = "Projects and case work stay on this device; the catalog and history stay local too. Account, Pro, and server AI features are temporarily unavailable. No project content is uploaded.",
-            actionLabel = null,
-            action = AccountPresentationAction.NONE,
-            isBusy = false,
-        )
-    }
-
     return when (this) {
         AccountSession.SignedOut -> AccountPresentation(
-            title = "Sign in for account features",
-            body = "Create and use local projects without an account. Sign in for account features when available. This does not upload projects; online sync is a separate choice.",
+            title = "Sign in or create an account",
+            body = "Local projects stay on this device. Account sign-in is optional and does not upload projects. Pro requires a signed-in account and a confirmed entitlement; server AI and cloud sync remain paused in this build.",
             actionLabel = null,
             action = AccountPresentationAction.NONE,
             isBusy = false,
@@ -48,8 +38,8 @@ fun AccountSession.toPresentation(): AccountPresentation {
         )
 
         AccountSession.AwaitingOAuthCallback -> AccountPresentation(
-            title = "Finish Google sign-in",
-            body = "Finish Google sign-in in your browser, then return to Evidrilo. Local projects remain available.",
+            title = "Finish sign-in",
+            body = "Finish sign-in in your browser, then return to Evidrilo. Local projects remain available.",
             actionLabel = null,
             action = AccountPresentationAction.NONE,
             isBusy = true,
@@ -61,7 +51,7 @@ fun AccountSession.toPresentation(): AccountPresentation {
                 title = pendingOperation?.let { unavailableTitle(AccountUnavailableReason.OPERATION_OUTCOME_UNKNOWN) }
                     ?: "Account connected",
                 body = pendingOperation?.let(::unknownMutationBody)
-                    ?: "You are signed in on this device. Online sync stays off unless you choose it separately.",
+                    ?: "You are signed in on this device. Local projects stay here; cloud sync remains paused in local mode.",
                 actionLabel = "Sign out",
                 action = AccountPresentationAction.SIGN_OUT,
                 isBusy = false,
@@ -106,34 +96,38 @@ fun AccountSession.toPresentation(): AccountPresentation {
 }
 
 fun AccountSession.toSettingsSubtitle(): String = when (this) {
-    AccountSession.SignedOut -> if (TEMPORARY_GUEST_MODE_ENABLED) {
-        "Guest mode · Local only"
-    } else {
-        "Sign in or create account"
-    }
+    AccountSession.SignedOut -> "Local only · Sign-in optional"
     AccountSession.SigningIn -> "Signing in securely"
-    AccountSession.AwaitingOAuthCallback -> "Finish Google sign-in"
+    AccountSession.AwaitingOAuthCallback -> "Finish sign-in"
     is AccountSession.SignedIn ->
         if (pendingOperationOutcome != null) "Account request not confirmed" else "Account connected"
     AccountSession.Expired -> "Sign-in expired"
     is AccountSession.PasswordRecovery -> "Finish password recovery"
     is AccountSession.Unavailable -> when (reason) {
-        AccountUnavailableReason.NOT_CONFIGURED -> if (TEMPORARY_GUEST_MODE_ENABLED) {
-            "Guest mode · Local only"
-        } else {
-            "Sign in or create account"
-        }
+        AccountUnavailableReason.NOT_CONFIGURED -> "Sign-in unavailable · Local projects stay here"
         else -> toPresentation().title
     }
 }
 
 /** Only show sign-in controls when a provider can actually accept the request. */
 fun shouldShowAccountAuthForm(session: AccountSession, accountConfigured: Boolean): Boolean =
-    !TEMPORARY_GUEST_MODE_ENABLED &&
+    ACCOUNT_AUTH_ENABLED &&
         accountConfigured &&
         session !is AccountSession.SignedIn &&
         session !is AccountSession.AwaitingOAuthCallback &&
         session !is AccountSession.PasswordRecovery
+
+fun accountAuthHeading(mode: AccountAuthMode): String = when (mode) {
+    AccountAuthMode.SIGN_IN -> "Welcome back"
+    AccountAuthMode.CREATE_ACCOUNT -> "Create your account"
+    AccountAuthMode.RESET_PASSWORD -> "Reset your password"
+}
+
+/** Account identity is independent from whether local guest mode enables cloud features. */
+fun shouldShowSignedInAccountInProfile(
+    session: AccountSession,
+    accountAuthRestoreComplete: Boolean,
+): Boolean = accountAuthRestoreComplete && session is AccountSession.SignedIn
 
 private fun unavailableTitle(reason: AccountUnavailableReason): String = when (reason) {
     AccountUnavailableReason.SECURE_STORAGE -> "Secure storage unavailable"
@@ -147,7 +141,7 @@ private fun unavailableTitle(reason: AccountUnavailableReason): String = when (r
     AccountUnavailableReason.EXPORT_TOO_LARGE -> "Export exceeds size limit"
     AccountUnavailableReason.EMAIL_CONFIRMATION_REQUIRED -> "Confirm your email"
     AccountUnavailableReason.PASSWORD_RESET_REQUESTED -> "Check your email"
-    AccountUnavailableReason.OAUTH_CANCELLED -> "Google sign-in cancelled"
+    AccountUnavailableReason.OAUTH_CANCELLED -> "Sign-in cancelled"
     AccountUnavailableReason.INVALID_REDIRECT -> "Sign-in link was not accepted"
     AccountUnavailableReason.NOT_CONFIGURED -> "Sign-in unavailable"
     AccountUnavailableReason.OWNER_TRANSFER_REQUIRED -> "Transfer ownership first"
@@ -165,7 +159,7 @@ private fun unavailableBody(reason: AccountUnavailableReason): String = when (re
     AccountUnavailableReason.EXPORT_TOO_LARGE -> "This account export exceeds the current size limit and could not be downloaded. No account data was changed."
     AccountUnavailableReason.EMAIL_CONFIRMATION_REQUIRED -> "Confirm the email address from the message we sent, then sign in."
     AccountUnavailableReason.PASSWORD_RESET_REQUESTED -> "If that address can receive mail, a reset message was requested. Sign in again after resetting your password."
-    AccountUnavailableReason.OAUTH_CANCELLED -> "Google sign-in was cancelled. You can retry or choose email sign-in."
+    AccountUnavailableReason.OAUTH_CANCELLED -> "Sign-in was cancelled. You can retry or choose email sign-in."
     AccountUnavailableReason.INVALID_REDIRECT -> "The sign-in callback could not be verified. No unverified session was stored; retry sign-in."
     AccountUnavailableReason.NOT_CONFIGURED -> "Sign-in is not available in this build. Local projects remain available, and no project data was changed."
     AccountUnavailableReason.OWNER_TRANSFER_REQUIRED -> "This account is the only active owner of an organization. Transfer ownership before deleting it."

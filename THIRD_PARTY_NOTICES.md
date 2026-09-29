@@ -137,7 +137,7 @@ license obligations must be reviewed before creating a redistribution artifact.
 
 ## kmp-zip
 
-The mobile application uses `no.synth:kmp-zip` version `0.9.2` for Kotlin
+The mobile application uses `no.synth:kmp-zip` version `1.0.0` for Kotlin
 Multiplatform ZIP stream encoding and decoding. The upstream project is
 available at <https://github.com/henrik242/kmp-zip> and is distributed under
 the Mozilla Public License 2.0. Evidrilo does not modify or vendor its source.

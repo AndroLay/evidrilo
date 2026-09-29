@@ -1,8 +1,8 @@
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.android.kotlin)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -53,7 +53,7 @@ if (releaseSigningConfigured) {
 
 android {
     namespace = "dev.nextgen.mobile.android"
-    compileSdk = 35
+    compileSdk = 37
 
     signingConfigs {
         if (releaseSigningConfigured) {
@@ -118,6 +118,29 @@ tasks.register("verifyReleaseSigning") {
         }
         check(releaseKeystoreFile?.isFile == true) {
             "The configured Android release keystore does not exist."
+        }
+    }
+}
+
+tasks.register("verifyComposeResourcePackaging") {
+    group = "verification"
+    description = "Verifies that shared Compose resources are present in the Android debug APK."
+    notCompatibleWithConfigurationCache("Inspects the assembled APK archive directly.")
+    dependsOn("assembleDebug")
+    doLast {
+        val apk = layout.buildDirectory.file("outputs/apk/debug/androidApp-debug.apk").get().asFile
+        check(apk.isFile) { "Android debug APK was not produced: ${apk.absolutePath}" }
+
+        val requiredAssets = listOf(
+            "assets/composeResources/dev.nextgen.mobile.design.resources/drawable/evidrilo_logo.png",
+            "assets/composeResources/dev.nextgen.mobile.design.resources/drawable/evidrilo_loading_logo.png",
+            "assets/composeResources/dev.nextgen.mobile.resources/files/audio/audio-manifest.json",
+        )
+        ZipFile(apk).use { archive ->
+            val missingAssets = requiredAssets.filter { archive.getEntry(it) == null }
+            check(missingAssets.isEmpty()) {
+                "Android debug APK is missing shared Compose resources: ${missingAssets.joinToString()}"
+            }
         }
     }
 }

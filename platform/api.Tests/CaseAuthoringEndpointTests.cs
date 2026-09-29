@@ -22,8 +22,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Case_authoring_requires_authenticated_identity()
     {
-        using var response = await client.PostAsJsonAsync("/v1/authoring/cases", ValidRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.PostAsJsonAsync("/v1/authoring/cases", ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -38,8 +38,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -61,8 +61,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_CASE_TRANSITION", body.GetProperty("code").GetString());
@@ -85,8 +85,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_CASE_TRANSITION", body.GetProperty("code").GetString());
@@ -101,8 +101,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -111,8 +111,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Case_audit_requires_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/authoring/cases/M0_T2:1/audit");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/authoring/cases/M0_T2:1/audit", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -124,8 +124,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/authoring/cases/M0_T2:1/audit");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -137,8 +137,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/authoring/cases/M0_T2:1/audit");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -150,8 +150,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/authoring/cases/not valid/audit");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_CASE_VERSION", body.GetProperty("code").GetString());
@@ -170,8 +170,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/authoring/cases/M0_T2:1/audit");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await testClient.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await testClient.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("evidrilo.case-lifecycle-audit", body.GetProperty("schema").GetString());
@@ -201,8 +201,8 @@ public sealed class CaseAuthoringEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/authoring/cases/M0_T2:1/audit");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await testClient.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await testClient.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(CaseLifecycleAuditLimits.MaxEvents, body.GetProperty("events").GetArrayLength());

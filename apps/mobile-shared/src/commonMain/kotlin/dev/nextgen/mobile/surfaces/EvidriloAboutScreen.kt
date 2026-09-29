@@ -50,7 +50,7 @@ internal fun EvidriloAboutScreen(
         EvidriloAboutPanel(
             title = "Privacy boundary",
             body = if (TEMPORARY_GUEST_MODE_ENABLED) {
-                "Projects, the catalog, case work, and history work in local guest mode. Account, cloud sync, Pro, and server AI are temporarily unavailable. Project data stays on this device."
+                "Projects, the catalog, case work, and history work in local guest mode. Sign-in is optional; Pro requires a signed-in account and confirmed entitlement. Cloud sync and server AI are disabled in this build. Project data stays on this device."
             } else {
                 "Local projects work without an account. Account-bound learning and project AI require sign-in; AI also needs separate consent and is disabled in this build. Project data stays on this device unless you separately enable cloud sync. Billing is not required for local work."
             },

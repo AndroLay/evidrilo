@@ -1,10 +1,11 @@
 import java.util.Properties
+import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
 }
 
 val localBuildProperties = Properties().apply {
@@ -20,10 +21,64 @@ fun localOrGradleProperty(name: String): String =
     providers.gradleProperty(name).orNull
         ?: localBuildProperties.getProperty(name).orEmpty()
 
+fun String.asKotlinStringLiteral(): String {
+    val dollar = 36.toChar().toString()
+    val escaped = replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace(dollar, "\\" + dollar)
+    return "\"" + escaped + "\""
+}
+
+val revenueCatApiKey = localOrGradleProperty("revenuecatAndroidApiKey")
+val revenueCatEntitlementId = localOrGradleProperty("revenuecatEntitlementId")
+val revenueCatProductIds = localOrGradleProperty("revenuecatProductIds")
+val supabaseUrl = localOrGradleProperty("supabaseUrl")
+val supabasePublishableKey = localOrGradleProperty("supabasePublishableKey")
+val supabaseAuthRedirectUrl = localOrGradleProperty("supabaseAuthRedirectUrl")
+val evidriloApiBaseUrl = localOrGradleProperty("evidriloApiBaseUrl")
+val normalizedSupabasePublishableKey = supabasePublishableKey.trim().lowercase()
+val safeSupabasePublishableKey = if (
+    normalizedSupabasePublishableKey.contains("service_role") ||
+    normalizedSupabasePublishableKey.contains("sb_secret") ||
+    normalizedSupabasePublishableKey.contains("secret")
+) {
+    ""
+} else {
+    supabasePublishableKey
+}
+val androidBuildConfigFields = linkedMapOf(
+    "REVENUECAT_PUBLIC_SDK_KEY" to revenueCatApiKey.asKotlinStringLiteral(),
+    "REVENUECAT_ENTITLEMENT_ID" to revenueCatEntitlementId.asKotlinStringLiteral(),
+    "REVENUECAT_PRODUCT_IDS" to revenueCatProductIds.asKotlinStringLiteral(),
+    "SUPABASE_URL" to supabaseUrl.asKotlinStringLiteral(),
+    "SUPABASE_PUBLISHABLE_KEY" to safeSupabasePublishableKey.asKotlinStringLiteral(),
+    "SUPABASE_AUTH_REDIRECT_URL" to supabaseAuthRedirectUrl.asKotlinStringLiteral(),
+    "EVIDRILO_API_BASE_URL" to evidriloApiBaseUrl.asKotlinStringLiteral(),
+    "EVIDRILO_APP_VERSION" to rootProject.version.toString().removeSuffix("-SNAPSHOT").asKotlinStringLiteral(),
+)
+val generatedAndroidBuildConfigDirectory = layout.buildDirectory.dir(
+    "generated/androidBuildConfig/kotlin/dev/nextgen/mobile/compose",
+)
+val generateAndroidBuildConfig = tasks.register<Copy>("generateEvidriloAndroidBuildConfig") {
+    inputs.properties(androidBuildConfigFields)
+    from(layout.projectDirectory.file("build-support/BuildConfig.kt.template"))
+    into(generatedAndroidBuildConfigDirectory)
+    rename { "BuildConfig.kt" }
+    expand(androidBuildConfigFields)
+}
+
 kotlin {
     jvmToolchain(21)
     jvm()
-    androidTarget()
+    android {
+        namespace = "dev.nextgen.mobile.compose"
+        compileSdk = 37
+        minSdk = 26
+        androidResources.enable = true
+        withHostTest {}
+    }
 
     listOf(
         iosArm64(),
@@ -45,11 +100,11 @@ kotlin {
             api(project(":modules:data"))
             api(project(":modules:application"))
             api(project(":modules:features"))
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.resources)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kmp.zip.core)
@@ -76,73 +131,26 @@ kotlin {
             implementation(kotlin("test"))
         }
 
+        named("androidHostTest") {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
         jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
+            implementation(libs.compose.desktop.jvm)
         }
     }
 
+}
+
+kotlin.sourceSets.named("androidMain") {
+    kotlin.srcDir(generateAndroidBuildConfig)
 }
 
 compose.resources {
     publicResClass = true
     packageOfResClass = "dev.nextgen.mobile.resources"
-}
-
-android {
-    namespace = "dev.nextgen.mobile.compose"
-    compileSdk = 35
-
-    val revenueCatApiKey = localOrGradleProperty("revenuecatAndroidApiKey")
-    val revenueCatEntitlementId = localOrGradleProperty("revenuecatEntitlementId")
-    val revenueCatProductIds = localOrGradleProperty("revenuecatProductIds")
-    val supabaseUrl = localOrGradleProperty("supabaseUrl")
-    val supabasePublishableKey = localOrGradleProperty("supabasePublishableKey")
-    val supabaseAuthRedirectUrl = localOrGradleProperty("supabaseAuthRedirectUrl")
-    val evidriloApiBaseUrl = localOrGradleProperty("evidriloApiBaseUrl")
-
-    fun String.asBuildConfigString(): String =
-        "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
-
-    fun String.asSafeClientConfigString(): String {
-        val normalized = trim().lowercase()
-        return if (normalized.contains("service_role") || normalized.contains("sb_secret") || normalized.contains("secret")) {
-            "".asBuildConfigString()
-        } else {
-            asBuildConfigString()
-        }
-    }
-
-    defaultConfig {
-        minSdk = 26
-        buildConfigField(
-            "String",
-            "REVENUECAT_PUBLIC_SDK_KEY",
-            revenueCatApiKey.asBuildConfigString(),
-        )
-        buildConfigField(
-            "String",
-            "REVENUECAT_ENTITLEMENT_ID",
-            revenueCatEntitlementId.asBuildConfigString(),
-        )
-        buildConfigField(
-            "String",
-            "REVENUECAT_PRODUCT_IDS",
-            revenueCatProductIds.asBuildConfigString(),
-        )
-        buildConfigField("String", "SUPABASE_URL", supabaseUrl.asBuildConfigString())
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", supabasePublishableKey.asSafeClientConfigString())
-        buildConfigField("String", "SUPABASE_AUTH_REDIRECT_URL", supabaseAuthRedirectUrl.asBuildConfigString())
-        buildConfigField("String", "EVIDRILO_API_BASE_URL", evidriloApiBaseUrl.asBuildConfigString())
-        buildConfigField(
-            "String",
-            "EVIDRILO_APP_VERSION",
-            rootProject.version.toString().removeSuffix("-SNAPSHOT").asBuildConfigString(),
-        )
-    }
-
-    buildFeatures {
-        buildConfig = true
-    }
 }
 
 compose.desktop {

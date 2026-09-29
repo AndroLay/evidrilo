@@ -23,6 +23,18 @@ class AccountClientConfigurationTest {
     }
 
     @Test
+    fun apple_is_disabled_until_provider_setup_is_explicitly_enabled() {
+        val configuration = AccountClientConfiguration(
+            supabaseUrl = "https://example.supabase.co",
+            publishableKey = "sb_publishable_synthetic",
+        )
+
+        assertTrue(configuration.isProviderConfigured(AccountOAuthProvider.GOOGLE))
+        assertFalse(configuration.isProviderConfigured(AccountOAuthProvider.APPLE))
+        assertTrue(configuration.copy(appleAuthEnabled = true).isProviderConfigured(AccountOAuthProvider.APPLE))
+    }
+
+    @Test
     fun secret_shaped_keys_and_non_https_urls_fail_closed() {
         val secretKey = AccountClientConfiguration(
             supabaseUrl = "https://example.supabase.co",

@@ -22,6 +22,8 @@ import dev.nextgen.mobile.domain.project.StudentProjectSynthesisTheme
 import dev.nextgen.mobile.projectcatalog.StudentProjectDraftFlowResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class EvidriloStudentProjectsScreenTest {
     @Test
@@ -263,11 +265,13 @@ class EvidriloStudentProjectsScreenTest {
         assertEquals(true, impact.removesClaimSourceLink)
         assertEquals("claim-a", impact.claimSourceLinkedClaim?.id)
         val warning = projectSourceRemovalWarning(source, impact)
-        assertEquals(true, warning.contains("First observation (#evidence-a)"))
-        assertEquals(true, warning.contains("Finding dependent on Study A (#finding-a)"))
-        assertEquals(true, warning.contains("Claim dependent on Study A (#claim-a)"))
-        assertEquals(true, warning.contains("Study A theme (#theme-a)"))
-        assertEquals(true, warning.contains("Claim-to-source link to #source-a is removed from Claim dependent on Study A (#claim-a)"))
+        assertTrue(warning.contains("First observation"))
+        assertTrue(warning.contains("Finding dependent on Study A"))
+        assertTrue(warning.contains("Claim dependent on Study A"))
+        assertTrue(warning.contains("Study A theme"))
+        assertTrue(warning.contains("source link is removed from “Claim dependent on Study A”"))
+        assertFalse(warning.contains("#"))
+        assertFalse(warning.contains("source-a"))
         assertEquals(true, warning.contains("free-text analysis and output are not linked automatically"))
         assertEquals(true, warning.contains("save a new revision"))
     }
@@ -303,9 +307,11 @@ class EvidriloStudentProjectsScreenTest {
         )
 
         val warning = projectEvidenceRemovalWarning(impact)
-        assertEquals(true, warning.contains("Finding remains (#finding-a)"))
-        assertEquals(true, warning.contains("Claim needs review (#claim-a)"))
-        assertEquals(true, warning.contains("Needs revision"))
+        assertTrue(warning.contains("Finding remains"))
+        assertTrue(warning.contains("Claim needs review"))
+        assertTrue(warning.contains("will be marked Needs revision"))
+        assertFalse(warning.contains("#"))
+        assertFalse(warning.contains("claim-a"))
         assertEquals(true, warning.contains("save a new revision"))
     }
 
@@ -340,7 +346,7 @@ class EvidriloStudentProjectsScreenTest {
     @Test
     fun archiveReadProgressUsesHonestByteCountsAndSaysNoProjectDataChanged() {
         assertEquals(
-            "Reading archive: 1 MB of 4 MB. Your project data has not changed.",
+            "Reading archive: 1 MB of 4 MB (25%). Your project data has not changed.",
             studentProjectImportProgressLabel(StudentProjectFileImportProgress(1_048_576, 4_194_304)),
         )
         assertEquals(

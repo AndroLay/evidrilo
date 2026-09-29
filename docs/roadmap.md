@@ -448,10 +448,10 @@ deterministic feedback item, ask a reflection question, or suggest a
 meaning-preserving language alternative.
 
 - A verified free account receives 20 AI credits once after explicit consent.
-- An active `evidrilo_pro` account receives 200 credits per entitlement month;
-  yearly subscriptions receive the same monthly grant while active.
-- Credits do not roll over. Lifetime allowances and paid top-ups are not part
-  of the initial plan.
+- Each earned active `evidrilo_pro` entitlement month adds 200 credits to the
+  existing balance for monthly and yearly subscriptions; earned credits do not
+  reset or expire after Pro ends. Lifetime allowances and paid top-ups are not
+  part of the initial plan.
 - Credits are based on token usage at the pinned model rates: uncached input,
   cached input, cache-write input, and output are priced separately. Reasoning
   tokens are included in output and are not counted twice.

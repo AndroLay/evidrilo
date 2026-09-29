@@ -18,8 +18,8 @@ public sealed class HealthEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/health/live");
         request.Headers.Add("X-Request-Id", "req-health-001");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("req-health-001", response.Headers.GetValues("X-Request-Id").Single());
@@ -32,8 +32,8 @@ public sealed class HealthEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Readiness_returns_service_unavailable_when_dependencies_are_degraded()
     {
-        using var response = await client.GetAsync("/health/ready");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/health/ready", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("ready", body.GetProperty("check").GetString());

@@ -9,6 +9,8 @@ source "$repo_root/scripts/bootstrap/toolchain-paths.sh"
 container_name="evidrilo-api-worker-e2e-$$"
 image="${EVIDRILO_POSTGRES_IMAGE:-postgres:16-alpine}"
 db_port="${EVIDRILO_API_WORKER_E2E_DB_PORT:-55435}"
+temporary_directory="${TMPDIR:-/tmp}"
+artifacts_parent="${EVIDRILO_API_WORKER_E2E_ARTIFACTS_PARENT:-$repo_root/platform}"
 container_created=0
 artifacts_dir=""
 cli_home=""
@@ -51,8 +53,9 @@ if [[ ! -x "$dotnet_root/dotnet" ]]; then
     exit 2
 fi
 
-artifacts_dir=$(mktemp -d "$repo_root/platform/.evidrilo-api-worker-e2e-artifacts.XXXXXX")
-cli_home=$(mktemp -d /tmp/evidrilo-api-worker-e2e-cli.XXXXXX)
+mkdir -p "$artifacts_parent"
+artifacts_dir=$(mktemp -d "${artifacts_parent%/}/.evidrilo-api-worker-e2e-artifacts.XXXXXX")
+cli_home=$(mktemp -d "${temporary_directory%/}/evidrilo-api-worker-e2e-cli.XXXXXX")
 
 docker run -d \
     --name "$container_name" \
@@ -108,6 +111,7 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1
     --artifacts-path "$artifacts_dir" \
     --configuration Release \
     --no-restore \
+    -p:UseSharedCompilation=false \
     --nologo \
     --verbosity quiet
 

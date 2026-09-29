@@ -66,13 +66,13 @@ is_sensitive_path() {
 
 is_public_path() {
   case "$1" in
-    README.md|LICENSE|CONTRIBUTING.md|CODE_OF_CONDUCT.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
+    README.md|LICENSE|CONTRIBUTING.md|CODE_OF_CONDUCT.md|SECURITY.md|CHANGELOG.md|THIRD_PARTY_NOTICES.md|.editorconfig|.gitattributes|.dockerignore|.gitignore|gradlew|gradle.properties|build.gradle.kts|settings.gradle.kts|global.json|local.properties.example|worktree-ownership.yml|version.props|Directory.Build.props)
       return 0
       ;;
     .github/*|apps/*|modules/*|contracts/*|gradle/*|infra/*|platform/*|scripts/*|tests/*|tooling/*|examples/*)
       return 0
       ;;
-    docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/architecture/system-execution-flows.md|docs/product/m0-product-contract.md|docs/product/workflows.md|docs/operations/README.md|docs/api/*|docs/adr/*)
+    docs/README.md|docs/decisions.md|docs/development/*|docs/release.md|docs/roadmap.md|docs/testing.md|docs/architecture/platform-decision.md|docs/architecture/repository-structure.md|docs/architecture/revenuecat.md|docs/architecture/system-execution-flows.md|docs/architecture/apple-auth-setup.md|docs/product/m0-product-contract.md|docs/product/workflows.md|docs/operations/README.md|docs/api/*|docs/adr/*)
       return 0
       ;;
   esac

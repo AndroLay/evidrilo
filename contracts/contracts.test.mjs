@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -27,8 +28,10 @@ const schemaFiles = [
   'recommendation.v1.json',
   'cohort-summary.v1.json',
   'ai-assist-result.v1.json',
+  'ai-assist-result.v2.json',
   'ai-conversation-session.v1.json',
   'ai-conversation-turn.v1.json',
+  'ai-conversation-turn.v2.json',
   'ai-conversation-clear.v1.json',
   'case-authoring-result.v1.json',
   'case-lifecycle-audit.v1.json',
@@ -57,8 +60,10 @@ const schemaFiles = [
     'project-ai-stage-assist-request.v1.json',
     'project-ai-stage-assist-settlement.v1.json',
     'project-ai-stage-assist-settlement-request.v1.json',
-    'project-ai-activity-history.v1.json',
-    'project-ai-activity-clear.v1.json',
+  'project-ai-activity-history.v1.json',
+  'project-ai-activity-clear.v1.json',
+  'project-ai-general-chat-request.v2.json',
+  'project-ai-general-chat-result.v2.json',
   'project-template-families.v1.json',
   'project-template-catalogue.v1.json',
   'project-template-detail.v1.json',
@@ -137,7 +142,7 @@ test('all versioned response schemas are present and closed at the root', () => 
   for (const file of schemaFiles) {
     const schema = readSchema(file);
     assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
-    assert.match(schema.$id, /^https:\/\/evidrilo\.dev\/contracts\/[a-z-]+\.v1\.json$/);
+    assert.match(schema.$id, /^https:\/\/evidrilo\.dev\/contracts\/[a-z-]+\.v[1-9][0-9]*\.json$/);
     assert.equal(schema.type, 'object');
     assert.equal(schema.additionalProperties, false);
     assert.match(schema.title, /Evidrilo/);
@@ -152,7 +157,7 @@ test('registered API routes map to response schemas and endpoint tests', () => {
   );
   assert.equal(manifest.schema, 'evidrilo.api-route-manifest');
   assert.equal(manifest.version, '1');
-  assert.equal(manifest.routes.length, 54);
+  assert.equal(manifest.routes.length, 55);
 
   const routeKeys = (routes) => routes
     .map((route) => `${route.method} ${route.path}`)
@@ -169,7 +174,18 @@ test('registered API routes map to response schemas and endpoint tests', () => {
   const seen = new Set();
   for (const route of manifest.routes) {
     assert.match(route.method, /^(GET|POST|PUT|PATCH|DELETE)$/);
-    assert.match(route.path, /^\/(?:health|v1)\/[A-Za-z0-9._:{}-]+(?:\/[A-Za-z0-9._:{}-]+)*$/);
+    assert.match(route.authentication, /^(none|supabase_bearer|revenuecat_webhook)$/);
+    for (const parameter of route.queryParameters ?? []) {
+      assert.match(parameter.name, /^[A-Za-z][A-Za-z0-9]*$/);
+      assert.equal(typeof parameter.required, 'boolean');
+      assert.equal(typeof parameter.schema?.type, 'string');
+    }
+    for (const parameter of route.headerParameters ?? []) {
+      assert.match(parameter.name, /^X-[A-Za-z0-9-]+$|^Idempotency-Key$/);
+      assert.equal(typeof parameter.required, 'boolean');
+      assert.equal(typeof parameter.schema?.type, 'string');
+    }
+    assert.match(route.path, /^\/(?:health|v[1-9][0-9]*)\/[A-Za-z0-9._:{}-]+(?:\/[A-Za-z0-9._:{}-]+)*$/);
     assert.ok(!seen.has(`${route.method} ${route.path}`), `duplicate ${route.method} ${route.path}`);
     seen.add(`${route.method} ${route.path}`);
 
@@ -189,6 +205,28 @@ test('registered API routes map to response schemas and endpoint tests', () => {
       assert.equal(requestSchema.$id, `https://evidrilo.dev/contracts/${route.requestSchema}`);
     }
   }
+  const negotiatedAiResponses = [
+    [
+      'POST',
+      '/v1/ai/assist',
+      'application/vnd.evidrilo.ai-assist-result.v2+json',
+      'ai-assist-result.v2.json',
+    ],
+    [
+      'POST',
+      '/v1/ai/conversations/{sessionId:guid}/turns',
+      'application/vnd.evidrilo.ai-conversation-turn.v2+json',
+      'ai-conversation-turn.v2.json',
+    ],
+  ];
+  for (const [method, routePath, mediaType, schemaName] of negotiatedAiResponses) {
+    const route = manifest.routes.find((candidate) => candidate.method === method && candidate.path === routePath);
+    assert.deepEqual(route?.responseVariants, [{ mediaType, responseSchema: schemaName }]);
+    const versionedSchema = readSchema(schemaName);
+    assert.equal(versionedSchema.properties.creditCost.minimum, 0);
+    assert.equal(versionedSchema.properties.creditCost.maximum, 200);
+    assert.equal(versionedSchema.required.includes('creditCost'), true);
+  }
   for (const [method, routePath, requestSchema] of [
     ['PUT', '/v1/notifications/preferences', 'notification-preferences-update.v1.json'],
     ['POST', '/v1/project-ai/scaffold', 'project-ai-scaffold-request.v1.json'],
@@ -204,6 +242,123 @@ test('registered API routes map to response schemas and endpoint tests', () => {
       `${method} ${routePath} request schema must be registered`,
     );
   }
+});
+
+test('General chat v2 is isolated and exposes only a bounded message contract', () => {
+  const manifest = readJson('routes.v1.json');
+  const route = manifest.routes.find((candidate) =>
+    candidate.method === 'POST' && candidate.path === '/v2/project-ai/general-chat');
+  assert.ok(route, 'General chat v2 must be registered as a separate API operation');
+  assert.equal(route.authentication, 'supabase_bearer');
+  assert.equal(route.requestSchema, 'project-ai-general-chat-request.v2.json');
+  assert.equal(route.responseSchema, 'project-ai-general-chat-result.v2.json');
+  assert.equal(route.headerParameters.find((parameter) => parameter.name === 'Idempotency-Key')?.required, true);
+
+  const request = readSchema(route.requestSchema);
+  assert.equal(request.additionalProperties, false);
+  assert.deepEqual(Object.keys(request.properties).sort(), [
+    'installationId', 'locale', 'message', 'schema', 'version',
+  ]);
+  assert.equal(request.properties.version.const, '2');
+  assert.equal(request.properties.message.type, 'string');
+  assert.equal(request.properties.message.minLength, 1);
+  assert.equal(request.properties.message.maxLength, 4000);
+  assert.ok(request.required.includes('message'));
+
+  const response = readSchema(route.responseSchema);
+  assert.equal(response.additionalProperties, false);
+  assert.deepEqual(response.required, ['schema', 'version', 'mode', 'status', 'answer', 'requestId', 'creditCost']);
+  assert.equal(response.properties.mode.const, 'GENERAL');
+  assert.ok(response.required.includes('answer'));
+  assert.ok(response.required.includes('requestId'));
+  assert.ok(response.required.includes('creditCost'));
+  for (const privateField of ['message', 'projectId', 'selectedFieldIds', 'selectedEvidenceIds']) {
+    assert.equal(Object.hasOwn(response.properties, privateField), false);
+  }
+  assert.ok(readSchema('project-ai-activity-history.v1.json')
+    .properties.activities.items.properties.outcome.enum.includes('COMPLETED'));
+});
+
+test('the committed OpenAPI document is reproducible from the route and schema contracts', () => {
+  const generated = spawnSync(
+    process.execPath,
+    [path.join(root, 'openapi', 'generate.mjs'), '--check'],
+    { cwd: repositoryRoot, encoding: 'utf8' },
+  );
+  assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+
+  const document = readJson('openapi/openapi.v1.json');
+  const manifest = readJson('routes.v1.json');
+  assert.equal(document.openapi, '3.1.0');
+  assert.equal(document.info.title, 'Evidrilo API');
+  assert.deepEqual(
+    Object.keys(document.paths).sort(),
+    [...new Set(manifest.routes.map((route) => route.path.replace(/:\w+(?=\})/g, '')))].sort(),
+  );
+
+  const publicRoutes = manifest.routes
+    .filter((route) => route.authentication === 'none')
+    .map((route) => `${route.method} ${route.path}`)
+    .sort();
+  assert.deepEqual(publicRoutes, [
+    'GET /health/live',
+    'GET /health/ready',
+    'GET /v1/project-template-families',
+    'GET /v1/project-templates',
+    'GET /v1/project-templates/{templateId}/versions/{templateVersion:int}',
+  ]);
+
+  for (const route of manifest.routes) {
+    const pathKey = route.path.replace(/:\w+(?=\})/g, '');
+    const operation = document.paths[pathKey][route.method.toLowerCase()];
+    assert.ok(operation, `${route.method} ${route.path} must be in OpenAPI`);
+    assert.ok(operation.responses.default, `${route.method} ${route.path} must document safe API errors`);
+    assert.ok(operation['x-evidrilo-test']);
+    if (route.requestSchema) {
+      assert.ok(operation.requestBody, `${route.method} ${route.path} must document its request schema`);
+    }
+  }
+
+  assert.deepEqual(document.paths['/health/ready'].get.security, []);
+  assert.deepEqual(document.paths['/v1/project-templates'].get.security, []);
+  assert.ok(document.paths['/v1/account/me'].get.security.length > 0);
+  assert.deepEqual(
+    document.paths['/v1/billing/webhook'].post.security,
+    [{ RevenueCatWebhookAuthorization: [] }, { RevenueCatWebhookSignature: [] }],
+  );
+  assert.ok(document.paths['/v1/projects/{projectId}'].parameters.some((parameter) =>
+    parameter.name === 'projectId' && parameter.schema.format === 'uuid'));
+  assert.ok(document.paths['/v1/projects'].get.parameters.some((parameter) =>
+    parameter.name === 'beforeCreatedAt' && parameter.schema.format === 'date-time'));
+  assert.ok(document.paths['/v1/project-ai/activity'].get.parameters.some((parameter) =>
+    parameter.name === 'installationId' && parameter.required));
+  assert.ok(document.paths['/v1/project-ai/stage-assist'].post.parameters.some((parameter) =>
+    parameter.name === 'Idempotency-Key' && parameter.in === 'header' && parameter.required));
+  assert.equal(document.paths['/v1/ai/assist'].post.parameters[0].required, false);
+  assert.equal(document.paths['/v1/account/me'].delete.parameters[0].schema.const, 'delete-my-account');
+  assert.ok(document.components.schemas['student-project.v1'].$defs.projectDocument);
+  assert.ok(document.paths['/v1/project-ai/stage-assist'].post.requestBody.content['application/json']);
+  assert.ok(document.paths['/v1/ai/assist'].post.responses['2XX'].content[
+    'application/vnd.evidrilo.ai-assist-result.v2+json']);
+  const checkReferences = (value, location = '$') => {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => checkReferences(item, `${location}[${index}]`));
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (typeof value.$ref === 'string') {
+      assert.match(value.$ref, /^#\/components\/schemas\//, `${location} must resolve locally`);
+      const pointer = value.$ref.slice(2).split('/').map((part) =>
+        part.replaceAll('~1', '/').replaceAll('~0', '~'));
+      const target = pointer.reduce((current, part) => current?.[part], document);
+      assert.notEqual(target, undefined, `${location} points to a defined schema`);
+    }
+    Object.entries(value).forEach(([key, nested]) => checkReferences(nested, `${location}.${key}`));
+  };
+  checkReferences(document.paths);
+  checkReferences(document.components.schemas);
+  assert.equal(JSON.stringify(document).includes('OPENAI_API_KEY'), false);
+  assert.equal(JSON.stringify(document).includes('SUPABASE_SECRET_KEY'), false);
 });
 
 test('notification preference updates require an optimistic revision precondition', () => {

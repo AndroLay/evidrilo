@@ -43,7 +43,7 @@ public sealed class ProjectAiConsentEndpointTests
         using var client = factory.CreateClient();
 
         using var notGranted = await SendAsAsync(client, HttpMethod.Get, "/v1/project-ai/consent", FirstAccount);
-        using var notGrantedBody = JsonDocument.Parse(await notGranted.Content.ReadAsStringAsync());
+        using var notGrantedBody = JsonDocument.Parse(await notGranted.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(HttpStatusCode.OK, notGranted.StatusCode);
         AssertExactKeys(notGrantedBody.RootElement,
             "schema", "version", "granted", "policyVersion", "grantedAt", "revokedAt", "generation");
@@ -52,7 +52,7 @@ public sealed class ProjectAiConsentEndpointTests
 
         using var grant = await SendAsAsync(client, HttpMethod.Put, "/v1/project-ai/consent", FirstAccount,
             ConsentBody(ProjectAiConsentPolicy.CurrentPolicyVersion));
-        using var grantedBody = JsonDocument.Parse(await grant.Content.ReadAsStringAsync());
+        using var grantedBody = JsonDocument.Parse(await grant.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
         AssertExactKeys(grantedBody.RootElement,
             "schema", "version", "granted", "policyVersion", "grantedAt", "revokedAt", "generation");
@@ -60,7 +60,7 @@ public sealed class ProjectAiConsentEndpointTests
         Assert.Equal(JsonValueKind.Null, grantedBody.RootElement.GetProperty("revokedAt").ValueKind);
 
         using var revoke = await SendAsAsync(client, HttpMethod.Delete, "/v1/project-ai/consent", FirstAccount);
-        using var revokedBody = JsonDocument.Parse(await revoke.Content.ReadAsStringAsync());
+        using var revokedBody = JsonDocument.Parse(await revoke.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
         AssertExactKeys(revokedBody.RootElement,
             "schema", "version", "granted", "policyVersion", "grantedAt", "revokedAt", "generation");
@@ -77,7 +77,7 @@ public sealed class ProjectAiConsentEndpointTests
 
         using var response = await SendAsAsync(client, HttpMethod.Put, "/v1/project-ai/consent", FirstAccount,
             ConsentBody("project-ai-data.v0"));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("PROJECT_AI_CONSENT_POLICY_STALE", body.RootElement.GetProperty("code").GetString());
@@ -97,7 +97,7 @@ public sealed class ProjectAiConsentEndpointTests
             "/v1/project-ai/scaffold",
             FirstAccount,
             ScaffoldBody(optedIn: true, projectDataConsent: true, consentVersion: ProjectAiConsentPolicy.CurrentPolicyVersion));
-        using var missingConsentBody = JsonDocument.Parse(await unconsented.Content.ReadAsStringAsync());
+        using var missingConsentBody = JsonDocument.Parse(await unconsented.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Forbidden, unconsented.StatusCode);
         Assert.Equal("PROJECT_AI_CONSENT_REQUIRED", missingConsentBody.RootElement.GetProperty("code").GetString());
@@ -121,7 +121,7 @@ public sealed class ProjectAiConsentEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, legacyFalseClaims.StatusCode);
-        using (var disabledBody = JsonDocument.Parse(await legacyFalseClaims.Content.ReadAsStringAsync()))
+        using (var disabledBody = JsonDocument.Parse(await legacyFalseClaims.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken)))
             Assert.Equal("PROJECT_AI_NOT_READY", disabledBody.RootElement.GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.OK, revoked.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, afterRevocation.StatusCode);
@@ -134,7 +134,7 @@ public sealed class ProjectAiConsentEndpointTests
         using var factory = CreateFactory(store);
         using var client = factory.CreateClient();
 
-        using var anonymous = await client.GetAsync("/v1/project-ai/consent");
+        using var anonymous = await client.GetAsync("/v1/project-ai/consent", cancellationToken: TestContext.Current.CancellationToken);
         using var unverified = await SendAsAsync(
             client,
             HttpMethod.Put,

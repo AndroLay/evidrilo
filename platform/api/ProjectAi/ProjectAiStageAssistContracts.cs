@@ -87,7 +87,12 @@ public sealed record ProjectAiStageAssistProviderRequest(
     IReadOnlyList<string> AllowedOutputFieldIds,
     IReadOnlyList<string> MethodSpecificLimitations,
     IReadOnlyList<string> ProvenanceRequirements,
-    string Locale);
+    string Locale)
+{
+    public Guid AccountId { get; init; }
+
+    public string RequestId { get; init; } = string.Empty;
+}
 
 public sealed record ProjectAiStageAssistEvidenceReference(
     [property: JsonPropertyName("id")] string Id,

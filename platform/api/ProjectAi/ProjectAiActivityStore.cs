@@ -14,8 +14,9 @@ public static class ProjectAiActivityOutcomes
     public const string Dismissed = "DISMISSED";
     public const string Stale = "STALE";
     public const string Failed = "FAILED";
+    public const string Completed = "COMPLETED";
 
-    public static bool IsFinal(string? outcome) => outcome is Applied or Edited or Dismissed or Stale or Failed;
+    public static bool IsFinal(string? outcome) => outcome is Applied or Edited or Dismissed or Stale or Failed or Completed;
 }
 
 public sealed record ProjectAiActivityCreate(
@@ -292,6 +293,7 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
             || (outcome is ProjectAiActivityOutcomes.Applied or ProjectAiActivityOutcomes.Edited
                 or ProjectAiActivityOutcomes.Dismissed)
                 != (requestedSettlementOutcome is not null && settlementHash is not null)
+            || (requestedSettlementOutcome is null) != (settlementHash is null)
             || (requestedSettlementOutcome is not null
                 && requestedSettlementOutcome is not (ProjectAiActivityOutcomes.Applied or ProjectAiActivityOutcomes.Edited
                     or ProjectAiActivityOutcomes.Dismissed or ProjectAiActivityOutcomes.Stale))

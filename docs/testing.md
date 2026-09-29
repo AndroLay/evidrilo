@@ -17,11 +17,12 @@ bash
 bash scripts/ci/verify-local.sh
 ```
 
-The harness covers Kotlin module tests and supported target compilation, an
-Android release bundle when JDK 21 is available, Node contract and repository
-guards, asset and deployment checks, and .NET API/worker tests when their
-toolchains are available. The output explicitly reports `UNAVAILABLE` toolchains;
-do not treat a skipped/unavailable check as a pass.
+The harness covers Kotlin/JVM and Android host tests, supported target
+compilation, an Android release bundle when JDK 21 is available, Node contract
+and repository guards, asset and deployment checks, and .NET API/worker tests
+when their toolchains and packages are available. iOS simulator compilation
+requires macOS/Xcode and is reported `UNAVAILABLE` on other hosts. The output
+explicitly reports unavailable checks; do not treat one as a pass.
 
 ## Focused checks
 
@@ -128,12 +129,18 @@ AI and credit tests must additionally cover:
 - a forward database migration that permits a 200-credit grant while keeping
   per-request cost validation independent of grant size;
 - consent and balance UI copy that matches the verified account's current grant;
-- operation settlement that matches the adopted 3-credit scaffold / 1-credit
-  standard-assist policy unless a separate owner decision changes those costs;
-- no rollover, lifetime allowance, anonymous grant, or paid top-up;
-- RevenueCat period/webhook replay idempotency and grant expiry;
+- token-priced settlement that reserves the bounded maximum from the selected
+  model rates, calculates actual cost from validated provider-reported usage,
+  rounds up at $0.001 per credit, and stays within the 200-credit request cap;
+- valid Project AI previews are charged at generation whether applied or
+  dismissed; recording that choice must not charge or release credits again;
+- additive 200-credit grants for each earned Pro entitlement month, including
+  yearly plans, with no reset or expiry after Pro ends;
+- one-time 20-credit Free grant plus the first Pro grant yields 220 credits;
+- RevenueCat period/webhook replay idempotency and no duplicate monthly grant;
+- reservations and partial settlements spanning multiple accumulated grants;
 - concurrent reservation cannot overspend or double-charge an account;
-- accepted schema-valid output consumes exactly one credit;
+- accepted schema-valid output consumes its calculated token-based charge;
 - timeout, cancellation, provider failure, malformed output, policy rejection,
   and disabled-provider fallback release the reservation;
 - account isolation, deletion behavior, request idempotency, rate limits, and

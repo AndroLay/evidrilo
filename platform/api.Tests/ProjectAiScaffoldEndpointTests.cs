@@ -65,10 +65,10 @@ public sealed class ProjectAiScaffoldEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Scaffold_request_requires_authentication_and_verified_email()
     {
-        using var anonymous = await client.PostAsync("/v1/project-ai/scaffold", Json(ValidRequest()));
+        using var anonymous = await client.PostAsync("/v1/project-ai/scaffold", Json(ValidRequest()), cancellationToken: TestContext.Current.CancellationToken);
         using var unverifiedRequest = Request(ValidRequest());
         unverifiedRequest.Headers.Add("X-Test-User", $"{AccountId}|false");
-        using var unverified = await client.SendAsync(unverifiedRequest);
+        using var unverified = await client.SendAsync(unverifiedRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, unverified.StatusCode);
@@ -79,8 +79,8 @@ public sealed class ProjectAiScaffoldEndpointTests : IClassFixture<ApiFactory>
     {
         using var request = Request(ValidRequest(projectDataConsent: false));
         request.Headers.Add("X-Test-User", $"{AccountId}|true");
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -91,8 +91,8 @@ public sealed class ProjectAiScaffoldEndpointTests : IClassFixture<ApiFactory>
     {
         using var request = Request(ValidRequest());
         request.Headers.Add("X-Test-User", $"{AccountId}|true");
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());

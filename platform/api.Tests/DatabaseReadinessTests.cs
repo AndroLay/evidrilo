@@ -47,7 +47,7 @@ public sealed class DatabaseReadinessTests
                 migrationLedgerExists: true,
                 currentMigrationApplied: true));
         Assert.Equal(
-            "050_ai_token_pricing_and_credit_grants",
+            "052_project_ai_general_completed_outcome",
             DatabaseSchemaReadiness.CurrentMigrationVersion);
     }
 }

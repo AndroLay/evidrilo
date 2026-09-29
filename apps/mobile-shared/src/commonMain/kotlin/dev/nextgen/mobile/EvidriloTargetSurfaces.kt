@@ -73,6 +73,7 @@ import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionRelation
 import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
+import dev.nextgen.mobile.billing.REVENUECAT_PRO_FEATURE_ENABLED
 import dev.nextgen.mobile.domain.conclusion.ConclusionImplication
 import dev.nextgen.mobile.audio.AudioPlaybackState
 import dev.nextgen.mobile.audio.EvidriloAudioListenControl
@@ -256,11 +257,6 @@ private fun TargetCompactHeader(
             },
         )
     }
-}
-
-@Composable
-private fun TargetBrandPageHeader(onSettings: (() -> Unit)? = null) {
-    EvidriloBrandHeader(onSettings = onSettings)
 }
 
 @Composable
@@ -478,8 +474,10 @@ internal fun EvidriloTargetSourcesScreen(
     onOpenProjects: () -> Unit = onOpenWorkspace,
 ) {
     EvidriloTargetSurface(EvidriloTargetSection.SOURCES, onNavigate) {
-        EvidriloContentColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TargetBrandPageHeader()
+        EvidriloContentColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            includeBottomSafeArea = false,
+        ) {
             TargetPageIntro(
                 title = "Start with your\nmaterials.",
                 body = "Organize an assignment, criteria, and source notes inside a project. You decide what becomes a finding.",
@@ -767,8 +765,7 @@ internal fun EvidriloTargetWorkspaceScreen(
         else -> "${metrics.gapCount} open support gaps"
     }
     EvidriloTargetSurface(EvidriloTargetSection.HOME, onNavigate) {
-        EvidriloContentColumn {
-            TargetBrandPageHeader()
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = EvidriloTargetWorkspaceCopy.caseHeading,
                 onBack = { onNavigate(EvidriloTargetSection.HOME) },
@@ -845,7 +842,7 @@ internal fun EvidriloTargetEvidenceScreen(
     val selectedEvidence = draft.evidenceRefs.toSet()
     val metrics = targetWorkspaceMetrics(case, draft)
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = "Evidence Map",
                 onBack = { onNavigate(EvidriloTargetSection.HOME) },
@@ -899,7 +896,7 @@ internal fun EvidriloTargetEvidenceLensScreen(
     val lens = evidenceLensFor(case, draft)
     var selectedFactId by remember(case.id) { mutableStateOf<String?>(null) }
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = "Evidence Lens",
                 onBack = onBack,
@@ -1298,7 +1295,7 @@ internal fun EvidriloTargetActionScreen(
         }
     }
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = "Action Plan",
                 onBack = { onNavigate(EvidriloTargetSection.HOME) },
@@ -1340,7 +1337,7 @@ internal fun EvidriloTargetClaimTraceScreen(
     var isRequirementDetailOpen by remember(case.id) { mutableStateOf(false) }
     var selectedEvidenceFactId by remember(case.id) { mutableStateOf<String?>(null) }
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = "Requirement Trace",
                 onBack = onBack,
@@ -1409,7 +1406,7 @@ internal fun EvidriloTargetClaimBoundaryScreen(
     onStartPractice: () -> Unit,
 ) {
     EvidriloTargetSurface(EvidriloTargetSection.EVIDENCE, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(
                 title = "Claim Boundary",
                 onBack = onBack,
@@ -1465,7 +1462,7 @@ internal fun EvidriloTargetVerifyClaimScreen(
 ) {
     var showVerificationDetails by remember(evaluation) { mutableStateOf(false) }
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(title = "Verify Claim", onBack = onBack, backLabel = "Action Plan")
             TargetPageIntro(
                 title = "Does the claim stay inside the evidence?",
@@ -1513,7 +1510,7 @@ internal fun EvidriloTargetEvidenceDeltaScreen(
     challengeAvailable: Boolean = true,
 ) {
     EvidriloTargetSurface(EvidriloTargetSection.ACTION, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             TargetCompactHeader(title = "What Changed?", onBack = onBack, backLabel = "Action Plan")
             TargetPageIntro(
                 title = "See what changed.",
@@ -1555,7 +1552,9 @@ internal fun EvidriloTargetProfileScreen(
     onNavigate: (EvidriloTargetSection) -> Unit,
     onOpenPremium: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenWorkspacePreferences: () -> Unit,
+    onOpenPrivacyData: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenLocalProjects: () -> Unit,
     onOpenSupport: () -> Unit,
@@ -1563,7 +1562,6 @@ internal fun EvidriloTargetProfileScreen(
     EvidriloTargetSurface(EvidriloTargetSection.PROFILE, onNavigate) {
         EvidriloContentColumn {
             EvidriloBackButton(label = "Home", onClick = onBack)
-            TargetBrandPageHeader()
             TargetPageIntro(
                 title = "Your workspace.",
                 body = if (TEMPORARY_GUEST_MODE_ENABLED) {
@@ -1580,7 +1578,7 @@ internal fun EvidriloTargetProfileScreen(
                 history = history,
                 onClick = onOpenAccount,
             )
-            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetCobaltCard(
+            if (REVENUECAT_PRO_FEATURE_ENABLED) TargetCobaltCard(
                 modifier = Modifier
                     .clickable(onClick = onOpenPremium)
                     .semantics(mergeDescendants = true) {
@@ -1611,13 +1609,13 @@ internal fun EvidriloTargetProfileScreen(
                 icon = EvidriloIconName.SETTINGS,
                 title = "Workspace preferences",
                 subtitle = "Customize your workspace",
-                onClick = onOpenSettings,
+                onClick = onOpenWorkspacePreferences,
             )
             TargetSettingsRow(
                 icon = EvidriloIconName.BELL,
                 title = "Notifications",
                 subtitle = "Off by default · local reminders",
-                onClick = onOpenSettings,
+                onClick = onOpenNotifications,
             )
             if (!TEMPORARY_GUEST_MODE_ENABLED) TargetSettingsRow(
                 icon = EvidriloIconName.DATABASE,
@@ -1627,15 +1625,9 @@ internal fun EvidriloTargetProfileScreen(
             )
             TargetSettingsRow(
                 icon = EvidriloIconName.SHIELD,
-                title = "Privacy",
+                title = "Privacy & data",
                 subtitle = "Your data, your control",
-                onClick = onOpenSettings,
-            )
-            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetSettingsRow(
-                icon = EvidriloIconName.LAYERS,
-                title = "Premium cases",
-                subtitle = "Two additional cases · monthly/yearly access",
-                onClick = onOpenPremium,
+                onClick = onOpenPrivacyData,
             )
             TargetSettingsRow(
                 icon = EvidriloIconName.HISTORY,
@@ -1706,11 +1698,13 @@ internal fun EvidriloTargetHistoryScreen(
     var confirmClear by remember { mutableStateOf(false) }
     val summary = targetHistorySummary(history)
     EvidriloTargetSurface(selected = selectedSection, onNavigate = onNavigate) {
-        EvidriloContentColumn {
-            TargetBrandPageHeader()
+        EvidriloContentColumn(
+            includeBottomSafeArea = !shouldShowTargetBottomNavigation(selectedSection),
+        ) {
+            EvidriloBackButton(label = backLabel, onClick = onBack)
             TargetPageIntro(
                 title = "Track what changed.",
-                body = "Follow your progress, revisions,\nand resolved evidence gaps.",
+                body = "Follow how evidence, claims, and actions changed.",
             )
             storageNotice
                 ?.takeIf { it.isError }
@@ -1725,37 +1719,30 @@ internal fun EvidriloTargetHistoryScreen(
                 }
                 EvidriloPrimaryButton(label = "Start evidence review", onClick = onStartPractice)
             } else {
-                TargetCobaltCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TargetIconTile(icon = EvidriloIconName.HISTORY, tint = EvidriloColors.White)
-                        Text("This workspace", modifier = Modifier.padding(start = 14.dp), style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
-                    }
+                EvidriloTargetCard {
+                    Text("This workspace", style = MaterialTheme.typography.titleLarge)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TargetMetric(summary.evidenceRemoved.toString(), "evidence removed", EvidriloColors.White)
-                        TargetMetric(summary.evidenceAdded.toString(), "evidence added", EvidriloColors.White)
-                        TargetMetric(summary.actionsChanged.toString(), "actions changed", EvidriloColors.White)
+                        TargetMetric(summary.evidenceRemoved.toString(), "evidence removed", EvidriloColors.Ink, EvidriloColors.Slate, Modifier.weight(1f))
+                        TargetMetric(summary.evidenceAdded.toString(), "evidence added", EvidriloColors.Ink, EvidriloColors.Slate, Modifier.weight(1f))
+                        TargetMetric(summary.actionsChanged.toString(), "actions changed", EvidriloColors.Ink, EvidriloColors.Slate, Modifier.weight(1f))
                     }
                 }
                 Text("Latest local comparison", style = MaterialTheme.typography.titleLarge)
                 TargetHistoryEventRow(
-                    icon = EvidriloIconName.LAYERS,
                     title = targetHistoryEvidenceLabel(summary),
                     body = "${summary.evidenceAdded} added · ${summary.evidenceRemoved} removed",
                 )
                 TargetHistoryEventRow(
-                    icon = EvidriloIconName.CHECKLIST,
                     title = targetHistoryResultLabel(history),
                     body = "The learner-authored before/after state is available locally.",
                 )
                 TargetHistoryEventRow(
-                    icon = EvidriloIconName.SHIELD,
                     title = "Boundary kept visible",
                     body = "History does not turn a bounded case into a scientific-truth score.",
                 )
                 EvidriloPrimaryButton(label = "View evidence delta", onClick = onOpenDelta)
                 EvidriloSecondaryButton(label = "Clear local comparison", onClick = { confirmClear = true })
             }
-            EvidriloBackButton(label = backLabel, onClick = onBack)
         }
     }
     if (confirmClear) {
@@ -1788,24 +1775,15 @@ internal fun EvidriloTargetHistoryScreen(
 
 @Composable
 private fun TargetHistoryEventRow(
-    icon: EvidriloIconName,
     title: String,
     body: String,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Surface(modifier = Modifier.size(46.dp), shape = RoundedCornerShape(16.dp), color = EvidriloColors.PaleBlue) {
-            Box(contentAlignment = Alignment.Center) {
-                EvidriloIcon(icon, tint = EvidriloColors.Cobalt)
-            }
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(body, style = MaterialTheme.typography.bodyMedium)
-        }
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(body, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -2459,10 +2437,16 @@ private fun RowScope.TargetMetricCard(icon: EvidriloIconName, value: String, lab
 }
 
 @Composable
-private fun TargetMetric(value: String, label: String, color: androidx.compose.ui.graphics.Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, style = MaterialTheme.typography.titleLarge, color = color)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.78f))
+private fun TargetMetric(
+    value: String,
+    label: String,
+    valueColor: androidx.compose.ui.graphics.Color,
+    labelColor: androidx.compose.ui.graphics.Color = valueColor.copy(alpha = 0.78f),
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value, style = MaterialTheme.typography.titleLarge, color = valueColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = labelColor)
     }
 }
 

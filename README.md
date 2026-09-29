@@ -10,10 +10,10 @@ Students can organize their own local project or practice separately with a
 bundled synthetic case. The case is not a project template and does not fill in
 a student's research.
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.12.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![RevenueCat](https://img.shields.io/badge/RevenueCat-KMP%203.7.0-00AEEF)](https://www.revenuecat.com/)
+[![RevenueCat](https://img.shields.io/badge/RevenueCat-KMP%203.10.1-00AEEF)](https://www.revenuecat.com/)
 [![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
 
 [Features](#features) · [Landing page](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md) · [Quick start](#quick-start) ·
@@ -229,12 +229,12 @@ the optional platform API uses ASP.NET Core/.NET 10 with PostgreSQL.
 
 | Layer | Technology | Responsibility |
 | --- | --- | --- |
-| Shared mobile | Kotlin Multiplatform 2.3.20 | Domain, evaluator, state, persistence contracts, and network boundary |
-| Shared UI | Compose Multiplatform 1.11.1 | Android/iOS presentation and JVM walkthrough |
-| Native hosts | Android SDK/API 35; SwiftUI/Xcode | Lifecycle, secure storage, audio, HTTP, and packaging |
-| Billing | RevenueCat KMP 3.7.0 | Offerings, purchase/restore boundary, entitlements, and paywall integration |
+| Shared mobile | Kotlin Multiplatform 2.4.20 | Domain, evaluator, state, persistence contracts, and network boundary |
+| Shared UI | Compose Multiplatform 1.12.1 | Android/iOS presentation and JVM walkthrough |
+| Native hosts | Android compileSdk 37 / targetSdk 35; SwiftUI/Xcode | Lifecycle, secure storage, audio, HTTP, and packaging |
+| Billing | RevenueCat KMP 3.10.1 | Offerings, purchase/restore boundary, entitlements, and paywall integration |
 | API | ASP.NET Core / .NET 10 | Versioned REST, verified-auth policy, rate limits, and health checks |
-| Data | PostgreSQL 16 / Npgsql 10.0 | Content, accounts, projections, and audit persistence |
+| Data | PostgreSQL 16 / Npgsql 10.0.3 | Content, accounts, projections, and audit persistence |
 | Worker | .NET 10 hosted worker | Bounded background processing, retries, and projections |
 | Local operations | Docker Compose and migration ledger | Reproducible local API/worker/PostgreSQL stack |
 | Landing page | Vanilla HTML/CSS/JavaScript | Responsive static site and interactive synthetic-case walkthrough |

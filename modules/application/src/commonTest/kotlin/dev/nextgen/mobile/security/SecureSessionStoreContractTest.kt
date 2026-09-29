@@ -31,7 +31,7 @@ class SecureSessionStoreContractTest {
 
         assertEquals(record, store.read())
         val encoded = SecureSessionRecordCodec.encode(record)
-        assertEquals(6, encoded.split('.').size)
+        assertEquals(8, encoded.split('.').size)
         assertFalse("refresh-token" in encoded)
         assertNull(store.toString().takeIf { "access-token" in it })
         store.clear()
@@ -48,7 +48,7 @@ class SecureSessionStoreContractTest {
         val encoded = SecureSessionRecordCodec.encode(record)
         val restored = SecureSessionRecordCodec.decode(encoded)
 
-        assertEquals(6, encoded.split('.').size)
+        assertEquals(8, encoded.split('.').size)
         assertEquals(record, restored)
         assertNotNull(restored).material.refreshToken
         assertFalse("refresh-token" in restored.toString())
@@ -84,6 +84,34 @@ class SecureSessionStoreContractTest {
         assertEquals(linked, SecureSessionRecordCodec.decode(encoded))
         val oldFiveField = encoded.split('.').take(5).joinToString(".")
         assertNull(SecureSessionRecordCodec.decode(oldFiveField)?.account?.googleLinked)
+    }
+
+    @Test
+    fun apple_identity_and_verified_email_round_trip_while_legacy_records_keep_unknown_defaults() {
+        val linked = StoredAccountSession(
+            account = AccountSummary(
+                accountId = "123e4567-e89b-42d3-a456-426614174000",
+                emailVerified = true,
+                googleLinked = false,
+                appleLinked = true,
+                email = "student@privaterelay.appleid.com",
+            ),
+            material = SecureSessionMaterial("access-token", 200L, "refresh-token"),
+        )
+
+        val encoded = SecureSessionRecordCodec.encode(linked)
+        val decoded = SecureSessionRecordCodec.decode(encoded)
+        val legacySixField = encoded.split('.').take(6).joinToString(".")
+        val legacyDecoded = SecureSessionRecordCodec.decode(legacySixField)
+
+        assertEquals(8, encoded.split('.').size)
+        assertEquals(linked, decoded)
+        assertFalse("student@privaterelay.appleid.com" in linked.account.toString())
+        assertFalse("student@privaterelay.appleid.com" in linked.toString())
+        assertFalse("student@privaterelay.appleid.com" in encoded)
+        assertEquals(false, legacyDecoded?.account?.googleLinked)
+        assertNull(legacyDecoded?.account?.appleLinked)
+        assertNull(legacyDecoded?.account?.email)
     }
 
     @Test

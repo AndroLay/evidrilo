@@ -150,10 +150,6 @@ class ProjectAiScaffoldGateway(
 
         val parsed = parsePreview(response)
             ?: return ProjectAiScaffoldGatewayResult.Rejected("INVALID_PROJECT_AI_RESPONSE")
-        val expectedCreditCost = when (request.operation) {
-            ProjectAiScaffoldOperation.CREATE_PROJECT -> 3
-            ProjectAiScaffoldOperation.ASSIST_PROJECT -> 1
-        }
         if (parsed.proposal.templateId != request.templateId
             || parsed.proposal.templateVersion != request.templateVersion
             || parsed.operation != request.operation
@@ -161,9 +157,6 @@ class ProjectAiScaffoldGateway(
             || parsed.proposal.baseProjectRevision != request.baseProjectRevision
         ) {
             return ProjectAiScaffoldGatewayResult.Rejected("PROJECT_AI_RESPONSE_CONTEXT_MISMATCH")
-        }
-        if (parsed.creditCost != expectedCreditCost) {
-            return ProjectAiScaffoldGatewayResult.Rejected("INVALID_PROJECT_AI_RESPONSE")
         }
         return ProjectAiScaffoldGatewayResult.Preview(parsed.proposal, response.requestId(), parsed.creditCost)
     }
@@ -251,7 +244,7 @@ class ProjectAiScaffoldGateway(
             is JsonPrimitive -> value.content.also { require(projectIdPattern.matches(it)) }
             else -> error("project id invalid")
         }
-        val creditCost = root.int("creditCost").also { require(it in 1..100) }
+        val creditCost = root.int("creditCost").also { require(it in 1..PROJECT_AI_MAX_CREDITS_PER_REQUEST) }
         val baseProjectRevision = when (val value = root["baseProjectRevision"]) {
             JsonNull -> null
             is JsonPrimitive -> value.content.toIntOrNull()?.also { require(it > 0) }

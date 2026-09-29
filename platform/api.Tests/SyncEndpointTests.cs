@@ -20,8 +20,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
     {
         using var response = await client.PostAsJsonAsync(
             "/v1/sync/commands",
-            ValidRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -36,8 +36,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -70,8 +70,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_COMMAND", body.GetProperty("code").GetString());
@@ -104,8 +104,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_REQUEST", body.GetProperty("code").GetString());
@@ -121,8 +121,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_REQUEST", body.GetProperty("code").GetString());
@@ -153,8 +153,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_REQUEST", body.GetProperty("code").GetString());
@@ -184,8 +184,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_REQUEST", body.GetProperty("code").GetString());
@@ -199,8 +199,8 @@ public sealed class SyncEndpointTests : IClassFixture<ApiFactory>
             "/v1/sync/pull?cursor=1000000000000001&limit=1");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_SYNC_CURSOR", body.GetProperty("code").GetString());

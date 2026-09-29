@@ -131,6 +131,55 @@ object NotificationPreferencesCodec {
     }
 }
 
+/** Minimal local state needed to restore the exact opted-in reminders after a device restart. */
+data class NotificationScheduleSnapshot(
+    val preferences: NotificationPreferences,
+    val categories: List<LocalNotificationCategory>,
+    /** Calendar.DAY_OF_WEEK anchor (1..7) for weekly reminders; absent for daily reminders. */
+    val weeklyDayOfWeek: Int? = null,
+) {
+    val isValid: Boolean
+        get() = preferences.enabled && preferences.isValid && categories.isNotEmpty() &&
+            (if (preferences.cadence == NotificationCadence.WEEKLY) {
+                weeklyDayOfWeek in 1..7
+            } else {
+                weeklyDayOfWeek == null
+            }) &&
+            categories.distinct().size == categories.size && categories.all { category ->
+                when (category) {
+                    LocalNotificationCategory.CONTINUE_UNFINISHED -> preferences.continueUnfinishedEnabled
+                    LocalNotificationCategory.REVIEW_COMPLETED -> preferences.reviewCompletedEnabled
+                }
+            }
+}
+
+object NotificationScheduleSnapshotCodec {
+    private const val VERSION = "v1"
+
+    fun encode(snapshot: NotificationScheduleSnapshot): String? {
+        if (!snapshot.isValid) return null
+        return listOf(
+            VERSION,
+            NotificationPreferencesCodec.encode(snapshot.preferences),
+            snapshot.categories.joinToString(",") { it.id },
+            snapshot.weeklyDayOfWeek?.toString() ?: "-",
+        ).joinToString("~")
+    }
+
+    fun decode(value: String?): NotificationScheduleSnapshot? = runCatching {
+        requireNotNull(value)
+        val fields = value.split('~')
+        require(fields.size == 4 && fields[0] == VERSION)
+        val preferences = requireNotNull(NotificationPreferencesCodec.decode(fields[1]))
+        val categories = fields[2].split(',').map { id ->
+            LocalNotificationCategory.entries.first { it.id == id }
+        }
+        val weeklyDayOfWeek = fields[3].takeUnless { it == "-" }?.toInt()
+        NotificationScheduleSnapshot(preferences, categories, weeklyDayOfWeek)
+            .also { require(it.isValid) }
+    }.getOrNull()
+}
+
 sealed interface LocalNotificationScheduleResult {
     data class Scheduled(
         val categories: List<LocalNotificationCategory>,

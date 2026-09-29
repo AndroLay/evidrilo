@@ -54,6 +54,7 @@ function createFixture() {
     'build.gradle.kts',
     'build.gradle.kts',
     'settings.gradle.kts',
+    'global.json',
     'local.properties.example',
     '.github/workflows/verify.yml',
     'apps/android/src.txt',
@@ -100,6 +101,8 @@ test('public allowlist follows the migrated repository roots', () => {
   const source = fs.readFileSync(checker, 'utf8');
   assert.match(source, /\.github\/\*\|apps\/\*\|modules\/\*\|contracts\/\*/);
   assert.match(source, /CODE_OF_CONDUCT\.md/);
+  assert.match(source, /global\.json/);
+  assert.match(source, /docs\/architecture\/apple-auth-setup\.md/);
   assert.doesNotMatch(source, /androidApp\/\*|composeApp\/\*/);
   assert.doesNotMatch(source, /platform\/contracts\/|deploy\/\*/);
 });

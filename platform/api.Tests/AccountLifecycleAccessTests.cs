@@ -109,8 +109,8 @@ public sealed class AccountLifecycleAccessTests
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Gone, response.StatusCode);
         Assert.Equal("ACCOUNT_DELETED", body.GetProperty("code").GetString());

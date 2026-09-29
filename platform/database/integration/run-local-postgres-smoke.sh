@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 container_name="evidrilo-postgres-smoke-$$"
 image="${EVIDRILO_POSTGRES_IMAGE:-postgres:16-alpine}"
+temporary_directory="${TMPDIR:-/tmp}"
 
 command -v docker >/dev/null 2>&1 || {
     echo "docker is required" >&2
@@ -47,8 +48,8 @@ docker cp "$repo_root/platform/database/migrations" \
     "$container_name:/tmp/evidrilo-migrations" >/dev/null
 
 database_url="postgresql://postgres@127.0.0.1:5432/evidrilo_it"
-first_migration_log="/tmp/evidrilo-migration-race-first-$$.log"
-second_migration_log="/tmp/evidrilo-migration-race-second-$$.log"
+first_migration_log="${temporary_directory%/}/evidrilo-migration-race-first-$$.log"
+second_migration_log="${temporary_directory%/}/evidrilo-migration-race-second-$$.log"
 docker exec -e "EVIDRILO_MIGRATION_DATABASE_URL=$database_url" \
     "$container_name" sh /tmp/evidrilo-migrations/apply-migrations.sh \
     >"$first_migration_log" 2>&1 &

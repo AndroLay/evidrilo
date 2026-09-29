@@ -74,10 +74,18 @@ deduction for using Test Store is published; the meaningful risk is an
 incomplete, mocked, or misleading purchase flow.
 
 RevenueCat also authorizes the optional AI allowance; it does not store or
-directly mutate the AI credit balance. D-126 sets the target policy at 20 one-time
-credits for a verified free account and 200 credits per active entitlement
-month for both monthly and yearly `evidrilo_pro`. Credits do not roll over, and
-failed AI requests release their reservation. See [D-126](../decisions.md#d-126-increase-the-free-and-pro-ai-credit-allowances) for current target amounts and [D-106](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance) for the assistance boundary.
+directly mutate the AI credit balance. D-126 sets the target grant amounts and
+D-130 makes them additive: a verified Free account gets 20 credits once, and
+each earned active entitlement month adds 200 credits for either monthly or
+yearly `evidrilo_pro`. Yearly plans do not receive an upfront annual grant.
+Earned credits do not expire when a grant period ends or when Pro ends. Failed
+AI requests release their reservation. D-127 prices successful requests from
+verified provider-token usage; there is no fixed credit price per AI operation.
+See [D-126](../decisions.md#d-126-increase-the-free-and-pro-ai-credit-allowances)
+for target grant amounts, [D-127](../decisions.md#d-127-charge-ai-credits-from-token-usage)
+for pricing, [D-130](../decisions.md#d-130-accumulate-pro-ai-credits-without-resetting-the-balance)
+for accumulation, and [D-106](../decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)
+for the assistance boundary.
 
 ## Mobile access flow
 
@@ -123,9 +131,10 @@ verified account + explicit AI consent
         → settle actual uncached/cached/cache-write input and output usage / release unused reserve
 ```
 
-Monthly and yearly packages use the same 200-credit grant for each active
+Monthly and yearly packages add the same 200-credit grant for each earned
 entitlement month. A yearly entitlement does not receive a single 2,400-credit
-balance, and unused credits do not roll over. AI cost is priced by uncached,
+balance; each earned monthly grant adds to the existing balance and does not
+expire. AI cost is priced by uncached,
 cached, and cache-write input plus output token categories and rounded up at
 the approved credit-to-dollar rate. Reasoning tokens are included in output.
 Entitlement-period grants must be

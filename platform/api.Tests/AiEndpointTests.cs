@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -17,8 +18,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Ai_assistance_requires_authenticated_identity()
     {
-        using var response = await client.PostAsJsonAsync("/v1/ai/assist", ValidRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.PostAsJsonAsync("/v1/ai/assist", ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -27,8 +28,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Ai_credits_require_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/ai/credits");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/ai/credits", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -40,8 +41,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/ai/credits");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -50,8 +51,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Ai_conversation_creation_requires_authenticated_identity()
     {
-        using var response = await client.PostAsJsonAsync("/v1/ai/conversations", ValidConversationStartRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.PostAsJsonAsync("/v1/ai/conversations", ValidConversationStartRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -66,8 +67,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_IDEMPOTENCY_KEY", body.GetProperty("code").GetString());
@@ -83,8 +84,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         request.Headers.Add("X-Test-User", $"{UserId}|true");
         request.Headers.Add("Idempotency-Key", "start_chat_0001");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -93,8 +94,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Ai_conversation_clear_requires_authenticated_identity()
     {
-        using var response = await client.DeleteAsync("/v1/ai/conversations/2c31ca7a-b10e-4f22-9409-b817aaf875f4");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.DeleteAsync("/v1/ai/conversations/2c31ca7a-b10e-4f22-9409-b817aaf875f4", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -105,8 +106,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     {
         using var response = await client.PostAsJsonAsync(
             "/v1/ai/conversations/2c31ca7a-b10e-4f22-9409-b817aaf875f4/turns",
-            ValidConversationTurnRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            ValidConversationTurnRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -123,8 +124,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_IDEMPOTENCY_KEY", body.GetProperty("code").GetString());
@@ -139,8 +140,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -156,8 +157,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         request.Headers.Add("X-Test-User", $"{UserId}|true");
         request.Headers.Add("Idempotency-Key", "contains spaces");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_IDEMPOTENCY_KEY", body.GetProperty("code").GetString());
@@ -172,13 +173,36 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("fallback", body.GetProperty("status").GetString());
+        Assert.Equal("1", body.GetProperty("version").GetString());
+        Assert.False(body.TryGetProperty("creditCost", out _));
         Assert.Equal("AI_OPT_IN_REQUIRED", body.GetProperty("reasonCode").GetString());
         Assert.Null(body.GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task Ai_assistance_returns_v2_cost_for_an_explicitly_unbilled_fallback()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/ai/assist")
+        {
+            Content = JsonContent.Create(ValidRequest(optedIn: false)),
+        };
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(
+            "application/vnd.evidrilo.ai-assist-result.v2+json"));
+
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/vnd.evidrilo.ai-assist-result.v2+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("2", body.GetProperty("version").GetString());
+        Assert.Equal("fallback", body.GetProperty("status").GetString());
+        Assert.Equal(0, body.GetProperty("creditCost").GetInt32());
     }
 
     [Fact]
@@ -195,8 +219,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_AI_REQUEST", body.GetProperty("code").GetString());
@@ -211,8 +235,8 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

@@ -21,7 +21,7 @@ class AiGatewayTest {
             AccountHttpResponse(
                 200,
                 """
-                {"schema":"evidrilo.ai-credits","version":"1","consentRecorded":true,"available":9,"grants":[{"grantKind":"free_once","grantKey":"free_once","granted":10,"reserved":1,"consumed":0,"available":9,"expiresAt":null}],"requestId":"req-ai-001"}
+                {"schema":"evidrilo.ai-credits","version":"1","consentRecorded":true,"available":19,"grants":[{"grantKind":"free_once","grantKey":"free_once","granted":20,"reserved":1,"consumed":0,"available":19,"expiresAt":null}],"requestId":"req-ai-001"}
                 """.trimIndent(),
             ),
             AccountHttpResponse(
@@ -58,7 +58,7 @@ class AiGatewayTest {
             },
         ).value
 
-        assertEquals(9, credits.available)
+        assertEquals(19, credits.available)
         assertEquals("The comparison is limited to the supplied observations.", result.text)
         assertEquals("GET", transport.requests[0].method)
         assertEquals("/v1/ai/credits", transport.requests[0].path)
@@ -69,6 +69,44 @@ class AiGatewayTest {
         assertTrue(transport.requests[1].body.contains("\"optedIn\":true"))
         assertTrue(transport.requests[1].body.contains("M0_T2:1"))
         assertTrue(transport.requests[1].body.contains("MISSING_EVIDENCE"))
+    }
+
+    @Test
+    fun `credits parser accepts the full free and active pro allowances`() {
+        val transport = QueueAiTransport(
+            AccountHttpResponse(
+                200,
+                """
+                {"schema":"evidrilo.ai-credits","version":"1","consentRecorded":true,"available":220,"grants":[{"grantKind":"free_once","grantKey":"free_once","granted":20,"reserved":0,"consumed":0,"available":20,"expiresAt":null},{"grantKind":"subscription_month","grantKey":"2026-09","granted":200,"reserved":0,"consumed":0,"available":200,"expiresAt":"2026-10-01T00:00:00Z"}],"requestId":"req-ai-full-allowance"}
+                """.trimIndent(),
+            ),
+        )
+
+        val credits = assertIs<AiGatewayResult.CreditsFound>(runSuspendTest { gateway(transport).getCredits() }).value
+
+        assertEquals(220, credits.available)
+        assertEquals(listOf(20, 200), credits.grants.map(AiCreditGrant::granted))
+    }
+
+    @Test
+    fun `assist requests and parses the negotiated server calculated charge`() {
+        val transport = QueueAiTransport(
+            AccountHttpResponse(
+                200,
+                """{"schema":"evidrilo.ai-assist-result","version":"2","status":"success","text":"A grounded explanation.","reasonCode":null,"promptVersion":"assist.v1","groundedAnchorIds":["OBS-01"],"requestId":"req-ai-cost-001","creditCost":4}""",
+            ),
+        )
+
+        val result = runSuspendTest {
+            gateway(transport).assist(
+                AiAssistRequest(AiAssistPurpose.EXPLAIN_FEEDBACK, "Explain this feedback.", "en-US", optedIn = true),
+                "ai-request-cost-001",
+            )
+        }
+
+        val assist = assertIs<AiGatewayResult.AssistFound>(result).value
+        assertEquals(4, assist.creditCost)
+        assertEquals("application/vnd.evidrilo.ai-assist-result.v2+json", transport.requests.single().headers["Accept"])
     }
 
     @Test
@@ -214,6 +252,58 @@ class AiGatewayTest {
         assertTrue(request.body.contains("Can you help me narrow this claim?"))
         assertTrue(request.body.contains("\"role\":\"assistant\""))
         assertTrue(request.body.contains("\"groundedAnchorIds\":[\"OBS-01\"]"))
+    }
+
+    @Test
+    fun `conversation turn exposes settled server cost and fallback cost`() {
+        val transport = QueueAiTransport(
+            AccountHttpResponse(
+                200,
+                """{"schema":"evidrilo.ai-conversation-turn","version":"2","status":"success","kind":"explanation","text":"The observation supports only a bounded comparison.","groundedAnchorIds":["OBS-01"],"autoApplied":false,"turnsUsed":1,"turnsRemaining":4,"requestId":"req-ai-cost-002","creditCost":4}""",
+            ),
+            AccountHttpResponse(
+                200,
+                """{"schema":"evidrilo.ai-conversation-turn","version":"2","status":"fallback","reasonCode":"AI_CONVERSATION_SESSION_EXPIRED","groundedAnchorIds":[],"autoApplied":false,"turnsUsed":0,"turnsRemaining":5,"requestId":"req-ai-cost-003","creditCost":2}""",
+            ),
+        )
+        val gateway = gateway(transport)
+
+        val success = runSuspendTest {
+            gateway.sendConversationTurn(
+                sessionId = "123e4567-e89b-42d3-a456-426614174111",
+                purpose = AiAssistPurpose.EXPLAIN_FEEDBACK,
+                input = "Explain this result.",
+                locale = "en-US",
+                optedIn = true,
+                context = conversationContext(),
+                learnerLimitation = null,
+                history = emptyList(),
+                idempotencyKey = "ai-conversation-cost-001",
+            )
+        }
+        val received = assertIs<AiConversationGatewayResult.TurnReceived>(success).value
+
+        assertEquals(4, received.creditCost)
+        assertEquals(
+            "application/vnd.evidrilo.ai-conversation-turn.v2+json",
+            transport.requests.first().headers["Accept"],
+        )
+
+        val fallback = runSuspendTest {
+            gateway.sendConversationTurn(
+                sessionId = "123e4567-e89b-42d3-a456-426614174111",
+                purpose = AiAssistPurpose.EXPLAIN_FEEDBACK,
+                input = "Explain this result.",
+                locale = "en-US",
+                optedIn = true,
+                context = conversationContext(),
+                learnerLimitation = null,
+                history = emptyList(),
+                idempotencyKey = "ai-conversation-cost-002",
+            )
+        }
+
+        assertEquals(2, assertIs<AiConversationGatewayResult.Fallback>(fallback).creditCost)
     }
 
     @Test

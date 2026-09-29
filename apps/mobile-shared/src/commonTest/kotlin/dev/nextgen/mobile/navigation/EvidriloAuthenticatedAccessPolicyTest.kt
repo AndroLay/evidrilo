@@ -97,6 +97,9 @@ class EvidriloAuthenticatedAccessPolicyTest {
             EvidriloDestination.HISTORY,
             EvidriloDestination.PROFILE,
             EvidriloDestination.SETTINGS,
+            EvidriloDestination.WORKSPACE_PREFERENCES,
+            EvidriloDestination.NOTIFICATIONS,
+            EvidriloDestination.PRIVACY_DATA,
         )
 
         EvidriloDestination.entries.filterNot(public::contains).forEach { destination ->

@@ -192,13 +192,23 @@ public static class ProjectAiScaffoldEndpoints
                     (validRequest.CurrentFields ?? new Dictionary<string, string>())
                         .ToDictionary(pair => pair.Key, pair => AiRedactor.Redact(pair.Value), StringComparer.Ordinal),
                     (validRequest.Constraints ?? Array.Empty<string>()).Select(AiRedactor.Redact).ToArray(),
-                    validRequest.Locale!);
+                    validRequest.Locale!)
+                {
+                    AllowedOutputFieldIds = ProjectAiScaffoldValidator.AllowedSuggestionFieldIds(template!),
+                };
                 int maximumCreditCost;
                 try
                 {
                     maximumCreditCost = generator.EstimateMaximumCreditCost(providerRequest);
                     if (maximumCreditCost is < 1 or > AiCreditPricing.MaximumCreditsPerRequest)
                         return Unavailable(context, "PROJECT_AI_COST_UNAVAILABLE");
+                }
+                catch (AiProviderFailureException exception)
+                    when (exception.ReasonCode == "PROJECT_AI_CONTEXT_TOO_LARGE")
+                {
+                    return Results.Json(
+                        ApiErrors.Create(context, "PROJECT_AI_CONTEXT_TOO_LARGE", "Select less project context before requesting assistance."),
+                        statusCode: StatusCodes.Status413PayloadTooLarge);
                 }
                 catch (Exception)
                 {

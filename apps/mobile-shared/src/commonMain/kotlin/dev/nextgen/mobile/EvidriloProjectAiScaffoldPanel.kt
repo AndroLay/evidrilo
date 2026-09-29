@@ -27,6 +27,7 @@ import dev.nextgen.mobile.domain.project.ProjectTemplateInputKind
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
 import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldDeferredReason
+import dev.nextgen.mobile.projectcatalog.PROJECT_AI_MAX_CREDITS_PER_REQUEST
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldDecision
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGatewayResult
 import dev.nextgen.mobile.projectcatalog.ProjectAiConsentDeferralReason
@@ -65,6 +66,39 @@ internal sealed interface ProjectAiConsentUiState {
     data object NotGranted : ProjectAiConsentUiState
     data class Unavailable(val message: String) : ProjectAiConsentUiState
 }
+
+internal data class ProjectAiScaffoldPanelStateKey(
+    val templateId: String,
+    val projectId: String?,
+    val projectRevision: Int?,
+    val accountId: String?,
+)
+
+internal fun projectAiScaffoldPanelStateKey(
+    templateId: String,
+    projectId: String?,
+    projectRevision: Int?,
+    accountId: String?,
+): ProjectAiScaffoldPanelStateKey = ProjectAiScaffoldPanelStateKey(
+    templateId = templateId,
+    projectId = projectId,
+    projectRevision = projectRevision,
+    accountId = accountId,
+)
+
+internal data class ProjectAiRequestConsentState(
+    val confirmed: Boolean = false,
+) {
+    fun consume(): ProjectAiRequestConsentConsumption = ProjectAiRequestConsentConsumption(
+        confirmedForThisRequest = confirmed,
+        nextRequestState = copy(confirmed = false),
+    )
+}
+
+internal data class ProjectAiRequestConsentConsumption(
+    val confirmedForThisRequest: Boolean,
+    val nextRequestState: ProjectAiRequestConsentState,
+)
 
 /** UI safeguard: a pending AI proposal belongs only to the account that requested it. */
 internal fun projectAiSessionMatchesOwner(ownerAccountId: String?, currentAccountId: String?): Boolean =
@@ -186,17 +220,24 @@ internal fun EvidriloProjectAiScaffoldPanel(
     onRetrySettlement: (ProjectAiScaffoldUiState.SettlementFailed) -> Unit,
 ) {
     val accountSignedIn = projectAiAccountKey != null
+    val panelStateKey = projectAiScaffoldPanelStateKey(
+        templateId = template.id,
+        projectId = existingProjectId,
+        projectRevision = existingProjectRevision,
+        accountId = projectAiAccountKey,
+    )
     LaunchedEffect(template.id, existingProjectRevision, projectAiAccountKey) {
         if (accountSignedIn) onRefreshConsent()
     }
     val creating = existingProjectRevision == null
     val assignmentField = template.inputFields.firstOrNull { it.kind == ProjectTemplateInputKind.ASSIGNMENT_BRIEF }
     val questionField = template.inputFields.firstOrNull { it.kind == ProjectTemplateInputKind.RESEARCH_QUESTION }
-    var title by remember(template.id, projectAiAccountKey) { mutableStateOf(projectTitle.ifBlank { "My project" }) }
-    var newAssignmentBrief by remember(template.id, projectAiAccountKey) { mutableStateOf("") }
-    var studentQuestion by remember(template.id, existingProjectRevision, projectAiAccountKey) { mutableStateOf("") }
-    var dataConsent by remember(template.id, existingProjectRevision, projectAiAccountKey) { mutableStateOf(false) }
-    var selectedContextFieldIds by remember(template.id, existingProjectRevision, projectAiAccountKey) { mutableStateOf(emptySet<String>()) }
+    var title by remember(panelStateKey) { mutableStateOf(projectTitle.ifBlank { "My project" }) }
+    var newAssignmentBrief by remember(panelStateKey) { mutableStateOf("") }
+    var studentQuestion by remember(panelStateKey) { mutableStateOf("") }
+    var requestConsentState by remember(panelStateKey) { mutableStateOf(ProjectAiRequestConsentState()) }
+    var selectedContextFieldIds by remember(panelStateKey) { mutableStateOf(emptySet<String>()) }
+    val dataConsent = requestConsentState.confirmed
     val assignmentBrief = if (creating) newAssignmentBrief else currentFieldValues[assignmentField?.id].orEmpty()
     val hasConsent = accountSignedIn && canRequestProjectAi(
         dataConsent = dataConsent,
@@ -317,7 +358,12 @@ internal fun EvidriloProjectAiScaffoldPanel(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = dataConsent, onCheckedChange = { dataConsent = it })
+            Checkbox(
+                checked = dataConsent,
+                onCheckedChange = { checked ->
+                    requestConsentState = requestConsentState.copy(confirmed = checked)
+                },
+            )
             Text(
                 "For this request only, send the assignment brief, optional question, and selected saved fields to Evidrilo's AI endpoint. Source files are excluded. Nothing is applied or saved from a response until I confirm.",
                 style = MaterialTheme.typography.bodySmall,
@@ -366,18 +412,14 @@ internal fun EvidriloProjectAiScaffoldPanel(
             ) {
                 CircularProgressIndicator()
                 Text(
-                    if (state.decision == ProjectAiScaffoldDecision.APPLY) {
-                        "Confirming the ${state.creditCost}-credit apply…"
-                    } else {
-                        "Releasing the reserved credits…"
-                    },
+                    projectAiSettlementStatusMessage(state.decision, state.creditCost),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
             is ProjectAiScaffoldUiState.SettlementFailed -> Column {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                 if (state.canRetry) {
-                    TextButton(onClick = { onRetrySettlement(state) }) { Text("Retry credit confirmation") }
+                    TextButton(onClick = { onRetrySettlement(state) }) { Text("Retry recording choice") }
                 }
             }
         }
@@ -387,6 +429,8 @@ internal fun EvidriloProjectAiScaffoldPanel(
                 state !is ProjectAiScaffoldUiState.Preview && state !is ProjectAiScaffoldUiState.Settling &&
                 state !is ProjectAiScaffoldUiState.SettlementFailed && consentState !is ProjectAiConsentUiState.Checking,
             onClick = {
+                val requestConsent = requestConsentState.consume()
+                requestConsentState = requestConsent.nextRequestState
                 onRequest(
                     existingProjectId,
                     assignmentBrief.trim(),
@@ -397,7 +441,7 @@ internal fun EvidriloProjectAiScaffoldPanel(
                         assignmentBriefFieldId = assignmentField?.id,
                     ),
                     existingProjectRevision,
-                    dataConsent,
+                    requestConsent.confirmedForThisRequest,
                 )
             },
         )
@@ -408,11 +452,21 @@ internal fun EvidriloProjectAiScaffoldPanel(
 internal fun canRequestProjectAi(dataConsent: Boolean, assignmentBrief: String): Boolean =
     dataConsent && assignmentBrief.isNotBlank()
 
-internal fun projectAiCreditDisclosure(creating: Boolean): String = if (creating) {
-    "Project scaffold: when AI is enabled, 3 AI credits are charged only if you apply a suggestion; dismissal or failure releases the reservation."
-} else {
-    "In-project assistance: when AI is enabled, 1 AI credit is charged only if you apply a suggestion; dismissal or failure releases the reservation."
+internal fun projectAiCreditDisclosure(creating: Boolean): String =
+    "${if (creating) "Project setup" else "In-project assistance"} uses shared credits based on verified provider token usage, up to $PROJECT_AI_MAX_CREDITS_PER_REQUEST credits for one request. The API reserves a bounded estimate before dispatch and charges actual cost after a valid preview—even if you dismiss it. Failed or invalid requests release the reservation."
+
+internal fun projectAiSettlementStatusMessage(
+    decision: ProjectAiScaffoldDecision,
+    creditCost: Int,
+): String = when (decision) {
+    ProjectAiScaffoldDecision.APPLY ->
+        "Recording your apply choice. The $creditCost-credit preview charge is already settled…"
+    ProjectAiScaffoldDecision.DISMISS ->
+        "Recording your dismissal. The $creditCost-credit preview charge is already settled…"
 }
+
+internal fun projectAiClientValidationFailureMessage(issue: String, creditCost: Int): String =
+    "The preview did not match this reviewed template/revision ($issue). The $creditCost-credit charge is already settled; no project fields were changed."
 
 internal fun selectProjectAiContextFields(
     currentFields: Map<String, String>,
@@ -447,7 +501,7 @@ private fun ProjectAiScaffoldPreview(
     EvidriloTargetCard {
         Text("AI draft · review before using", style = MaterialTheme.typography.titleMedium)
         Text(
-            "$creditCost AI credit${if (creditCost == 1) "" else "s"} reserved · charged only when you apply a suggestion; dismissing releases it.",
+            "$creditCost AI credit${if (creditCost == 1) "" else "s"} charged for this valid preview from verified provider token usage. Applying or dismissing does not change the charge.",
             style = MaterialTheme.typography.bodySmall,
             color = EvidriloColors.Slate,
         )

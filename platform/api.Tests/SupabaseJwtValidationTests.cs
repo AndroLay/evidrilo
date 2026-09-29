@@ -33,7 +33,7 @@ public sealed class SupabaseJwtValidationTests : IAsyncLifetime
         signingKey = new RsaSecurityKey(rsa) { KeyId = "local-synthetic-key" };
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -74,7 +74,7 @@ public sealed class SupabaseJwtValidationTests : IAsyncLifetime
         client = app.GetTestClient();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         client?.Dispose();
         if (app is not null) await app.DisposeAsync();
@@ -85,7 +85,7 @@ public sealed class SupabaseJwtValidationTests : IAsyncLifetime
     public async Task Valid_supabase_shaped_jwt_authenticates_through_the_real_bearer_pipeline()
     {
         using var response = await SendTokenAsync(CreateToken());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(AccountId.ToString(), body.RootElement.GetProperty("accountId").GetString());
@@ -99,7 +99,7 @@ public sealed class SupabaseJwtValidationTests : IAsyncLifetime
     public async Task Invalid_issuer_audience_lifetime_or_signature_is_rejected(string invalidPart)
     {
         using var response = await SendTokenAsync(CreateToken(invalidPart));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.RootElement.GetProperty("code").GetString());

@@ -44,8 +44,8 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Evidence_graph_requires_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/cases/case-1:v1/evidence-graph");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/cases/case-1:v1/evidence-graph", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -59,8 +59,8 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
             "/v1/cases/case-1:v1/evidence-graph");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -74,8 +74,8 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
             "/v1/cases/not%20valid/evidence-graph");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_CASE_VERSION", body.GetProperty("code").GetString());
@@ -89,8 +89,8 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
             "/v1/cases/case-1:v1/evidence-graph");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -111,8 +111,8 @@ public sealed class EvidenceGraphEndpointTests : IClassFixture<ApiFactory>
             "/v1/cases/case-1:v1/evidence-graph");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await testClient.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await testClient.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("evidrilo.evidence-graph", body.GetProperty("schema").GetString());

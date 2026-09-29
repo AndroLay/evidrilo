@@ -1,11 +1,16 @@
 import java.io.File
 import org.gradle.api.tasks.testing.Test
 
+buildscript {
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.20")
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
-    alias(libs.plugins.android.kotlin) apply false
     alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.kmp.library) apply false
     alias(libs.plugins.compose.multiplatform) apply false
     alias(libs.plugins.compose.compiler) apply false
 }

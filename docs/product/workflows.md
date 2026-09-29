@@ -45,12 +45,12 @@ or evaluator boundaries.
   privacy, AI context/cost, and data-transfer consent understandable at the
   point where they matter; brevity must not hide a consequential choice.
 - When a student chooses an account-gated action, open the main sign-in surface
-  directly and preserve that requested destination. Make **Continue with
-  Google** primary only when Google sign-in is configured; show email as an
-  alternative only when that provider is configured. After success, resume the
-  requested action. If no provider is available, show one short recovery message
-  and a route back to local work. Do not expose long configuration diagnostics
-  or a disabled provider button as if it were usable.
+  directly and preserve that requested destination. Show **Continue with
+  Google**, **Continue with Apple**, or email only when each provider is
+  configured. After success, resume the requested action. If no provider is
+  available, show one short recovery message and a route back to local work. Do
+  not expose long configuration diagnostics or a disabled provider button as
+  if it were usable.
 
 ~~~mermaid
 flowchart TD
@@ -114,9 +114,11 @@ claim that every research method or template family is implemented or reviewed.
 
 **Current path:** Home is the first-launch destination. The optional Get Started
 tour can be opened from the app and skipped; it is an orientation, not a gate to
-local project work. Browsing the read-only catalog and using local projects do
-not require an account. M0 case learning and account-bound services have their
-own sign-in gates.
+local project work. Browsing the read-only catalog, using local projects, and
+practicing the bundled M0 case with local history do not require an account.
+Sign-in is optional for local Free work. Pro requires sign-in and a confirmed
+active RevenueCat entitlement; temporary guest mode continues to pause server
+AI, cloud sync, and analytics transmission.
 
 ~~~mermaid
 flowchart TD
@@ -130,28 +132,35 @@ flowchart TD
     Guide --> Demo[Inspect clearly labeled synthetic demo]
     Demo --> Home
     Home --> Practice[Open guided M0 case]
-    Practice --> AccountCheck{Signed in?}
-    AccountCheck -->|No| Gate[Show account gate and preserve destination]
-    Gate -->|Cancel or back| Home
-    Gate -->|Continue sign-in| Auth[Run configured identity flow]
-    AccountCheck -->|Yes| Case[Open case workspace]
+    Practice --> Case[Open local case workspace]
+    Home --> Profile[Open Profile or Account]
+    Profile --> Identity[Choose sign-in, session, or provider-link action]
+    Identity --> Auth
+    Home --> Protected[Choose an account-backed service]
+    Protected --> ServiceReady{Service enabled in this build?}
+    ServiceReady -->|No: current guest mode| Paused[No account-backed operation; keep local work]
+    Paused --> LocalSurface
+    ServiceReady -->|Yes| AccountCheck{Verified session available?}
+    AccountCheck -->|No| Auth[Run configured identity flow and keep destination]
+    AccountCheck -->|Yes| Resume[Resume the requested service]
     Auth --> AuthResult{Authentication succeeds?}
-    AuthResult -->|No or cancelled| Home
-    AuthResult -->|Yes| Return[Return to requested destination]
-    Return --> GuideOffer{Unfinished guide?}
-    GuideOffer -->|Open optional guide| PostAuthGuide[Offer guide without blocking the destination]
-    GuideOffer -->|Skip| Case
-    PostAuthGuide --> Case
-    Home --> Profile[Open Profile or Settings]
-    Profile --> AccountAction{Choose account-bound action?}
-    AccountAction -->|No| LocalSurface[Keep local surface available]
-    AccountAction -->|Yes| Gate
+    AuthResult -->|No or cancelled| Prior[Return to the prior surface]
+    AuthResult -->|Yes| GuideStatus{Get Started unfinished?}
+    GuideStatus -->|No| Resume
+    GuideStatus -->|Yes| GuideOffer[Offer optional Resume or Skip without blocking the action]
+    GuideOffer -->|Resume| PostAuthGuide[Continue the optional guide]
+    PostAuthGuide --> Resume
+    GuideOffer -->|Skip or later| Resume
+    Home --> Settings[Open Settings]
+    Settings --> LocalSurface[Keep local preferences, projects, and history available]
 ~~~
 
 The Get Started tour does not create a project, add project history, or turn its
 synthetic example into a reviewed template. Successful sign-in does not imply
 project sync or backup. Identity-provider behavior and the full sign-in journey
-still require provider and device acceptance.
+still require provider and device acceptance. If a returning user has not
+finished Get Started, offer Resume or Skip while preserving the requested
+destination.
 The current source uses an eight-step fictional tablet-dissolution walkthrough
 and synthetic record IDs. D-123 records a different presentation target; this
 description is not an endorsement of the current example as cross-discipline
@@ -184,26 +193,34 @@ flowchart TD
     Evidence --> Synthesis[Link evidence to themes and student-authored claims]
     Synthesis --> Limits[Record limitations and next actions]
     Limits --> Check[Review structural gaps and links]
-    Check --> Save[Autosave locally and create revision checkpoints]
-    Save --> Continue{Continue working?}
+    Check --> Save[Autosave the working draft locally]
+    Save --> Checkpoint{Explicit or meaningful checkpoint?}
+    Checkpoint -->|Yes| Revision[Create a revision checkpoint]
+    Checkpoint -->|No| Continue{Continue working?}
+    Revision --> Continue
     Continue -->|Yes| Editor
     Continue -->|Complete| Complete[Mark project completed]
     Continue -->|Archive| Archive[Archive project]
     Continue -->|Move to Trash| Trash[Move project to local Trash]
     Complete --> LocalHistory[Keep project and its revision history locally]
     Archive --> LocalHistory
-    Trash --> Restore{Restore within retention and capacity?}
-    Restore -->|Yes| Save
-    Restore -->|No| Expired[Keep unavailable, purge Trash after 30 days]
+    Trash --> Retention{Within 30-day retention?}
+    Retention -->|No| Expired[Eligible for expiry purge]
+    Retention -->|Yes| Capacity{Active-project slot available?}
+    Capacity -->|Yes| RestoreDraft[Restore as a draft]
+    Capacity -->|No| ArchiveChoice{Restore as archived?}
+    ArchiveChoice -->|Yes| RestoreArchived[Restore archived without an active slot]
+    ArchiveChoice -->|No| KeepTrash[Keep in Trash; free a slot or retry later]
+    RestoreDraft --> Editor
+    RestoreArchived --> List
+    KeepTrash --> Trash
 ~~~
 
-**Recommended project interaction (target; not implemented yet):** Use a project
-hub with a flexible progress bar, rather than one long editor or a locked
-wizard. Show the active section by name, without visible “Step N of M” copy. The
-hub shows the project question, its structural progress, and one useful next
-action. Students can open any stage, move backward or forward, and open the full
-review at any time. Incomplete stages remain accessible and are marked for
-later attention; they do not block drafting elsewhere.
+**Current editor and next hub target:** The source has a multi-section project
+editor with a progress bar, Back/Continue navigation, autosave state, and a
+full-project review. Device acceptance remains open. A dedicated project hub
+that summarizes the question, progress, and one next action is still a target;
+the diagram below describes that proposed hub around the existing editor.
 
 ~~~mermaid
 flowchart TD
@@ -244,8 +261,10 @@ Local active-project capacity is five on the Free path and up to fifty only
 when a signed-in account has a verified active `evidrilo_pro` entitlement. If
 entitlement state is unknown, the app uses the Free limit; it must not delete,
 hide, or rewrite existing projects. These are per-installation limits, not
-account-wide quota or cloud sync. Trash retention is thirty days in the local
-project rules.
+account-wide quota or cloud sync. While temporary guest mode is enabled,
+RevenueCat is not initialized, so the current client uses the Free limit. Trash
+retention is thirty days in the local project rules; a full active quota does
+not expire or purge an item early.
 
 The catalog currently has no reviewed, student-selectable template. Blank
 project creation remains the working route. A project that is signed in remains
@@ -283,21 +302,23 @@ flowchart LR
         Valid -->|Yes| Preview[Preview project and attachment metadata]
         Preview --> Choice{Choose import action}
         Choice -->|Import as copy| Remap[Remap project and record IDs]
-    Choice -->|Restore newer revision| Conflict[Check matching project ID and revision]
-    Conflict --> RevisionValid{Same project and newer compatible revision?}
-    RevisionValid -->|No| Reject
-    RevisionValid -->|Yes| ConfirmRevision{Student confirms restore?}
-    ConfirmRevision -->|No| CancelImport
-    ConfirmRevision -->|Yes| RestoreRevision[Restore as a new local revision]
-    RestoreRevision -->|Saved| Imported
-    RestoreRevision -->|Failed| Preserve[Keep the existing project revision]
-    Remap --> Capacity{Within local capacity?}
+        Choice -->|Restore newer revision| Conflict[Check matching project ID and revision]
+        Conflict --> RevisionValid{Same project and newer compatible revision?}
+        RevisionValid -->|No| Reject
+        RevisionValid -->|Yes| ConfirmRevision{Student confirms restore?}
+        ConfirmRevision -->|No| CancelImport
+        ConfirmRevision -->|Yes| RestoreRevision[Restore as a new local revision]
+        RestoreRevision -->|Saved| Imported
+        RestoreRevision -->|Failed| Preserve[Keep the existing project revision]
+        Remap --> Capacity{Within local capacity?}
         Capacity -->|No| CapacityChoice{Archive the imported project?}
         Capacity -->|Yes| Stage[Stage attachment bytes privately]
         CapacityChoice -->|Cancel| CancelImport[Leave the existing project list unchanged]
         CapacityChoice -->|Yes| ArchiveImport[Keep imported project archived]
         ArchiveImport --> Stage
-        Stage --> Commit[Write project and attachment references]
+        Stage --> StageResult{Attachment staging succeeded?}
+        StageResult -->|No| StageFailed[Stop import; preserve project list and offer retry]
+        StageResult -->|Yes| Commit[Write project and attachment references]
         Commit -->|Failure| Rollback[Rollback staged files and preserve existing work]
         Commit -->|Success| Imported[Open imported local project]
     end
@@ -318,15 +339,12 @@ extraction and automatic redaction are not available.
 
 **Current path:** The bundled tablet-dissolution case is a synthetic, bounded
 learning experience. It uses supplied facts and deterministic rules. It is
-separate from student projects, and the M0 learning route is account-gated.
+separate from student projects. The case and its local history are available
+without sign-in while the D-125/D-129 guest workflow is enabled.
 
 ~~~mermaid
 flowchart TD
-    Entry[Choose guided case practice] --> Auth{Signed in?}
-    Auth -->|No| SignIn[Sign in]
-    SignIn -->|Cancel or back| Home[Return to Home]
-    SignIn -->|Success| Case[Open supplied case and requirement]
-    Auth -->|Yes| Case
+    Entry[Choose guided case practice] --> Case[Open supplied case and requirement locally]
     Case --> Facts[Inspect supplied observations and limitations]
     Facts --> Select[Select relevant observation anchors in Evidence Lens]
     Select --> Draft[Write claim, scope, limits, and next action]
@@ -348,7 +366,10 @@ The evaluator only checks the active case and its versioned rules. It is not a
 scientific-truth oracle, general grader, or universal assessment. `CANNOT_ASSESS`
 is an intentional abstention when the configured case cannot support a check.
 Case history is distinct from a project's revision history. Premium cases, if
-locked, use the separate RevenueCat flow below.
+locked, use RevenueCat only for a signed-in account after provider identity is
+confirmed; an active matching entitlement is still required to unlock Pro.
+Provider configuration and Test Store runtime acceptance remain open. Guest
+mode continues to pause server AI, cloud sync, and analytics transmission.
 
 ## 5. Template review and catalog
 
@@ -384,8 +405,11 @@ started from.
 **Current path:** Profile and Settings surfaces are reachable from the app
 while signed out. Local projects and Support remain accessible. An action that
 needs an account must gate that action, preserve the requested destination, and
-return there after successful authentication. Signing in alone never uploads
-local projects.
+return there after successful authentication. D-129 currently permits sign-in
+and identity linking. D-131 enables RevenueCat Pro separately for signed-in
+accounts with a provider-confirmed entitlement; server AI, cloud sync, and
+analytics transmission remain paused in guest mode. Signing in alone never
+uploads local projects or enables those services.
 
 ~~~mermaid
 flowchart TD
@@ -393,41 +417,73 @@ flowchart TD
     Home --> Settings[Settings]
     Profile --> LocalProjects[Open local projects without sign-in]
     Profile --> Support[Open Support]
-    Profile --> AccountAction[Choose account or entitlement action]
+    Profile --> AccountAction[Open sign-in or identity settings]
     Settings --> Preferences[Device-local preferences, privacy, and audio controls]
     Settings --> Reminders[Reminder controls]
     Settings --> Help[Help, Support, and About]
-    Settings --> Protected[Choose account-bound action]
-    AccountAction --> Gate{Verified session available?}
-    Protected --> Gate
+    Settings --> Protected[Choose account-backed service]
+    Protected --> ServiceReady{Service enabled in this build?}
+    ServiceReady -->|No: current guest mode| Paused[Account-backed action paused; preserve local work]
+    Paused --> LocalProjects
+    ServiceReady -->|Yes| Gate{Verified session available?}
+    AccountAction --> Auth
     Gate -->|No| Auth[Sign in, keep requested destination]
     Auth --> AuthResult{Provider succeeds?}
     AuthResult -->|No, cancelled, or expired| Return[Keep local data and show recovery path]
     AuthResult -->|Yes| Destination[Return to requested account action]
     Gate -->|Yes| Destination
     Destination --> AccountData[Show only authorized account data]
+    AccountData --> ConnectedMethods[Review connected sign-in methods]
+    ConnectedMethods --> LinkProvider[Choose Link Google or Apple]
+    LinkProvider --> Reauthenticate[Authenticate provider for this account]
+    Reauthenticate --> LinkCheck{Verified identity belongs to this account?}
+    LinkCheck -->|Yes| Linked[Link provider without changing account ID]
+    LinkCheck -->|No, conflict, or cancel| LinkRecovery[Keep current session and show generic recovery]
     Profile --> HistoryChoice{Choose history}
     HistoryChoice --> ProjectHistory[Local project revision history]
-    HistoryChoice --> CaseHistory[Local M0 case history]
+    HistoryChoice --> CaseHistory[Local M0 case history; available in guest mode]
     AccountData --> Delete[Choose account export or deletion]
-    Delete --> Confirm[Review scope and confirm explicitly]
+    Delete --> AccountServiceReady{Account service enabled in this build?}
+    AccountServiceReady -->|No: current guest mode| Paused
+    AccountServiceReady -->|Yes| Confirm[Review scope and confirm explicitly]
     Confirm -->|Account export| Export[Request account data export]
     Confirm -->|Delete account| DeleteAccount[Request server-account deletion]
     Confirm -->|Clear local work| ClearLocal[Separate confirmation for local projects/history]
 ~~~
 
-Project revision history and M0 case history are separate records. Account
-history and server projections require a restored signed-in session. Account
-deletion is distinct from clearing local projects; neither action should silently
-delete the other store. Support is intended to be reachable from Profile,
-Settings, and account gates. The selected contact is
+Project revision history and M0 case history are separate local records and
+remain available in guest mode. Account history and server projections require
+a restored signed-in session and an enabled service; they are paused in the
+current guest mode. Account export and deletion are also paused there. Account
+deletion is distinct from clearing local projects; neither action should
+silently delete the other store. Support is intended to be reachable from
+Profile, Settings, and account gates. The selected contact is
 `andrlay30@gmail.com`, but the current app build reports that a production
 support address is not configured; owner configuration and runtime verification
 are still required.
 
-Google/email provider redirects, session recovery, account linking, and
-account export/deletion require their own provider and device acceptance. A
-successful sign-in is not evidence of cloud project transfer.
+The account screen exposes configured sign-in methods and an explicit action
+to link another provider to the account already in use. The internal Evidrilo
+account ID stays canonical; provider identities use their verified stable
+subject IDs, not email addresses. The Apple link action displays the current
+account email when available and asks the student to confirm before opening
+Apple. Apple may provide a private relay email, which is accepted and never
+used to switch the active account. The client verifies the same Supabase user
+ID after linking.
+
+Supabase Auth automatically links OAuth identities with the same verified
+email. This managed behavior cannot be disabled by this client, so same-email
+provider sign-in may attach an identity without the in-app link confirmation;
+the app does not merge separate Evidrilo records. If the Apple relay differs
+from an existing account email, the student should sign in with the existing
+method and link Apple from that session to avoid creating a second account.
+Apple is disabled by default in the build until provider configuration is
+complete. Source support is implemented, but Apple credentials, manual-link
+configuration, and device acceptance remain unverified. Sign-in also does not
+imply cloud project transfer.
+
+Google, Apple, and email provider redirects, session recovery, account linking,
+and account export/deletion require their own provider and device acceptance.
 
 ## 7. Local reminders
 
@@ -461,15 +517,21 @@ delivery-time guarantee.
 ## 8. AI assistance
 
 **Current-source case path (D-106):** The mobile case-AI conversation and typed
-proposal bridge are connected in source. Each request requires a signed-in M0
-session and a fresh, explicit context-sharing choice. The provider is disabled,
-so this build does not provide live generation; provider, device, accessibility,
-privacy, and human-usefulness acceptance remain open. A failed or unavailable
-AI request leaves the case draft and deterministic feedback unchanged.
+proposal bridge are connected in source. When account-backed services are
+enabled, each request requires a signed-in session and a fresh, explicit
+context-sharing choice. In the current D-129 guest mode, the client pauses case
+AI before sending a request; the provider is also disabled. Provider, device,
+accessibility, privacy, and human-usefulness acceptance remain open. A failed
+or unavailable AI request leaves the case draft and deterministic feedback
+unchanged.
 
 ~~~mermaid
 flowchart TD
-    Case[Open AI in an authenticated M0 case] --> Consent[Review shown context and consent for this request]
+    Case[Open AI from the local M0 case] --> GuestMode{Temporary guest mode enabled?}
+    GuestMode -->|Yes: current mode| Paused[Show AI paused; send no context]
+    Paused --> Manual[Continue the local case workflow]
+    GuestMode -->|No, account services enabled| Auth[Require a verified account session]
+    Auth --> Consent[Review shown context and consent for this request]
     Consent --> Send[Submit bounded case question]
     Send --> API[Rebuild active case context, check account, session, and anchors]
     API --> Provider{Provider enabled?}
@@ -485,15 +547,22 @@ flowchart TD
     Reducer --> Submit[Student submits the revised draft]
     Submit --> Evaluate[Run deterministic case evaluator]
     Evaluate --> Result[Show normal case feedback and comparison when applicable]
-    Unavailable --> Manual[Continue the manual case workflow]
+    Unavailable --> Manual
 ~~~
 
-The server reserves one credit for a turn and consumes it only after an accepted
-response; disabled, unavailable, rejected, or invalid responses release the
-reservation. The Clear control is hidden while a turn is running. Clearing a
-completed chat removes the local transcript immediately, requests deletion of
-server session metadata, and refreshes the balance. The current UI does not show
-a failed server-delete result; metadata expires with the 30-minute session.
+The server reserves a bounded estimate using the configured model rates, then
+settles verified provider token usage for a valid response. Disabled,
+unavailable, rejected, or invalid responses release the reservation. The Clear
+control is hidden while a turn is running. Clearing a completed chat removes
+the local transcript immediately, requests deletion of server session metadata,
+and refreshes the balance. If the server does not confirm deletion, the UI says
+so and offers a same-session retry for retryable failures; metadata may
+otherwise remain until the 30-minute session expires.
+Current mobile requests the negotiated v2 turn response to show the server's
+actual settled cost and refresh the shared account balance. A normal fallback
+reports zero credits charged; if usage was already settled before the
+conversation session expired, show that actual nonzero cost instead of implying
+the turn was free. Older v1 response shapes remain unchanged.
 
 **Gated D-119 target:** Keep one AI chat bubble available throughout the project
 workspace, including every step and the full review. Navigating between steps
@@ -522,10 +591,12 @@ records it used and mark unsupported gaps for the student. It must not invent or
 verify sources, DOI data, observations, or findings.
 
 Project AI history records its project and stage; unlinked General chat stays
-separate. The all-stage project UI/API, General mode, and AI Activity History
-remain incomplete, and the provider remains disabled. Every applied proposal
-must pass through the project reducer and preserve AI provenance. This target
-is separate from the current D-106 case-AI path and conclusion reducer.
+separate. Stage-assist and metadata-history API routes now exist, but the
+all-stage project UI, General mode, and AI Activity History screens remain
+incomplete. General mode remains unavailable and Project AI provider activation
+is off by default. Every applied proposal must pass through the project reducer
+and preserve AI provenance. This target is separate from the current D-106
+case-AI path and conclusion reducer.
 
 ~~~mermaid
 flowchart TD
@@ -564,7 +635,7 @@ student can understand a method, keep their own work, or retrieve their data.
 | Catalog | Browse all five family guides; preview every published version; start a reviewed baseline template whenever that family has one | May start optional reviewed specialist templates introduced later; no family is Pro-only |
 | Projects | Blank/manual projects, full core workflow, five active projects per installation | Fifty active projects per installation while entitlement is verified |
 | Case practice | Complete Free learning loop | Two additional approved premium cases |
-| AI allowance | 20 one-time credits for an eligible verified account after consent | 200 credits per active entitlement month; yearly plans receive the same monthly grant |
+| AI allowance | 20 one-time credits for an eligible verified account after consent | Adds 200 credits for each active entitlement month; monthly and yearly plans accumulate unused credits, including after Pro ends |
 | Reports and data | Essential report export and complete project-data portability | No paid-only lock on existing project data or recovery/export |
 
 Template publication and Pro access are separate decisions: only a reviewed,
@@ -577,9 +648,11 @@ are more correct.
 
 These are product rules, not proof of availability or enforcement. The current
 catalog may still have no selectable template. AI remains finite and metered:
-explicit consent and a verified account are required for the Free grant;
-Project AI retains the three-credit scaffold and one-credit-on-apply rules.
-General-chat allowance is unresolved. Cloud sync/backup is not included in the
+explicit consent and a verified account are required for the Free grant.
+Every AI mode uses D-127 token-based pricing from one account balance. A valid
+Project AI preview is charged when generated, whether applied or dismissed;
+failure or invalid output releases the reservation. General chat uses the same
+account balance and does not have a separate grant. Cloud sync/backup is not included in the
 current Pro promise and needs the separate R2 privacy, consent, retention,
 quota, cost, operations, and acceptance gates. Do not add paid top-ups,
 lifetime, one-time packs, institutional sales, or ads in v1.
@@ -587,13 +660,15 @@ lifetime, one-time packs, institutional sales, or ads in v1.
 **Gated:** Premium access must come from verified RevenueCat entitlement, not a
 local UI flag. The Test Store transaction matrix has not been completed.
 
-Free means no subscription is required. It does not mean anonymous M0 case
-access: M0 learning requires sign-in, while local projects and read-only catalog
-browsing remain available signed out.
+Free means no subscription is required. The bundled M0 case, local histories,
+local projects, and read-only catalog browsing work without sign-in under the
+current guest mode. Pro requires a signed-in account and a confirmed active
+RevenueCat entitlement; signing in alone does not activate Pro. Guest mode
+continues to pause server AI, cloud sync, and analytics transmission.
 
 ~~~mermaid
 flowchart TD
-    Free[Use the complete Free workflow] --> PremiumValue[Open a locked premium case, future reviewed specialist template, or plans]
+    Free[Use the local Free workflow] --> PremiumValue[Open a premium case, future specialist template, or plans]
     PremiumValue --> SignIn{Signed in?}
     SignIn -->|No| Auth[Sign in and return to the requested destination]
     SignIn -->|Yes| Compare[Review Free and Pro value]

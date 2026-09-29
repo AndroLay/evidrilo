@@ -29,8 +29,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
 
         using var getRequest = new HttpRequestMessage(HttpMethod.Get, "/v1/notifications/preferences");
         getRequest.Headers.Add("X-Test-User", $"{UserId}|true");
-        using var getResponse = await testClient.SendAsync(getRequest);
-        using var getBody = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        using var getResponse = await testClient.SendAsync(getRequest, cancellationToken: TestContext.Current.CancellationToken);
+        using var getBody = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         AssertExactKeys(getBody.RootElement,
@@ -43,8 +43,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
             Content = JsonContent.Create(ValidRequest()),
         };
         putRequest.Headers.Add("X-Test-User", $"{UserId}|true");
-        using var putResponse = await testClient.SendAsync(putRequest);
-        using var putBody = JsonDocument.Parse(await putResponse.Content.ReadAsStringAsync());
+        using var putResponse = await testClient.SendAsync(putRequest, cancellationToken: TestContext.Current.CancellationToken);
+        using var putBody = JsonDocument.Parse(await putResponse.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
         AssertExactKeys(putBody.RootElement,
@@ -56,8 +56,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
     [Fact]
     public async Task Notification_preferences_require_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/notifications/preferences");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/notifications/preferences", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -69,8 +69,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/notifications/preferences");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -82,8 +82,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/notifications/preferences");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -94,8 +94,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
     {
         using var response = await client.PutAsJsonAsync(
             "/v1/notifications/preferences",
-            ValidRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -120,8 +120,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_NOTIFICATION_PREFERENCES", body.GetProperty("code").GetString());
@@ -165,8 +165,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
             };
             request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-            using var response = await client.SendAsync(request);
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal("INVALID_NOTIFICATION_PREFERENCES", body.GetProperty("code").GetString());
@@ -182,8 +182,8 @@ public sealed class NotificationPreferenceEndpointTests : IClassFixture<ApiFacto
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

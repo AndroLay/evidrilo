@@ -20,8 +20,8 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = CreateFactory(new TestProjectTemplateStore());
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/v1/project-template-families");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/project-template-families", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("evidrilo.project-template-families", body.GetProperty("schema").GetString());
@@ -35,8 +35,8 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = CreateFactory(new TestProjectTemplateStore(includePublished: true));
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/v1/project-templates?family=literature_review&limit=20");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/project-templates?family=literature_review&limit=20", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
         var template = body.GetProperty("templates")[0];
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -53,8 +53,8 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = CreateFactory(new TestProjectTemplateStore(includePublished: true));
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/v1/project-templates/template-1/versions/1");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/project-templates/template-1/versions/1", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
         var template = body.GetProperty("template");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -70,7 +70,7 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = CreateFactory(new TestProjectTemplateStore());
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/v1/project-templates/template-1/versions/1");
+        using var response = await client.GetAsync("/v1/project-templates/template-1/versions/1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -85,8 +85,8 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = CreateFactory(new TestProjectTemplateStore());
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync(path);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync(path, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains(body.GetProperty("code").GetString(), new[]
@@ -104,7 +104,7 @@ public sealed class ProjectTemplateEndpointTests
 
         using var anonymous = await client.PostAsync(
             "/v1/authoring/project-templates",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+            new StringContent("{}", Encoding.UTF8, "application/json"), cancellationToken: TestContext.Current.CancellationToken);
         using var unverifiedRequest = new HttpRequestMessage(
             HttpMethod.Post,
             "/v1/authoring/project-templates")
@@ -112,7 +112,7 @@ public sealed class ProjectTemplateEndpointTests
             Content = new StringContent("{}", Encoding.UTF8, "application/json"),
         };
         unverifiedRequest.Headers.Add("X-Test-User", $"{UserId}|false");
-        using var unverified = await client.SendAsync(unverifiedRequest);
+        using var unverified = await client.SendAsync(unverifiedRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, unverified.StatusCode);
@@ -126,7 +126,7 @@ public sealed class ProjectTemplateEndpointTests
 
         using var response = await client.PostAsync(
             "/v1/authoring/project-templates/template-1/versions/1/transition",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+            new StringContent("{}", Encoding.UTF8, "application/json"), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -145,8 +145,8 @@ public sealed class ProjectTemplateEndpointTests
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_PROJECT_TEMPLATE_DRAFT", body.GetProperty("code").GetString());
@@ -158,8 +158,8 @@ public sealed class ProjectTemplateEndpointTests
         using var factory = new ApiFactory();
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/v1/project-templates");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/project-templates", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

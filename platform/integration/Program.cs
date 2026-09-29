@@ -89,29 +89,40 @@ public static class EntryPoint
         }
 
         await SeedAsync(databaseConnectionString);
-        using var apiFactory = new E2eApiFactory(databaseConnectionString, repositoryRoot);
-        using var client = apiFactory.CreateClient();
-        var worker = StartWorker(dotnetRoot, workerAssembly, databaseConnectionString);
+        Process? worker = null;
         try
         {
-            await AssertReadyAsync(client);
-            await AssertBillingLifecycleFlowAsync(client, databaseConnectionString);
-            await AssertContentLifecycleFlowAsync(client, databaseConnectionString);
-            await AssertProjectTemplateCatalogFlowAsync(databaseConnectionString, repositoryRoot);
-            await AssertAiCreditFlowAsync(client, databaseConnectionString);
-            await AssertPublishedCaseEvidenceFlowAsync(client);
-            await AssertAiConversationFlowAsync(databaseConnectionString, repositoryRoot);
-            await AssertAiProviderSpendBudgetAsync(databaseConnectionString);
-            await AssertSyncAndProjectionFlowAsync(client);
-            await AssertStudentProjectFlowAsync(client, databaseConnectionString);
-            await AssertNotificationAndAccountExportFlowAsync(client, databaseConnectionString, repositoryRoot);
-            await AssertIsolationAsync(client);
-            await AssertAccountDeletionOutboxFlowAsync(client, databaseConnectionString);
+            using (var apiFactory = new E2eApiFactory(databaseConnectionString, repositoryRoot))
+            using (var client = apiFactory.CreateClient())
+            {
+                worker = StartWorker(dotnetRoot, workerAssembly, databaseConnectionString);
+                await AssertReadyAsync(client);
+                await AssertBillingLifecycleFlowAsync(client, databaseConnectionString);
+                await AssertContentLifecycleFlowAsync(client, databaseConnectionString);
+                await AssertProjectTemplateCatalogFlowAsync(databaseConnectionString, repositoryRoot);
+                await AssertAiCreditFlowAsync(client, databaseConnectionString);
+                await AssertPublishedCaseEvidenceFlowAsync(client);
+                await AssertAiConversationFlowAsync(databaseConnectionString, repositoryRoot);
+                await AssertAiProviderSpendBudgetAsync(databaseConnectionString);
+                await AssertSyncAndProjectionFlowAsync(client);
+                await AssertStudentProjectFlowAsync(client, databaseConnectionString);
+            }
+
+            // The suite exercises more routes than one account's production
+            // minute quota; start a fresh host for the remaining account flows.
+            using (var accountApiFactory = new E2eApiFactory(databaseConnectionString, repositoryRoot))
+            using (var accountClient = accountApiFactory.CreateClient())
+            {
+                await AssertNotificationAndAccountExportFlowAsync(accountClient, databaseConnectionString, repositoryRoot);
+                await AssertIsolationAsync(accountClient);
+                await AssertAccountDeletionOutboxFlowAsync(accountClient, databaseConnectionString);
+            }
+
             Console.WriteLine("EVIDRILO_API_DATABASE_WORKER_PUBLISHED_CASE_EVIDENCE_GRAPH_E2E_PASS");
         }
         finally
         {
-            StopWorker(worker);
+            if (worker is not null) StopWorker(worker);
         }
     }
 
@@ -120,7 +131,7 @@ public static class EntryPoint
         string databaseConnectionString)
     {
         AiEntitlementPeriodStart = DateTimeOffset.FromUnixTimeMilliseconds(
-            DateTimeOffset.UtcNow.AddDays(-10).ToUnixTimeMilliseconds());
+            DateTimeOffset.UtcNow.AddMonths(-2).AddDays(-10).ToUnixTimeMilliseconds());
         AiEntitlementExpiresAt = AiEntitlementPeriodStart.AddYears(1);
         var baseEventTimestampMs = AiEntitlementPeriodStart.ToUnixTimeMilliseconds();
         var purchase = CreateRevenueCatEventBody(
@@ -374,6 +385,19 @@ public static class EntryPoint
         insertReservation.Parameters.AddWithValue("account_id", accountId);
         insertReservation.Parameters.AddWithValue("grant_id", grantId);
         await insertReservation.ExecuteNonQueryAsync();
+
+        await using var insertAllocation = connection.CreateCommand();
+        insertAllocation.Transaction = transaction;
+        insertAllocation.CommandText = """
+            insert into public.ai_credit_reservation_allocations (
+                account_id, request_id, allocation_index, grant_id, reserved_credits, settled_credits
+            ) values (
+                @account_id, 'ai-e2e-stale-lease-001', 0, @grant_id, 1, null
+            );
+            """;
+        insertAllocation.Parameters.AddWithValue("account_id", accountId);
+        insertAllocation.Parameters.AddWithValue("grant_id", grantId);
+        await insertAllocation.ExecuteNonQueryAsync();
         await transaction.CommitAsync();
     }
 
@@ -546,23 +570,23 @@ public static class EntryPoint
             RequireStatus(balance, HttpStatusCode.OK, "AI credit balance after opt-in");
             var body = await ReadJsonAsync(balance);
             RequireString(body, "schema", "evidrilo.ai-credits");
-            RequireNumber(body, "available", 220);
+            RequireNumber(body, "available", 620);
             var grants = body.GetProperty("grants");
             var freeGrant = grants.EnumerateArray().SingleOrDefault(grant =>
                 grant.GetProperty("grantKind").GetString() == "free_once");
-            var subscriptionGrant = grants.EnumerateArray().SingleOrDefault(grant =>
+            var subscriptionGrants = grants.EnumerateArray().Where(grant =>
                 grant.GetProperty("grantKind").GetString() == "subscription_month");
             if (!body.GetProperty("consentRecorded").GetBoolean()
-                || grants.GetArrayLength() != 2
+                || grants.GetArrayLength() != 4
                 || freeGrant.ValueKind != JsonValueKind.Object
                 || freeGrant.GetProperty("granted").GetInt32() != 20
-                || subscriptionGrant.ValueKind != JsonValueKind.Object
-                || subscriptionGrant.GetProperty("granted").GetInt32() != 200
-                || subscriptionGrant.GetProperty("expiresAt").GetDateTimeOffset()
-                    != AiEntitlementPeriodStart.AddMonths(1))
+                || subscriptionGrants.Count() != 3
+                || subscriptionGrants.Any(grant =>
+                    grant.GetProperty("granted").GetInt32() != 200
+                    || grant.GetProperty("expiresAt").ValueKind != JsonValueKind.Null))
             {
                 throw new InvalidOperationException(
-                    "AI opt-in did not create the one-time free grant and current entitlement-month grant.");
+                    "AI opt-in did not preserve the Free grant and accrue one non-expiring Pro grant for each active entitlement month.");
             }
         }
 
@@ -576,10 +600,70 @@ public static class EntryPoint
         {
             RequireStatus(recoveredBalance, HttpStatusCode.OK, "AI balance after stale reservation recovery");
             var body = await ReadJsonAsync(recoveredBalance);
-            RequireNumber(body, "available", 220);
+            RequireNumber(body, "available", 620);
         }
 
         await RequireExpiredAiReservationReleasedAsync(databaseConnectionString, AccountId);
+
+        var revokedAt = DateTimeOffset.UtcNow;
+        var revokedPeriod = CreateRevenueCatEventBody(
+            "rc-e2e-credit-revoke",
+            "CANCELLATION",
+            productId: null,
+            accountId: AccountId,
+            eventTimestampMs: revokedAt.ToUnixTimeMilliseconds(),
+            cancellationReason: "CUSTOMER_SUPPORT",
+            periodStartedAtMs: AiEntitlementPeriodStart.ToUnixTimeMilliseconds(),
+            periodExpiresAtMs: AiEntitlementExpiresAt.ToUnixTimeMilliseconds());
+        using (var revoked = await SendBillingWebhookAsync(client, revokedPeriod))
+        {
+            RequireStatus(revoked, HttpStatusCode.OK, "AI credit entitlement revoke");
+            await RequireBillingOutcomeAsync(revoked, "accepted");
+        }
+
+        using (var accruedBalance = await SendAsync(
+            client,
+            HttpMethod.Get,
+            "/v1/ai/credits",
+            AccountId,
+            body: null))
+        {
+            RequireStatus(accruedBalance, HttpStatusCode.OK, "accrued balance after Pro ends");
+            RequireNumber(await ReadJsonAsync(accruedBalance), "available", 620);
+        }
+
+        await SeedFragmentedAiCreditBalanceAsync(databaseConnectionString, AccountId, 125);
+        using (var ledger = new NpgsqlAiCreditLedger(databaseConnectionString))
+        {
+            var reservation = await ledger.TryReserveAsync(
+                AccountId,
+                "ai-accumulated-credit-001",
+                new string('a', 64),
+                creditCost: 200,
+                cancellationToken: CancellationToken.None);
+            if (reservation is null)
+                throw new InvalidOperationException("Accumulated AI credits could not be reserved across grants.");
+            if (!await ledger.CompleteAsync(
+                    AccountId,
+                    reservation,
+                    accepted: true,
+                    settledCreditCost: 150,
+                    cancellationToken: CancellationToken.None))
+            {
+                throw new InvalidOperationException("Accumulated AI credit reservation did not settle.");
+            }
+        }
+
+        using (var settledBalance = await SendAsync(
+            client,
+            HttpMethod.Get,
+            "/v1/ai/credits",
+            AccountId,
+            body: null))
+        {
+            RequireStatus(settledBalance, HttpStatusCode.OK, "balance after multi-grant settlement");
+            RequireNumber(await ReadJsonAsync(settledBalance), "available", 95);
+        }
 
         using (var otherBalance = await SendAsync(
             client,
@@ -610,14 +694,34 @@ public static class EntryPoint
         await using var reader = await command.ExecuteReaderAsync();
         if (!await reader.ReadAsync()
             || reader.GetInt64(0) != 1
-            || reader.GetInt64(1) != 2
-            || reader.GetInt64(2) != 2
+            || reader.GetInt64(1) != 4
+            || reader.GetInt64(2) != 3
             || reader.GetInt64(3) != 2)
         {
             throw new InvalidOperationException(
                 "AI credit database state did not preserve consent, grants, or provider-failure refund.");
         }
         Console.WriteLine("EVIDRILO_AI_CREDIT_LEDGER_PASS");
+    }
+
+    private static async Task SeedFragmentedAiCreditBalanceAsync(
+        string databaseConnectionString,
+        Guid accountId,
+        int consumedCreditsPerGrant)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            update public.ai_credit_grants
+            set consumed_credits = @consumed_credits
+            where account_id = @account_id
+              and grant_kind = 'subscription_month';
+            """;
+        command.Parameters.AddWithValue("account_id", accountId);
+        command.Parameters.AddWithValue("consumed_credits", consumedCreditsPerGrant);
+        if (await command.ExecuteNonQueryAsync() != 3)
+            throw new InvalidOperationException("The synthetic multi-month Pro grant rows were not available.");
     }
 
     private static async Task AssertNotificationAndAccountExportFlowAsync(

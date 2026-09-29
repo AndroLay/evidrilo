@@ -3,7 +3,10 @@ package dev.nextgen.mobile
 import dev.nextgen.mobile.ai.AiAssistPurpose
 import dev.nextgen.mobile.ai.AiConversationGatewayResult
 import dev.nextgen.mobile.ai.AiConversationProposal
+import dev.nextgen.mobile.ai.AiConversationTurn
 import dev.nextgen.mobile.ai.AiGatewayResult
+import dev.nextgen.mobile.ai.AiCreditGrant
+import dev.nextgen.mobile.ai.AiCredits
 import dev.nextgen.mobile.domain.conclusion.ConclusionField
 import dev.nextgen.mobile.domain.conclusion.ConclusionDraft
 import dev.nextgen.mobile.domain.conclusion.ConclusionScope
@@ -15,6 +18,116 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class EvidriloAiAssistCardTest {
+    @Test
+    fun `stale paid ai response reports its actual charge without exposing its answer`() {
+        val response = AiConversationGatewayResult.TurnReceived(
+            AiConversationTurn(
+                status = "success",
+                kind = "explanation",
+                text = "This answer belongs to the previous project context.",
+                reasonCode = null,
+                groundedAnchorIds = listOf("OBS-01"),
+                proposal = null,
+                turnsUsed = 1,
+                turnsRemaining = 4,
+                requestId = "req-stale-paid-001",
+                autoApplied = false,
+                creditCost = 4,
+            ),
+        )
+
+        val state = assertIs<EvidriloAiAssistUiState.Unavailable>(
+            staleAiConversationRecoveryState(response, remainingCredits = 7),
+        )
+
+        assertEquals(4, state.creditCost)
+        assertEquals(7, state.remainingCredits)
+        assertEquals("req-stale-paid-001", state.requestId)
+        assertFalse(state.retryable)
+        assertTrue(state.message.contains("previous workspace state"))
+        assertFalse(state.message.contains("This answer belongs"))
+    }
+
+    @Test
+    fun `stale session-expired fallback reports the actual charge and refreshed balance`() {
+        val response = AiConversationGatewayResult.Fallback(
+            reasonCode = "AI_CONVERSATION_SESSION_EXPIRED",
+            requestId = "req-stale-expired-001",
+            creditCost = 2,
+        )
+
+        val state = assertIs<EvidriloAiAssistUiState.Unavailable>(
+            staleAiConversationRecoveryState(response, remainingCredits = 5),
+        )
+
+        assertEquals(2, state.creditCost)
+        assertEquals(5, state.remainingCredits)
+        assertEquals("req-stale-expired-001", state.requestId)
+        assertFalse(state.retryable)
+    }
+
+    @Test
+    fun `credit allowance copy makes no tier promise before consent`() {
+        val credits = AiCredits(
+            consentRecorded = false,
+            available = 0,
+            grants = emptyList(),
+            requestId = "req-ai-test",
+        )
+
+        val label = aiCreditAllowanceLabel(credits)
+
+        assertEquals("Review consent to see available credits", label)
+        assertFalse(label.any(Char::isDigit))
+        assertFalse(label.contains("Free", ignoreCase = true))
+        assertFalse(label.contains("Pro", ignoreCase = true))
+    }
+
+    @Test
+    fun `credit balance explains the server returned grant scopes and expiry`() {
+        val credits = AiCredits(
+            consentRecorded = true,
+            available = 217,
+            grants = listOf(
+                AiCreditGrant("free_once", "free_once", 20, 1, 2, 17, null),
+                AiCreditGrant("subscription_month", "2026-09", 200, 0, 0, 200, "2026-10-01T00:00:00Z"),
+            ),
+            requestId = "req-ai-test",
+        )
+
+        assertEquals(
+            "217 available\nFree · one-time: 17 available\nPro · current period: 200 available · expires 2026-10-01",
+            aiCreditAllowanceLabel(credits),
+        )
+    }
+
+    @Test
+    fun `consented zero balance states when no grant is active`() {
+        val credits = AiCredits(
+            consentRecorded = true,
+            available = 0,
+            grants = emptyList(),
+            requestId = "req-ai-test",
+        )
+
+        assertEquals("0 available\nNo active AI credit grants", aiCreditAllowanceLabel(credits))
+    }
+
+    @Test
+    fun `chat reports actual successful and fallback credit costs`() {
+        assertEquals("1 AI credit used", aiCreditUsageLabel(1, error = false))
+        assertEquals("4 AI credits used", aiCreditUsageLabel(4, error = false))
+        assertEquals("No AI credits were charged", aiCreditUsageLabel(0, error = true))
+        assertEquals(
+            "1 AI credit was charged before this turn became unavailable",
+            aiCreditUsageLabel(1, error = true),
+        )
+        assertEquals(
+            "2 AI credits were charged before this turn became unavailable",
+            aiCreditUsageLabel(2, error = true),
+        )
+    }
+
     @Test
     fun chat_quick_actions_stay_inside_the_bounded_ai_contract() {
         val actions = evidriloAiChatQuickActions()

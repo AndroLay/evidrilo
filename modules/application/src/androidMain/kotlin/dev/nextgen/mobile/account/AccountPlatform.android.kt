@@ -31,6 +31,8 @@ actual fun createAccountClientConfiguration(): AccountClientConfiguration = Acco
     publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
     redirectUrl = BuildConfig.SUPABASE_AUTH_REDIRECT_URL.ifBlank { DEFAULT_ACCOUNT_AUTH_REDIRECT_URL },
     apiBaseUrl = BuildConfig.EVIDRILO_API_BASE_URL,
+    googleAuthEnabled = BuildConfig.SUPABASE_GOOGLE_AUTH_ENABLED,
+    appleAuthEnabled = BuildConfig.SUPABASE_APPLE_AUTH_ENABLED,
 )
 
 actual fun createAccountAuthPlatform(): AccountAuthPlatform = AndroidAccountAuthPlatform()

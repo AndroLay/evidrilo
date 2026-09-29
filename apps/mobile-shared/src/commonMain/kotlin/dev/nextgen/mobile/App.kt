@@ -5,9 +5,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 import dev.nextgen.mobile.billing.BillingGateway
-import dev.nextgen.mobile.billing.billingGatewayForAccessMode
+import dev.nextgen.mobile.billing.REVENUECAT_PRO_FEATURE_ENABLED
+import dev.nextgen.mobile.billing.revenueCatGatewayForFeatureEnabled
 import dev.nextgen.mobile.billing.createPlatformBillingGateway
 
 @Composable
@@ -18,7 +18,7 @@ fun App() {
     EvidriloTheme(mode = themeController.mode) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val billingGateway: BillingGateway = remember {
-                billingGatewayForAccessMode(TEMPORARY_GUEST_MODE_ENABLED, ::createPlatformBillingGateway)
+                revenueCatGatewayForFeatureEnabled(REVENUECAT_PRO_FEATURE_ENABLED, ::createPlatformBillingGateway)
             }
             EvidriloApp(billingGateway, themeController = themeController)
         }

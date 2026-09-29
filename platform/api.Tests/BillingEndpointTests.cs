@@ -28,8 +28,8 @@ public sealed class BillingEndpointTests : IClassFixture<ApiFactory>
         };
         request.Headers.Add("X-RevenueCat-Webhook-Signature", "t=0,v1=synthetic");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("BILLING_NOT_CONFIGURED", body.GetProperty("code").GetString());

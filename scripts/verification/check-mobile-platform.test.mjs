@@ -109,10 +109,9 @@ test('local reminder platform boundary is wired without remote-push dependencies
     read('modules/application/src/commonMain/kotlin/dev/nextgen/mobile/notifications/NotificationModels.kt'),
     /expect fun createLocalNotificationScheduler\(\)/,
   );
-  assert.match(
-    read('modules/application/src/androidMain/kotlin/dev/nextgen/mobile/notifications/LocalNotificationScheduler.android.kt'),
-    /setInexactRepeating/,
-  );
+  const androidScheduler = read('modules/application/src/androidMain/kotlin/dev/nextgen/mobile/notifications/LocalNotificationScheduler.android.kt');
+  assert.match(androidScheduler, /alarmManager\.set\(\s*AlarmManager\.RTC_WAKEUP,/);
+  assert.match(androidScheduler, /scheduleNextOccurrence\(category\)/);
   assert.match(
     read('modules/application/src/iosMain/kotlin/dev/nextgen/mobile/notifications/LocalNotificationScheduler.ios.kt'),
     /UNUserNotificationCenter/,

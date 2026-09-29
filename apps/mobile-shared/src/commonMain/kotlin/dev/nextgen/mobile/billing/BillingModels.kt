@@ -58,6 +58,11 @@ sealed interface BillingOutcome {
 fun premiumAccessFromEntitlement(isActive: Boolean?): PremiumAccess =
     if (isActive == true) PremiumAccess.UNLOCKED else PremiumAccess.LOCKED
 
+internal fun billingIdentityMatches(
+    currentAccountId: String?,
+    identifiedAccountId: String?,
+): Boolean = !currentAccountId.isNullOrBlank() && currentAccountId == identifiedAccountId
+
 /**
  * A provider entitlement is usable only when its active product belongs to the
  * configured Evidrilo subscription catalog. This keeps a retired lifetime
@@ -132,12 +137,12 @@ class UnavailableBillingGateway(
     }
 }
 
-/** Avoid initializing the store provider at all while the app is guest-only. */
-internal fun billingGatewayForAccessMode(
-    guestOnlyMode: Boolean,
+/** Keep the provider disabled unless the Pro feature is enabled for this build. */
+internal fun revenueCatGatewayForFeatureEnabled(
+    featureEnabled: Boolean,
     configuredProvider: () -> BillingGateway,
-): BillingGateway = if (guestOnlyMode) {
-    UnavailableBillingGateway("Pro is temporarily unavailable in local guest mode.")
+): BillingGateway = if (!featureEnabled) {
+    UnavailableBillingGateway("Evidrilo Pro is disabled in this build.")
 } else {
     configuredProvider()
 }

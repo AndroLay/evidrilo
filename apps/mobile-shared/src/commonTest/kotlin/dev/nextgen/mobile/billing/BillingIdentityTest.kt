@@ -2,16 +2,18 @@ package dev.nextgen.mobile.billing
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class BillingIdentityTest {
     @Test
-    fun guest_only_mode_does_not_initialize_the_store_provider() {
+    fun disabled_pro_feature_does_not_initialize_the_store_provider() {
         var providerFactoryCalls = 0
         val providerGateway = UnavailableBillingGateway("Provider gateway")
 
-        val selected = billingGatewayForAccessMode(guestOnlyMode = true) {
+        val selected = revenueCatGatewayForFeatureEnabled(featureEnabled = false) {
             providerFactoryCalls += 1
             providerGateway
         }
@@ -21,17 +23,25 @@ class BillingIdentityTest {
     }
 
     @Test
-    fun normal_mode_keeps_the_configured_store_provider() {
+    fun enabled_pro_feature_keeps_the_configured_store_provider_even_for_local_guest_mode() {
         var providerFactoryCalls = 0
         val providerGateway = UnavailableBillingGateway("Provider gateway")
 
-        val selected = billingGatewayForAccessMode(guestOnlyMode = false) {
+        val selected = revenueCatGatewayForFeatureEnabled(featureEnabled = true) {
             providerFactoryCalls += 1
             providerGateway
         }
 
         assertEquals(1, providerFactoryCalls)
         assertSame(providerGateway, selected)
+    }
+
+    @Test
+    fun provider_identity_must_match_the_active_evidrilo_account_before_pro_access() {
+        assertTrue(billingIdentityMatches("account-a", "account-a"))
+        assertFalse(billingIdentityMatches("account-a", "account-b"))
+        assertFalse(billingIdentityMatches("account-a", null))
+        assertFalse(billingIdentityMatches(null, "account-a"))
     }
 
     @Test

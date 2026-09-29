@@ -28,6 +28,7 @@ public sealed class AiConversationGatewayTests
         var result = await gateway.GenerateAsync(AccountId, ValidRequest(), "chat_req_0001", CancellationToken.None);
 
         Assert.Equal("success", result.Status);
+        Assert.Equal(4, result.CreditCost);
         Assert.Equal("draft_proposal", result.Kind);
         Assert.Equal("GENERAL_CAUSAL", result.Proposal?.BeforeValue);
         Assert.Equal("OBSERVED_COMPARISON_ONLY", result.Proposal?.SuggestedValue);

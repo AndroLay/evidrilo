@@ -33,6 +33,8 @@ actual fun createAccountClientConfiguration(): AccountClientConfiguration = Acco
     publishableKey = infoValue("SUPABASE_PUBLISHABLE_KEY"),
     redirectUrl = infoValue("SUPABASE_AUTH_REDIRECT_URL").ifBlank { DEFAULT_ACCOUNT_AUTH_REDIRECT_URL },
     apiBaseUrl = infoValue("EVIDRILO_API_BASE_URL"),
+    googleAuthEnabled = infoValue("SUPABASE_GOOGLE_AUTH_ENABLED").toBooleanStrictOrNull() ?: true,
+    appleAuthEnabled = infoValue("SUPABASE_APPLE_AUTH_ENABLED").toBooleanStrictOrNull() ?: false,
 )
 
 @OptIn(ExperimentalForeignApi::class)

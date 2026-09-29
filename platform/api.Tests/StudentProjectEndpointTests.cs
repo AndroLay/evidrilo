@@ -18,8 +18,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Project_list_requires_authentication()
     {
-        using var response = await client.GetAsync("/v1/projects");
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.GetAsync("/v1/projects", cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.RootElement.GetProperty("code").GetString());
@@ -31,8 +31,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/projects");
         request.Headers.Add("X-Test-User", $"{AccountId}|false");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.RootElement.GetProperty("code").GetString());
@@ -41,8 +41,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Project_cloud_consent_requires_authentication()
     {
-        using var response = await client.GetAsync("/v1/projects/cloud-consent");
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.GetAsync("/v1/projects/cloud-consent", cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.RootElement.GetProperty("code").GetString());
@@ -53,8 +53,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
     {
         using var request = AuthenticatedRequest(HttpMethod.Get, "/v1/projects/cloud-consent", "{}");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -68,8 +68,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             "/v1/projects/cloud-consent",
             CloudConsentBody("allow"));
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_PROJECT_CLOUD_CONSENT", body.RootElement.GetProperty("code").GetString());
@@ -83,8 +83,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             "/v1/projects/cloud-consent",
             CloudConsentBody("grant", "student-project-cloud.v0"));
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("PROJECT_CLOUD_CONSENT_POLICY_STALE", body.RootElement.GetProperty("code").GetString());
@@ -98,8 +98,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             "/v1/projects/cloud-consent",
             CloudConsentBody("grant"));
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -110,8 +110,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
     {
         using var request = AuthenticatedRequest(HttpMethod.Post, "/v1/projects", CreateBody());
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("IDEMPOTENCY_KEY_REQUIRED", body.RootElement.GetProperty("code").GetString());
@@ -123,8 +123,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
         using var request = AuthenticatedRequest(HttpMethod.Post, "/v1/projects", CreateBody());
         request.Headers.Add("Idempotency-Key", "project-create-local-001");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -136,8 +136,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
         using var request = AuthenticatedRequest(HttpMethod.Post, "/v1/projects", CreateBodyWithEvidence());
         request.Headers.Add("Idempotency-Key", "project-create-evidence-001");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -148,8 +148,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
     {
         using var request = AuthenticatedRequest(HttpMethod.Get, "/v1/projects", body: "{}");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -166,8 +166,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
         {
             using var request = AuthenticatedRequest(HttpMethod.Get, path, body: "{}");
 
-            using var response = await client.SendAsync(request);
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
             Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -183,8 +183,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             SaveBody()))
         {
             save.Headers.Add("Idempotency-Key", "project-save-local-001");
-            using var response = await client.SendAsync(save);
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var response = await client.SendAsync(save, cancellationToken: TestContext.Current.CancellationToken);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
             Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -199,7 +199,7 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             $"/v1/projects/{ProjectId:D}",
             DeleteBody(confirmPermanently: true));
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
@@ -219,8 +219,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
                 bodyText);
             request.Headers.Add("Idempotency-Key", "project-delete-confirm-001");
 
-            using var response = await client.SendAsync(request);
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal(
@@ -238,8 +238,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             DeleteBody(confirmPermanently: true));
         request.Headers.Add("Idempotency-Key", "project-delete-confirmed-001");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());
@@ -253,8 +253,8 @@ public sealed class StudentProjectEndpointTests : IClassFixture<ApiFactory>
             $"/v1/projects/{ProjectId:D}/revisions?limit=1",
             body: "{}");
 
-        using var response = await client.SendAsync(request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.RootElement.GetProperty("code").GetString());

@@ -66,6 +66,9 @@ internal sealed interface ProjectTemplateRemoteUiState<out T> {
 internal const val projectTemplateCatalogBrowseInstructions =
     "Swipe sideways or choose a type. Screen readers move focus through cards and activate one."
 
+internal const val projectTemplateFamilyEvaluationBoundaryCopy =
+    "Orientation only—not an evaluation or grade. Ask an educator about method, ethics, or evidence quality when needed."
+
 internal fun <T> ProjectTemplateCatalogGatewayResult<T>.toRemoteUiState(): ProjectTemplateRemoteUiState<T> = when (this) {
     is ProjectTemplateCatalogGatewayResult.Loaded -> ProjectTemplateRemoteUiState.Loaded(value)
     is ProjectTemplateCatalogGatewayResult.Unavailable -> ProjectTemplateRemoteUiState.Unavailable(reason)
@@ -221,8 +224,7 @@ internal fun EvidriloProjectTemplateCatalogScreen(
     }
 
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             EvidriloBackButton(label = "Home", onClick = onBack)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -373,20 +375,14 @@ internal fun EvidriloProjectTemplateFamilyScreen(
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             EvidriloBackButton(label = "Project types", onClick = onBack)
             Text(overview.family.displayName, style = MaterialTheme.typography.headlineLarge)
-            Text(
-                overview.summary,
-                style = MaterialTheme.typography.bodyLarge,
-                color = EvidriloColors.Slate,
-            )
             EvidriloTargetCard {
                 Text("Overview only", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "This guidance is general. Published templates, when available, are listed separately and include their own scope and limitations.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    projectTemplateFamilyEvaluationBoundaryCopy,
+                    style = MaterialTheme.typography.bodySmall,
                     color = EvidriloColors.Slate,
                 )
             }
@@ -409,14 +405,6 @@ internal fun EvidriloProjectTemplateFamilyScreen(
                 onRetry = onRetryRemoteTemplates,
                 onInspect = onInspectTemplate,
             )
-            EvidriloTargetCard {
-                Text("Evaluation boundary", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "This is a general orientation, not a method-specific evaluation or academic grade. The app should assess only explicit criteria it has been designed and reviewed to assess; ambiguous method, ethics, and evidence-quality decisions may need an educator or domain reviewer.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EvidriloColors.Slate,
-                )
-            }
             EvidriloSecondaryButton(label = "Browse other project types", onClick = onBack)
             Spacer(Modifier.height(8.dp))
         }
@@ -445,8 +433,7 @@ internal fun EvidriloProjectTemplateDetailScreen(
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             EvidriloBackButton(label = "Template list", onClick = onBack)
             notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
             Text(

@@ -14,6 +14,10 @@ actual fun createAccountClientConfiguration(): AccountClientConfiguration = Acco
     redirectUrl = readJvmValue("evidrilo.supabaseAuthRedirectUrl", "SUPABASE_AUTH_REDIRECT_URL")
         .ifBlank { DEFAULT_ACCOUNT_AUTH_REDIRECT_URL },
     apiBaseUrl = readJvmValue("evidrilo.apiBaseUrl", "EVIDRILO_API_BASE_URL"),
+    googleAuthEnabled = readJvmValue("evidrilo.supabaseGoogleAuthEnabled", "SUPABASE_GOOGLE_AUTH_ENABLED")
+        .toBooleanStrictOrNull() ?: true,
+    appleAuthEnabled = readJvmValue("evidrilo.supabaseAppleAuthEnabled", "SUPABASE_APPLE_AUTH_ENABLED")
+        .toBooleanStrictOrNull() ?: false,
 )
 
 private fun readJvmValue(property: String, environment: String): String =

@@ -17,8 +17,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Progress_requires_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/progress/me");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/progress/me", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -30,8 +30,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/progress/me");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -43,8 +43,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/progress/me");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());
@@ -58,8 +58,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
             "/v1/progress/daily?from=not-a-date&to=2026-09-10");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_PROGRESS_RANGE", body.GetProperty("code").GetString());
@@ -68,8 +68,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Daily_progress_requires_authenticated_identity()
     {
-        using var response = await client.GetAsync("/v1/progress/daily");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/progress/daily", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -81,8 +81,8 @@ public sealed class ProgressEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/progress/daily");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

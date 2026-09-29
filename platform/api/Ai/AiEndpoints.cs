@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Evidrilo.Api.Auth;
@@ -16,6 +17,17 @@ public sealed record AiAssistResponse(
     [property: JsonPropertyName("groundedAnchorIds")] IReadOnlyList<string> GroundedAnchorIds,
     [property: JsonPropertyName("requestId")] string RequestId);
 
+public sealed record AiAssistResponseV2(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("text"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Text,
+    [property: JsonPropertyName("reasonCode"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? ReasonCode,
+    [property: JsonPropertyName("promptVersion")] string PromptVersion,
+    [property: JsonPropertyName("groundedAnchorIds")] IReadOnlyList<string> GroundedAnchorIds,
+    [property: JsonPropertyName("requestId")] string RequestId,
+    [property: JsonPropertyName("creditCost")] int CreditCost);
+
 public sealed record AiCreditGrantResponse(
     [property: JsonPropertyName("grantKind")] string GrantKind,
     [property: JsonPropertyName("grantKey")] string GrantKey,
@@ -23,7 +35,7 @@ public sealed record AiCreditGrantResponse(
     [property: JsonPropertyName("reserved")] int Reserved,
     [property: JsonPropertyName("consumed")] int Consumed,
     [property: JsonPropertyName("available")] int Available,
-    [property: JsonPropertyName("expiresAt")] DateTimeOffset? ExpiresAt);
+    [property: JsonPropertyName("expiresAt"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] DateTimeOffset? ExpiresAt);
 
 public sealed record AiCreditsResponse(
     [property: JsonPropertyName("schema")] string Schema,
@@ -79,6 +91,21 @@ public sealed record AiConversationTurnResponse(
     [property: JsonPropertyName("turnsUsed")] int TurnsUsed,
     [property: JsonPropertyName("turnsRemaining")] int TurnsRemaining,
     [property: JsonPropertyName("requestId")] string RequestId);
+
+public sealed record AiConversationTurnResponseV2(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("kind")] string? Kind,
+    [property: JsonPropertyName("text")] string? Text,
+    [property: JsonPropertyName("reasonCode")] string? ReasonCode,
+    [property: JsonPropertyName("groundedAnchorIds")] IReadOnlyList<string> GroundedAnchorIds,
+    [property: JsonPropertyName("proposal")] AiConversationProposalResponse? Proposal,
+    [property: JsonPropertyName("autoApplied")] bool AutoApplied,
+    [property: JsonPropertyName("turnsUsed")] int TurnsUsed,
+    [property: JsonPropertyName("turnsRemaining")] int TurnsRemaining,
+    [property: JsonPropertyName("requestId")] string RequestId,
+    [property: JsonPropertyName("creditCost")] int CreditCost);
 
 public sealed record AiConversationClearResponse(
     [property: JsonPropertyName("schema")] string Schema,
@@ -225,6 +252,21 @@ public static class AiEndpoints
                         result.ReasonCode,
                         cancellationToken);
                 }
+                var requestId = RequestIdMiddleware.Get(context);
+                if (WantsResponseVariant(context.Request, "application/vnd.evidrilo.ai-assist-result.v2+json"))
+                    return Results.Json(
+                        new AiAssistResponseV2(
+                            "evidrilo.ai-assist-result",
+                            "2",
+                            result.Status,
+                            result.Text,
+                            result.ReasonCode,
+                            result.Audit.PromptVersion,
+                            result.GroundedAnchorIds,
+                            requestId,
+                            result.CreditCost),
+                        contentType: "application/vnd.evidrilo.ai-assist-result.v2+json");
+
                 return Results.Ok(new AiAssistResponse(
                     "evidrilo.ai-assist-result",
                     "1",
@@ -233,7 +275,7 @@ public static class AiEndpoints
                     result.ReasonCode,
                     result.Audit.PromptVersion,
                     result.GroundedAnchorIds,
-                    RequestIdMiddleware.Get(context)));
+                    requestId));
             })
             .RequireAuthorization()
             .RequireRateLimiting("ai");
@@ -453,6 +495,7 @@ public static class AiEndpoints
                     cancellationToken);
                 if (!settled)
                 {
+                    var settledCreditCost = result.CreditCost;
                     result = new AiConversationGatewayResult(
                         "fallback",
                         null,
@@ -460,7 +503,10 @@ public static class AiEndpoints
                         "AI_CONVERSATION_SESSION_EXPIRED",
                         Array.Empty<string>(),
                         null,
-                        result.Audit with { Provider = null, Outcome = "session_expired" });
+                        result.Audit with { Provider = null, Outcome = "session_expired" })
+                    {
+                        CreditCost = settledCreditCost,
+                    };
                     accepted = false;
                 }
 
@@ -472,6 +518,33 @@ public static class AiEndpoints
                     cancellationToken);
 
                 var turnsUsed = accepted ? reservation.TurnIndex : reservation.TurnIndex - 1;
+                var remainingTurns = NpgsqlAiConversationStore.TurnLimit - turnsUsed;
+                var responseRequestId = RequestIdMiddleware.Get(context);
+                var proposal = result.Proposal is null
+                    ? null
+                    : new AiConversationProposalResponse(
+                        result.Proposal.Field,
+                        result.Proposal.BeforeValue,
+                        result.Proposal.SuggestedValue,
+                        result.Proposal.AnchorIds);
+                if (WantsResponseVariant(context.Request, "application/vnd.evidrilo.ai-conversation-turn.v2+json"))
+                    return Results.Json(
+                        new AiConversationTurnResponseV2(
+                            "evidrilo.ai-conversation-turn",
+                            "2",
+                            result.Status,
+                            result.Kind,
+                            result.Text,
+                            result.ReasonCode,
+                            result.GroundedAnchorIds,
+                            proposal,
+                            AutoApplied: false,
+                            turnsUsed,
+                            remainingTurns,
+                            responseRequestId,
+                            result.CreditCost),
+                        contentType: "application/vnd.evidrilo.ai-conversation-turn.v2+json");
+
                 return Results.Ok(new AiConversationTurnResponse(
                     "evidrilo.ai-conversation-turn",
                     "1",
@@ -480,17 +553,11 @@ public static class AiEndpoints
                     result.Text,
                     result.ReasonCode,
                     result.GroundedAnchorIds,
-                    result.Proposal is null
-                        ? null
-                        : new AiConversationProposalResponse(
-                            result.Proposal.Field,
-                            result.Proposal.BeforeValue,
-                            result.Proposal.SuggestedValue,
-                            result.Proposal.AnchorIds),
+                    proposal,
                     AutoApplied: false,
                     turnsUsed,
-                    NpgsqlAiConversationStore.TurnLimit - turnsUsed,
-                    RequestIdMiddleware.Get(context)));
+                    remainingTurns,
+                    responseRequestId));
             })
             .RequireAuthorization()
             .RequireRateLimiting("ai");
@@ -563,6 +630,37 @@ public static class AiEndpoints
         !string.IsNullOrWhiteSpace(locale)
         && locale.Length <= 32
         && locale.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
+
+    private static bool WantsResponseVariant(HttpRequest request, string mediaType)
+    {
+        foreach (var headerValue in request.Headers["Accept"])
+        {
+            if (string.IsNullOrWhiteSpace(headerValue))
+                continue;
+
+            foreach (var entry in headerValue.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parameters = entry.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                if (parameters.Length == 0 || !string.Equals(parameters[0], mediaType, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var qualityParameter = parameters.Skip(1)
+                    .FirstOrDefault(parameter => parameter.StartsWith("q=", StringComparison.OrdinalIgnoreCase));
+                if (qualityParameter is null)
+                    return true;
+
+                if (double.TryParse(
+                        qualityParameter.AsSpan(2),
+                        NumberStyles.AllowDecimalPoint,
+                        CultureInfo.InvariantCulture,
+                        out var quality)
+                    && quality is > 0 and <= 1)
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     private static AiCreditsResponse ToResponse(AiCreditBalance balance, string requestId) =>
         new(

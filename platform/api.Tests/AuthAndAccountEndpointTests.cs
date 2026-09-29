@@ -48,14 +48,14 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me");
             request.Headers.Add("X-Test-User", $"{firstAccount}|true");
-            using var response = await isolatedClient.SendAsync(request);
+            using var response = await isolatedClient.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);
         }
 
         using var secondRequest = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me");
         secondRequest.Headers.Add("X-Test-User", $"{secondAccount}|true");
-        using var secondResponse = await isolatedClient.SendAsync(secondRequest);
+        using var secondResponse = await isolatedClient.SendAsync(secondRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
     }
@@ -63,8 +63,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Account_endpoint_rejects_anonymous_requests_with_safe_error_contract()
     {
-        using var response = await client.GetAsync("/v1/account/me");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/account/me", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -78,8 +78,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(UserId.ToString(), body.GetProperty("accountId").GetString());
@@ -96,8 +96,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -110,8 +110,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me/export");
         request.Headers.Add("X-Test-User", $"{UserId}|false");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("FORBIDDEN", body.GetProperty("code").GetString());
@@ -120,8 +120,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Account_export_rejects_anonymous_requests_without_account_discovery()
     {
-        using var response = await client.GetAsync("/v1/account/me/export");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync("/v1/account/me/export", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -134,8 +134,8 @@ public sealed class AuthAndAccountEndpointTests : IClassFixture<ApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/account/me/export");
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

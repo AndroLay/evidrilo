@@ -14,15 +14,15 @@ import kotlin.test.assertIs
 
 class ProjectAiScaffoldSettlementGatewayTest {
     @Test
-    fun `apply settlement is account-bound idempotent and verifies cost`() {
+    fun `apply settlement is account-bound idempotent and verifies token-priced cost`() {
         val transport = QueueProjectAiSettlementTransport(
-            AccountHttpResponse(200, settlementJson("applied", "project-ai-request-0001", 3)),
+            AccountHttpResponse(200, settlementJson("applied", "project-ai-request-0001", 7)),
         )
         val result = runSuspendTest {
             gateway(transport).settle(
                 requestId = "project-ai-request-0001",
                 decision = ProjectAiScaffoldDecision.APPLY,
-                expectedCreditCost = 3,
+                expectedCreditCost = 7,
             )
         }
 
@@ -30,7 +30,7 @@ class ProjectAiScaffoldSettlementGatewayTest {
             ProjectAiScaffoldSettlementResult.Settled(
                 requestId = "project-ai-request-0001",
                 decision = ProjectAiScaffoldDecision.APPLY,
-                creditCost = 3,
+                creditCost = 7,
             ),
             result,
         )
@@ -68,23 +68,23 @@ class ProjectAiScaffoldSettlementGatewayTest {
     }
 
     @Test
-    fun `settlement fails closed on mismatched request id or cost`() {
+    fun `settlement fails closed on mismatched request id or token cost`() {
         val wrongId = gateway(
             QueueProjectAiSettlementTransport(
-                AccountHttpResponse(200, settlementJson("applied", "different-request-0001", 3)),
+                AccountHttpResponse(200, settlementJson("applied", "different-request-0001", 7)),
             ),
         )
         val wrongCost = gateway(
             QueueProjectAiSettlementTransport(
-                AccountHttpResponse(200, settlementJson("applied", "project-ai-request-0001", 1)),
+                AccountHttpResponse(200, settlementJson("applied", "project-ai-request-0001", 8)),
             ),
         )
 
         val idResult = runSuspendTest {
-            wrongId.settle("project-ai-request-0001", ProjectAiScaffoldDecision.APPLY, 3)
+            wrongId.settle("project-ai-request-0001", ProjectAiScaffoldDecision.APPLY, 7)
         }
         val costResult = runSuspendTest {
-            wrongCost.settle("project-ai-request-0001", ProjectAiScaffoldDecision.APPLY, 3)
+            wrongCost.settle("project-ai-request-0001", ProjectAiScaffoldDecision.APPLY, 7)
         }
 
         assertEquals(ProjectAiScaffoldSettlementResult.Rejected("INVALID_PROJECT_AI_SETTLEMENT_RESPONSE"), idResult)

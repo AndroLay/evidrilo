@@ -29,7 +29,7 @@ public sealed class ContractBoundaryTests
         var root = FindRepositoryRoot();
         var schemaDirectory = Path.Combine(root, "contracts", "schemas");
 
-        var files = Directory.EnumerateFiles(schemaDirectory, "*.v1.json")
+        var files = Directory.EnumerateFiles(schemaDirectory, "*.v*.json")
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
         Assert.NotEmpty(files);
@@ -48,6 +48,11 @@ public sealed class ContractBoundaryTests
 
     private static string FindRepositoryRoot()
     {
+        var configuredRoot = Environment.GetEnvironmentVariable("EVIDRILO_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot)
+            && File.Exists(Path.Combine(configuredRoot, "settings.gradle.kts")))
+            return Path.GetFullPath(configuredRoot);
+
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {

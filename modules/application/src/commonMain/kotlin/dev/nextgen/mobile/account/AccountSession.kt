@@ -32,6 +32,7 @@ sealed interface AccountSession {
         val account: AccountSummary,
         val googleLinkOutcome: GoogleIdentityLinkOutcome? = null,
         val pendingOperationOutcome: AccountMutationOperation? = null,
+        val appleLinkOutcome: IdentityLinkOutcome? = null,
     ) : AccountSession
 
     data object Expired : AccountSession
@@ -133,6 +134,7 @@ class AccountSessionController(
             AccountGatewayResult.OAuthStarted -> AccountSession.AwaitingOAuthCallback
 
             is AccountGatewayResult.GoogleIdentityLink -> acceptGoogleIdentityLink(result)
+            is AccountGatewayResult.AppleIdentityLink -> acceptAppleIdentityLink(result)
 
             AccountGatewayResult.Expired -> markExpired()
 
@@ -229,6 +231,34 @@ class AccountSessionController(
         val signedIn = state as? AccountSession.SignedIn
             ?: return AccountSession.Unavailable(AccountUnavailableReason.INVALID_CREDENTIALS)
         state = signedIn.copy(googleLinkOutcome = outcome)
+        return state
+    }
+
+    private fun acceptAppleIdentityLink(result: AccountGatewayResult.AppleIdentityLink): AccountSession {
+        if (result.outcome == IdentityLinkOutcome.LINKED || result.outcome == IdentityLinkOutcome.ALREADY_LINKED) {
+            val linkedSession = result.session
+            val currentAccount = state as? AccountSession.SignedIn
+            if (linkedSession != null &&
+                currentAccount != null &&
+                linkedSession.account.accountId == currentAccount.account.accountId &&
+                linkedSession.account.emailVerified &&
+                linkedSession.account.appleLinked == true
+            ) {
+                val accepted = acceptVerifiedSession(linkedSession)
+                if (accepted is AccountSession.SignedIn) {
+                    state = accepted.copy(appleLinkOutcome = result.outcome)
+                    return state
+                }
+            }
+            return preserveSignedInAppleLinkOutcome(IdentityLinkOutcome.FAILED)
+        }
+        return preserveSignedInAppleLinkOutcome(result.outcome)
+    }
+
+    private fun preserveSignedInAppleLinkOutcome(outcome: IdentityLinkOutcome): AccountSession {
+        val signedIn = state as? AccountSession.SignedIn
+            ?: return AccountSession.Unavailable(AccountUnavailableReason.INVALID_CREDENTIALS)
+        state = signedIn.copy(appleLinkOutcome = outcome)
         return state
     }
 

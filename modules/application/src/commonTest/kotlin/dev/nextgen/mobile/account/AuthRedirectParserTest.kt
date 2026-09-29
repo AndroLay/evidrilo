@@ -54,11 +54,11 @@ class AuthRedirectParserTest {
     @Test
     fun parses_provider_error_code_without_exposing_untrusted_description() {
         val result = parseAuthRedirect(
-            "evidrilo://auth/callback?error=access_denied&error_code=identity_already_exists&error_description=private%20detail",
+            "evidrilo://auth/callback?error=access_denied&error_code=identity_already_exists&state=expected-state&error_description=private%20detail",
             DEFAULT_ACCOUNT_AUTH_REDIRECT_URL,
         )
 
-        assertEquals(AuthRedirect.ProviderError("identity_already_exists"), result)
+        assertEquals(AuthRedirect.ProviderError("identity_already_exists", "expected-state"), result)
     }
 
     @Test

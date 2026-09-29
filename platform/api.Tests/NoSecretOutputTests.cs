@@ -14,8 +14,8 @@ public sealed class NoSecretOutputTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Anonymous_error_body_contains_no_credential_value_patterns()
     {
-        using var response = await client.GetAsync("/v1/account/me");
-        var body = await response.Content.ReadAsStringAsync();
+        using var response = await client.GetAsync("/v1/account/me", cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain("eyJ", body, StringComparison.Ordinal);
         Assert.DoesNotContain("service_role", body, StringComparison.OrdinalIgnoreCase);
@@ -38,6 +38,11 @@ public sealed class NoSecretOutputTests : IClassFixture<ApiFactory>
 
     private static string FindRepositoryRoot()
     {
+        var configuredRoot = Environment.GetEnvironmentVariable("EVIDRILO_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot)
+            && File.Exists(Path.Combine(configuredRoot, "settings.gradle.kts")))
+            return Path.GetFullPath(configuredRoot);
+
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {

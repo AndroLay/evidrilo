@@ -17,8 +17,8 @@ public sealed class RecommendationInteractionEndpointTests : IClassFixture<ApiFa
     [Fact]
     public async Task Recommendation_interaction_requires_authenticated_identity()
     {
-        using var response = await client.PostAsJsonAsync("/v1/recommendations/interactions", ValidRequest());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.PostAsJsonAsync("/v1/recommendations/interactions", ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("AUTH_REQUIRED", body.GetProperty("code").GetString());
@@ -33,8 +33,8 @@ public sealed class RecommendationInteractionEndpointTests : IClassFixture<ApiFa
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("RECOMMENDATION_CONSENT_REQUIRED", body.GetProperty("code").GetString());
@@ -58,8 +58,8 @@ public sealed class RecommendationInteractionEndpointTests : IClassFixture<ApiFa
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_RECOMMENDATION_INTERACTION", body.GetProperty("code").GetString());
@@ -74,8 +74,8 @@ public sealed class RecommendationInteractionEndpointTests : IClassFixture<ApiFa
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
 
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("DATABASE_NOT_CONFIGURED", body.GetProperty("code").GetString());

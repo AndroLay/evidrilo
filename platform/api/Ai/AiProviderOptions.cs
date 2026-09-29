@@ -6,11 +6,14 @@ namespace Evidrilo.Api.Ai;
 
 public sealed class AiProviderOptions
 {
+    private static readonly Uri DefaultResponsesEndpoint = new("https://api.openai.com/v1/responses");
+
     private AiProviderOptions(
         bool enabled,
         bool activationApproved,
         string? apiKey,
         string? model,
+        Uri responsesEndpoint,
         decimal? inputUsdPerMillionTokens,
         decimal? cachedInputUsdPerMillionTokens,
         decimal? cacheWriteInputUsdPerMillionTokens,
@@ -24,6 +27,7 @@ public sealed class AiProviderOptions
         ActivationApproved = activationApproved;
         ApiKey = apiKey;
         Model = model;
+        ResponsesEndpoint = responsesEndpoint;
         InputUsdPerMillionTokens = inputUsdPerMillionTokens;
         CachedInputUsdPerMillionTokens = cachedInputUsdPerMillionTokens;
         CacheWriteInputUsdPerMillionTokens = cacheWriteInputUsdPerMillionTokens;
@@ -41,6 +45,8 @@ public sealed class AiProviderOptions
     public string? ApiKey { get; }
 
     public string? Model { get; }
+
+    public Uri ResponsesEndpoint { get; }
 
     public decimal? InputUsdPerMillionTokens { get; }
 
@@ -63,6 +69,7 @@ public sealed class AiProviderOptions
         false,
         null,
         null,
+        DefaultResponsesEndpoint,
         0.10m,
         0.01m,
         0.125m,
@@ -88,8 +95,9 @@ public sealed class AiProviderOptions
                 "AI_PROVIDER_ACTIVATION_APPROVED must be true before enabling an AI provider.");
         }
 
-        var apiKey = RequiredSecret(configuration, "OPENAI_API_KEY", maximumLength: 1024);
+        var apiKey = RequiredProviderSecret(configuration);
         var model = RequiredModel(configuration, "AI_OPENAI_MODEL");
+        var responsesEndpoint = RequiredResponsesEndpoint(configuration);
         var inputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_INPUT_USD_PER_MILLION_TOKENS");
         var cachedInputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_CACHED_INPUT_USD_PER_MILLION_TOKENS");
         var cacheWriteInputRate = RequiredPositiveDecimal(configuration, "AI_OPENAI_CACHE_WRITE_INPUT_USD_PER_MILLION_TOKENS");
@@ -114,6 +122,7 @@ public sealed class AiProviderOptions
             true,
             apiKey,
             model,
+            responsesEndpoint,
             inputRate,
             cachedInputRate,
             cacheWriteInputRate,
@@ -206,6 +215,89 @@ public sealed class AiProviderOptions
             && !value.Any(char.IsWhiteSpace))
             return value;
         throw new PlatformConfigurationException($"{key} must be configured as a server-side secret.");
+    }
+
+    private static string RequiredProviderSecret(IConfiguration configuration)
+    {
+        var secretFile = configuration["AI_PROVIDER_API_KEY_FILE"]?.Trim();
+        var environmentSecret = configuration["OPENAI_API_KEY"];
+        var hasSecretFile = !string.IsNullOrWhiteSpace(secretFile);
+        var hasEnvironmentSecret = !string.IsNullOrWhiteSpace(environmentSecret);
+        if (hasSecretFile && hasEnvironmentSecret)
+            throw new PlatformConfigurationException(
+                "Configure only one of AI_PROVIDER_API_KEY_FILE or OPENAI_API_KEY.");
+
+        if (!hasSecretFile)
+            return RequiredSecret(configuration, "OPENAI_API_KEY", maximumLength: 1024);
+
+        if (!Path.IsPathFullyQualified(secretFile!))
+            throw new PlatformConfigurationException(
+                "AI_PROVIDER_API_KEY_FILE must point to an absolute, owner-only secret file.");
+
+        try
+        {
+            var file = new FileInfo(secretFile!);
+            if (!file.Exists || file.LinkTarget is not null || (File.GetAttributes(secretFile!) & FileAttributes.Directory) != 0)
+                throw new PlatformConfigurationException(
+                    "AI_PROVIDER_API_KEY_FILE must point to a regular, owner-only secret file.");
+
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                var mode = File.GetUnixFileMode(secretFile!);
+                const UnixFileMode nonOwnerPermissions = UnixFileMode.GroupRead
+                    | UnixFileMode.GroupWrite
+                    | UnixFileMode.GroupExecute
+                    | UnixFileMode.OtherRead
+                    | UnixFileMode.OtherWrite
+                    | UnixFileMode.OtherExecute;
+                if ((mode & UnixFileMode.UserRead) == 0 || (mode & nonOwnerPermissions) != 0)
+                    throw new PlatformConfigurationException(
+                        "AI_PROVIDER_API_KEY_FILE must be readable only by its owner (for example, mode 0600).");
+            }
+
+            var value = File.ReadAllText(secretFile!).Trim();
+            if (string.IsNullOrWhiteSpace(value)
+                || value.Length > 1024
+                || value.Any(char.IsWhiteSpace))
+                throw new PlatformConfigurationException(
+                    "AI_PROVIDER_API_KEY_FILE must contain one non-empty API key line.");
+            return value;
+        }
+        catch (PlatformConfigurationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException
+            or System.Security.SecurityException)
+        {
+            throw new PlatformConfigurationException(
+                "AI_PROVIDER_API_KEY_FILE could not be read as a secure server-side secret.");
+        }
+    }
+
+    private static Uri RequiredResponsesEndpoint(IConfiguration configuration)
+    {
+        var raw = configuration["AI_PROVIDER_BASE_URL"]?.Trim();
+        if (string.IsNullOrWhiteSpace(raw)) return DefaultResponsesEndpoint;
+
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var baseUri)
+            || !string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !baseUri.IsDefaultPort
+            || !string.IsNullOrEmpty(baseUri.UserInfo)
+            || !string.IsNullOrEmpty(baseUri.Query)
+            || !string.IsNullOrEmpty(baseUri.Fragment)
+            || !string.Equals(baseUri.AbsolutePath.TrimEnd('/'), "/v1", StringComparison.Ordinal)
+            || !(string.Equals(baseUri.Host, "api.openai.com", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(baseUri.Host, "api.experientiallabs.ai", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new PlatformConfigurationException(
+                "AI_PROVIDER_BASE_URL must be the HTTPS v1 endpoint for OpenAI or Experiential Labs.");
+        }
+
+        return new Uri($"{baseUri.GetLeftPart(UriPartial.Authority)}/v1/responses", UriKind.Absolute);
     }
 
     private static string RequiredModel(IConfiguration configuration, string key)

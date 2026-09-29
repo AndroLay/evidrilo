@@ -1,12 +1,17 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
 }
 
 kotlin {
     jvmToolchain(21)
     jvm()
-    androidTarget()
+    android {
+        namespace = "dev.nextgen.mobile.data"
+        compileSdk = 37
+        minSdk = 26
+        withHostTest {}
+    }
 
     listOf(
         iosArm64(),
@@ -29,10 +34,11 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
-    }
-}
 
-android {
-    namespace = "dev.nextgen.mobile.data"
-    compileSdk = 35
+        named("androidHostTest") {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+    }
 }

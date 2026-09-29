@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-general-chat-result.v2.json",
+  "title": "Evidrilo isolated Project AI General chat result v2",
+  "description": "Structured answer and token-priced credit cost. The message and answer are not part of activity history.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "mode", "status", "answer", "requestId", "creditCost"],
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-general-chat" },
+    "version": { "const": "2" },
+    "mode": { "const": "GENERAL" },
+    "status": { "const": "success" },
+    "answer": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "requestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "creditCost": { "type": "integer", "minimum": 1, "maximum": 200 }
+  }
+}

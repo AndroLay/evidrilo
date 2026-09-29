@@ -176,6 +176,13 @@ public static partial class ProjectAiScaffoldValidator
         return null;
     }
 
+    public static IReadOnlyList<string> AllowedSuggestionFieldIds(ProjectTemplateCatalogEntry template) =>
+        template.Template.InputFields!
+            .Where(field => CanSuggest(field.Kind))
+            .Select(field => field.Id!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
     public static string? ValidateOutput(
         ProjectTemplateCatalogEntry? template,
         ProjectAiScaffoldOutput? output)

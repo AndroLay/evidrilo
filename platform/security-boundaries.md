@@ -62,8 +62,11 @@ issue reports.
 - Membership operations protect the last active organization owner.
 - Forwarded headers are ignored unless trusted proxy addresses are explicitly
   configured.
-- Rate limits and worker retries are bounded; stale worker leases cannot
-  overwrite a newer claim.
+- API fixed-window rate limits and worker retries are bounded. API limiter
+  state is process-local and resets on restart; keep the API single-instance or
+  put a shared limiter at the trusted edge before horizontal scaling. The
+  limiter is an abuse control, separate from durable credit and provider-spend
+  ceilings.
 - Retry keys are bounded and validated at the API boundary. A supplied
   `Idempotency-Key` must use the same safe grammar as request identifiers;
   malformed keys fail before the route executes.
@@ -98,15 +101,23 @@ issue reports.
   The client cannot grant, transfer, or edit credits; raw prompts and raw
   responses are not ordinary audit-log data.
 - The OpenAI Responses adapter is server-only and remains disabled by default
-  behind two explicit activation flags. Its local implementation uses a fixed
-  HTTPS endpoint, disables redirects, tools, and provider conversation state,
-  requests strict structured output with approved anchor IDs, and enforces a
-  short timeout plus per-request and monthly spend reservations. The request
-  sets `store:false`, which does not disable standard provider abuse-monitoring
-  retention; OpenAI documents retention of such logs for up to 30 days unless
-  an eligible organization-level control is approved. Do not enable the
-  provider or claim zero retention before owner privacy/data-use review and
-  user disclosure are complete.
+  behind `AI_PROVIDER_ENABLED` and `AI_PROVIDER_ACTIVATION_APPROVED`. Project
+  scaffold and stage-assist additionally require
+  `PROJECT_AI_PROVIDER_ENABLED`, `PROJECT_AI_PROVIDER_ACTIVATION_APPROVED`, and
+  `PROJECT_AI_PRIVACY_APPROVED`; all default to false. Their adapters reuse the
+  fixed HTTPS transport, strict structured output, timeout, token pricing, and
+  monthly provider-spend ledger. Per-account revocable Project AI consent is
+  checked before dispatch, and only bounded redacted brief/question/allowlisted
+  fields or explicitly selected stage/evidence context reaches the provider.
+  The request sets `store:false`, which does not disable standard
+  provider abuse-monitoring retention; OpenAI documents retention of such logs
+  for up to 30 days unless an eligible organization-level control is approved.
+  Do not enable a provider or claim zero retention before owner privacy/data-use
+  review and user disclosure are complete.
+  General chat additionally requires `PROJECT_AI_GENERAL_CHAT_POLICY_APPROVED`,
+  which defaults to false. It accepts only a bounded redacted message and keeps
+  metadata-only history; the separate gate represents approval of its cost,
+  limit, and provider-retention policy.
 
 ## Billing
 
@@ -117,13 +128,12 @@ issue reports.
   flag.
 - Unknown or unapproved active products fail closed. Product-less expiry or
   revocation cleanup may remove old access but cannot grant new access.
-- Under D-126, `evidrilo_pro` targets 200 AI credits per active entitlement
-  month; a verified free account receives a one-time 20-credit grant after
-  consent. Yearly entitlements receive monthly grants while active, with no
-  rollover. Migration `031_ai_credit_ledger` caps a grant at 100; migration 050
-  raises that bound to 200 and requires fresh/upgrade database/API acceptance.
-  Webhook replay, restore, and concurrent requests must not duplicate a grant
-  or spend one credit twice.
+- Under D-126 and D-130, `evidrilo_pro` adds 200 AI credits per earned active
+  entitlement month; a verified Free account receives a one-time 20-credit
+  grant after consent. Monthly and yearly plans accumulate the same monthly
+  grants, which do not expire when Pro ends. Migration 051 makes grants
+  non-expiring and records multi-grant reservations. Webhook replay, restore,
+  and concurrent requests must not duplicate a grant or spend one credit twice.
 - Billing failure must not disable the local free workflow.
 
 ## Configuration and operations

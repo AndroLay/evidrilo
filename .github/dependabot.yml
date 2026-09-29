@@ -15,6 +15,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+  - package-ecosystem: nuget
+    directory: "/platform/api.Tests"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: nuget
+    directory: "/platform/worker.Tests"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: nuget
+    directory: "/platform/integration"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

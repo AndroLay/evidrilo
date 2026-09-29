@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.project.ProjectTemplateInputField
@@ -77,6 +78,7 @@ import dev.nextgen.mobile.projectcatalog.StudentProjectExportFormatter
 import dev.nextgen.mobile.projectcatalog.StudentProjectImportReceipt
 import dev.nextgen.mobile.projectcatalog.readStudentProjectAttachmentForPreview
 import dev.nextgen.mobile.storage.StudentProjectAttachmentStore
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -223,6 +225,7 @@ internal data class ProjectEvidenceRemovalImpact(
 internal data class ProjectRemovalRelationImpact(
     val relation: StudentProjectEvidenceRelation,
     val targetLabel: String,
+    val evidenceLabel: String,
 )
 
 internal fun projectSourceRemovalImpact(
@@ -279,6 +282,7 @@ private fun projectRemovalRelationshipImpacts(
 ): List<ProjectRemovalRelationImpact> {
     val findings = draft.findings.associateBy(StudentProjectFindingRecord::id)
     val claims = StudentProjectDraftRules.effectiveClaims(draft).associateBy(StudentProjectClaimRecord::id)
+    val evidence = draft.evidenceItems.associateBy(StudentProjectEvidenceItem::id)
     return draft.evidenceRelations.asSequence()
         .filter { it.evidenceId in evidenceIds }
         .map { relation ->
@@ -286,7 +290,11 @@ private fun projectRemovalRelationshipImpacts(
                 StudentProjectEvidenceTargetType.FINDING -> findings[relation.targetId]?.statement
                 StudentProjectEvidenceTargetType.CLAIM -> claims[relation.targetId]?.statement
             }.orEmpty().ifBlank { "Untitled ${relation.targetType.name.lowercase()}" }
-            ProjectRemovalRelationImpact(relation, label)
+            val evidenceLabel = evidence[relation.evidenceId]?.excerpt
+                ?.ifBlank { "Untitled evidence note" }
+                ?.removalPreview()
+                ?: "unavailable evidence note"
+            ProjectRemovalRelationImpact(relation, label, evidenceLabel)
         }
         .toList()
 }
@@ -295,22 +303,23 @@ internal fun projectSourceRemovalWarning(
     source: StudentProjectSourceRecord,
     impact: ProjectSourceRemovalImpact,
 ): String = buildString {
-    appendLine("Removing “${source.title.ifBlank { source.id }}” (#${source.id}) affects these linked project items:")
+    val sourceLabel = source.title.trim().takeIf(String::isNotEmpty)?.removalPreview() ?: "this source"
+    appendLine("Removing “$sourceLabel” affects these linked project items:")
     impact.evidenceNotes.forEach { evidence ->
-        appendLine("Evidence note: ${evidence.excerpt.removalPreview()} (#${evidence.id})")
+        appendLine("Evidence note “${evidence.excerpt.ifBlank { "Untitled evidence note" }.removalPreview()}” will be removed.")
     }
     impact.relationships.forEach { appendLine(it.toRemovalPreview()) }
     impact.themes.forEach { theme ->
-        appendLine("Theme: ${theme.title.ifBlank { "Untitled theme" }} (#${theme.id}) loses this source link; its text remains.")
+        appendLine("Theme “${theme.title.ifBlank { "Untitled theme" }.removalPreview()}” loses its source link; the text remains.")
     }
     val linkedClaim = impact.claimSourceLinkedClaim
     if (linkedClaim != null) {
-        appendLine("Claim-to-source link to #${source.id} is removed from ${linkedClaim.statement.removalPreview()} (#${linkedClaim.id}).")
+        appendLine("The source link is removed from “${linkedClaim.statement.removalPreview()}”.")
     } else if (impact.removesClaimSourceLink) {
-        appendLine("A claim-to-source link to #${source.id} is removed; its claim record could not be identified.")
+        appendLine("A source link is removed from a claim that could not be identified.")
     }
     impact.claimsNeedingReview.forEach { claim ->
-        appendLine("Claim marked Needs revision: ${claim.statement.removalPreview()} (#${claim.id}).")
+        appendLine("Claim “${claim.statement.removalPreview()}” will be marked Needs revision.")
     }
     if (impact.evidenceNotes.isEmpty() && impact.relationships.isEmpty() && impact.themes.isEmpty() &&
         !impact.removesClaimSourceLink
@@ -322,10 +331,12 @@ internal fun projectSourceRemovalWarning(
 }
 
 internal fun projectEvidenceRemovalWarning(impact: ProjectEvidenceRemovalImpact): String = buildString {
-    appendLine("Evidence note: ${impact.evidenceNote.excerpt.removalPreview()} (#${impact.evidenceNote.id}) will be removed.")
+    appendLine(
+        "Evidence note “${impact.evidenceNote.excerpt.ifBlank { "Untitled evidence note" }.removalPreview()}” will be removed from this revision.",
+    )
     impact.relationships.forEach { appendLine(it.toRemovalPreview()) }
     impact.claimsNeedingReview.forEach { claim ->
-        appendLine("Claim marked Needs revision: ${claim.statement.removalPreview()} (#${claim.id}).")
+        appendLine("Claim “${claim.statement.removalPreview()}” will be marked Needs revision.")
     }
     if (impact.relationships.isEmpty()) appendLine("No finding or claim currently links to this note.")
     appendLine("Findings and free-text analysis/output are retained; free-text analysis and output are not linked automatically, so review them manually.")
@@ -338,7 +349,7 @@ private fun ProjectRemovalRelationImpact.toRemovalPreview(): String {
         StudentProjectEvidenceTargetType.CLAIM -> "Claim"
     }
     val relationLabel = relation.relation.name.lowercase().replace('_', ' ')
-    return "$target: ${targetLabel.removalPreview()} (#${relation.targetId}) loses $relationLabel link to evidence #${relation.evidenceId}."
+    return "$target “${targetLabel.removalPreview()}” loses its $relationLabel link to evidence note “$evidenceLabel”."
 }
 
 private fun String.removalPreview(): String {
@@ -499,7 +510,17 @@ internal fun detachClaimFromLimitationActions(
 internal fun studentProjectImportProgressLabel(progress: StudentProjectFileImportProgress): String =
     "Reading archive: ${formatProjectImportBytes(progress.bytesRead)}" +
         (progress.totalBytes?.let { " of ${formatProjectImportBytes(it)}" } ?: "") +
+        (studentProjectImportProgressFraction(progress)?.let { " (${(it * 100).roundToInt()}%)" } ?: "") +
         ". Your project data has not changed."
+
+internal fun studentProjectImportProgressFraction(progress: StudentProjectFileImportProgress): Float? =
+    progress.totalBytes
+        ?.takeIf { it > 0L }
+        ?.let { totalBytes ->
+            (progress.bytesRead.coerceAtLeast(0L).toDouble() / totalBytes.toDouble())
+                .coerceIn(0.0, 1.0)
+                .toFloat()
+        }
 
 private fun formatProjectImportBytes(bytes: Long): String = when {
     bytes >= 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
@@ -623,8 +644,7 @@ internal fun EvidriloStudentProjectsScreen(
     }
 
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
+        EvidriloContentColumn(includeBottomSafeArea = false) {
             EvidriloBackButton(label = "Home", onClick = onBack)
             Text("My projects", style = MaterialTheme.typography.headlineLarge)
             Text(
@@ -776,7 +796,18 @@ internal fun EvidriloStudentProjectsScreen(
         is StudentProjectArchiveImportDialogState.Busy -> AlertDialog(
             onDismissRequest = ::cancelArchiveImport,
             title = { Text("Working with project archive") },
-            text = { Text(importState.message) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().semantics {
+                            contentDescription = "Project archive operation progress"
+                            stateDescription = importState.message
+                            progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                        },
+                    )
+                    Text(importState.message)
+                }
+            },
             confirmButton = {
                 TextButton(onClick = ::cancelArchiveImport) { Text("Cancel import") }
             },
@@ -784,7 +815,30 @@ internal fun EvidriloStudentProjectsScreen(
         is StudentProjectArchiveImportDialogState.Reading -> AlertDialog(
             onDismissRequest = ::cancelArchiveImport,
             title = { Text("Reading project archive") },
-            text = { Text(studentProjectImportProgressLabel(importState.progress)) },
+            text = {
+                val fraction = studentProjectImportProgressFraction(importState.progress)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(studentProjectImportProgressLabel(importState.progress))
+                    if (fraction == null) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().semantics {
+                                contentDescription = "Project archive import progress"
+                                stateDescription = "Reading project archive; total size is unknown"
+                                progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                            },
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.fillMaxWidth().semantics {
+                                contentDescription = "Project archive import progress"
+                                stateDescription = "${(fraction * 100).roundToInt()}% read"
+                                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+                            },
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = ::cancelArchiveImport) { Text("Cancel import") }
             },
@@ -1526,7 +1580,6 @@ internal fun EvidriloStudentProjectEditorScreen(
     Box(Modifier.fillMaxSize().background(EvidriloColors.Canvas)) {
         key(activeEditorSectionIndex) {
         EvidriloContentColumn {
-            EvidriloBrandHeader(onSettings = null)
             EvidriloBackButton(label = "My projects", onClick = onRequestClose)
             LinearProgressIndicator(
                 progress = { editorProgress },

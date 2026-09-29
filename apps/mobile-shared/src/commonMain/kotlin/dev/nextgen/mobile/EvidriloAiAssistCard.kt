@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -83,6 +84,7 @@ internal sealed interface EvidriloAiAssistUiState {
         val requestId: String? = null,
         val turnsUsed: Int? = null,
         val proposal: AiConversationProposal? = null,
+        val creditCost: Int? = null,
     ) : EvidriloAiAssistUiState
 
     data class Unavailable(
@@ -90,6 +92,8 @@ internal sealed interface EvidriloAiAssistUiState {
         val retryable: Boolean,
         val turnsUsed: Int? = null,
         val requestId: String? = null,
+        val creditCost: Int? = null,
+        val remainingCredits: Int? = null,
     ) : EvidriloAiAssistUiState
 }
 
@@ -129,6 +133,42 @@ internal fun aiConversationClearStateAfterGatewayResult(
     is AiConversationGatewayResult.SessionStarted,
     is AiConversationGatewayResult.TurnReceived ->
         EvidriloAiConversationClearState.Failed(sessionId, accountId, retryable = false)
+}
+
+/** Keeps stale replies out of the current transcript while preserving server-reported billing facts. */
+internal fun staleAiConversationRecoveryState(
+    result: AiConversationGatewayResult,
+    remainingCredits: Int?,
+): EvidriloAiAssistUiState.Unavailable? = when (result) {
+    is AiConversationGatewayResult.TurnReceived -> EvidriloAiAssistUiState.Unavailable(
+        message = "An earlier AI reply belongs to a previous workspace state. It was not added to this chat, and no draft change was applied.",
+        retryable = false,
+        turnsUsed = result.value.turnsUsed,
+        requestId = result.value.requestId,
+        creditCost = result.value.creditCost,
+        remainingCredits = remainingCredits,
+    )
+    is AiConversationGatewayResult.Fallback -> EvidriloAiAssistUiState.Unavailable(
+        message = "An earlier AI turn became unavailable after the workspace changed. No draft change was applied.",
+        retryable = false,
+        turnsUsed = result.turnsUsed,
+        requestId = result.requestId,
+        creditCost = result.creditCost,
+        remainingCredits = remainingCredits,
+    )
+    is AiConversationGatewayResult.Failed -> if (result.error.outcomeUnknown) {
+        EvidriloAiAssistUiState.Unavailable(
+            message = "An earlier AI turn may have been processed before the workspace changed. Its reply was not added; check the refreshed credit balance before retrying.",
+            retryable = false,
+            remainingCredits = remainingCredits,
+        )
+    } else {
+        null
+    }
+    is AiConversationGatewayResult.SessionStarted,
+    is AiConversationGatewayResult.Cleared,
+    is AiConversationGatewayResult.Deferred,
+    -> null
 }
 
 internal fun aiChatCanSendDuringConversationClear(
@@ -205,9 +245,14 @@ internal sealed interface EvidriloAiChatMessage {
         val remainingCredits: Int?,
         val requestId: String,
         val proposal: AiConversationProposal?,
+        val creditCost: Int? = null,
     ) : EvidriloAiChatMessage
 
-    data class AssistantError(val text: String) : EvidriloAiChatMessage
+    data class AssistantError(
+        val text: String,
+        val creditCost: Int? = null,
+        val remainingCredits: Int? = null,
+    ) : EvidriloAiChatMessage
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -250,6 +295,7 @@ internal fun EvidriloAiAssistCard(
                             remainingCredits = current.remainingCredits,
                             requestId = key,
                             proposal = current.proposal,
+                            creditCost = current.creditCost,
                         ),
                     )
                     lastAnswerKey = key
@@ -260,7 +306,13 @@ internal fun EvidriloAiAssistCard(
             is EvidriloAiAssistUiState.Unavailable -> {
                 val key = current.requestId ?: current.message
                 if (key != lastErrorKey) {
-                    transcript.add(EvidriloAiChatMessage.AssistantError(current.message))
+                    transcript.add(
+                        EvidriloAiChatMessage.AssistantError(
+                            current.message,
+                            current.creditCost,
+                            current.remainingCredits,
+                        ),
+                    )
                     lastErrorKey = key
                 }
                 current.turnsUsed?.let { requestsUsed = it }
@@ -550,7 +602,7 @@ private fun EvidriloAiChatSheet(
             ) { Text("Send") }
         }
         Text(
-            "One credit is used only for a valid AI response. The deterministic check remains authoritative.",
+            "Credits follow verified provider token usage. A valid AI response is charged; failed or rejected requests release the reservation. The deterministic check remains authoritative.",
             style = MaterialTheme.typography.labelSmall,
             color = EvidriloColors.Slate,
         )
@@ -641,11 +693,14 @@ private fun EvidriloAiChatBubble(message: EvidriloAiChatMessage) {
                 text = message.text,
                 groundedAnchorIds = message.groundedAnchorIds,
                 remainingCredits = message.remainingCredits,
+                creditCost = message.creditCost,
             )
         }
         is EvidriloAiChatMessage.AssistantError -> EvidriloAiAssistantBubble(
             text = message.text,
             error = true,
+            creditCost = message.creditCost,
+            remainingCredits = message.remainingCredits,
         )
     }
 }
@@ -786,6 +841,7 @@ private fun EvidriloAiAssistantBubble(
     text: String,
     groundedAnchorIds: List<String> = emptyList(),
     remainingCredits: Int? = null,
+    creditCost: Int? = null,
     error: Boolean = false,
 ) {
     Row(
@@ -836,10 +892,25 @@ private fun EvidriloAiAssistantBubble(
                         color = EvidriloColors.Slate,
                     )
                 }
+                creditCost?.let { cost ->
+                    Text(
+                        aiCreditUsageLabel(cost, error),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EvidriloColors.Slate,
+                    )
+                }
             }
         }
     }
 }
+
+internal fun aiCreditUsageLabel(creditCost: Int, error: Boolean): String = when {
+    error && creditCost == 0 -> "No AI credits were charged"
+    error -> "$creditCost AI ${creditCostLabel(creditCost)} ${if (creditCost == 1) "was" else "were"} charged before this turn became unavailable"
+    else -> "$creditCost AI ${creditCostLabel(creditCost)} used"
+}
+
+private fun creditCostLabel(creditCost: Int): String = if (creditCost == 1) "credit" else "credits"
 
 @Composable
 private fun EvidriloAiTypingBubble() {
@@ -945,28 +1016,64 @@ private fun EvidriloAiPromptChip(
     }
 }
 
+internal fun aiCreditAllowanceLabel(credits: AiCredits): String =
+    if (!credits.consentRecorded) {
+        "Review consent to see available credits"
+    } else {
+        buildList {
+            add("${credits.available} available")
+            if (credits.grants.isEmpty()) {
+                add("No active AI credit grants")
+            } else {
+                credits.grants.forEach { grant ->
+                    val expires = grant.expiresAt?.take(10)?.let { " · expires $it" }.orEmpty()
+                    val scope = when (grant.grantKind) {
+                        "free_once" -> "Free · one-time"
+                        "subscription_month" -> "Pro · current period"
+                        else -> "AI grant"
+                    }
+                    add("$scope: ${grant.available} available$expires")
+                }
+            }
+        }.joinToString("\n")
+    }
+
 @Composable
 private fun AiCreditSummary(credits: AiCredits) {
+    val allowanceLines = aiCreditAllowanceLabel(credits).split('\n')
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = EvidriloColors.Surface,
         border = BorderStroke(2.dp, EvidriloColors.Separator),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EvidriloIcon(name = EvidriloIconName.SPARK, tint = EvidriloColors.Cobalt, modifier = Modifier.size(18.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                EvidriloIcon(
+                    name = EvidriloIconName.SPARK,
+                    tint = EvidriloColors.Cobalt,
+                    modifier = Modifier.size(18.dp),
+                )
                 Text("AI credits", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.weight(1f))
+                if (credits.consentRecorded) {
+                    Text(
+                        allowanceLines.first(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = EvidriloColors.Cobalt,
+                    )
+                }
             }
-            Text(
-                if (!credits.consentRecorded) "10 available after consent" else "${credits.available} remaining",
-                style = MaterialTheme.typography.labelLarge,
-                color = EvidriloColors.Cobalt,
-            )
+            val detailLines = if (credits.consentRecorded) allowanceLines.drop(1) else allowanceLines
+            detailLines.forEach { line ->
+                Text(line, style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Slate)
+            }
         }
     }
 }

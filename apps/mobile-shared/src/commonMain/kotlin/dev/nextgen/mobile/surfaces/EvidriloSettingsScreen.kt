@@ -43,13 +43,22 @@ import dev.nextgen.mobile.notifications.NotificationPermissionState
 import dev.nextgen.mobile.notifications.NotificationPreferences
 import dev.nextgen.mobile.sync.SyncConsent
 import dev.nextgen.mobile.sync.syncPresentation
+import dev.nextgen.mobile.billing.REVENUECAT_PRO_FEATURE_ENABLED
 import dev.nextgen.mobile.storage.LocalStorageNotice
 import dev.nextgen.mobile.storage.LocalStorageStatus
 import dev.nextgen.mobile.surfaces.cloudSyncDisclosure
 import dev.nextgen.mobile.surfaces.disclosureStateDescription
 
+internal enum class EvidriloSettingsSection {
+    HUB,
+    NOTIFICATIONS,
+    WORKSPACE_PREFERENCES,
+    PRIVACY_DATA,
+}
+
 @Composable
 internal fun EvidriloSettingsScreen(
+    section: EvidriloSettingsSection = EvidriloSettingsSection.HUB,
     historyAvailable: Boolean,
     storageNotice: LocalStorageNotice?,
     analyticsConsent: AnalyticsConsent,
@@ -88,6 +97,9 @@ internal fun EvidriloSettingsScreen(
     onDisableNotifications: () -> Unit = {},
     onSetNotificationPreferences: (NotificationPreferences) -> Unit = {},
     onOpenNotificationSettings: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    onOpenWorkspacePreferences: () -> Unit = {},
+    onOpenPrivacyData: () -> Unit = {},
 ) {
     var pendingAction by remember { mutableStateOf<SettingsDestructiveAction?>(null) }
     var readingExpanded by remember { mutableStateOf(false) }
@@ -132,9 +144,22 @@ internal fun EvidriloSettingsScreen(
     EvidriloContentColumn {
         EvidriloBackButton(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Settings", style = MaterialTheme.typography.displayMedium)
             Text(
-                "Tune the evidence workflow and keep local data understandable.",
+                when (section) {
+                    EvidriloSettingsSection.HUB -> "Settings"
+                    EvidriloSettingsSection.NOTIFICATIONS -> "Notifications"
+                    EvidriloSettingsSection.WORKSPACE_PREFERENCES -> "Workspace preferences"
+                    EvidriloSettingsSection.PRIVACY_DATA -> "Privacy & data"
+                },
+                style = MaterialTheme.typography.displayMedium,
+            )
+            Text(
+                when (section) {
+                    EvidriloSettingsSection.HUB -> "Choose what you want to manage."
+                    EvidriloSettingsSection.NOTIFICATIONS -> "Manage reminders on this device."
+                    EvidriloSettingsSection.WORKSPACE_PREFERENCES -> "Adjust how your workspace looks and sounds."
+                    EvidriloSettingsSection.PRIVACY_DATA -> "Review what stays local and control optional data use."
+                },
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -143,6 +168,105 @@ internal fun EvidriloSettingsScreen(
             EvidriloRecoveryNotice(notice = notice)
         }
 
+        if (section == EvidriloSettingsSection.HUB) {
+            EvidriloSectionHeading("Preferences")
+            EvidriloSettingsGroup {
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.CHECKLIST,
+                    title = "Workspace preferences",
+                    subtitle = "Theme, reading, and audio",
+                    onClick = onOpenWorkspacePreferences,
+                )
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.BELL,
+                    title = "Notifications",
+                    subtitle = if (notificationPreferences.enabled) "On · local reminders" else "Off by default",
+                    onClick = onOpenNotifications,
+                )
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.SHIELD,
+                    title = "Privacy & data",
+                    subtitle = "Local storage and optional services",
+                    onClick = onOpenPrivacyData,
+                )
+            }
+
+            EvidriloSectionHeading("Your Evidrilo")
+            EvidriloSettingsGroup {
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.BOOK,
+                    title = "How Evidrilo works",
+                    subtitle = "Evidence · claims · limits · revision",
+                    onClick = onOpenGuide,
+                )
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.LIGHTNING,
+                    title = "Try a guided case",
+                    subtitle = "A separate worked example",
+                    onClick = onOpenGuidedCase,
+                )
+                if (historyAvailable) {
+                    EvidriloDivider()
+                    EvidriloSettingsRow(
+                        icon = EvidriloIconName.HISTORY,
+                        title = "Track what changed",
+                        subtitle = "Review your latest local comparison",
+                        onClick = onOpenHistory,
+                    )
+                }
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.LAYERS,
+                    title = "Evidrilo Pro",
+                    subtitle = if (REVENUECAT_PRO_FEATURE_ENABLED) {
+                        "Optional project capacity and evidence cases"
+                    } else {
+                        "Unavailable in this build"
+                    },
+                    onClick = onOpenPremium,
+                )
+            }
+
+            EvidriloSectionHeading("Account & help")
+            EvidriloSettingsGroup {
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.ACCOUNT,
+                    title = "Account",
+                    subtitle = accountSubtitle,
+                    onClick = onOpenAccount,
+                )
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.QUESTION,
+                    title = "Support and billing",
+                    subtitle = "Restore · manage · refund · privacy",
+                    onClick = onOpenSupport,
+                )
+                EvidriloDivider()
+                EvidriloSettingsRow(
+                    icon = EvidriloIconName.INFO,
+                    title = "About Evidrilo",
+                    subtitle = "Boundaries, privacy, and attribution",
+                    onClick = onOpenAbout,
+                )
+            }
+            EvidriloTintPanel {
+                Text("Local-first by default", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (TEMPORARY_GUEST_MODE_ENABLED) {
+                        "Free project work stays on this device. Pro requires sign-in and a confirmed RevenueCat entitlement. Server AI, cloud sync, and analytics transmission remain paused."
+                    } else {
+                        cloudSyncDisclosure() + " Local projects work without an account."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+
+        if (section == EvidriloSettingsSection.WORKSPACE_PREFERENCES) {
         EvidriloSectionHeading("Appearance")
         EvidriloSettingsGroup {
             EvidriloSettingsRow(
@@ -196,36 +320,6 @@ internal fun EvidriloSettingsScreen(
                     )
                 }
             }
-            EvidriloDivider()
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.BOOK,
-                title = "How Evidrilo works",
-                subtitle = "Evidence · claims · limits · revision",
-                onClick = onOpenGuide,
-            )
-            EvidriloDivider()
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.LIGHTNING,
-                title = "Try a guided case",
-                subtitle = "A separate worked example",
-                onClick = onOpenGuidedCase,
-            )
-            if (historyAvailable) {
-                EvidriloDivider()
-                EvidriloSettingsRow(
-                    icon = EvidriloIconName.HISTORY,
-                    title = "Recent case changes",
-                    subtitle = "Review what changed between revisions",
-                    onClick = onOpenHistory,
-                )
-            }
-            EvidriloDivider()
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.LAYERS,
-                title = "Evidence cases",
-                subtitle = "Two additional cases · optional monthly/yearly access",
-                onClick = onOpenPremium,
-            )
             EvidriloDivider()
             EvidriloSettingsRow(
                 icon = EvidriloIconName.BOOK,
@@ -289,7 +383,12 @@ internal fun EvidriloSettingsScreen(
                     }
                 }
             }
-            EvidriloDivider()
+        }
+        }
+
+        if (section == EvidriloSettingsSection.NOTIFICATIONS) {
+            EvidriloSectionHeading("Local reminders")
+            EvidriloSettingsGroup {
             EvidriloSettingsRow(
                 icon = EvidriloIconName.BELL,
                 title = "Local reminders",
@@ -458,8 +557,10 @@ internal fun EvidriloSettingsScreen(
                 }
             }
         }
+        }
 
-        EvidriloSectionHeading("Data and account")
+        if (section == EvidriloSettingsSection.PRIVACY_DATA) {
+        EvidriloSectionHeading("Data controls")
         EvidriloSettingsGroup {
             EvidriloSettingsRow(
                 icon = EvidriloIconName.SHIELD,
@@ -500,7 +601,9 @@ internal fun EvidriloSettingsScreen(
             EvidriloSettingsRow(
                 icon = EvidriloIconName.SHIELD,
                 title = "Optional product analytics",
-                subtitle = if (analyticsConsent == AnalyticsConsent.GRANTED) {
+                subtitle = if (TEMPORARY_GUEST_MODE_ENABLED) {
+                    "Paused in local guest mode"
+                } else if (analyticsConsent == AnalyticsConsent.GRANTED) {
                     "On · minimal events only"
                 } else {
                     "Off by default"
@@ -521,13 +624,17 @@ internal fun EvidriloSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        "Analytics is optional and off by default. If enabled, a signed-in account may send completion and recommendation events without draft text, passwords, or payment data. Turning it off stops future sends.",
+                        if (TEMPORARY_GUEST_MODE_ENABLED) {
+                            "Analytics transmission is paused in local guest mode. Your choice here does not send events from this build."
+                        } else {
+                            "Analytics is optional and off by default. If enabled, a signed-in account may send completion and recommendation events without draft text, passwords, or payment data. Turning it off stops future sends."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     EvidriloPrimaryButton(
                         label = "Enable optional analytics",
                         onClick = { onSetAnalyticsConsent(AnalyticsConsent.GRANTED) },
-                        enabled = analyticsConsent != AnalyticsConsent.GRANTED,
+                        enabled = !TEMPORARY_GUEST_MODE_ENABLED && analyticsConsent != AnalyticsConsent.GRANTED,
                         trailingIcon = null,
                     )
                     EvidriloSecondaryButton(
@@ -597,42 +704,18 @@ internal fun EvidriloSettingsScreen(
                     }
                 }
             }
-            EvidriloDivider()
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.ACCOUNT,
-                title = "Account",
-                subtitle = accountSubtitle,
-                onClick = onOpenAccount,
-            )
         }
-
-        EvidriloSectionHeading("About")
-        EvidriloSettingsGroup {
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.QUESTION,
-                title = "Support and billing",
-                subtitle = "Restore · manage · refund · privacy",
-                onClick = onOpenSupport,
-            )
-            EvidriloDivider()
-            EvidriloSettingsRow(
-                icon = EvidriloIconName.INFO,
-                title = "About Evidrilo",
-                subtitle = "Boundaries, privacy, and attribution",
-                onClick = onOpenAbout,
-            )
-        }
-
         EvidriloTintPanel {
-            Text("Local-first by default", style = MaterialTheme.typography.titleSmall)
+            Text("What stays local", style = MaterialTheme.typography.titleSmall)
             Text(
                 if (TEMPORARY_GUEST_MODE_ENABLED) {
-                    "Local guest mode keeps project and case work on this device. Account, Pro, cloud sync, and server AI are temporarily paused."
+                    "Project drafts and case work stay on this device. Pro requires sign-in and a confirmed RevenueCat entitlement; server AI, cloud sync, and analytics transmission remain paused."
                 } else {
                     cloudSyncDisclosure() + " Local projects work without an account. Sign-in is needed for account-bound learning and project AI when enabled; it does not enable cloud sync."
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
         }
     }
 }

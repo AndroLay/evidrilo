@@ -1,0 +1,29 @@
+previews:
+  generation: "off"
+
+services:
+  - type: worker
+    name: evidrilo-staging-worker
+    runtime: docker
+    dockerfilePath: infra/docker/worker.Dockerfile
+    dockerContext: .
+    region: singapore
+    plan: 0.5c-512mb
+    branch: main
+    autoDeployTrigger: "off"
+    maxShutdownDelaySeconds: 120
+    envVars:
+      - key: DOTNET_ENVIRONMENT
+        value: Staging
+      - key: SUPABASE_AUTH_ADMIN_ENABLED
+        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WORKER_POLL_INTERVAL_SECONDS
+        value: "5"
+      - key: WORKER_BATCH_SIZE
+        value: "10"

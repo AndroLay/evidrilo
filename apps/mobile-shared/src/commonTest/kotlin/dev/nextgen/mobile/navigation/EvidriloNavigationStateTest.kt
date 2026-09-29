@@ -36,6 +36,48 @@ class EvidriloNavigationStateTest {
     }
 
     @Test
+    fun settingsSubpagesArePublicAndBackReturnsToTheirEntrySurface() {
+        val destinations = listOf(
+            EvidriloDestination.WORKSPACE_PREFERENCES,
+            EvidriloDestination.NOTIFICATIONS,
+            EvidriloDestination.PRIVACY_DATA,
+        )
+
+        destinations.forEach { destination ->
+            assertFalse(destination.requiresAuthenticatedFreeAccess())
+            val fromSettings = EvidriloNavigationState()
+                .open(EvidriloDestination.SETTINGS)
+                .open(destination)
+            assertEquals(EvidriloDestination.SETTINGS, fromSettings.back().current)
+
+            val fromProfile = EvidriloNavigationState()
+                .selectRoot(EvidriloDestination.PROFILE)
+                .open(destination)
+            assertEquals(EvidriloDestination.PROFILE, fromProfile.back().current)
+        }
+    }
+
+    @Test
+    fun premiumStillRequiresAnAccountWhileLocalFreeProjectRoutesDoNot() {
+        assertFalse(EvidriloDestination.PROJECTS.requiresAuthenticatedFreeAccess())
+        assertFalse(EvidriloDestination.WORKSPACE_PREFERENCES.requiresAuthenticatedFreeAccess())
+        assertTrue(EvidriloDestination.PREMIUM.requiresAuthenticatedFreeAccess())
+
+        var authenticationWasRequested = false
+        var actionRan = false
+        val accepted = runWithAuthenticatedAccess(
+            destination = EvidriloDestination.PREMIUM,
+            authenticated = false,
+            onAuthenticationRequired = { authenticationWasRequested = true },
+            action = { actionRan = true },
+        )
+
+        assertFalse(accepted)
+        assertTrue(authenticationWasRequested)
+        assertFalse(actionRan)
+    }
+
+    @Test
     fun systemBackIsEnabledOnlyWhileThereIsAPreviousDestination() {
         val home = EvidriloNavigationState()
         val catalog = home.open(EvidriloDestination.PROJECT_CATALOG)

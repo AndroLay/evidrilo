@@ -5,8 +5,24 @@ import dev.nextgen.mobile.domain.project.StudentProjectStatus
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class EvidriloHomeProjectSummaryTest {
+    @Test
+    fun project_list_shortcut_only_appears_when_a_visible_list_can_be_opened() {
+        val empty = homeProjectSummary(emptyList(), activeLimit = 3)
+        val withProjects = homeProjectSummary(
+            listOf(project("archived", StudentProjectStatus.ARCHIVED)),
+            activeLimit = 3,
+        )
+
+        assertFalse(shouldShowHomeProjectListAction(empty, isLoading = false, loadError = null))
+        assertFalse(shouldShowHomeProjectListAction(withProjects, isLoading = true, loadError = null))
+        assertFalse(shouldShowHomeProjectListAction(withProjects, isLoading = false, loadError = "offline"))
+        assertTrue(shouldShowHomeProjectListAction(withProjects, isLoading = false, loadError = null))
+    }
+
     @Test
     fun every_project_family_has_a_distinct_field_specific_catalog_marker() {
         val designs = ProjectTemplateFamily.values().map(::projectTemplateFamilyCardDesign)

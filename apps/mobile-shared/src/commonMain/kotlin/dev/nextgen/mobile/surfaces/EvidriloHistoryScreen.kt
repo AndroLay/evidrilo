@@ -39,7 +39,9 @@ internal fun EvidriloHistoryScreen(
         selected = selectedSection,
         onNavigate = onNavigate,
     ) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(
+            includeBottomSafeArea = !shouldShowTargetBottomNavigation(selectedSection),
+        ) {
             EvidriloBackButton(label = backLabel, onClick = onBack)
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("History", style = MaterialTheme.typography.displayMedium)

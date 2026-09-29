@@ -28,9 +28,14 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 var platformOptions = PlatformOptions.From(builder.Configuration, builder.Environment.EnvironmentName);
 var aiProviderOptions = AiProviderOptions.From(builder.Configuration);
+var projectAiProviderOptions = ProjectAiProviderOptions.From(builder.Configuration, aiProviderOptions);
 if (aiProviderOptions.Enabled && !platformOptions.DatabaseConfigured)
 {
     throw new PlatformConfigurationException("An enabled AI provider requires a configured provider-spend database.");
+}
+if (projectAiProviderOptions.Enabled && !platformOptions.DatabaseConfigured)
+{
+    throw new PlatformConfigurationException("An enabled project-AI provider requires a configured provider-spend database.");
 }
 
 builder.Services.AddSingleton(platformOptions);
@@ -49,6 +54,8 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod());
 });
+// These fixed-window policies use process-local state. Add a shared edge or
+// distributed limiter before running multiple API instances.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -122,6 +129,7 @@ if (platformOptions.TrustedProxyAddresses.Count > 0)
 }
 builder.Services.AddSupabaseAuthentication(platformOptions);
 builder.Services.AddSingleton(aiProviderOptions);
+builder.Services.AddSingleton(projectAiProviderOptions);
 if (aiProviderOptions.Enabled)
 {
     builder.Services.AddSingleton<HttpClient>(_ => new HttpClient(new SocketsHttpHandler
@@ -155,10 +163,23 @@ else
 }
 builder.Services.AddSingleton<AiGateway>();
 builder.Services.AddSingleton<AiConversationGateway>();
-// Project AI remains deliberately unavailable until its independent provider,
-// privacy/consent, and variable credit-cost gates are approved and verified.
-builder.Services.AddSingleton<IProjectAiScaffoldGenerator, DisabledProjectAiScaffoldGenerator>();
-builder.Services.AddSingleton<IProjectAiStageAssistGenerator, DisabledProjectAiStageAssistGenerator>();
+// Project AI has separate default-off activation, privacy, and per-user consent gates.
+if (projectAiProviderOptions.Enabled)
+{
+    builder.Services.AddSingleton<OpenAiProjectAiGenerator>();
+    builder.Services.AddSingleton<IProjectAiScaffoldGenerator>(services =>
+        services.GetRequiredService<OpenAiProjectAiGenerator>());
+    builder.Services.AddSingleton<IProjectAiStageAssistGenerator>(services =>
+        services.GetRequiredService<OpenAiProjectAiGenerator>());
+    builder.Services.AddSingleton<IProjectAiGeneralChatGenerator>(services =>
+        services.GetRequiredService<OpenAiProjectAiGenerator>());
+}
+else
+{
+    builder.Services.AddSingleton<IProjectAiScaffoldGenerator, DisabledProjectAiScaffoldGenerator>();
+    builder.Services.AddSingleton<IProjectAiStageAssistGenerator, DisabledProjectAiStageAssistGenerator>();
+    builder.Services.AddSingleton<IProjectAiGeneralChatGenerator, DisabledProjectAiGeneralChatGenerator>();
+}
 if (platformOptions.DatabaseConfigured)
 {
     builder.Services.AddSingleton<IProjectAiConsentStore>(_ =>
@@ -267,6 +288,7 @@ app.MapProjectTemplateEndpoints();
 app.MapProjectAiConsentEndpoints();
 app.MapProjectAiScaffoldEndpoints();
 app.MapProjectAiStageAssistEndpoints();
+app.MapProjectAiGeneralChatEndpoints();
 app.MapProjectAiActivityEndpoints();
 app.MapProjectAiStageAssistSettlementEndpoints();
 

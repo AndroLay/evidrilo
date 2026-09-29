@@ -9,7 +9,8 @@ source "$repo_root/scripts/bootstrap/toolchain-paths.sh"
 container_name="evidrilo-worker-smoke-$$"
 image="${EVIDRILO_POSTGRES_IMAGE:-postgres:16-alpine}"
 db_port="${EVIDRILO_WORKER_DB_PORT:-55434}"
-log_file="/tmp/evidrilo-worker-smoke-$$.log"
+temporary_directory="${TMPDIR:-/tmp}"
+log_file="${temporary_directory%/}/evidrilo-worker-smoke-$$.log"
 worker_pid=""
 container_created=0
 worker_cli_home=""
@@ -102,8 +103,7 @@ if [[ ! -x "$dotnet_bin" || ! -f "$worker_dll" ]]; then
     exit 2
 fi
 
-worker_cli_home="/tmp/evidrilo-worker-cli-$$"
-mkdir -p "$worker_cli_home"
+worker_cli_home=$(mktemp -d "${temporary_directory%/}/evidrilo-worker-cli.XXXXXX")
 worker_database_url="Host=127.0.0.1;Port=${db_port};Database=evidrilo_it;Username=postgres;Timeout=5;Command Timeout=5"
 
 (

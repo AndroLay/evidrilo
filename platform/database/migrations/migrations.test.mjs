@@ -820,6 +820,60 @@ test('050 aligns AI grants and records token usage categories for credit settlem
   assert.doesNotMatch(sql, /drop table|drop column|truncate|delete from|service[_ -]?role|password\s*=/i);
 });
 
+test('051 carries Pro grants forward and records multi-grant reservations', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '051_ai_credit_accumulation.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '051 must be a new forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /update public\.ai_credit_grants[\s\S]*set credits\s*=\s*200[\s\S]*expires_at\s*=\s*null[\s\S]*grant_kind\s*=\s*'subscription_month'/i);
+  assert.match(sql, /create table if not exists public\.ai_credit_reservation_allocations/i);
+  assert.match(sql, /foreign key\s*\(account_id,\s*request_id\)[\s\S]*references public\.ai_credit_reservations\s*\(account_id,\s*request_id\)/i);
+  assert.match(sql, /foreign key\s*\(account_id,\s*grant_id\)[\s\S]*references public\.ai_credit_grants\s*\(account_id,\s*grant_id\)/i);
+  assert.match(sql, /insert into public\.ai_credit_reservation_allocations[\s\S]*select[\s\S]*from public\.ai_credit_reservations/i);
+  assert.match(sql, /alter table public\.ai_credit_reservation_allocations enable row level security/i);
+  assert.match(sql, /account_id\s*=\s*auth\.uid\(\)/i);
+  assert.doesNotMatch(sql, /drop table|drop column|truncate|service[_ -]?role|password\s*=/i);
+});
+
+test('052 allows a completed outcome for unlinked General chat metadata only', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '052_project_ai_general_completed_outcome.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '052 must be a forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /drop constraint if exists project_ai_activity_outcome_check/i);
+  assert.match(sql, /add constraint project_ai_activity_outcome_check[\s\S]*?'COMPLETED'/i);
+  assert.match(sql, /drop constraint if exists project_ai_activity_context_check/i);
+  assert.match(sql, /mode = 'GENERAL'[\s\S]*?outcome in \('PENDING', 'FAILED', 'COMPLETED'\)/i);
+  assert.match(sql, /mode = 'PROJECT'[\s\S]*?outcome not in \('APPLIED', 'EDITED'\)/i);
+  assert.doesNotMatch(sql, /drop table|drop column|truncate|delete from|service[_ -]?role|password\s*=/i);
+
+  const structure = sql.replace(/--[^\n]*/g, '').replace(/'(?:''|[^'])*'/g, "''");
+  let parenthesisDepth = 0;
+  for (const character of structure) {
+    if (character === '(') parenthesisDepth += 1;
+    if (character === ')') parenthesisDepth -= 1;
+    assert.ok(parenthesisDepth >= 0, 'migration must not close an unopened parenthesis');
+  }
+  assert.equal(parenthesisDepth, 0, 'migration parentheses must be balanced');
+});
+
+test('AI credit accrual reconciles earned months and spends the aggregate balance', () => {
+  const ledgerPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'api',
+    'Ai',
+    'AiCreditLedger.cs',
+  );
+  const ledger = fs.readFileSync(ledgerPath, 'utf8');
+
+  assert.match(ledger, /ReconcileSubscriptionCreditPeriodsAsync/);
+  assert.match(ledger, /ai_credit_reservation_allocations/);
+  assert.doesNotMatch(ledger, /grant_key = @subscription_grant_key/);
+  assert.doesNotMatch(ledger, /and exists\s*\(\s*select 1\s*from public\.entitlements entitlement[\s\S]*?period_expires_at > @now/i);
+});
+
 test('settled token-priced Project AI previews can record apply or dismiss outcomes', () => {
   const ledger = fs.readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'api', 'Ai', 'AiCreditLedger.cs'),
@@ -882,11 +936,12 @@ test('AI credit ledger reserves, settles, and recovers each persisted reservatio
   assert.match(ledger, /string requestHash,\s+int creditCost,\s+CancellationToken cancellationToken/);
   assert.match(ledger, /select request_hash, status, credit_cost/i);
   assert.match(ledger, /existingCreditCost != creditCost/);
-  assert.match(ledger, /credits >= reserved_credits \+ consumed_credits \+ @credit_cost/i);
+  assert.match(ledger, /credits - reserved_credits - consumed_credits as available_credits/i);
+  assert.match(ledger, /credits >= reserved_credits \+ consumed_credits \+ @allocation_credits/i);
   assert.match(ledger, /request_hash, grant_id, credit_cost,[\s\S]*?@request_hash, @grant_id, @credit_cost/i);
-  assert.match(ledger, /returning grant_id, credit_cost/i);
-  assert.match(ledger, /reserved_credits = reserved_credits - @credit_cost,\s+consumed_credits = consumed_credits \+ @credit_cost/i);
-  assert.match(ledger, /sum\(credit_cost\)::integer as released_credit_cost/i);
+  assert.match(ledger, /insert into public\.ai_credit_reservation_allocations/i);
+  assert.match(ledger, /SettleReservationAllocationsAsync/);
+  assert.match(ledger, /sum\(reserved_credits\)::integer as released_credit_cost/i);
   assert.match(ledger, /reserved_credits - grant_costs\.released_credit_cost/i);
 });
 

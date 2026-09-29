@@ -1327,6 +1327,25 @@ class StudentProjectDraftFlowTest {
     }
 
     @Test
+    fun `NUL bytes in selected plain text attachment are rejected without crashing the flow`() {
+        val projectStore = InMemoryDraftStore()
+        val attachmentStore = InMemoryAttachmentStore()
+        val flow = StudentProjectDraftFlow(projectStore, { "local-id" }, { 200 }, attachmentStore = attachmentStore)
+        val project = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.startManual("My project"),
+        ).value
+
+        val result = flow.addAttachment(project.id, "notes.txt", byteArrayOf(0))
+
+        assertEquals(
+            StudentProjectDraftFlowResult.Rejected("PROJECT_ATTACHMENT_CONTENT_INVALID"),
+            result,
+        )
+        assertEquals(null, attachmentStore.importProjectId)
+        assertEquals(listOf(project), projectStore.drafts)
+    }
+
+    @Test
     fun `cancelled archive import rolls back staged files and leaves local projects unchanged`() {
         val projectId = "f3cd82c5-b6ba-4f25-80e3-ae743ce4071b"
         val bytes = "%PDF-1.4\nEvidence source\n%%EOF".encodeToByteArray()

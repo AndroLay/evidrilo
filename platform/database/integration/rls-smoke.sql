@@ -318,7 +318,7 @@ insert into public.ai_credit_grants (
 ) values (
     'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     '22222222-2222-2222-2222-222222222222', 'free_once', 'once', 10,
-    0, 0, now()
+    1, 0, now()
 )
 on conflict (account_id, grant_kind, grant_key) do nothing;
 
@@ -330,6 +330,28 @@ insert into public.ai_credit_reservations (
     repeat('a', 64)
 )
 on conflict (account_id, request_id) do nothing;
+
+insert into public.ai_credit_reservations (
+    account_id, request_id, grant_id, status, request_hash
+) values (
+    '22222222-2222-2222-2222-222222222222',
+    'ai-rls-request-002', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'reserved',
+    repeat('b', 64)
+)
+on conflict (account_id, request_id) do nothing;
+
+insert into public.ai_credit_reservation_allocations (
+    account_id, request_id, allocation_index, grant_id, reserved_credits
+) values
+    (
+        '11111111-1111-1111-1111-111111111111',
+        'ai-rls-request-001', 0, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 1
+    ),
+    (
+        '22222222-2222-2222-2222-222222222222',
+        'ai-rls-request-002', 0, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 1
+    )
+on conflict (account_id, request_id, allocation_index) do nothing;
 
 insert into public.notification_preferences (
     account_id, enabled, continue_unfinished_enabled, review_completed_enabled,
@@ -484,6 +506,11 @@ begin
     if (select count(*) from public.student_project_commands) <> 0 then
         raise exception 'student project idempotency receipts leaked to an authenticated client';
     end if;
+    if (select count(*) from public.ai_credit_reservation_allocations) <> 1
+       or (select count(*) from public.ai_credit_reservation_allocations
+            where account_id = '22222222-2222-2222-2222-222222222222') <> 0 then
+        raise exception 'AI credit reservation allocations were not isolated to the authenticated account';
+    end if;
 
     begin
         insert into public.ai_conversation_sessions (
@@ -567,6 +594,18 @@ begin
         if changed <> 0 then
             raise exception 'client AI grant mutation was allowed';
         end if;
+    exception when insufficient_privilege then
+        null;
+    end;
+
+    begin
+        insert into public.ai_credit_reservation_allocations (
+            account_id, request_id, allocation_index, grant_id, reserved_credits
+        ) values (
+            '11111111-1111-1111-1111-111111111111',
+            'client-allocation-001', 0, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 1
+        );
+        raise exception 'client AI reservation allocation write was allowed';
     exception when insufficient_privilege then
         null;
     end;
@@ -698,6 +737,8 @@ begin
     if n <> 1 then raise exception 'second account projection visibility failed: %', n; end if;
     select count(*) into n from public.progress_daily_projections;
     if n <> 1 then raise exception 'second account daily visibility failed: %', n; end if;
+    select count(*) into n from public.ai_credit_reservation_allocations;
+    if n <> 1 then raise exception 'second account AI credit allocation visibility failed: %', n; end if;
     select count(*) into n from public.notification_preferences;
     if n <> 1 then raise exception 'second account notification preference visibility failed: %', n; end if;
     select count(*) into n from public.notification_preferences
@@ -950,6 +991,12 @@ begin
     select count(*) into n from public.ai_credit_reservations
       where account_id = '11111111-1111-1111-1111-111111111111';
     if n <> 0 then raise exception 'AI reservation deletion failed: %', n; end if;
+    select count(*) into n from public.ai_credit_reservation_allocations
+      where account_id = '11111111-1111-1111-1111-111111111111';
+    if n <> 0 then raise exception 'AI reservation allocation deletion failed: %', n; end if;
+    select count(*) into n from public.ai_credit_reservation_allocations
+      where account_id = '22222222-2222-2222-2222-222222222222';
+    if n <> 1 then raise exception 'other account AI reservation allocation was changed: %', n; end if;
     select count(*) into n from public.notification_preferences
       where account_id = '11111111-1111-1111-1111-111111111111';
     if n <> 0 then raise exception 'notification preference deletion failed: %', n; end if;

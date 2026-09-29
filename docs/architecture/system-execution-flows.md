@@ -19,10 +19,12 @@ evidence.
 
 ## 1. System context
 
-**Current architecture:** the mobile app owns the offline learning and local
-project paths. The API and worker provide optional account-backed capabilities.
-The mobile project editor does not automatically synchronize local projects to
-the server.
+**Current architecture:** the mobile app owns offline learning and local
+projects. The API and worker provide account-backed capabilities in source;
+temporary guest mode pauses server AI, cloud sync, and analytics transmission.
+RevenueCat Pro is independently available to signed-in accounts after provider
+identity is confirmed. The project editor never automatically synchronizes
+local projects.
 
 ```mermaid
 flowchart LR
@@ -38,10 +40,11 @@ flowchart LR
         App --> Billing[BillingGateway and platform RevenueCat adapter]
     end
 
-    Billing --> RC[RevenueCat SDK]
-    RC <--> Stores[Apple App Store or Google Play]
+    Billing -. when billing is enabled .-> RC[RevenueCat SDK]
+    RC -. submit store transaction .-> Stores[Apple App Store or Google Play]
+    Stores -. verified transaction result .-> RC
     RC -. optional signed webhook .-> Api
-    RC -->|CustomerInfo for local case access| Billing
+    RC -. active CustomerInfo when enabled .-> Billing
 
     subgraph Platform[Optional ASP.NET Core modular monolith]
         Api[Evidrilo API]
@@ -52,14 +55,19 @@ flowchart LR
         Api -. provider disabled .-> AiProvider[AI provider]
     end
 
-    App -. optional account, catalog, progress, and AI requests .-> Api
+    App -. optional configured requests .-> Api
 ```
 
-The local M0 evaluator remains authoritative for case feedback. RevenueCat
-`CustomerInfo` is the immediate authority for bundled premium-case access; the
-optional webhook projection does not grant those local cases. The API's
-student-project routes are a separate server-owned capability and are not yet
-wired to the local mobile project editor.
+The local M0 evaluator remains authoritative for case feedback. Pro is enabled
+independently from temporary local guest mode by D-131. The client identifies
+the signed-in Evidrilo account before requesting offers, purchases, or restores;
+only active matching RevenueCat `CustomerInfo` is the local Pro-access
+authority, and the optional webhook projection does not unlock local content.
+Provider configuration and runtime acceptance remain open. Public read-only
+catalog requests may still use the network, but account-backed mobile services
+including sync and server AI remain paused by D-129. The API's student-project
+routes are separate server-owned records and are not wired to the local mobile
+project editor.
 
 ## 2. Data ownership and trust boundaries
 
@@ -69,7 +77,7 @@ flowchart TB
         LocalProject[Project brief, sources, evidence notes, findings, claims, revisions]
         Attachments[Project attachments]
         CaseDraft[Case drafts, evaluation snapshots, and local history]
-        CustomerInfo[RevenueCat CustomerInfo]
+        CustomerInfo[RevenueCat CustomerInfo when billing is enabled]
     end
 
     subgraph Server[Account-owned platform data]
@@ -82,8 +90,8 @@ flowchart TB
 
     LocalProject -->|references separately stored bytes| Attachments
     LocalProject -. sign-in does not upload or merge .-> ServerProject
-    CaseDraft -. only explicit bounded sync commands .-> Progress
-    CustomerInfo --> LocalCaseAccess[Local premium-case gate]
+    CaseDraft -. explicit bounded sync only when enabled and consented .-> Progress
+    CustomerInfo -. when billing is enabled .-> LocalCaseAccess[Local Pro-access gate]
     CustomerInfo -. signed provider event .-> EntitlementProjection
     Account --> AiLedger
     AiLedger --> AiRequest[Bounded AI request when provider is enabled]
@@ -289,12 +297,19 @@ remains usable when this API is unavailable.
 
 ### 5.4 Project AI scaffold contract — Gated
 
-The API route exists, but the project-AI generator is disabled and the complete
-student UI/provider path is not available. The **current** route verifies the
-account and consent, validates the idempotency key, then reads and validates
-the bounded request body before checking the generator flag. With the current
-disabled generator it returns `PROJECT_AI_NOT_READY`; it does not load a
-template, reserve credits, dispatch to a provider, or persist the student text.
+The API route and a strict-schema Responses adapter exist, but Project AI is
+disabled by default and the complete student UI/provider path is not available.
+The route verifies the account and current consent, validates the idempotency
+key, then reads and validates the bounded request body before checking the
+generator flag. With default-off configuration it returns
+`PROJECT_AI_NOT_READY`; it does not load a template, reserve credits, dispatch
+to a provider, or persist the student text. When every server-side provider and
+privacy approval flag is explicitly enabled, it loads the published template,
+validates account ownership and revision, bounds selected context and cost,
+reserves credits and provider spend, rechecks consent/revision, and only then
+dispatches the selected redacted context. Provider response usage is settled by
+token category, and a student preview still requires explicit apply/dismiss
+settlement.
 
 #### Current request: provider disabled
 
@@ -348,8 +363,8 @@ sequenceDiagram
     API->>Consent: Recheck consent before reserving credits
     Consent-->>API: Still authorized or revoked
     alt Consent still authorized before reservation
-        API->>Credits: Ensure grant, reserve 3 create or 1 assist credit
-        Credits-->>API: Request-bound reservation or rejection
+        API->>Credits: Estimate maximum cost from bounded tokens and configured rates; reserve up to 200 credits
+        Credits-->>API: Request-bound maximum reservation or rejection
         alt Credit reservation succeeded
             API->>Consent: Recheck consent immediately before dispatch
             alt Consent still authorizes dispatch
@@ -357,13 +372,13 @@ sequenceDiagram
                 API->>API: Redact bounded student fields
                 API->>Generator: Generate a structured proposal
                 Generator->>Provider: Send redacted context
-                Provider-->>Generator: Candidate proposal or provider failure
-                Generator-->>API: Output or typed failure
-                API->>API: Validate version, field allowlist, size, and credentials
-                alt Output is valid and reservation remains held
-                    API->>Credits: Mark preview ready, keep reservation for student decision
-                    Credits-->>API: Preview reservation confirmed
-                    API-->>UI: Show preview without changing project
+                Provider-->>Generator: Candidate proposal, provider token usage, or failure
+                Generator-->>API: Output and usage, or typed failure
+                API->>API: Validate version, field allowlist, size, credentials, and usage; calculate actual charge
+                alt Output and usage are valid
+                    API->>Credits: Settle actual token charge and release unused reservation
+                    Credits-->>API: Preview charge confirmed
+                    API-->>UI: Show preview and actual credit cost without changing project
                 else Provider fails, output is invalid, or reservation expires
                     API->>Credits: Release reservation
                     Credits-->>API: Reservation released
@@ -402,7 +417,7 @@ sequenceDiagram
     API-->>Caller: Return typed error, keep project unchanged
 ```
 
-#### Future response: student review and settlement
+#### Future response: student review and outcome recording
 
 ```mermaid
 sequenceDiagram
@@ -410,37 +425,37 @@ sequenceDiagram
     participant Student
     participant UI as Project AI preview
     participant API as Project AI API
-    participant Credits as Credit ledger
 
     Student->>UI: Review, edit, apply selected parts, or dismiss
-    UI->>API: Send settlement decision with request key
-    API->>Credits: Settle reservation
+    UI->>API: Record apply/dismiss outcome with request key
+    API->>API: Store idempotent preview outcome; do not change the settled charge
     alt Student applies selected parts
-        Credits-->>API: Consume reserved credits
-        API-->>UI: Settlement accepted
+        API-->>UI: Outcome recorded; original preview charge unchanged
         UI->>UI: Apply only selected fields
         UI-->>Student: Show updated draft and provenance
     else Student dismisses proposal
-        Credits-->>API: Release reserved credits
-        API-->>UI: Proposal dismissed
+        API-->>UI: Dismissal recorded; original preview charge unchanged
         UI-->>Student: Keep project unchanged
     end
 ```
 
 The future diagrams separate the disabled current path from the gated proposal
-and settlement contract. Initial consent and request validation precede
+and outcome-recording contract. Initial consent and request validation precede
 template lookup; consent is rechecked before credit reservation and immediately
 before dispatch. Template availability, credit reservation, idempotency,
 validation, and provider approval remain required gates. Failures before a
-reservation do not touch credits; failures after reservation release it unless
-a validated preview is ready for student settlement.
+reservation do not touch credits; failures after reservation release it. A
+valid preview settles its token-based charge when generated, while later
+apply/dismiss recording does not change that charge.
 
-The future branch is a contract/design path, not an available feature. Provider
-privacy, retention, cost, human/domain review, selectable reviewed templates,
-student-facing UI, and runtime acceptance remain gates. Generated content is a
-proposal, never evidence or evaluator authority.
+The future branch is a contract/design path, not an available feature. A valid
+preview is charged from verified token usage when generated; later apply or
+dismiss only records the student's choice. Provider privacy, retention, cost,
+human/domain review, selectable reviewed templates, student-facing UI, and
+runtime acceptance remain gates. Generated content is a proposal, never
+evidence or evaluator authority.
 
-### 5.5 RevenueCat purchase and local access — Current code; provider acceptance gated
+### 5.5 RevenueCat purchase and local access — Client path enabled by D-131; provider acceptance gated
 
 ```mermaid
 sequenceDiagram
@@ -455,6 +470,8 @@ sequenceDiagram
     participant API as Optional entitlement projection
 
     Student->>UI: Open plans or a locked premium case
+    UI->>UI: Require signed-in account and confirmed RevenueCat identity
+    UI->>UI: Keep Pro locked if identity or provider is unavailable
     UI->>Gateway: Load offerings or refresh access
     Gateway->>Adapter: Platform billing operation
     Adapter->>RC: getOfferings or getCustomerInfo
@@ -483,19 +500,21 @@ sequenceDiagram
         Gateway-->>UI: Refresh paywall/access state
     end
 
-    opt RevenueCat sends a signed server event
+    opt RevenueCat sends a signed server event after provider setup
         RC-->>API: POST /v1/billing/webhook
         API->>API: Verify signature, event identity, ordering, and idempotency
         API->>API: Update server-owned entitlement projection
     end
 ```
 
-For bundled premium cases, local RevenueCat `CustomerInfo` is the immediate
-access authority; the server projection is not the unlock path. Cancelling a
-purchase leaves access unchanged. Cancelling renewal keeps access through the
-store-reported entitlement period; expiry or revoke removes Pro benefits while
-preserving local work. Test Store purchase, restore, revoke, and expiry still
-require provider/device evidence.
+The purchase/restore branch is available independently from local guest mode,
+but still requires a signed-in account and working provider configuration.
+Only active matching RevenueCat `CustomerInfo` unlocks Pro locally; the server
+projection is not the unlock path. Cancelling a purchase leaves access unchanged.
+Cancelling renewal keeps
+access through the store-reported entitlement period; expiry or revoke removes
+Pro benefits while preserving local work. Test Store purchase, restore, revoke,
+and expiry still require provider/device evidence.
 
 ### 5.6 Template authoring, review, and student catalog — API workflow; dashboard/content gated
 
@@ -605,7 +624,12 @@ sequenceDiagram
         Preflight-->>UI: Show import preview
         Student->>UI: Confirm copy or compatible revision restore
         UI->>Archive: Stage validated attachments
-        Archive-->>UI: Staged data or failure
+        alt Attachment staging succeeds
+            Archive-->>UI: Staged attachments
+        else Attachment staging fails
+            Archive-->>UI: Staging error
+            UI-->>Student: Keep project list unchanged; offer retry
+        end
     else Archive is invalid or exceeds bounds
         Preflight-->>UI: Reject without changing project list
         UI-->>Student: Show import error
@@ -654,10 +678,12 @@ exported file is student-owned; exporting does not create cloud sync.
 ### 5.8 D-106 case-AI conversation — mobile path source-wired; provider gated
 
 The mobile case-AI client is connected to the authenticated conversation
-start/turn/clear routes. Each request requires a signed-in case session and an
-explicit, request-level choice to share the displayed feedback, claim, and
-selected evidence. The current provider configuration is disabled; the
-successful-response branch below is a future gated path, not a live capability.
+start/turn/clear routes in source. Under current D-129 guest mode, the client
+pauses case AI before sending a request; no case context is sent. When
+account-backed services are enabled, each request requires a signed-in case
+session and an explicit, request-level choice to share displayed feedback,
+claim, and selected evidence. The provider is disabled; successful-response
+branches below remain future gated paths, not live capabilities.
 The client holds a bounded transcript for the active context; the server stores
 conversation metadata rather than raw dialogue. `next_action` and unmapped
 proposal fields remain preview-only. Supported claim, scope, and limitation
@@ -682,6 +708,12 @@ sequenceDiagram
     participant Reducer as ConclusionReducer
     participant Evaluator as ConclusionEvaluator
 
+    alt Temporary guest mode enabled (current)
+        Student->>UI: Open case AI
+        UI->>App: Request assistance for local case
+        App-->>UI: AI paused; no request or context sent
+        UI-->>Student: Continue deterministic case work
+    else Account-backed AI path enabled
     Student->>UI: Confirm context sharing and submit a question
     UI->>App: Send bounded prompt for the active case
     App->>App: Build case, draft, and evaluation fingerprint
@@ -707,7 +739,7 @@ sequenceDiagram
     Store-->>API: Turn reservation or typed conflict/limit error
     alt Turn reservation created
         API->>Server: Generate from bounded, redacted prompt
-        Server->>Credits: Check ledger consent and reserve one credit
+        Server->>Credits: Estimate bounded maximum from configured token rates and reserve it
         alt Credit reservation denied or replayed
             Credits-->>Server: No new reservation
             Server-->>API: Quota or idempotency fallback, do not call provider
@@ -720,11 +752,11 @@ sequenceDiagram
                 Credits-->>Server: Released, no credit consumed
                 Server-->>API: Typed fallback, draft unchanged
             else Future approved provider returns a response
-                Provider-->>Server: Candidate explanation, question, or typed proposal
-                Server->>Server: Validate purpose, anchors, schema, and proposal before-value
-                alt Response is valid
-                    Server->>Credits: Consume reserved credit for accepted output
-                    Credits-->>Server: Settlement succeeded or failed
+                Provider-->>Server: Candidate response, verified token usage, or provider failure
+                Server->>Server: Validate purpose, anchors, schema, before-values, and token usage
+                alt Response and usage are valid
+                    Server->>Credits: Settle actual usage charge and release unused reservation
+                    Credits-->>Server: Token-priced settlement succeeded or failed
                     Server-->>API: Validated typed response or settlement fallback
                 else Response is invalid or stale
                     Server->>Credits: Release reserved credit
@@ -771,7 +803,7 @@ sequenceDiagram
         API->>Store: Clear only this account's session and turn metadata
         Store-->>API: Cleared, absent, in-progress, or error
         API-->>Client: Clear result
-        Client-->>App: Clear result (current UI does not surface this result)
+        Client-->>App: Clear result
         App->>Client: Refresh account credit balance
         Client->>API: GET /v1/ai/credits
         API->>Credits: Read account balance
@@ -779,16 +811,25 @@ sequenceDiagram
         API-->>Client: Balance result
         Client-->>App: Balance or refresh failure
         App-->>UI: Show ready/unavailable state, keep local transcript cleared
+        opt Server deletion is unconfirmed
+            UI-->>Student: Report that metadata may remain until expiry
+            opt Retry is allowed
+                Student->>UI: Retry server clear
+                UI->>App: Retry with the same session and account
+            end
+        end
+    end
     end
 ```
 
 The case-AI reducer path is not the student-project reducer path. Mobile source,
-focused tests, and Android compilation are verified; provider operation,
-device interaction, accessibility, iOS runtime, and human usefulness remain
-open. A dismiss or unsupported proposal leaves the draft unchanged. The current
-Clear action removes the local transcript immediately and requests server
-metadata deletion separately; the UI does not currently surface a failed delete,
-so the server's 30-minute session expiry remains the cleanup bound in that case.
+focused tests, and Android compilation are verified; current guest mode blocks
+the network path, and provider operation, device interaction, accessibility,
+iOS runtime, and human usefulness remain open. A dismiss or unsupported
+proposal leaves the draft unchanged. The current Clear action removes the local
+transcript immediately and requests server metadata deletion separately. If
+deletion is unconfirmed, the UI reports it and offers a same-session retry when
+retryable; the server's 30-minute session expiry is the fallback cleanup bound.
 
 ### 5.9 Remove an attachment from the current project revision — Current source; device acceptance gated
 

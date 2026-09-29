@@ -23,8 +23,8 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
 
-        using var response = await host.PostScaffoldAsync(AccountA, "project-ai-flow-0001", ValidRequest());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await host.PostScaffoldAsync(AccountA, "project-ai-flow-0001", ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("preview", body.RootElement.GetProperty("status").GetString());
@@ -48,8 +48,8 @@ public sealed class ProjectAiScaffoldFlowTests
             ValidRequest(
                 baseProjectRevision: 7,
                 operation: ProjectAiScaffoldValidator.AssistOperation,
-                projectId: "11111111-1111-4111-8111-111111111111"));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                projectId: "11111111-1111-4111-8111-111111111111"), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(ProjectAiScaffoldValidator.AssistOperation, body.RootElement.GetProperty("operation").GetString());
@@ -61,13 +61,50 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
+    public async Task Scaffold_context_too_large_is_rejected_before_credit_reservation()
+    {
+        using var host = new TestHost();
+        host.Generator.EstimateFailure = new AiProviderFailureException(
+            "PROJECT_AI_CONTEXT_TOO_LARGE",
+            "project_context_too_large");
+
+        using var response = await host.PostScaffoldAsync(AccountA, "project-ai-large-0001", ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal("PROJECT_AI_CONTEXT_TOO_LARGE", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.Calls);
+    }
+
+    [Fact]
+    public async Task Stage_assist_context_too_large_is_rejected_before_credit_reservation()
+    {
+        using var host = new TestHost();
+        host.Generator.EstimateFailure = new AiProviderFailureException(
+            "PROJECT_AI_CONTEXT_TOO_LARGE",
+            "project_context_too_large");
+
+        using var response = await host.PostStageAssistAsync(
+            AccountA,
+            "project-ai-stage-large-01",
+            ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal("PROJECT_AI_CONTEXT_TOO_LARGE", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.Calls);
+    }
+
+    [Fact]
     public async Task Stage_assist_binds_project_stage_and_template_operation()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-stage-0001";
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("PROJECT", body.RootElement.GetProperty("mode").GetString());
@@ -93,8 +130,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             "project-ai-stage-typed-01",
-            ValidStageAssistRequest());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(body.RootElement.TryGetProperty("assist", out var assist), "The stage response must use the typed assist contract.");
@@ -123,8 +160,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             "project-ai-stage-redaction-01",
-            ValidStageAssistRequest());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var providerField = Assert.Single(host.Generator.LastStageRequest!.SelectedFields);
@@ -134,7 +171,7 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(selectedText, proposal.GetProperty("beforeValue").GetString());
 
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        Assert.DoesNotContain("learner@example.org", await history.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("learner@example.org", await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -151,8 +188,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             "project-ai-stage-selected-evidence",
-            ValidStageAssistRequest(selectedEvidenceIds: ["source-1"]));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(selectedEvidenceIds: ["source-1"]), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("source-1", Assert.Single(host.Generator.LastStageRequest!.SelectedEvidence).Id);
@@ -173,7 +210,7 @@ public sealed class ProjectAiScaffoldFlowTests
         };
         const string requestId = "project-ai-stage-unselected-source";
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
@@ -189,7 +226,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(selectedEvidenceIds: ["not-in-project"]));
+            ValidStageAssistRequest(selectedEvidenceIds: ["not-in-project"]), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservationCount);
@@ -208,7 +245,7 @@ public sealed class ProjectAiScaffoldFlowTests
         };
         const string requestId = "project-ai-stage-stale-before";
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
@@ -226,7 +263,7 @@ public sealed class ProjectAiScaffoldFlowTests
         };
         const string requestId = "project-ai-stage-output-field-denied";
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
@@ -241,7 +278,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(operationId: "prepare_output_section"));
+            ValidStageAssistRequest(operationId: "prepare_output_section"), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
@@ -257,8 +294,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(selectedFieldIds: ["unrelated_field"]));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(selectedFieldIds: ["unrelated_field"]), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("PROJECT_AI_FIELD_NOT_ALLOWED_FOR_OPERATION", body.RootElement.GetProperty("code").GetString());
@@ -289,8 +326,8 @@ public sealed class ProjectAiScaffoldFlowTests
             locale = "en",
         });
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, request);
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, request, cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("INVALID_PROJECT_AI_STAGE_ASSIST", body.RootElement.GetProperty("code").GetString());
@@ -307,8 +344,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(selectedFieldIds: ["source"]));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(selectedFieldIds: ["source"]), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("PROJECT_AI_EVIDENCE_SELECTION_REQUIRES_IDS", body.RootElement.GetProperty("code").GetString());
@@ -325,8 +362,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostStageAssistAsync(
             AccountA,
             requestId,
-            ValidStageAssistRequest(mode: "GENERAL"));
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            ValidStageAssistRequest(mode: "GENERAL"), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("PROJECT_AI_GENERAL_NOT_READY", body.RootElement.GetProperty("code").GetString());
@@ -336,19 +373,163 @@ public sealed class ProjectAiScaffoldFlowTests
     }
 
     [Fact]
+    public async Task General_chat_v2_stays_closed_until_its_separate_policy_gate_is_enabled()
+    {
+        using var host = new TestHost(generalChatEnabled: false);
+        const string requestId = "project-ai-general-v2-off";
+
+        using var response = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest("Explain repeated measurements."), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("PROJECT_AI_GENERAL_CHAT_NOT_READY", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.StudentProjects.ReadCount);
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.GeneralChatCalls);
+    }
+
+    [Fact]
+    public async Task General_chat_v2_uses_only_the_message_and_records_metadata_without_transcript()
+    {
+        using var host = new TestHost(generalChatEnabled: true);
+        const string requestId = "project-ai-general-v2-on";
+        const string message = "Explain repeated measurements; contact learner@example.org if needed.";
+
+        using var response = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest(message), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("evidrilo.project-ai-general-chat", body.RootElement.GetProperty("schema").GetString());
+        Assert.Equal("2", body.RootElement.GetProperty("version").GetString());
+        Assert.Equal("GENERAL", body.RootElement.GetProperty("mode").GetString());
+        Assert.Equal("Repeated measurements help show variation.", body.RootElement.GetProperty("answer").GetString());
+        Assert.Equal(1, body.RootElement.GetProperty("creditCost").GetInt32());
+        Assert.Equal(0, host.StudentProjects.ReadCount);
+        Assert.Equal(1, host.Generator.GeneralChatCalls);
+        Assert.Equal("Explain repeated measurements; contact [REDACTED_EMAIL] if needed.",
+            host.Generator.LastGeneralChatRequest?.Message);
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
+
+        using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        var historyJson = await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
+        using var historyBody = JsonDocument.Parse(historyJson);
+        var activity = Assert.Single(historyBody.RootElement.GetProperty("activities").EnumerateArray());
+        Assert.Equal("GENERAL", activity.GetProperty("mode").GetString());
+        Assert.Equal("COMPLETED", activity.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, activity.GetProperty("projectId").ValueKind);
+        Assert.DoesNotContain("learner@example.org", historyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Explain repeated measurements", historyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Repeated measurements help show variation.", historyJson, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Explain sampling bias.", "en", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")]
+    [InlineData("Explain repeated measurements.", "id", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")]
+    [InlineData("Explain repeated measurements.", "en", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")]
+    public async Task General_chat_rejects_reusing_a_request_key_for_a_different_provider_payload(
+        string message,
+        string locale,
+        string installationId)
+    {
+        using var host = new TestHost(generalChatEnabled: true);
+        const string requestId = "project-ai-general-fingerprint";
+
+        using var firstResponse = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest("Explain repeated measurements."), cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        using var replayResponse = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest(message, locale, installationId), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await replayResponse.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.Conflict, replayResponse.StatusCode);
+        Assert.Equal("AI_IDEMPOTENCY_KEY_REUSE", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(1, host.Generator.GeneralChatCalls);
+        Assert.Equal(1, host.Credits.ReservationCount);
+        Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
+    }
+
+    [Fact]
+    public async Task General_chat_v2_rejects_project_context_fields_before_reserving_or_dispatching()
+    {
+        using var host = new TestHost(generalChatEnabled: true);
+        const string requestId = "project-ai-general-v2-context";
+        var request = ValidGeneralChatRequest("Explain repeated measurements.")
+            .Replace("\"locale\":\"en\"", "\"locale\":\"en\",\"projectId\":\"11111111-1111-4111-8111-111111111111\"", StringComparison.Ordinal);
+
+        using var response = await host.PostGeneralChatAsync(AccountA, requestId, request, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.GeneralChatCalls);
+        Assert.Equal(0, host.StudentProjects.ReadCount);
+    }
+
+    [Fact]
+    public async Task General_chat_v2_rejects_messages_over_4000_characters_before_reserving_or_dispatching()
+    {
+        using var host = new TestHost(generalChatEnabled: true);
+        const string requestId = "project-ai-general-v2-too-long";
+
+        using var response = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest(new string('x', ProjectAiGeneralChatValidator.MaximumMessageLength + 1)), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("INVALID_PROJECT_AI_GENERAL_CHAT", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ReservationCount);
+        Assert.Equal(0, host.Generator.GeneralChatCalls);
+        Assert.Equal(0, host.StudentProjects.ReadCount);
+    }
+
+    [Fact]
+    public async Task General_chat_v2_releases_reserved_credit_if_consent_is_revoked_while_provider_runs()
+    {
+        var consent = new RecordingConsentStore { RevokeOnRead = 3 };
+        using var host = new TestHost(consent: consent, generalChatEnabled: true);
+        const string requestId = "project-ai-general-v2-revoked";
+
+        using var response = await host.PostGeneralChatAsync(
+            AccountA,
+            requestId,
+            ValidGeneralChatRequest("Explain repeated measurements."), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("PROJECT_AI_CONSENT_REQUIRED", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
+        Assert.Equal(3, host.Credits.ReleasedFor(AccountA, requestId));
+        Assert.Equal(1, host.Generator.GeneralChatCalls);
+    }
+
+    [Fact]
     public async Task Stage_assist_history_is_metadata_only_and_scoped_to_the_installation()
     {
         using var host = new TestHost();
         const string requestId = "project-ai-stage-history-01";
 
-        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var response = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var responseText = await response.Content.ReadAsStringAsync();
+        var responseText = await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var body = JsonDocument.Parse(responseText);
         var activities = body.RootElement.GetProperty("activities");
 
@@ -365,12 +546,12 @@ public sealed class ProjectAiScaffoldFlowTests
             AccountA,
             "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
         Assert.Equal(HttpStatusCode.OK, anotherInstallation.StatusCode);
-        using var otherBody = JsonDocument.Parse(await anotherInstallation.Content.ReadAsStringAsync());
+        using var otherBody = JsonDocument.Parse(await anotherInstallation.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(otherBody.RootElement.GetProperty("activities").EnumerateArray());
         using var otherAccount = await host.GetProjectAiActivityAsync(
             AccountB,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var otherAccountBody = JsonDocument.Parse(await otherAccount.Content.ReadAsStringAsync());
+        using var otherAccountBody = JsonDocument.Parse(await otherAccount.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(otherAccountBody.RootElement.GetProperty("activities").EnumerateArray());
     }
 
@@ -378,8 +559,8 @@ public sealed class ProjectAiScaffoldFlowTests
     public async Task Activity_history_paginates_without_repeating_entries()
     {
         using var host = new TestHost();
-        using var firstPreview = await host.PostStageAssistAsync(AccountA, "project-ai-history-page-01", ValidStageAssistRequest());
-        using var secondPreview = await host.PostStageAssistAsync(AccountA, "project-ai-history-page-02", ValidStageAssistRequest());
+        using var firstPreview = await host.PostStageAssistAsync(AccountA, "project-ai-history-page-01", ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var secondPreview = await host.PostStageAssistAsync(AccountA, "project-ai-history-page-02", ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, firstPreview.StatusCode);
         Assert.Equal(HttpStatusCode.OK, secondPreview.StatusCode);
 
@@ -387,7 +568,7 @@ public sealed class ProjectAiScaffoldFlowTests
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             limit: "1");
-        using var firstBody = JsonDocument.Parse(await firstPage.Content.ReadAsStringAsync());
+        using var firstBody = JsonDocument.Parse(await firstPage.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var firstEntry = Assert.Single(firstBody.RootElement.GetProperty("activities").EnumerateArray());
         var firstId = firstEntry.GetProperty("activityId").GetString();
         var cursor = firstBody.RootElement.GetProperty("nextCursor").GetString();
@@ -398,7 +579,7 @@ public sealed class ProjectAiScaffoldFlowTests
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             limit: "1",
             cursor: cursor);
-        using var secondBody = JsonDocument.Parse(await secondPage.Content.ReadAsStringAsync());
+        using var secondBody = JsonDocument.Parse(await secondPage.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var secondEntry = Assert.Single(secondBody.RootElement.GetProperty("activities").EnumerateArray());
         Assert.NotEqual(firstId, secondEntry.GetProperty("activityId").GetString());
     }
@@ -409,7 +590,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-01";
 
-        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         host.StudentProjects.SetVersion(8);
 
@@ -430,7 +611,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var history = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("APPLIED", activity.GetProperty("outcome").GetString());
         Assert.Equal(8, activity.GetProperty("resultProjectRevision").GetInt32());
@@ -442,7 +623,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-02";
 
-        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var response = await host.PostStageSettlementAsync(
@@ -457,7 +638,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var history = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("STALE", activity.GetProperty("outcome").GetString());
     }
@@ -468,7 +649,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-03";
 
-        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var response = await host.PostStageSettlementAsync(AccountA, requestId, "STALE");
@@ -479,7 +660,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var history = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("STALE", activity.GetProperty("outcome").GetString());
     }
@@ -490,7 +671,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost();
         const string requestId = "project-ai-stage-settle-dismiss";
 
-        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         using var response = await host.PostStageSettlementAsync(AccountA, requestId, "DISMISSED");
 
@@ -498,7 +679,7 @@ public sealed class ProjectAiScaffoldFlowTests
         Assert.Equal(1, host.Credits.ConsumedFor(AccountA, requestId));
         Assert.Equal(0, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("DISMISSED", activity.GetProperty("outcome").GetString());
     }
@@ -508,7 +689,7 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
         const string projectRequestId = "project-ai-general-clear-project";
-        using var preview = await host.PostStageAssistAsync(AccountA, projectRequestId, ValidStageAssistRequest());
+        using var preview = await host.PostStageAssistAsync(AccountA, projectRequestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         host.Activities.SeedGeneralActivity(AccountA, Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), "project-ai-general-clear-001");
         host.Activities.SeedGeneralActivity(AccountA, Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), "project-ai-general-clear-002");
@@ -518,7 +699,7 @@ public sealed class ProjectAiScaffoldFlowTests
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var clearBody = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var clearBody = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(1, clearBody.RootElement.GetProperty("clearedCount").GetInt32());
         Assert.Equal(3, host.StudentProjects.ReadCount);
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, projectRequestId));
@@ -527,13 +708,13 @@ public sealed class ProjectAiScaffoldFlowTests
         using var sameInstallation = await host.GetProjectAiActivityAsync(
             AccountA,
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var sameBody = JsonDocument.Parse(await sameInstallation.Content.ReadAsStringAsync());
+        using var sameBody = JsonDocument.Parse(await sameInstallation.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var projectActivity = Assert.Single(sameBody.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("PROJECT", projectActivity.GetProperty("mode").GetString());
         using var anotherInstallation = await host.GetProjectAiActivityAsync(
             AccountA,
             "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
-        using var anotherBody = JsonDocument.Parse(await anotherInstallation.Content.ReadAsStringAsync());
+        using var anotherBody = JsonDocument.Parse(await anotherInstallation.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var generalActivity = Assert.Single(anotherBody.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("GENERAL", generalActivity.GetProperty("mode").GetString());
         Assert.Equal(JsonValueKind.Null, generalActivity.GetProperty("projectId").ValueKind);
@@ -546,12 +727,12 @@ public sealed class ProjectAiScaffoldFlowTests
         const string requestId = "project-ai-stage-stale-after-dispatch";
         host.Generator.OnGenerate = () => host.StudentProjects.SetVersion(8);
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("STALE", activity.GetProperty("outcome").GetString());
     }
@@ -563,13 +744,13 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost(consent: consent);
         const string requestId = "project-ai-stage-consent-stale";
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(1, host.Generator.Calls);
         Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("STALE", activity.GetProperty("outcome").GetString());
     }
@@ -581,12 +762,12 @@ public sealed class ProjectAiScaffoldFlowTests
         const string requestId = "project-ai-stage-provider-failure";
         host.Generator.Failure = new InvalidOperationException("synthetic provider failure");
 
-        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest());
+        using var response = await host.PostStageAssistAsync(AccountA, requestId, ValidStageAssistRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal(1, host.Credits.ReleasedFor(AccountA, requestId));
         using var history = await host.GetProjectAiActivityAsync(AccountA, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await history.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
         var activity = Assert.Single(body.RootElement.GetProperty("activities").EnumerateArray());
         Assert.Equal("FAILED", activity.GetProperty("outcome").GetString());
     }
@@ -603,7 +784,7 @@ public sealed class ProjectAiScaffoldFlowTests
             ValidRequest(
                 baseProjectRevision: 7,
                 operation: ProjectAiScaffoldValidator.AssistOperation,
-                projectId: ExistingProjectId.ToString()));
+                projectId: ExistingProjectId.ToString()), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservedFor(AccountB, requestId));
@@ -623,7 +804,7 @@ public sealed class ProjectAiScaffoldFlowTests
             ValidRequest(
                 baseProjectRevision: 7,
                 operation: ProjectAiScaffoldValidator.AssistOperation,
-                projectId: ExistingProjectId.ToString()));
+                projectId: ExistingProjectId.ToString()), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
@@ -646,7 +827,7 @@ public sealed class ProjectAiScaffoldFlowTests
             ValidRequest(
                 baseProjectRevision: 7,
                 operation: ProjectAiScaffoldValidator.AssistOperation,
-                projectId: ExistingProjectId.ToString()));
+                projectId: ExistingProjectId.ToString()), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
@@ -669,7 +850,7 @@ public sealed class ProjectAiScaffoldFlowTests
             ValidRequest(
                 baseProjectRevision: 7,
                 operation: ProjectAiScaffoldValidator.AssistOperation,
-                projectId: ExistingProjectId.ToString()));
+                projectId: ExistingProjectId.ToString()), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservedFor(AccountA, requestId));
@@ -684,7 +865,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostScaffoldAsync(
             AccountA,
             "project-ai-flow-0017",
-            ValidRequest(baseProjectRevision: 7));
+            ValidRequest(baseProjectRevision: 7), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservationCount);
@@ -703,7 +884,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var response = await host.PostScaffoldAsync(
             AccountA,
             "project-ai-flow-0018",
-            requestWithoutRevisionKey);
+            requestWithoutRevisionKey, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, host.Credits.ReservationCount);
@@ -716,13 +897,13 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0014";
         var request = ValidRequest();
-        using var preview = await host.PostScaffoldAsync(AccountA, requestId, request);
-        using var replay = await host.PostScaffoldAsync(AccountA, requestId, request);
+        using var preview = await host.PostScaffoldAsync(AccountA, requestId, request, cancellationToken: TestContext.Current.CancellationToken);
+        using var replay = await host.PostScaffoldAsync(AccountA, requestId, request, cancellationToken: TestContext.Current.CancellationToken);
         var changedRequest = request.Replace(
             "Help me define a manageable first step.",
             "Help me define a different first step.",
             StringComparison.Ordinal);
-        using var changedPayload = await host.PostScaffoldAsync(AccountA, requestId, changedRequest);
+        using var changedPayload = await host.PostScaffoldAsync(AccountA, requestId, changedRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, replay.StatusCode);
@@ -737,14 +918,14 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0003";
-        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var first = await host.PostSettlementAsync(AccountA, requestId, "apply", requestId);
-        var firstText = await first.Content.ReadAsStringAsync();
+        var firstText = await first.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var firstBody = JsonDocument.Parse(firstText);
         using var retry = await host.PostSettlementAsync(AccountA, requestId, "apply", requestId);
-        var retryText = await retry.Content.ReadAsStringAsync();
+        var retryText = await retry.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
@@ -766,7 +947,7 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0004";
-        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var first = await host.PostSettlementAsync(AccountA, requestId, "dismiss", requestId);
@@ -784,7 +965,7 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0005";
-        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var changedKey = await host.PostSettlementAsync(AccountA, requestId, "dismiss", "different-key-0001");
@@ -803,7 +984,7 @@ public sealed class ProjectAiScaffoldFlowTests
     {
         using var host = new TestHost();
         const string requestId = "project-ai-flow-0006";
-        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var preview = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         using var otherAccount = await host.PostSettlementAsync(AccountB, requestId, "apply", requestId);
@@ -820,8 +1001,8 @@ public sealed class ProjectAiScaffoldFlowTests
         host.Generator.WaitUntilReleased = true;
         const string requestId = "project-ai-flow-0013";
 
-        var pendingPreview = host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
-        await host.Generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var pendingPreview = host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        await host.Generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken: TestContext.Current.CancellationToken);
         using var earlyApply = await host.PostSettlementAsync(AccountA, requestId, "apply", requestId);
         using var earlyDismiss = await host.PostSettlementAsync(AccountA, requestId, "dismiss", requestId);
         host.Generator.Release.TrySetResult();
@@ -841,7 +1022,7 @@ public sealed class ProjectAiScaffoldFlowTests
         host.Generator.Failure = new InvalidOperationException("synthetic provider failure");
         const string requestId = "project-ai-flow-0007";
 
-        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
@@ -856,7 +1037,7 @@ public sealed class ProjectAiScaffoldFlowTests
         host.Generator.Output = null;
         const string requestId = "project-ai-flow-0008";
 
-        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
@@ -874,7 +1055,7 @@ public sealed class ProjectAiScaffoldFlowTests
         };
         const string requestId = "project-ai-flow-0010";
 
-        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
@@ -889,7 +1070,7 @@ public sealed class ProjectAiScaffoldFlowTests
         host.Generator.Failure = new OperationCanceledException("synthetic provider timeout");
         const string requestId = "project-ai-flow-0011";
 
-        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
+        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal(0, host.Credits.ConsumedFor(AccountA, requestId));
@@ -905,7 +1086,7 @@ public sealed class ProjectAiScaffoldFlowTests
         using var cancellation = new CancellationTokenSource();
         const string requestId = "project-ai-flow-0012";
         var pending = host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellation.Token);
-        await host.Generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await host.Generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken: TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
@@ -920,8 +1101,8 @@ public sealed class ProjectAiScaffoldFlowTests
         using var host = new TestHost(providerEnabled: false);
         const string requestId = "project-ai-flow-0009";
 
-        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest());
-        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var response = await host.PostScaffoldAsync(AccountA, requestId, ValidRequest(), cancellationToken: TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("PROJECT_AI_NOT_READY", body.RootElement.GetProperty("code").GetString());
@@ -951,6 +1132,18 @@ public sealed class ProjectAiScaffoldFlowTests
         optedIn = true,
         projectDataConsent = true,
         projectDataConsentVersion = "project-ai-data.v1",
+    });
+
+    private static string ValidGeneralChatRequest(
+        string message,
+        string locale = "en",
+        string installationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa") => JsonSerializer.Serialize(new
+    {
+        schema = "evidrilo.project-ai-general-chat",
+        version = "2",
+        installationId,
+        locale,
+        message,
     });
 
     private static string ValidStageAssistRequest(
@@ -999,10 +1192,11 @@ public sealed class ProjectAiScaffoldFlowTests
         public TestHost(
             bool providerEnabled = true,
             RecordingStudentProjectStore? projects = null,
-            RecordingConsentStore? consent = null)
+            RecordingConsentStore? consent = null,
+            bool generalChatEnabled = false)
         {
             Credits = new RecordingCreditLedger();
-            Generator = new RecordingScaffoldGenerator(providerEnabled);
+            Generator = new RecordingScaffoldGenerator(providerEnabled, generalChatEnabled);
             StudentProjects = projects ?? new RecordingStudentProjectStore();
             Activities = new RecordingProjectAiActivityStore();
             ConsentStore = consent ?? new RecordingConsentStore();
@@ -1016,6 +1210,8 @@ public sealed class ProjectAiScaffoldFlowTests
                 services.AddSingleton<IProjectAiScaffoldGenerator>(Generator);
                 services.RemoveAll<IProjectAiStageAssistGenerator>();
                 services.AddSingleton<IProjectAiStageAssistGenerator>(Generator);
+                services.RemoveAll<IProjectAiGeneralChatGenerator>();
+                services.AddSingleton<IProjectAiGeneralChatGenerator>(Generator);
                 services.RemoveAll<IAiCreditLedger>();
                 services.AddSingleton<IAiCreditLedger>(Credits);
                 services.RemoveAll<IStudentProjectStore>();
@@ -1046,6 +1242,13 @@ public sealed class ProjectAiScaffoldFlowTests
             string content,
             CancellationToken cancellationToken = default) =>
             SendAsync(HttpMethod.Post, "/v1/project-ai/stage-assist", accountId, requestId, content, cancellationToken);
+
+        public Task<HttpResponseMessage> PostGeneralChatAsync(
+            Guid accountId,
+            string requestId,
+            string content,
+            CancellationToken cancellationToken = default) =>
+            SendAsync(HttpMethod.Post, "/v2/project-ai/general-chat", accountId, requestId, content, cancellationToken);
 
         public Task<HttpResponseMessage> GetProjectAiActivityAsync(
             Guid accountId,
@@ -1422,16 +1625,21 @@ public sealed class ProjectAiScaffoldFlowTests
             throw new NotSupportedException();
     }
 
-    private sealed class RecordingScaffoldGenerator(bool enabled) : IProjectAiScaffoldGenerator, IProjectAiStageAssistGenerator
+    private sealed class RecordingScaffoldGenerator(bool enabled, bool generalChatEnabled)
+        : IProjectAiScaffoldGenerator, IProjectAiStageAssistGenerator, IProjectAiGeneralChatGenerator
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool IsEnabled { get; } = enabled;
+        bool IProjectAiGeneralChatGenerator.IsEnabled => generalChatEnabled;
         public int Calls { get; private set; }
+        public int GeneralChatCalls { get; private set; }
         public ProjectAiScaffoldProviderRequest? LastRequest { get; private set; }
         public ProjectAiStageAssistProviderRequest? LastStageRequest { get; private set; }
+        public ProjectAiGeneralChatProviderRequest? LastGeneralChatRequest { get; private set; }
         public bool WaitUntilCancelled { get; set; }
         public bool WaitUntilReleased { get; set; }
+        public Exception? EstimateFailure { get; set; }
         public Action? OnGenerate { get; set; }
         public Exception? Failure { get; set; }
         public ProjectAiScaffoldOutput? Output { get; set; } = new(
@@ -1453,10 +1661,23 @@ public sealed class ProjectAiScaffoldFlowTests
             [],
             []);
 
-        public int EstimateMaximumCreditCost(ProjectAiScaffoldProviderRequest request) =>
-            request.Operation == ProjectAiScaffoldValidator.CreateOperation ? 3 : 1;
+        public int EstimateMaximumCreditCost(ProjectAiScaffoldProviderRequest request)
+        {
+            if (EstimateFailure is not null) throw EstimateFailure;
+            return request.Operation == ProjectAiScaffoldValidator.CreateOperation ? 3 : 1;
+        }
 
-        public int EstimateMaximumCreditCost(ProjectAiStageAssistProviderRequest request) => 1;
+        public int EstimateMaximumCreditCost(ProjectAiStageAssistProviderRequest request)
+        {
+            if (EstimateFailure is not null) throw EstimateFailure;
+            return 1;
+        }
+
+        public int EstimateMaximumCreditCost(ProjectAiGeneralChatProviderRequest request)
+        {
+            if (EstimateFailure is not null) throw EstimateFailure;
+            return 3;
+        }
 
         public Task<ProjectAiScaffoldOutput?> GenerateAsync(ProjectAiScaffoldProviderRequest request, CancellationToken cancellationToken)
         {
@@ -1483,6 +1704,23 @@ public sealed class ProjectAiScaffoldFlowTests
             if (WaitUntilCancelled) return WaitForCancellationAsync(output, cancellationToken);
             if (WaitUntilReleased) return WaitForReleaseAsync(output, cancellationToken);
             return Task.FromResult<ProjectAiStageAssistOutput?>(output);
+        }
+
+        public Task<ProjectAiGeneralChatOutput?> GenerateGeneralAsync(
+            ProjectAiGeneralChatProviderRequest request,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            GeneralChatCalls++;
+            LastGeneralChatRequest = request;
+            PrepareCall();
+            var output = new ProjectAiGeneralChatOutput("Repeated measurements help show variation.")
+            {
+                Usage = new AiProviderTokenUsage(1_000, 0, 0, 100, 0),
+            };
+            if (WaitUntilCancelled) return WaitForCancellationAsync<ProjectAiGeneralChatOutput?>(output, cancellationToken);
+            if (WaitUntilReleased) return WaitForReleaseAsync<ProjectAiGeneralChatOutput?>(output, cancellationToken);
+            return Task.FromResult<ProjectAiGeneralChatOutput?>(output);
         }
 
         private void PrepareCall()
