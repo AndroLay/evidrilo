@@ -16,7 +16,7 @@ a student's research.
 [![RevenueCat](https://img.shields.io/badge/RevenueCat-KMP%203.7.0-00AEEF)](https://www.revenuecat.com/)
 [![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
 
-[Features](#features) · [Landing page](apps/landing/README.md) · [Quick start](#quick-start) ·
+[Features](#features) · [Landing page](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md) · [Quick start](#quick-start) ·
 [Architecture](docs/architecture/repository-structure.md) · [System flows](docs/architecture/system-execution-flows.md) ·
 [Workflows](docs/product/workflows.md) · [Documentation](docs/README.md) ·
 [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
@@ -150,7 +150,9 @@ Local integration is separate from a hosted production deployment.
 
 ### Static Landing Page
 
-Responsive vanilla HTML/CSS/JavaScript site with a project-first story, an interactive synthetic-case walkthrough, and a five-question FAQ. [Landing guide →](apps/landing/README.md)
+Responsive vanilla HTML/CSS/JavaScript site with a project-first story, an interactive synthetic-case walkthrough, and a five-question FAQ. [Open the live landing page →](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md)
+
+The production site is hosted on Cloudflare Pages and connected to this GitHub repository. Changes under `apps/landing/` on `main` are configured to trigger a deployment.
 Preview with `python3 -m http.server 8000 --directory apps/landing`; replace the README screenshot gallery with a WebM walkthrough when the demo is recorded.
 
 ## Quick start
