@@ -89,7 +89,9 @@ internal object PracticeCourseCodec {
 
     private fun draft(value: PracticeLessonDraft): JsonObject = buildJsonObject {
         put("evidence", buildJsonArray { value.evidence.sorted().forEach { add(JsonPrimitive(it)) } })
-        put("groups", buildJsonObject { value.groups.toSortedMap().forEach { (id, group) -> put(id, group.name) } })
+        put("groups", buildJsonObject {
+            value.groups.entries.sortedBy { it.key }.forEach { (id, group) -> put(id, group.name) }
+        })
         put("claim", value.claim)
         put("scope", value.scope?.name?.let(::JsonPrimitive) ?: JsonNull)
         put("limitation", value.limitation?.name?.let(::JsonPrimitive) ?: JsonNull)

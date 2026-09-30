@@ -102,15 +102,19 @@ test('accepts a minimal clean public package', () => {
 
 test('GitHub verification installs ripgrep before running repo checks that require it', () => {
   const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'verify.yml'), 'utf8');
+  const mobileStart = workflow.indexOf('\n  mobile:');
   const contractsStart = workflow.indexOf('\n  contracts:');
   const platformStart = workflow.indexOf('\n  platform:', contractsStart);
   const publicStart = workflow.indexOf('\n  public-package:');
+  assert.notEqual(mobileStart, -1);
   assert.notEqual(contractsStart, -1);
   assert.notEqual(platformStart, -1);
   assert.notEqual(publicStart, -1);
 
+  const mobileJob = workflow.slice(mobileStart, contractsStart);
   const contractsJob = workflow.slice(contractsStart, platformStart);
   const publicJob = workflow.slice(publicStart);
+  assert.match(mobileJob, /apt-get update[\s\S]*apt-get install[^\n]*ripgrep/);
   assert.match(contractsJob, /apt-get update[\s\S]*apt-get install[^\n]*ripgrep/);
   assert.match(publicJob, /apt-get update[\s\S]*apt-get install[^\n]*ripgrep/);
 });

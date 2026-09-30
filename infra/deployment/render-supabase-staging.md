@@ -1,7 +1,7 @@
 # Render + Supabase staging handoff
 
-API staging status: `BLUEPRINT AND LOCAL GATES VERIFIED / NOT DEPLOYED / CANDIDATE AND DATABASE ROLE GATES REMAIN`.
-Full API-and-worker staging status: `NOT READY — no Render services, frozen candidate, runtime database roles, or applied migrations`.
+API staging status: `BLUEPRINT VERIFIED / NOT DEPLOYED / CANDIDATE CI AND DATABASE ROLE GATES REMAIN`.
+Full API-and-worker staging status: `NOT READY — no Render services, passing Verify candidate, runtime database roles, or applied migrations`.
 
 The landing page has a separate Cloudflare Pages setup in
 [`cloudflare-pages-landing.md`](cloudflare-pages-landing.md). The default API
@@ -61,10 +61,10 @@ least-privilege grants. The migration/owner login must remain separate from
 both runtime logins. The current repository does not yet provision and prove
 those runtime grant sets, so neither Blueprint is ready to sync.
 
-The current worktree also contains uncommitted application and migration
-changes. Do not deploy that worktree or treat it as a release candidate. First
-freeze an exact commit, run the repository's GitHub `Verify` workflow for that
-commit, review the migration set, and use only that SHA for staging.
+The root development worktree contains uncommitted application changes and
+must not be deployed. Candidate `e114571` is frozen on `main`, but its hosted
+mobile checks failed. Run GitHub `Verify` on the focused follow-up commit,
+review the migration set, and use only a passing exact SHA for Staging.
 
 ## Provider setup after the candidate is frozen
 
@@ -163,7 +163,7 @@ destination, managed backup/restore rehearsal, or production monitoring provider
 is configured. Those remain explicit operational gates before any production
 use.
 
-### Latest live preflight before candidate freeze (2026-10-01)
+### Latest live Staging and CI check (2026-10-01)
 
 - A read-only Supabase Staging check confirmed `Evidrilo Staging`
   (`cdgzbrrrvlrrgpzbgqog`) remains `ACTIVE_HEALTHY`. The public schema has zero
@@ -172,40 +172,33 @@ use.
   2026-09-30 value of zero.
 - The Render service inventory is empty. No API or worker service, deployment,
   or Render-side secret configuration exists.
-- Local `main` and `origin/main` still point to
-  `85582b8a920106870ef10d7a59669f5f8b9a5238`, while extensive application and
-  migration changes remain uncommitted, including `053` and `054`. There is no
-  frozen candidate commit.
-- On 2026-10-01, `gh auth status` and a read-only GitHub API check succeeded
-  for `AndroLay` with the `repo` and `workflow` scopes. The current worktree
-  still has no frozen candidate SHA, so no candidate has been pushed and no
-  GitHub `Verify` result exists for these local changes.
-- GitHub's latest checks for the existing `main` SHA
-  `85582b8a920106870ef10d7a59669f5f8b9a5238` are not green: contract/migration,
-  public-package boundary, mobile compile/JVM, and iOS simulator checks failed;
-  ASP.NET/worker checks passed. The CI logs show the Android job calls a Gradle
-  task that does not exist and the public-package job lacks `rg`, which the
-  repository checks require. The local candidate now uses the supported
-  Android source-set tasks and installs `ripgrep` in the affected jobs. These
-  fixes have not yet run on GitHub.
+- Candidate `e114571b03185a84549e2a1feb16b2c9d1f1905d` is on `main`. Its
+  contract/migration, public-package, and ASP.NET/worker jobs passed. The
+  Android/JVM compile step passed, but the mobile release-configuration step
+  failed because that job lacked `rg`.
+- The separate iOS Simulator workflow for `e114571` failed because
+  `PracticeCourseStore.kt` called `toSortedMap()`, which is unavailable in
+  common Kotlin. A focused follow-up change fixes both CI issues and adds
+  regression coverage; its hosted workflow result is pending.
 - A full `scripts/ci/verify-local.sh` run passed earlier on 2026-10-01:
   Kotlin/JVM and Android tests/build, 168 Node tests, 453 API tests, 30 worker
   tests, Docker Compose, architecture, audio assets, and deployment checks
   passed. A fresh rerun could not complete in this restricted Linux workspace:
   the default Gradle cache is read-only, and a new temporary cache exceeded its
   disk quota before the Kotlin build. The iOS simulator requires macOS/Xcode.
-- After the CI fixes, the focused workflow checks passed (10 public-package and
-  16 mobile-platform tests); the deterministic 12-file Node check, exported
-  public-package scan, deployment check, GitHub safety scan in a temporary
-  staged public checkout, and `git diff --check` passed. This still is not a hosted GitHub
-  `Verify` result for a frozen candidate.
+- The focused workflow checks passed (10 public-package and 16 mobile-platform
+  tests); the deterministic 12-file Node check, exported public-package scan,
+  deployment check, GitHub safety scan in a temporary staged public checkout,
+  and `git diff --check` passed. A fresh full local rerun is limited by this
+  workspace's read-only Gradle cache and temporary disk quota.
 - A fail-fast API configuration check now rejects
   `LOCAL_DEVELOPER_ACCESS_ENABLED=true` in Staging or Production; the focused
   regression and full API suite pass.
 - API and worker database logins still lack reviewed least-privilege grants.
   No migrations were applied and no Render service was created because the
-  migration set and runtime-role grants must be tied to the frozen candidate.
-  The temporary `agentctl` Full lease is off. Production was not changed.
+  migration set and runtime-role grants must be tied to a candidate that passes
+  hosted CI. The temporary `agentctl` Full lease is off. Production was not
+  changed.
 
 The initial credentialless snapshot in this document predates the current
 Supabase connection. As of 2026-09-29, the dedicated Staging project exists and
