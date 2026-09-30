@@ -7,16 +7,22 @@ does not authorize production changes or replace the release gates in
 
 ## Current setup snapshot
 
-Audit date: 2026-09-29.
+Audit date: 2026-10-01.
 
 | Environment | Project | Region | Current boundary |
 | --- | --- | --- | --- |
-| Staging | `Evidrilo Staging` (`cdgzbrrrvlrrgpzbgqog`) | `ap-southeast-1` | Synthetic data. Email sign-in and sign-up are enabled, email confirmation is required, Google and Apple sign-in are disabled, and manual identity linking is disabled. The `evidrilo://auth/callback` redirect is on the Auth allowlist. |
+| Staging | `Evidrilo Staging` (`cdgzbrrrvlrrgpzbgqog`) | `ap-southeast-1` | Synthetic data. Email sign-in and sign-up are enabled, email confirmation is required, Google is configured, Apple stays disabled under D-132, and manual identity linking is disabled. The `evidrilo://auth/callback` redirect is on the Auth allowlist. |
 | Production | `Evidrilo` | `ap-south-1` | Not changed by this setup. Select it by project name in the Supabase dashboard and verify its project reference before any production action. |
 
-The migration ledger could not be read through the Supabase Management API, so
-the staging schema state is unknown. No database migration was applied. The
-Render API and worker are not deployed, and no production setting was changed.
+The 2026-10-01 read-only Staging preflight confirmed the project is still
+healthy, with zero public tables and no
+`public.evidrilo_schema_migrations` ledger. The last observed Auth user count
+was zero on 2026-09-30. No repository migration has been applied. The Google
+client pair is configured in Supabase and the app deep-link redirect is
+allowlisted, but the Google Cloud callback/test-user settings and an Android
+sign-in have not been verified. The Render service inventory is empty, and no
+production setting was changed. See the [Render/Supabase staging handoff](render-supabase-staging.md)
+for the current activation gates.
 
 Local mobile configuration points to Staging:
 
@@ -70,9 +76,11 @@ Use this sequence after the application and migration set are frozen:
    supabaseAppleAuthEnabled=false
    ```
 
-   The Google and Apple flags stay false until the matching provider
-   credentials, redirect URIs, and device sign-in flows have been configured
-   and verified for that environment.
+   These sample values keep provider sign-in disabled in a new environment.
+   For the existing Staging project, Google is configured in Supabase, but
+   leave the mobile flag disabled until its Google Cloud callback, test-user
+   allowlist, and Android sign-in are verified. Keep Apple disabled under D-132
+   until its credentials, redirect URIs, and device sign-in flow are verified.
 4. Add `evidrilo://auth/callback` to that project's Supabase Auth redirect
    allowlist. Review email confirmation and recovery redirects, sender
    configuration, signup policy, and provider settings separately for each

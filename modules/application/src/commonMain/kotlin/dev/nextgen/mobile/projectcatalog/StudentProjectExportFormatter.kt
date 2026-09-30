@@ -1,6 +1,7 @@
 package dev.nextgen.mobile.projectcatalog
 
 import dev.nextgen.mobile.domain.project.ManualLiteratureSynthesisFields
+import dev.nextgen.mobile.domain.project.ProjectTemplatePublication
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
 import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
 import dev.nextgen.mobile.domain.project.StudentProjectEvidenceRelation
@@ -40,8 +41,18 @@ object StudentProjectExportFormatter {
             appendLine("- Status: ${project.status.displayLabel()}")
             appendLine("- Created (UTC epoch milliseconds): ${project.createdAtEpochMillis}")
             appendLine("- Last saved (UTC epoch milliseconds): ${project.updatedAtEpochMillis}")
-            val templateDescription = project.templateSnapshot?.let { "${it.title} · version ${it.version}" }
-                ?: "Manual project; no reviewed catalog template applied"
+            appendLine("- Optional deadline: ${project.deadlineDate ?: "Not set"}")
+            val templateDescription = project.templateSnapshot?.let { template ->
+                when (template.publication) {
+                    ProjectTemplatePublication.BUILT_IN_STARTER ->
+                        "Local starter guide: ${template.title} · version ${template.version} · structure only; not method-reviewed"
+                    ProjectTemplatePublication.PUBLISHED ->
+                        "Published catalog template: ${template.title} · version ${template.version}"
+                    ProjectTemplatePublication.DRAFT,
+                    ProjectTemplatePublication.RETIRED,
+                    -> "Unavailable template snapshot: ${template.title} · version ${template.version}"
+                }
+            } ?: "Manual project; no catalog template applied"
             appendLine("- Template: ${templateDescription.asMarkdownText()}")
             appendLine()
             appendLine("## Revision checkpoints")

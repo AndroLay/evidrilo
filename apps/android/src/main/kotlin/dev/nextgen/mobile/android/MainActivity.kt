@@ -21,6 +21,7 @@ import dev.nextgen.mobile.analytics.AndroidAnalyticsConsentStorage
 import dev.nextgen.mobile.audio.AndroidAudioStorage
 import dev.nextgen.mobile.notifications.AndroidLocalNotificationPlatform
 import dev.nextgen.mobile.notifications.AndroidNotificationPreferencesStorage
+import dev.nextgen.mobile.projectcatalog.AndroidProjectAiInstallationStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
         AndroidSecureSessionStorage.initialize(applicationContext)
         AndroidAccountAuthStorage.initialize(applicationContext)
         AndroidNotificationPreferencesStorage.initialize(applicationContext)
+        AndroidProjectAiInstallationStorage.initialize(applicationContext)
         AndroidLocalNotificationPlatform.initialize(this)
         setContent { App() }
         handleAuthIntent(intent)

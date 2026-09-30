@@ -12,7 +12,6 @@ services:
     branch: main
     autoDeployTrigger: "off"
     healthCheckPath: /health/ready
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Staging

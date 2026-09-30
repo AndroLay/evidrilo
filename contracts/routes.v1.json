@@ -35,6 +35,56 @@
       "authentication": "supabase_bearer"
     },
     {
+      "method": "POST",
+      "path": "/v2/account/exports",
+      "responseSchema": "account-export-job.v2.json",
+      "responseMediaType": "application/vnd.evidrilo.account-export-job.v2+json",
+      "successStatusCode": 202,
+      "testFile": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+      "testAnchor": "/v2/account/exports",
+      "authentication": "supabase_bearer",
+      "headerParameters": [
+        {
+          "name": "Idempotency-Key",
+          "required": true,
+          "description": "Stable key for replaying the same empty-body export creation request.",
+          "schema": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 80,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v2/account/exports/{exportId:guid}",
+      "responseSchema": "account-export-job.v2.json",
+      "responseMediaType": "application/vnd.evidrilo.account-export-job.v2+json",
+      "testFile": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+      "testAnchor": "/v2/account/exports/{exportId:guid}",
+      "authentication": "supabase_bearer"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/account/exports/{exportId:guid}/download",
+      "responseSchema": "account-export.v2.json",
+      "responseMediaType": "application/vnd.evidrilo.account-export.v2+json",
+      "testFile": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+      "testAnchor": "/v2/account/exports/{exportId:guid}/download",
+      "authentication": "supabase_bearer"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v2/account/exports/{exportId:guid}",
+      "responseSchema": "account-export-job.v2.json",
+      "responseMediaType": "application/vnd.evidrilo.account-export-job.v2+json",
+      "testFile": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+      "testAnchor": "/v2/account/exports/{exportId:guid}",
+      "authentication": "supabase_bearer"
+    },
+    {
       "method": "DELETE",
       "path": "/v1/account/me",
       "responseSchema": "account-deletion-result.v1.json",
@@ -251,8 +301,8 @@
       "headerParameters": [
         {
           "name": "Idempotency-Key",
-          "required": false,
-          "description": "Optional request key; the server-generated request ID is used when omitted.",
+          "required": true,
+          "description": "Stable operation key required to prevent duplicate dispatch and credit charges on retries.",
           "schema": {
             "type": "string",
             "minLength": 8,
@@ -442,6 +492,31 @@
       ]
     },
     {
+      "method": "PUT",
+      "path": "/v1/project-ai/projects/{projectId:guid}/local-context",
+      "requestSchema": "project-ai-local-project-context-request.v1.json",
+      "responseSchema": "project-ai-local-project-context.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/projects/",
+      "authentication": "supabase_bearer",
+      "headerParameters": [
+        {
+          "name": "X-Evidrilo-Project-AI-Consent",
+          "required": true,
+          "description": "Versioned explicit confirmation for this selected project-context request.",
+          "schema": { "type": "string", "const": "project-ai.v1" }
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/project-ai/projects/{projectId:guid}/local-context",
+      "responseSchema": "project-ai-local-project-context-delete.v1.json",
+      "testFile": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+      "testAnchor": "/v1/project-ai/projects/",
+      "authentication": "supabase_bearer"
+    },
+    {
       "method": "POST",
       "path": "/v1/project-ai/stage-assist",
       "requestSchema": "project-ai-stage-assist-request.v1.json",
@@ -460,6 +535,12 @@
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9_-]+$"
           }
+        },
+        {
+          "name": "X-Evidrilo-Project-AI-Consent",
+          "required": true,
+          "description": "Versioned explicit confirmation for this selected project-context request.",
+          "schema": { "type": "string", "const": "project-ai.v1" }
         }
       ]
     },
@@ -548,6 +629,15 @@
             "minLength": 8,
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        {
+          "name": "X-Evidrilo-General-Chat-Consent",
+          "required": true,
+          "description": "Must equal general-chat.v1 to confirm the current General chat notice for this request.",
+          "schema": {
+            "type": "string",
+            "const": "general-chat.v1"
           }
         }
       ]

@@ -27,7 +27,9 @@ public sealed record ProjectAiActivityCreate(
     string? StageId,
     string? OperationId,
     int? BaseProjectRevision,
-    int? ConsentGeneration);
+    int? ConsentGeneration,
+    bool UsesLocalProjectContext = false,
+    long? BaseProjectBindingGeneration = null);
 
 public sealed record ProjectAiActivityRecord(
     Guid ActivityId,
@@ -39,6 +41,8 @@ public sealed record ProjectAiActivityRecord(
     string? OperationId,
     int? BaseProjectRevision,
     int? ConsentGeneration,
+    bool UsesLocalProjectContext,
+    long? BaseProjectBindingGeneration,
     int? ResultProjectRevision,
     string Outcome,
     string? RequestedSettlementOutcome,
@@ -147,10 +151,12 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
             command.CommandText = """
                 insert into public.project_ai_activity (
                     account_id, installation_id, request_id, mode, project_id,
-                    stage_id, operation_id, base_project_revision, consent_generation, outcome
+                    stage_id, operation_id, base_project_revision, consent_generation,
+                    uses_local_project_context, base_project_binding_generation, outcome
                 ) values (
                     @account_id, @installation_id, @request_id, @mode, @project_id,
-                    @stage_id, @operation_id, @base_project_revision, @consent_generation, 'PENDING'
+                    @stage_id, @operation_id, @base_project_revision, @consent_generation,
+                    @uses_local_project_context, @base_project_binding_generation, 'PENDING'
                 )
                 on conflict (account_id, request_id) do nothing
                 returning activity_id;
@@ -452,6 +458,7 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
     private static readonly string SelectColumns = """
         select activity_id, installation_id, request_id, mode, project_id,
                stage_id, operation_id, base_project_revision, consent_generation,
+               uses_local_project_context, base_project_binding_generation,
                result_project_revision, outcome, requested_settlement_outcome, settlement_hash,
                created_at, updated_at
           from public.project_ai_activity
@@ -483,6 +490,11 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
         {
             Value = activity.ConsentGeneration is null ? DBNull.Value : activity.ConsentGeneration.Value,
         });
+        command.Parameters.AddWithValue("uses_local_project_context", NpgsqlDbType.Boolean, activity.UsesLocalProjectContext);
+        command.Parameters.Add(new NpgsqlParameter("base_project_binding_generation", NpgsqlDbType.Bigint)
+        {
+            Value = activity.BaseProjectBindingGeneration is null ? DBNull.Value : activity.BaseProjectBindingGeneration.Value,
+        });
     }
 
     private static void AddScopeParameters(NpgsqlCommand command, Guid accountId, Guid installationId, string requestId)
@@ -502,12 +514,14 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
         reader.IsDBNull(6) ? null : reader.GetString(6),
         reader.IsDBNull(7) ? null : reader.GetInt32(7),
         reader.IsDBNull(8) ? null : reader.GetInt32(8),
-        reader.IsDBNull(9) ? null : reader.GetInt32(9),
-        reader.GetString(10),
-        reader.IsDBNull(11) ? null : reader.GetString(11),
-        reader.IsDBNull(12) ? null : reader.GetString(12),
-        AsUtcOffset(reader.GetDateTime(13)),
-        AsUtcOffset(reader.GetDateTime(14)));
+        reader.GetBoolean(9),
+        reader.IsDBNull(10) ? null : reader.GetInt64(10),
+        reader.IsDBNull(11) ? null : reader.GetInt32(11),
+        reader.GetString(12),
+        reader.IsDBNull(13) ? null : reader.GetString(13),
+        reader.IsDBNull(14) ? null : reader.GetString(14),
+        AsUtcOffset(reader.GetDateTime(15)),
+        AsUtcOffset(reader.GetDateTime(16)));
 
     private static void ValidateActivity(ProjectAiActivityCreate activity)
     {
@@ -518,7 +532,10 @@ public sealed class NpgsqlProjectAiActivityStore : IProjectAiActivityStore, IDis
             && !string.IsNullOrWhiteSpace(activity.StageId)
             && !string.IsNullOrWhiteSpace(activity.OperationId)
             && activity.BaseProjectRevision is > 0
-            && activity.ConsentGeneration is > 0)
+            && activity.ConsentGeneration is > 0
+            && (activity.UsesLocalProjectContext
+                ? activity.BaseProjectBindingGeneration is > 0
+                : activity.BaseProjectBindingGeneration is null))
             return;
         if (activity.Mode == "GENERAL"
             && activity.ProjectId is null

@@ -21,10 +21,12 @@ evidence.
 
 **Current architecture:** the mobile app owns offline learning and local
 projects. The API and worker provide account-backed capabilities in source;
-temporary guest mode pauses server AI, cloud sync, and analytics transmission.
-RevenueCat Pro is independently available to signed-in accounts after provider
-identity is confirmed. The project editor never automatically synchronizes
-local projects.
+when `TEMPORARY_GUEST_MODE_ENABLED` is true, D-129 pauses server AI, cloud sync,
+and analytics transmission. The current mobile constant is false, but each
+account-backed capability still requires its own authentication, consent, and
+provider gates. RevenueCat Pro is independently available to signed-in
+accounts after provider identity is confirmed. The project editor never
+automatically synchronizes local projects.
 
 ```mermaid
 flowchart LR
@@ -64,8 +66,9 @@ the signed-in Evidrilo account before requesting offers, purchases, or restores;
 only active matching RevenueCat `CustomerInfo` is the local Pro-access
 authority, and the optional webhook projection does not unlock local content.
 Provider configuration and runtime acceptance remain open. Public read-only
-catalog requests may still use the network, but account-backed mobile services
-including sync and server AI remain paused by D-129. The API's student-project
+catalog requests may still use the network. D-129 pauses account-backed mobile
+services only while the temporary guest flag is enabled; the current source
+flag is false, but server AI remains default-off. The API's student-project
 routes are separate server-owned records and are not wired to the local mobile
 project editor.
 
@@ -130,6 +133,9 @@ and [`../../infra/monitoring/README.md`](../../infra/monitoring/README.md).
 ```mermaid
 flowchart LR
     Project[StudentProjectDraft]
+    Project --> Template[Immutable template snapshot]
+    Template --> Starter[Bundled family starter<br/>structure only]
+    Template -. reviewed remote version only .-> MethodGuidance[Published method template]
     Project --> Sources[Source records]
     Sources --> Evidence[Evidence items with source IDs]
     Project --> Themes[Synthesis themes with source IDs]
@@ -148,6 +154,11 @@ flowchart LR
 Evidence relations record a student's selected relationship; they do not
 automatically judge evidence quality or prove a claim. Attachments remain
 separate from evidence until a student creates a note or link explicitly.
+The snapshot is either the exact bundled structure-only starter selected by the
+student or a separately published remote template. A bundled starter creates a
+usable local project outline, but it is not human-reviewed method guidance and
+cannot enable Project AI. Neither snapshot contains the student's sources,
+observations, findings, or claims.
 
 ## 5. System execution sequences
 
@@ -295,21 +306,31 @@ This server path does not silently import or merge device-local drafts. A
 successful account sign-in is not project consent, and the local project flow
 remains usable when this API is unavailable.
 
-### 5.4 Project AI scaffold contract — Gated
+### 5.4 Project AI — source-wired, provider and reviewed-template gated
 
-The API route and a strict-schema Responses adapter exist, but Project AI is
-disabled by default and the complete student UI/provider path is not available.
-The route verifies the account and current consent, validates the idempotency
-key, then reads and validates the bounded request body before checking the
-generator flag. With default-off configuration it returns
-`PROJECT_AI_NOT_READY`; it does not load a template, reserve credits, dispatch
-to a provider, or persist the student text. When every server-side provider and
-privacy approval flag is explicitly enabled, it loads the published template,
-validates account ownership and revision, bounds selected context and cost,
-reserves credits and provider spend, rechecks consent/revision, and only then
-dispatches the selected redacted context. Provider response usage is settled by
-token category, and a student preview still requires explicit apply/dismiss
-settlement.
+Mobile source includes AI-assisted project scaffolding from a selected
+reviewed/published template and stage assistance only where that template
+declares supported operations. The student sees the project and stage, chooses
+the fields/evidence to share, and reviews an editable proposal before any
+project-reducer application. The five bundled structure-only family starters
+do not enable method-specific AI. Home's AI entry first offers General Chat or
+one eligible Draft/Active project; the project picker includes only a Published
+template with a declared AI operation and sends no project list to the provider.
+General Chat remains a separate, unlinked mode; each request requires its own
+consent and sends only the current message, not prior transcript or project
+data. Server activity history is metadata-only. Project history supports
+cursor-based older pages; General Chat opens an account activity view that
+labels unlinked General entries separately from project-bound metadata.
+
+The API routes and strict-schema Responses adapter are source-wired, but the
+provider and General Chat policy remain disabled by default. The project route
+verifies the account and current consent, validates idempotency, project owner
+binding and revision, bounds the selected context and cost, reserves credits
+and provider spend, then rechecks consent/revision before dispatch. It sends
+only selected, redacted context. Valid previews settle actual provider token
+usage; invalid, stale, rejected, or failed requests release the reservation.
+With the current default-off configuration the route returns
+`PROJECT_AI_NOT_READY` and does not dispatch to a provider.
 
 #### Current request: provider disabled
 
@@ -337,7 +358,7 @@ The current disabled path has already read and validated the request body, but
 does not look up the template, reserve or consume credits, call an external
 provider, or store the submitted text.
 
-#### Future request: gated proposal generation
+#### Gated local request: provider-enabled proposal generation
 
 ```mermaid
 sequenceDiagram
@@ -417,7 +438,7 @@ sequenceDiagram
     API-->>Caller: Return typed error, keep project unchanged
 ```
 
-#### Future response: student review and outcome recording
+#### Source-wired response: student review and outcome recording
 
 ```mermaid
 sequenceDiagram
@@ -439,21 +460,16 @@ sequenceDiagram
     end
 ```
 
-The future diagrams separate the disabled current path from the gated proposal
-and outcome-recording contract. Initial consent and request validation precede
-template lookup; consent is rechecked before credit reservation and immediately
-before dispatch. Template availability, credit reservation, idempotency,
-validation, and provider approval remain required gates. Failures before a
-reservation do not touch credits; failures after reservation release it. A
-valid preview settles its token-based charge when generated, while later
-apply/dismiss recording does not change that charge.
-
-The future branch is a contract/design path, not an available feature. A valid
-preview is charged from verified token usage when generated; later apply or
-dismiss only records the student's choice. Provider privacy, retention, cost,
-human/domain review, selectable reviewed templates, student-facing UI, and
-runtime acceptance remain gates. Generated content is a proposal, never
-evidence or evaluator authority.
+The diagrams distinguish the default-off request from the locally configured
+provider path; neither is a claim of a live runtime. Consent and request
+validation precede template lookup; consent and revision are rechecked around
+credit reservation and dispatch. A valid preview settles its token-based
+charge when generated, while later apply/dismiss recording does not change
+that charge. Invalid or stale output is withheld and releases the reservation.
+Provider terms/privacy/retention approval, an actually reviewed selectable
+template, provider-backed Android acceptance, and human/domain review remain
+gates. Generated content remains a proposal, never evidence or evaluator
+authority.
 
 ### 5.5 RevenueCat purchase and local access — Client path enabled by D-131; provider acceptance gated
 
@@ -678,12 +694,12 @@ exported file is student-owned; exporting does not create cloud sync.
 ### 5.8 D-106 case-AI conversation — mobile path source-wired; provider gated
 
 The mobile case-AI client is connected to the authenticated conversation
-start/turn/clear routes in source. Under current D-129 guest mode, the client
-pauses case AI before sending a request; no case context is sent. When
-account-backed services are enabled, each request requires a signed-in case
-session and an explicit, request-level choice to share displayed feedback,
-claim, and selected evidence. The provider is disabled; successful-response
-branches below remain future gated paths, not live capabilities.
+start/turn/clear routes in source. D-129 pauses this path only when the
+temporary guest flag is enabled; the current source constant is false. Each
+request still requires a verified signed-in case session and an explicit,
+request-level choice to share displayed feedback, claim, and selected
+evidence. The provider is disabled by default; successful-response branches
+below remain gated paths, not live capabilities.
 The client holds a bounded transcript for the active context; the server stores
 conversation metadata rather than raw dialogue. `next_action` and unmapped
 proposal fields remain preview-only. Supported claim, scope, and limitation
@@ -823,9 +839,9 @@ sequenceDiagram
 ```
 
 The case-AI reducer path is not the student-project reducer path. Mobile source,
-focused tests, and Android compilation are verified; current guest mode blocks
-the network path, and provider operation, device interaction, accessibility,
-iOS runtime, and human usefulness remain open. A dismiss or unsupported
+focused tests, and Android compilation are verified; provider operation,
+device interaction, accessibility, iOS runtime, and human usefulness remain
+open. A dismiss or unsupported
 proposal leaves the draft unchanged. The current Clear action removes the local
 transcript immediately and requests server metadata deletion separately. If
 deletion is unconfirmed, the UI reports it and offers a same-session retry when

@@ -1039,7 +1039,7 @@ internal fun aiCreditAllowanceLabel(credits: AiCredits): String =
     }
 
 @Composable
-private fun AiCreditSummary(credits: AiCredits) {
+internal fun AiCreditSummary(credits: AiCredits) {
     val allowanceLines = aiCreditAllowanceLabel(credits).split('\n')
     Surface(
         modifier = Modifier.fillMaxWidth(),

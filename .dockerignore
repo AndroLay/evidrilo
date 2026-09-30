@@ -19,6 +19,7 @@
 **/obj
 **/obj/**
 local.properties
+**/appsettings.Development.json
 *.env
 *.env.*
 *.keystore

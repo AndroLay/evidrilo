@@ -99,6 +99,44 @@ class StudentProjectDraftTest {
     }
 
     @Test
+    fun `project deadline is optional and validated as a calendar date without timezone`() {
+        val project = assertIs<StudentProjectDraftCreateResult.Created>(
+            StudentProjectDraftRules.createManual("manual-project-1", "My project", 100),
+        ).draft
+
+        assertEquals(null, project.deadlineDate)
+        assertTrue(StudentProjectDraftRules.validate(project.copy(deadlineDate = "2028-02-29")).isEmpty())
+        assertTrue("PROJECT_DEADLINE_INVALID" in StudentProjectDraftRules.validate(project.copy(deadlineDate = "2027-02-29")))
+        assertTrue("PROJECT_DEADLINE_INVALID" in StudentProjectDraftRules.validate(project.copy(deadlineDate = "2026-13-01")))
+        assertTrue("PROJECT_DEADLINE_INVALID" in StudentProjectDraftRules.validate(project.copy(deadlineDate = "2026-2-01")))
+    }
+
+    @Test
+    fun `date picker conversion round trips Gregorian dates before and after the epoch`() {
+        assertEquals(0, StudentProjectDeadlineDate.parse("1970-01-01"))
+        assertEquals("1969-12-31", StudentProjectDeadlineDate.format(-1))
+        assertEquals("2000-02-29", StudentProjectDeadlineDate.format(
+            StudentProjectDeadlineDate.parse("2000-02-29") ?: error("valid leap day rejected"),
+        ))
+        assertEquals(null, StudentProjectDeadlineDate.parse("1900-02-29"))
+        assertEquals(null, StudentProjectDeadlineDate.format(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun `deadline changes are revisioned and captured in immutable history`() {
+        val project = assertIs<StudentProjectDraftCreateResult.Created>(
+            StudentProjectDraftRules.createManual("manual-project-1", "My project", 100),
+        ).draft.copy(deadlineDate = "2026-09-30")
+
+        assertTrue(StudentProjectDraftRules.needsRevisionCheckpoint(project))
+        assertEquals("2026-09-30", StudentProjectDraftRules.captureRevisionSnapshot(
+            project,
+            StudentProjectRevisionActor.STUDENT,
+            "Set project deadline",
+        ).deadlineDate)
+    }
+
+    @Test
     fun `structure report checks links and presence without scoring academic quality`() {
         val project = assertIs<StudentProjectDraftCreateResult.Created>(
             StudentProjectDraftRules.createManual("manual-project-1", "My project", 100),

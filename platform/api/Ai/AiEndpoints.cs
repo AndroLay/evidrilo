@@ -179,6 +179,11 @@ public static class AiEndpoints
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
+                if (!TryReadIdempotencyKey(context, out var operationId))
+                    return Results.Json(
+                        ApiErrors.Create(context, "INVALID_IDEMPOTENCY_KEY", "A valid Idempotency-Key header is required."),
+                        statusCode: StatusCodes.Status400BadRequest);
+
                 var payload = await RequestJsonReader.ReadAsync(
                     context.Request,
                     "INVALID_AI_REQUEST",
@@ -240,8 +245,6 @@ public static class AiEndpoints
                     request = request with { Input = grounded.Context.Prompt };
                 }
 
-                var operationId = context.Request.Headers["Idempotency-Key"].FirstOrDefault()
-                    ?? RequestIdMiddleware.Get(context);
                 var result = await gateway.GenerateAsync(accountId, request, operationId, cancellationToken);
                 if (!string.Equals(result.ReasonCode, "AI_OPT_IN_REQUIRED", StringComparison.Ordinal))
                 {

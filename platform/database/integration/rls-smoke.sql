@@ -6,6 +6,31 @@
 grant usage on schema public to authenticated;
 grant select, update, delete on all tables in schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+-- The local RLS harness grants broadly to exercise owner policies. Keep export
+-- payloads outside that simulated client boundary, as in the real migration.
+revoke all on public.account_export_jobs from public, anon, authenticated;
+
+do $$
+begin
+    if has_table_privilege('authenticated', 'public.account_export_jobs', 'select')
+       or has_table_privilege('authenticated', 'public.account_export_jobs', 'insert')
+       or has_table_privilege('authenticated', 'public.account_export_jobs', 'update')
+       or has_table_privilege('authenticated', 'public.account_export_jobs', 'delete') then
+        raise exception 'authenticated has direct access to private account export jobs';
+    end if;
+    if not exists (
+        select 1
+          from pg_class relation
+          join pg_namespace ns on ns.oid = relation.relnamespace
+         where ns.nspname = 'public'
+           and relation.relname = 'account_export_jobs'
+           and relation.relrowsecurity
+    ) then
+        raise exception 'account export jobs must have RLS enabled';
+    end if;
+    raise notice 'ACCOUNT_EXPORT_PRIVATE_TABLE_PASS';
+end;
+$$;
 
 begin;
 insert into auth.users (id) values
@@ -151,6 +176,41 @@ values
 on conflict (cohort_id, account_id) do nothing;
 
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+insert into public.project_ai_local_contexts (
+    account_id, project_id, current_revision, template_id, template_version, available_evidence_ids
+) values
+    (
+        '11111111-1111-1111-1111-111111111111',
+        '40404040-4040-4040-8040-404040404040',
+        3, 'reviewed_template', 1, '["owner-evidence"]'::jsonb
+    ),
+    (
+        '22222222-2222-2222-2222-222222222222',
+        '50505050-5050-4050-8050-505050505050',
+        4, 'reviewed_template', 1, '["other-evidence"]'::jsonb
+    )
+on conflict (account_id, project_id) do nothing;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+do $$
+declare
+    visible_count integer;
+begin
+    select count(*) into visible_count
+      from public.project_ai_local_contexts
+     where project_id in (
+         '40404040-4040-4040-8040-404040404040'::uuid,
+         '50505050-5050-4050-8050-505050505050'::uuid
+     );
+    if visible_count <> 1 then
+        raise exception 'local Project AI context crossed account boundary: %', visible_count;
+    end if;
+    raise notice 'PROJECT_AI_LOCAL_CONTEXT_OWNER_RLS_PASS';
+end;
+$$;
+reset role;
 
 insert into public.case_versions (
     case_version_id, content_hash, status, published_at, case_id, title,
@@ -1418,5 +1478,29 @@ begin
         raise exception 'project template actor deletion anonymization failed';
     end if;
     raise notice 'PROJECT_TEMPLATE_DELETION_ANONYMIZATION_PASS';
+end;
+$$;
+
+insert into public.account_export_jobs (
+    account_id, idempotency_key_hash, request_id, status
+) values (
+    '88888888-8888-8888-8888-888888888888', repeat('a', 64), 'export-delete-smoke-001', 'queued'
+);
+insert into public.account_deletion_requests (account_id, status)
+values ('88888888-8888-8888-8888-888888888888', 'in_progress')
+on conflict (account_id) do update
+    set status = 'in_progress', requested_at = now(), completed_at = null;
+update public.account_deletion_requests
+   set status = 'completed', completed_at = now()
+ where account_id = '88888888-8888-8888-8888-888888888888';
+do $$
+begin
+    if exists (
+        select 1 from public.account_export_jobs
+         where account_id = '88888888-8888-8888-8888-888888888888'
+    ) then
+        raise exception 'account deletion left an account export artifact';
+    end if;
+    raise notice 'ACCOUNT_EXPORT_DELETION_PURGE_PASS';
 end;
 $$;

@@ -45,12 +45,13 @@ or evaluator boundaries.
   privacy, AI context/cost, and data-transfer consent understandable at the
   point where they matter; brevity must not hide a consequential choice.
 - When a student chooses an account-gated action, open the main sign-in surface
-  directly and preserve that requested destination. Show **Continue with
-  Google**, **Continue with Apple**, or email only when each provider is
-  configured. After success, resume the requested action. If no provider is
-  available, show one short recovery message and a route back to local work. Do
-  not expose long configuration diagnostics or a disabled provider button as
-  if it were usable.
+  directly and preserve that requested destination. Show configured email or
+  **Continue with Google** options. Apple sign-in is deferred by D-132: keep it
+  disabled and hidden until the owner revisits the decision and provider setup
+  is available. After successful authentication, resume the requested action.
+  If no provider is available, show one short recovery message and a route back
+  to local work. Do not expose long configuration diagnostics or a disabled
+  provider button as if it were usable.
 
 ~~~mermaid
 flowchart TD
@@ -87,13 +88,17 @@ flowchart TD
   current section title, and free movement backward or forward. Progress reports
   structural completion only, never research quality. Keep the one-page full
   review available as a separate final inspection before confirmation/export.
-- The catalog's job is to start a real project from an actually published,
-  reviewed template. Before **Use template**, show its method, expected output,
-  and sections. Starting it creates a local project scaffold from the exact
-  template version; it does not invent or prefill sources, findings, or claims.
-  While no reviewed template is available, make **Start a blank project** the
-  primary route and keep the empty-catalog message short. Project-type overviews
-  are orientation, not a substitute for a usable template.
+- Each of the five family pages has a bundled offline **Use this guide in a
+  project** action. It creates a local, editable, versioned structure-only
+  starter and leaves the student's answers, sources, data, findings, and claims
+  empty. Show the starter's purpose, sections, limits, provenance, and
+  accessibility notes; identify it as unreviewed guidance, never an evaluator.
+  **Start a blank project** remains available at all times.
+- The remote catalog is a separate source of genuinely reviewed, published
+  method templates. Before **Use reviewed template**, show its exact method,
+  output, sections, and version. Only that reviewed/published path may be used
+  for method-specific AI. A family starter is never silently upgraded into a
+  remote template or treated as human approval.
 - Keep case practice separate from the student's project. A synthetic case is
   clearly labeled as practice, its facts never become project sources, and its
   account gate does not block local project work. Remove visible narration
@@ -117,8 +122,10 @@ tour can be opened from the app and skipped; it is an orientation, not a gate to
 local project work. Browsing the read-only catalog, using local projects, and
 practicing the bundled M0 case with local history do not require an account.
 Sign-in is optional for local Free work. Pro requires sign-in and a confirmed
-active RevenueCat entitlement; temporary guest mode continues to pause server
-AI, cloud sync, and analytics transmission.
+active RevenueCat entitlement. D-129 pauses server AI, cloud sync, and analytics
+transmission only when `TEMPORARY_GUEST_MODE_ENABLED` is true; the current
+source constant is false. AI remains separately gated by verified account,
+consent, provider, and reviewed-template requirements.
 
 ~~~mermaid
 flowchart TD
@@ -138,7 +145,7 @@ flowchart TD
     Identity --> Auth
     Home --> Protected[Choose an account-backed service]
     Protected --> ServiceReady{Service enabled in this build?}
-    ServiceReady -->|No: current guest mode| Paused[No account-backed operation; keep local work]
+    ServiceReady -->|No: guest guard enabled| Paused[No account-backed operation; keep local work]
     Paused --> LocalSurface
     ServiceReady -->|Yes| AccountCheck{Verified session available?}
     AccountCheck -->|No| Auth[Run configured identity flow and keep destination]
@@ -168,25 +175,32 @@ onboarding.
 
 ## 2. Local project lifecycle
 
-**Current path:** A student may start a blank/manual project without a reviewed
-template. The initial project workflow focuses on directed literature
-synthesis. A project can hold the brief and question, source records, evidence
-notes, findings, themes, claims, limitations, next actions, and revision
-checkpoints. Structural checks surface missing fields or links; they do not
-grade academic quality or decide whether a claim is true.
+**Current path:** A student may start blank/manual or choose one of five
+bundled offline family starters. A starter saves an immutable, versioned
+structure snapshot to a local editable project; all student content starts
+empty. It provides prompts and boundaries, not reviewed methodological
+approval, an evaluator, or a grade. The initial manual workflow focuses on
+directed literature synthesis. Any project can hold the brief and question,
+source records, evidence notes, findings, themes, claims, limitations, next
+actions, and revision checkpoints. Structural checks surface missing fields or
+links; they do not grade academic quality or decide whether a claim is true.
 
 ~~~mermaid
 flowchart TD
     Home[Home] --> List[My Projects]
     List --> CreateChoice{Choose how to start}
     CreateChoice -->|Blank/manual| Blank[Create an empty local project]
-    CreateChoice -->|Reviewed template| Catalog[Browse published templates]
+    CreateChoice -->|Choose a project type| Families[Browse five family guides]
+    Families --> Starter[Use an offline structure-only starter]
+    Starter --> Snapshot[Create project from its exact local version]
+    Families -->|Optional| Catalog[Browse remote published templates]
     Catalog --> Available{Compatible reviewed template available?}
-    Available -->|No| Explain[Explain that no reviewed template is available]
-    Explain --> Blank
-    Available -->|Yes| Snapshot[Create project from a versioned template snapshot]
+    Available -->|No| Explain[Keep starter and blank routes available]
+    Explain --> Families
+    Available -->|Yes| ReviewedSnapshot[Create from published reviewed version]
     Blank --> Editor[Open project editor]
     Snapshot --> Editor
+    ReviewedSnapshot --> Editor
     Editor --> Brief[Record assignment brief, question, purpose, and scope]
     Brief --> Sources[Add and select sources]
     Sources --> Evidence[Record evidence notes and findings]
@@ -261,19 +275,20 @@ Local active-project capacity is five on the Free path and up to fifty only
 when a signed-in account has a verified active `evidrilo_pro` entitlement. If
 entitlement state is unknown, the app uses the Free limit; it must not delete,
 hide, or rewrite existing projects. These are per-installation limits, not
-account-wide quota or cloud sync. While temporary guest mode is enabled,
-RevenueCat is not initialized, so the current client uses the Free limit. Trash
-retention is thirty days in the local project rules; a full active quota does
-not expire or purge an item early.
+account-wide quota or cloud sync. The temporary guest-mode switch controls
+whether RevenueCat is initialized for a guest installation; it is currently
+disabled in the client. Trash retention is thirty days in the local project
+rules; a full active quota does not expire or purge an item early.
 
-The catalog currently has no reviewed, student-selectable template. Blank
-project creation remains the working route. A project that is signed in remains
-local unless the student uses an explicit export; cloud continuity is a later,
-separately consented capability.
-When a reviewed template becomes available, its detail screen must make clear
-what project sections and outputs it will scaffold, then **Use template** must
-create and open that local project. Templates provide structure and guidance;
-they do not supply the student's research material or conclusions.
+The five bundled offline family starters are selectable and create local
+projects from their exact structure snapshots. The last recorded remote
+catalog observation (E225) had no reviewed, student-selectable template; it
+was not refreshed in E286, and its data is not substituted with local starters.
+A project remains local unless the student explicitly
+exports it; cloud continuity is a later, separately consented capability.
+Both starter and reviewed-template actions show what sections will be created,
+then create and open the local project. Neither path supplies the student's
+research material, observations, findings, or conclusions.
 
 ## 3. Project import, export, and attachments
 
@@ -394,22 +409,26 @@ flowchart LR
     NewVersion --> Catalog
 ~~~
 
-No reviewed, student-selectable template is currently available. The app must
-continue to say so and offer blank/manual project creation. Template content
-must have method-specific evaluation and human/domain review before it is
-presented as guidance. Existing projects must retain the template version they
-started from.
+The last recorded remote published-catalog observation (E225) had no reviewed,
+student-selectable template; no refresh was made in E286. The app must state
+that accurately while keeping blank/manual and
+offline structure-only starters available. A local starter is useful for
+organizing work but must not be described as reviewed method guidance or
+presented as an evaluator. Any remote method template or method-specific
+evaluation still requires human/domain review before publication. Existing
+projects retain the exact template or starter version they started from.
 
 ## 6. Profile, Settings, account, and history
 
 **Current path:** Profile and Settings surfaces are reachable from the app
 while signed out. Local projects and Support remain accessible. An action that
 needs an account must gate that action, preserve the requested destination, and
-return there after successful authentication. D-129 currently permits sign-in
-and identity linking. D-131 enables RevenueCat Pro separately for signed-in
-accounts with a provider-confirmed entitlement; server AI, cloud sync, and
-analytics transmission remain paused in guest mode. Signing in alone never
-uploads local projects or enables those services.
+return there after successful authentication. D-129 permits optional
+sign-in/linking for configured providers; D-132 defers Apple sign-in. D-131
+enables RevenueCat Pro separately for signed-in accounts with a
+provider-confirmed entitlement; server AI, cloud sync, and analytics
+transmission remain paused in guest mode. Signing in alone never uploads local
+projects or enables those services.
 
 ~~~mermaid
 flowchart TD
@@ -423,7 +442,7 @@ flowchart TD
     Settings --> Help[Help, Support, and About]
     Settings --> Protected[Choose account-backed service]
     Protected --> ServiceReady{Service enabled in this build?}
-    ServiceReady -->|No: current guest mode| Paused[Account-backed action paused; preserve local work]
+    ServiceReady -->|No: guest guard enabled| Paused[Account-backed action paused; preserve local work]
     Paused --> LocalProjects
     ServiceReady -->|Yes| Gate{Verified session available?}
     AccountAction --> Auth
@@ -434,7 +453,7 @@ flowchart TD
     Gate -->|Yes| Destination
     Destination --> AccountData[Show only authorized account data]
     AccountData --> ConnectedMethods[Review connected sign-in methods]
-    ConnectedMethods --> LinkProvider[Choose Link Google or Apple]
+    ConnectedMethods --> LinkProvider[Choose another configured provider]
     LinkProvider --> Reauthenticate[Authenticate provider for this account]
     Reauthenticate --> LinkCheck{Verified identity belongs to this account?}
     LinkCheck -->|Yes| Linked[Link provider without changing account ID]
@@ -444,7 +463,7 @@ flowchart TD
     HistoryChoice --> CaseHistory[Local M0 case history; available in guest mode]
     AccountData --> Delete[Choose account export or deletion]
     Delete --> AccountServiceReady{Account service enabled in this build?}
-    AccountServiceReady -->|No: current guest mode| Paused
+    AccountServiceReady -->|No: guest guard enabled| Paused
     AccountServiceReady -->|Yes| Confirm[Review scope and confirm explicitly]
     Confirm -->|Account export| Export[Request account data export]
     Confirm -->|Delete account| DeleteAccount[Request server-account deletion]
@@ -452,38 +471,37 @@ flowchart TD
 ~~~
 
 Project revision history and M0 case history are separate local records and
-remain available in guest mode. Account history and server projections require
-a restored signed-in session and an enabled service; they are paused in the
-current guest mode. Account export and deletion are also paused there. Account
-deletion is distinct from clearing local projects; neither action should
-silently delete the other store. Support is intended to be reachable from
+remain available without sign-in. Account history and server projections
+require a restored signed-in session and an enabled service; D-129 pauses them
+only when the temporary guest guard is enabled. Account export and deletion
+follow the same guard. Account deletion is distinct from clearing local
+projects; neither action should silently delete the other store. Support is intended to be reachable from
 Profile, Settings, and account gates. The selected contact is
 `andrlay30@gmail.com`, but the current app build reports that a production
 support address is not configured; owner configuration and runtime verification
 are still required.
 
 The account screen exposes configured sign-in methods and an explicit action
-to link another provider to the account already in use. The internal Evidrilo
-account ID stays canonical; provider identities use their verified stable
-subject IDs, not email addresses. The Apple link action displays the current
-account email when available and asks the student to confirm before opening
-Apple. Apple may provide a private relay email, which is accepted and never
-used to switch the active account. The client verifies the same Supabase user
-ID after linking.
+to link another configured provider to the account already in use. The internal
+Evidrilo account ID stays canonical; provider identities use their verified
+stable subject IDs, not email addresses. The client verifies the same Supabase
+user ID after linking. Apple-specific sign-in, linking, and private-relay
+handling remain deferred by D-132; keep Apple configuration and app flags off
+and do not present an Apple action. Revisit that flow only after a new owner
+decision and Apple provider setup.
 
 Supabase Auth automatically links OAuth identities with the same verified
 email. This managed behavior cannot be disabled by this client, so same-email
 provider sign-in may attach an identity without the in-app link confirmation;
-the app does not merge separate Evidrilo records. If the Apple relay differs
-from an existing account email, the student should sign in with the existing
-method and link Apple from that session to avoid creating a second account.
-Apple is disabled by default in the build until provider configuration is
-complete. Source support is implemented, but Apple credentials, manual-link
-configuration, and device acceptance remain unverified. Sign-in also does not
-imply cloud project transfer.
+the app does not merge separate Evidrilo records. Email is not an identity key:
+on a provider collision, preserve the active session and direct the student to
+authenticate with the existing account before attempting an explicit link.
+Sign-in also does not imply cloud project transfer.
 
-Google, Apple, and email provider redirects, session recovery, account linking,
-and account export/deletion require their own provider and device acceptance.
+Configured email/Google redirects, session recovery, and account linking still
+require provider and device acceptance. Apple provider setup and runtime remain
+out of current scope under D-132. Account export/deletion also require their
+own API and device acceptance.
 
 ## 7. Local reminders
 
@@ -517,18 +535,18 @@ delivery-time guarantee.
 ## 8. AI assistance
 
 **Current-source case path (D-106):** The mobile case-AI conversation and typed
-proposal bridge are connected in source. When account-backed services are
-enabled, each request requires a signed-in session and a fresh, explicit
-context-sharing choice. In the current D-129 guest mode, the client pauses case
-AI before sending a request; the provider is also disabled. Provider, device,
-accessibility, privacy, and human-usefulness acceptance remain open. A failed
-or unavailable AI request leaves the case draft and deterministic feedback
-unchanged.
+proposal bridge are connected in source. Each request requires a verified
+signed-in session and a fresh, explicit context-sharing choice. D-129's guest
+guard applies only when `TEMPORARY_GUEST_MODE_ENABLED` is true; the current
+source sets it false. The provider remains disabled by default, so this does
+not establish a live AI capability. Provider, device, accessibility, privacy,
+and human-usefulness acceptance remain open. A failed or unavailable request
+leaves the case draft and deterministic feedback unchanged.
 
 ~~~mermaid
 flowchart TD
     Case[Open AI from the local M0 case] --> GuestMode{Temporary guest mode enabled?}
-    GuestMode -->|Yes: current mode| Paused[Show AI paused; send no context]
+    GuestMode -->|Yes: if the guest guard is enabled| Paused[Show AI paused; send no context]
     Paused --> Manual[Continue the local case workflow]
     GuestMode -->|No, account services enabled| Auth[Require a verified account session]
     Auth --> Consent[Review shown context and consent for this request]
@@ -564,12 +582,30 @@ reports zero credits charged; if usage was already settled before the
 conversation session expired, show that actual nonzero cost instead of implying
 the turn was free. Older v1 response shapes remain unchanged.
 
-**Gated D-119 target:** Keep one AI chat bubble available throughout the project
-workspace, including every step and the full review. Navigating between steps
-may update its active context but must not clear the conversation. The bubble
-shows which project and step it is using. A global AI entry requires an explicit
-choice of one project and step or a separate unlinked General chat; General chat
-must not read or write project data. Neither mode may inherit M0 case context.
+**D-115/D-116/D-119 source implementation; provider and reviewed-content gates
+remain:** AI project scaffolding is exposed only for a reviewed/published
+template. Stage assistance is exposed only for a project step whose template
+declares supported AI operations; the five bundled structure-only starters do
+not enable method-specific AI. The project panel identifies the active project
+and stage and lets the student select fields/items before sending. The API
+binds the local project ID to the authenticated account, checks consent and the
+latest saved revision, and rejects stale proposals. Home's AI entry first asks
+the student to choose General Chat or one project; its project list includes
+only Draft/Active projects whose saved template is Published and declares an AI
+operation. Choosing a project opens it through the normal resume flow; other
+projects remain available through My Projects for manual work. The project list
+is not sent to the provider. General Chat has no project ID or case context and
+sends only the current message. Before sending, the app refreshes the signed-in
+account's revocable AI data-use consent from the platform; granting it sends no
+message by itself, and each message still requires separate `general-chat.v1`
+confirmation. The server stores metadata rather than the transcript. No
+project history is sent to its provider.
+
+These mobile surfaces and API contracts are implemented in source, but they
+are not yet provider-backed end-to-end acceptance. The committed/default local
+provider and General Chat policy flags remain off. A real method-specific flow
+also depends on an actually reviewed and published selectable template; an
+offline structure-only starter is not a substitute.
 
 Project AI can help at each supported stage, but generated content is always a
 proposal. Before sending, show the project, step, selected context, purpose,
@@ -591,12 +627,18 @@ records it used and mark unsupported gaps for the student. It must not invent or
 verify sources, DOI data, observations, or findings.
 
 Project AI history records its project and stage; unlinked General chat stays
-separate. Stage-assist and metadata-history API routes now exist, but the
-all-stage project UI, General mode, and AI Activity History screens remain
-incomplete. General mode remains unavailable and Project AI provider activation
-is off by default. Every applied proposal must pass through the project reducer
-and preserve AI provenance. This target is separate from the current D-106
-case-AI path and conclusion reducer.
+separate. Stage-assist and metadata-history API routes now exist, and the
+stage-assist, scaffold, General Chat, and project activity surfaces exist in
+mobile source. Project history displays a bounded page and can request older
+pages by cursor. General Chat can open the account's metadata-only AI activity
+view; entries label General Chat as unlinked and distinguish project-bound
+records. Neither view reads or stores chat transcripts. Assistance remains
+limited to operations declared by the selected template; no all-method
+capability is implied. General Chat's API policy and all Project AI provider
+activation flags remain off by default. Every applied proposal passes through
+the project reducer and preserves AI provenance. This is separate from the
+current D-106 case-AI path and conclusion reducer. Source tests and builds do
+not substitute for provider-backed Android acceptance.
 
 ~~~mermaid
 flowchart TD
@@ -632,19 +674,19 @@ student can understand a method, keep their own work, or retrieve their data.
 
 | Capability | Free | Pro |
 | --- | --- | --- |
-| Catalog | Browse all five family guides; preview every published version; start a reviewed baseline template whenever that family has one | May start optional reviewed specialist templates introduced later; no family is Pro-only |
+| Catalog | Browse and use all five offline structure-only starters; preview every remote published version; start a reviewed baseline template whenever that family has one | May start optional reviewed specialist templates introduced later; no family is Pro-only |
 | Projects | Blank/manual projects, full core workflow, five active projects per installation | Fifty active projects per installation while entitlement is verified |
 | Case practice | Complete Free learning loop | Two additional approved premium cases |
 | AI allowance | 20 one-time credits for an eligible verified account after consent | Adds 200 credits for each active entitlement month; monthly and yearly plans accumulate unused credits, including after Pro ends |
 | Reports and data | Essential report export and complete project-data portability | No paid-only lock on existing project data or recovery/export |
 
-Template publication and Pro access are separate decisions: only a reviewed,
-published, versioned template may be startable, and every catalog family stays
-browseable on Free. Keep at least one reviewed baseline template Free in each
-family once such a template exists. If none exists, show the family as a guide
-only and preserve blank/manual project creation. A Pro specialist template is
-optional future depth, not a method-family paywall or a claim that its results
-are more correct.
+Template publication and Pro access are separate decisions. Bundled
+structure-only starters are startable on Free; remote templates used as reviewed
+method guidance require a reviewed, published, versioned snapshot. Every family
+stays browseable on Free, with at least one reviewed baseline template Free in
+each family once such a template exists. A Pro specialist template is optional
+future depth, not a method-family paywall or a claim that its results are more
+correct.
 
 These are product rules, not proof of availability or enforcement. The current
 catalog may still have no selectable template. AI remains finite and metered:
@@ -661,10 +703,12 @@ lifetime, one-time packs, institutional sales, or ads in v1.
 local UI flag. The Test Store transaction matrix has not been completed.
 
 Free means no subscription is required. The bundled M0 case, local histories,
-local projects, and read-only catalog browsing work without sign-in under the
-current guest mode. Pro requires a signed-in account and a confirmed active
-RevenueCat entitlement; signing in alone does not activate Pro. Guest mode
-continues to pause server AI, cloud sync, and analytics transmission.
+local projects, and read-only catalog browsing work without sign-in. Pro
+requires a signed-in account and a confirmed active RevenueCat entitlement;
+signing in alone does not activate Pro. When the temporary guest guard is
+enabled, D-129 also pauses server AI, cloud sync, and analytics transmission;
+regardless of that flag, AI still requires its separate consent, provider, and
+content gates.
 
 ~~~mermaid
 flowchart TD

@@ -54,6 +54,7 @@ object ProjectAiScaffoldRules {
         expectedBaseRevision: Int?,
         expectedProjectId: String? = null,
     ): String? {
+        if (template.publication != ProjectTemplatePublication.PUBLISHED) return "TEMPLATE_NOT_READY"
         val templateSelection = ProjectTemplateCatalog.select(
             ProjectTemplateCatalogSnapshot(schemaVersion = 1, templates = listOf(template)),
             template.id,

@@ -6,4 +6,6 @@ import androidx.compose.runtime.Composable
 internal actual fun EvidriloSystemBackHandler(
     enabled: Boolean,
     onBack: () -> Unit,
-) = Unit
+) { RegisterEvidriloBackGesture(enabled, onBack) }
+
+internal actual val evidriloUsesEdgeBackGesture: Boolean = true

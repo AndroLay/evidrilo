@@ -25,7 +25,7 @@ internal fun EvidriloAboutScreen(
     backLabel: String = "Settings",
 ) {
     EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
+        EvidriloBackGesture(label = backLabel, onClick = onBack)
         Row(verticalAlignment = Alignment.CenterVertically) {
             EvidriloLogoMark(contentDescription = "Evidrilo app icon")
             Spacer(modifier = Modifier.width(12.dp))
@@ -35,17 +35,17 @@ internal fun EvidriloAboutScreen(
             }
         }
         Text(
-            "Evidrilo helps students connect supplied observations to a bounded conclusion, then see what changes when one observation is unavailable.",
+            "Turn a question into a project you can explain. Organize sources, connect evidence to claims, keep limits visible, and export your work.",
             style = MaterialTheme.typography.bodyLarge,
         )
 
         EvidriloAboutPanel(
             title = "What this app does",
-            body = "It checks evidence links, claim scope, limitations, and one practical next action using deterministic rules anchored to the supplied case.",
+            body = "Create a local project from five structure-only starters or a blank page. Record sources and evidence, develop findings and claims, review revisions, and export reports or a recovery archive. Three synthetic Practice cases help you rehearse these moves.",
         )
         EvidriloAboutPanel(
             title = "What this app does not do",
-            body = "It does not grade science, determine truth, generate an answer for you, or claim a learning outcome. Unsupported input produces an explicit bounded result.",
+            body = "Structure progress is not a grade. Practice checks are bounded to supplied material. AI suggestions require available services, account access, and separate consent; you review suggestions before using them. Evidrilo does not verify your research or replace your instructor.",
         )
         EvidriloAboutPanel(
             title = "Privacy boundary",
@@ -64,19 +64,5 @@ internal fun EvidriloAboutScreen(
 
 @Composable
 private fun EvidriloAboutPanel(title: String, body: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = EvidriloColors.Surface),
-        border = BorderStroke(2.dp, EvidriloColors.Separator),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(body, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    EvidriloExplanation(title, body)
 }

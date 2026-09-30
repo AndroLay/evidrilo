@@ -100,6 +100,20 @@ internal data class ProjectAiRequestConsentConsumption(
     val nextRequestState: ProjectAiRequestConsentState,
 )
 
+internal fun projectAiAccountRequirementMessage(
+    guestModeEnabled: Boolean,
+    consentManagement: Boolean,
+): String = when {
+    guestModeEnabled && consentManagement ->
+        "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent."
+    guestModeEnabled ->
+        "Project AI is temporarily unavailable in local guest mode. Your local project remains available; no context was sent."
+    consentManagement ->
+        "Sign in with a verified account to manage Project AI consent. No context was sent."
+    else ->
+        "Sign in with a verified account to use Project AI. Your local project remains available; no context was sent."
+}
+
 /** UI safeguard: a pending AI proposal belongs only to the account that requested it. */
 internal fun projectAiSessionMatchesOwner(ownerAccountId: String?, currentAccountId: String?): Boolean =
     ownerAccountId != null && currentAccountId != null && ownerAccountId == currentAccountId
@@ -168,10 +182,12 @@ internal fun ProjectAiScaffoldGatewayResult.toProjectAiScaffoldUiState(): Projec
         },
     )
     is ProjectAiScaffoldGatewayResult.Unavailable -> ProjectAiScaffoldUiState.Unavailable(
-        message = if (code == "PROJECT_AI_NOT_READY") {
-            "Project AI is not enabled yet. No AI-generated content or credits were produced; continue manually."
-        } else {
-            "Project AI is temporarily unavailable. Your project and manual workflow remain available."
+        message = when (code) {
+            "PROJECT_AI_NOT_READY" ->
+                "Project AI is not enabled yet. No AI-generated content or credits were produced; continue manually."
+            "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN" ->
+                "The request may have completed, but its credit settlement could not be confirmed. Check your shared AI balance before retrying; your project is unchanged."
+            else -> "Project AI is temporarily unavailable. Your project and manual workflow remain available."
         },
         retryable = code != "PROJECT_AI_NOT_READY",
     )
@@ -184,7 +200,7 @@ internal fun ProjectAiScaffoldGatewayResult.toProjectAiScaffoldUiState(): Projec
     )
     is ProjectAiScaffoldGatewayResult.Failed -> ProjectAiScaffoldUiState.Unavailable(
         message = when {
-            outcomeUnknown -> "The request outcome is unknown. Check before retrying; no project fields were applied."
+            outcomeUnknown -> "The request outcome is unknown. Check your shared AI balance before retrying; no project fields were applied."
             code == "PROJECT_AI_OFFLINE" -> "You are offline. Project work stays local; reconnect before asking AI."
             else -> "Project AI could not complete this request. Your project was not changed."
         },
@@ -200,9 +216,12 @@ internal fun EvidriloProjectAiScaffoldPanel(
     existingProjectRevision: Int?,
     projectTitle: String,
     projectAiAccountKey: String?,
+    aiCreditBalance: AiCreditBalancePresentation = AiCreditBalancePresentation.SignInRequired,
     state: ProjectAiScaffoldUiState,
     consentState: ProjectAiConsentUiState,
     allowRequest: Boolean = true,
+    allowApply: Boolean = true,
+    onRefreshAiCreditBalance: () -> Unit = {},
     onRefreshConsent: () -> Unit,
     onGrantConsent: () -> Unit,
     onRevokeConsent: () -> Unit,
@@ -227,7 +246,10 @@ internal fun EvidriloProjectAiScaffoldPanel(
         accountId = projectAiAccountKey,
     )
     LaunchedEffect(template.id, existingProjectRevision, projectAiAccountKey) {
-        if (accountSignedIn) onRefreshConsent()
+        if (accountSignedIn) {
+            onRefreshAiCreditBalance()
+            onRefreshConsent()
+        }
     }
     val creating = existingProjectRevision == null
     val assignmentField = template.inputFields.firstOrNull { it.kind == ProjectTemplateInputKind.ASSIGNMENT_BRIEF }
@@ -256,6 +278,10 @@ internal fun EvidriloProjectAiScaffoldPanel(
             "AI can help frame your assignment and suggest editable project fields. It does not verify research quality, supply evidence, or replace your decision.",
             style = MaterialTheme.typography.bodyMedium,
             color = EvidriloColors.Slate,
+        )
+        EvidriloAiCreditBalancePanel(
+            presentation = aiCreditBalance,
+            onRefresh = onRefreshAiCreditBalance,
         )
         if (!accountSignedIn) {
             Text(
@@ -375,7 +401,7 @@ internal fun EvidriloProjectAiScaffoldPanel(
             color = EvidriloColors.Slate,
         )
         Text(
-            "Provider status: disabled in this build. A request cannot generate suggestions or consume AI credits yet; your manual project workflow remains available. Revoking consent prevents future requests; it cannot recall data already sent.",
+            "Project AI is optional and may be unavailable when the API or provider is offline or not enabled. Each request needs your confirmation; manual project work remains available. Revoking consent stops future requests but cannot recall data already sent.",
             style = MaterialTheme.typography.bodySmall,
             color = EvidriloColors.Slate,
         )
@@ -401,6 +427,13 @@ internal fun EvidriloProjectAiScaffoldPanel(
                 creditCost = state.creditCost,
                 creating = creating,
                 projectTitle = title,
+                allowApply = if (creating) true else canApplyProjectAiPreview(
+                    allowApply = allowApply,
+                    proposalProjectId = state.proposal.projectId,
+                    existingProjectId = existingProjectId,
+                    proposalRevision = state.proposal.baseProjectRevision,
+                    currentRevision = existingProjectRevision,
+                ),
                 onCreateProject = onCreateProject,
                 onApplyToProject = onApplyToProject,
                 onDiscardPreview = onDiscardPreview,
@@ -452,8 +485,16 @@ internal fun EvidriloProjectAiScaffoldPanel(
 internal fun canRequestProjectAi(dataConsent: Boolean, assignmentBrief: String): Boolean =
     dataConsent && assignmentBrief.isNotBlank()
 
+internal fun canApplyProjectAiPreview(
+    allowApply: Boolean,
+    proposalProjectId: String?,
+    existingProjectId: String?,
+    proposalRevision: Int?,
+    currentRevision: Int?,
+): Boolean = allowApply && proposalProjectId == existingProjectId && proposalRevision == currentRevision
+
 internal fun projectAiCreditDisclosure(creating: Boolean): String =
-    "${if (creating) "Project setup" else "In-project assistance"} uses shared credits based on verified provider token usage, up to $PROJECT_AI_MAX_CREDITS_PER_REQUEST credits for one request. The API reserves a bounded estimate before dispatch and charges actual cost after a valid preview—even if you dismiss it. Failed or invalid requests release the reservation."
+    "${if (creating) "Project setup" else "In-project assistance"} uses shared credits based on verified provider token usage, up to $PROJECT_AI_MAX_CREDITS_PER_REQUEST credits per request. Only a valid preview for the current project and consent is charged; rejected, failed, or stale requests release the reservation. Dismissing a valid preview does not refund it."
 
 internal fun projectAiSettlementStatusMessage(
     decision: ProjectAiScaffoldDecision,
@@ -485,6 +526,7 @@ private fun ProjectAiScaffoldPreview(
     creditCost: Int,
     creating: Boolean,
     projectTitle: String,
+    allowApply: Boolean,
     onCreateProject: (String, ProjectAiScaffoldProposal, Set<String>, Map<String, String>, String, Int) -> Unit,
     onApplyToProject: (ProjectAiScaffoldProposal, Set<String>, Map<String, String>, Set<String>, String, Int) -> StudentProjectDraft?,
     onDiscardPreview: (String, Int) -> Unit,
@@ -578,7 +620,7 @@ private fun ProjectAiScaffoldPreview(
         } else {
             EvidriloPrimaryButton(
                 label = "Apply selected suggestions",
-                enabled = selectionReady,
+                enabled = selectionReady && allowApply,
                 onClick = {
                     val updated = onApplyToProject(
                         proposal,

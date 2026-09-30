@@ -1,6 +1,7 @@
 package dev.nextgen.mobile
 
 import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
+import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionField
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
@@ -31,5 +32,23 @@ class EvidriloPresentationTest {
         assertEquals("Observation", ConclusionFactType.OBSERVATION.displayLabel())
         assertEquals("Limitation", ConclusionFactType.LIMITATION.displayLabel())
         assertEquals("Boundary", ConclusionFactType.BOUNDARY.displayLabel())
+    }
+
+    @Test
+    fun evidenceReferenceLabelUsesReadableCaseLanguageInsteadOfInternalId() {
+        val observation = ConclusionFact(
+            id = "OBS-WARM-01",
+            type = ConclusionFactType.OBSERVATION,
+            text = "Warm water: 32 seconds.",
+            displayLabel = "Warm",
+        )
+        val limitation = ConclusionFact(
+            id = "LIMIT-TRIAL-01",
+            type = ConclusionFactType.LIMITATION,
+            text = "Each condition was measured once.",
+        )
+
+        assertEquals("Warm · Observation", observation.learnerFacingEvidenceLabel())
+        assertEquals("Limitation", limitation.learnerFacingEvidenceLabel())
     }
 }

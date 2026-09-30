@@ -1,6 +1,7 @@
 package dev.nextgen.mobile.projectcatalog
 
 import dev.nextgen.mobile.domain.project.ProjectTemplateDefinition
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.ProjectTemplateExample
 import dev.nextgen.mobile.domain.project.ProjectTemplateExampleKind
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
@@ -12,6 +13,7 @@ import dev.nextgen.mobile.domain.project.ProjectAiFieldSuggestion
 import dev.nextgen.mobile.domain.project.ProjectAiScaffoldProposal
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
 import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
+import dev.nextgen.mobile.domain.project.StudentProjectDeadlineChange
 import dev.nextgen.mobile.domain.project.StudentProjectEvidenceItem
 import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
 import dev.nextgen.mobile.domain.project.StudentProjectClaimReviewStatus
@@ -65,6 +67,26 @@ class StudentProjectDraftFlowTest {
         assertEquals(template, resumed.templateSnapshot)
         assertEquals(1, resumed.revision)
         assertEquals("My inquiry", resumed.title)
+    }
+
+    @Test
+    fun `all five built in starters create local editable project drafts`() {
+        ProjectStarterTemplateCatalog.templates.forEachIndexed { index, template ->
+            val store = InMemoryDraftStore()
+            val flow = StudentProjectDraftFlow(store, { "starter-project-${index + 1}" }, { 100 })
+
+            val started = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+                flow.start(template, template.title),
+            ).value
+
+            assertEquals(template, started.templateSnapshot)
+            assertEquals(emptyMap(), started.fieldValues)
+            assertEquals(emptyList(), started.sources)
+            assertEquals(emptyList(), started.evidenceItems)
+            assertEquals(emptyList(), started.findings)
+            assertEquals(emptyList(), started.claims)
+            assertEquals(listOf(started), store.drafts)
+        }
     }
 
     @Test
@@ -848,6 +870,81 @@ class StudentProjectDraftFlowTest {
     }
 
     @Test
+    fun `stage AI applies only confirmed allowlisted values and records assistance provenance`() {
+        val store = InMemoryDraftStore()
+        val flow = flow(store)
+        val template = projectAiTemplate()
+        val started = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.start(template, "My inquiry"),
+        ).value
+        val saved = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(started.id, started.title, mapOf("question" to "What changes?", "method" to "Compare observations.")),
+        ).value
+
+        val applied = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.applyAiStageAssistToProject(
+                projectId = saved.id,
+                expectedTemplateId = template.id,
+                expectedTemplateVersion = template.version,
+                stageId = "frame",
+                operationId = "suggest_revision",
+                expectedBaseRevision = saved.revision,
+                expectedBeforeValues = mapOf("question" to "What changes?"),
+                confirmedValues = mapOf("question" to "How does the measured condition relate to the observed outcome?"),
+            ),
+        ).value
+
+        assertEquals(saved.revision + 1, applied.revision)
+        assertEquals("How does the measured condition relate to the observed outcome?", applied.fieldValues["question"])
+        assertEquals("Compare observations.", applied.fieldValues["method"])
+        assertEquals(StudentProjectRevisionActor.CONFIRMED_ASSISTANCE, applied.revisionSnapshots.last().actor)
+        assertTrue(applied.revisionSnapshots.last().changeSummary.contains("AI"))
+    }
+
+    @Test
+    fun `stage AI rejects stale and non-allowlisted changes without writing`() {
+        val store = InMemoryDraftStore()
+        val flow = flow(store)
+        val template = projectAiTemplate()
+        val started = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.start(template, "My inquiry"),
+        ).value
+        val saved = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(started.id, started.title, mapOf("question" to "Old question", "method" to "Old method")),
+        ).value
+        val newer = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(saved.id, saved.title, mapOf("question" to "New question", "method" to "Old method")),
+        ).value
+        val writesBeforeRejectedApplies = store.saveCount
+
+        val stale = flow.applyAiStageAssistToProject(
+            projectId = newer.id,
+            expectedTemplateId = template.id,
+            expectedTemplateVersion = template.version,
+            stageId = "frame",
+            operationId = "suggest_revision",
+            expectedBaseRevision = saved.revision,
+            expectedBeforeValues = mapOf("question" to "Old question"),
+            confirmedValues = mapOf("question" to "A stale suggestion."),
+        )
+        val unlisted = flow.applyAiStageAssistToProject(
+            projectId = newer.id,
+            expectedTemplateId = template.id,
+            expectedTemplateVersion = template.version,
+            stageId = "frame",
+            operationId = "suggest_revision",
+            expectedBaseRevision = newer.revision,
+            expectedBeforeValues = mapOf("method" to "Old method"),
+            confirmedValues = mapOf("method" to "An unsupported change."),
+        )
+
+        assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_AI_STALE_REVISION"), stale)
+        assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_AI_FIELD_NOT_ALLOWED"), unlisted)
+        assertEquals(writesBeforeRejectedApplies, store.saveCount)
+        assertEquals(newer, store.drafts.single())
+    }
+
+    @Test
     fun `in-project AI preview cannot be applied to another project`() {
         val store = InMemoryDraftStore()
         val ids = mutableListOf("project-source", "project-other")
@@ -898,6 +995,43 @@ class StudentProjectDraftFlowTest {
         assertEquals(2, updated.revision)
         assertEquals(listOf(1, 2), updated.revisionSnapshots.map { it.revision })
         assertEquals("Why?", updated.fieldValues["question"])
+    }
+
+    @Test
+    fun `optional deadline saves clears and restores as part of project revision history`() {
+        val store = InMemoryDraftStore()
+        val flow = flow(store)
+        val started = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.startManual("My project"),
+        ).value
+
+        val dated = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(
+                projectId = started.id,
+                title = started.title,
+                fieldValues = started.fieldValues,
+                deadlineChange = StudentProjectDeadlineChange.Set("2026-10-15"),
+            ),
+        ).value
+        val cleared = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(
+                projectId = dated.id,
+                title = dated.title,
+                fieldValues = dated.fieldValues,
+                deadlineChange = StudentProjectDeadlineChange.Set(null),
+            ),
+        ).value
+
+        assertEquals("2026-10-15", dated.deadlineDate)
+        assertEquals("2026-10-15", dated.revisionSnapshots.last().deadlineDate)
+        assertEquals(null, cleared.deadlineDate)
+        assertEquals(dated.revision + 1, cleared.revision)
+
+        val restored = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.restoreRevision(started.id, dated.revision),
+        ).value
+        assertEquals("2026-10-15", restored.deadlineDate)
+        assertEquals("2026-10-15", restored.revisionSnapshots.last().deadlineDate)
     }
 
     @Test
@@ -1744,6 +1878,23 @@ class StudentProjectDraftFlowTest {
         store: InMemoryDraftStore,
         attachments: StudentProjectAttachmentStore = InMemoryAttachmentStore(),
     ) = StudentProjectDraftFlow(store, { "project-a" }, { 100 }, attachmentStore = attachments)
+
+    private fun projectAiTemplate() = publishedTemplate().copy(
+        steps = listOf(
+            ProjectTemplateStep(
+                "frame",
+                "Frame the project",
+                listOf("question", "method"),
+                aiOperations = listOf(
+                    dev.nextgen.mobile.domain.project.ProjectTemplateAiOperationCapability(
+                        "suggest_revision",
+                        inputFieldIds = listOf("question"),
+                        outputFieldIds = listOf("question"),
+                    ),
+                ),
+            ),
+        ),
+    )
 
     private fun publishedTemplate() = ProjectTemplateDefinition(
         id = "reviewed-template",

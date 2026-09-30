@@ -10,19 +10,24 @@ const recommendationMetadataMigrationPath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '009_case_recommendation_metadata.sql',
 );
-const accountExportPath = path.join(
+const accountExportWriterPath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
   '..',
-  'api',
-  'Account',
-  'AccountExport.cs',
+  'shared',
+  'AccountExportDataWriter.cs',
 );
 const postgresSmokePath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
   'integration',
   'run-local-postgres-smoke.sh',
+);
+const rlsSmokePath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'integration',
+  'rls-smoke.sql',
 );
 
 test('P2 migration contains account isolation and append-only sync boundaries', () => {
@@ -293,7 +298,7 @@ test('notification preferences migration is account-scoped and deletion-safe', (
 });
 
 test('account export includes the server-owned notification preference mirror', () => {
-  const source = fs.readFileSync(accountExportPath, 'utf8');
+  const source = fs.readFileSync(accountExportWriterPath, 'utf8');
 
   assert.match(source, /["]notificationPreferences["]/i);
   assert.match(source, /from public\.notification_preferences preference/i);
@@ -857,6 +862,26 @@ test('052 allows a completed outcome for unlinked General chat metadata only', (
   assert.equal(parenthesisDepth, 0, 'migration parentheses must be balanced');
 });
 
+test('053 keeps export artifacts private, bounded, fenced, and deletion-scoped', () => {
+  const migrationPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '053_account_export_jobs.sql');
+  assert.equal(fs.existsSync(migrationPath), true, '053 must be a forward-only migration');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(sql, /create table if not exists public\.account_export_jobs/i);
+  assert.match(sql, /alter table public\.account_export_jobs enable row level security/i);
+  assert.match(sql, /revoke all on public\.account_export_jobs from public, anon, authenticated/i);
+  assert.match(sql, /status in \('queued', 'running', 'ready', 'failed', 'cancelled'\)/i);
+  assert.match(sql, /status = 'running'[\s\S]*lease_token is not null[\s\S]*lease_expires_at is not null/i);
+  assert.match(sql, /artifact_bytes = octet_length\(payload\)/i);
+  assert.match(sql, /artifact_bytes between 1 and 67108864/i);
+  assert.match(sql, /unique \(account_id, idempotency_key_hash\)/i);
+  assert.match(sql, /one_active_per_account/i);
+  assert.match(sql, /where status = 'queued'/i);
+  assert.match(sql, /purge_account_exports_on_account_deletion/i);
+  assert.match(sql, /after update of status on public\.account_deletion_requests/i);
+  assert.doesNotMatch(sql, /prompt\s+text|response\s+text|access[_ -]?token|refresh[_ -]?token/i);
+});
+
 test('AI credit accrual reconciles earned months and spends the aggregate balance', () => {
   const ledgerPath = path.join(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -973,7 +998,7 @@ test('migration runner locks before checking and applying each version', () => {
     'utf8',
   );
   const migrationLoopIndex = runner.indexOf('for migration in');
-  const lockIndex = runner.indexOf('select pg_advisory_xact_lock(814235);', migrationLoopIndex);
+  const lockIndex = runner.indexOf('select pg_advisory_lock(814235);', migrationLoopIndex);
   const checksumQueryIndex = runner.indexOf('select checksum from public.evidrilo_schema_migrations', migrationLoopIndex);
 
   assert.ok(migrationLoopIndex >= 0, 'migration runner must iterate numbered versions');
@@ -984,7 +1009,30 @@ test('migration runner locks before checking and applying each version', () => {
     'the checksum check must be inside the transaction that holds the migration lock',
   );
   assert.match(runner, /--single-transaction/);
+  assert.doesNotMatch(runner.slice(migrationLoopIndex), /pg_advisory_xact_lock/);
   assert.match(runner, /migration_already_applied/);
   assert.match(runner, /migration_checksum_ok/);
+  assert.doesNotMatch(runner, /select pg_advisory_unlock\(814235\);/);
   assert.match(runner, /\[0-9\]\[0-9\]\[0-9\]_\[A-Za-z0-9_\]\*\)/);
+});
+
+test('054 binds local project AI metadata to one owner and revision without storing project text', () => {
+  const sql = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '054_project_ai_local_context_bindings.sql'),
+    'utf8',
+  );
+  assert.match(sql, /create table if not exists public\.project_ai_local_contexts/i);
+  assert.match(sql, /add column if not exists uses_local_project_context boolean not null default false/i);
+  assert.match(sql, /add column if not exists base_project_binding_generation bigint/i);
+  assert.match(sql, /primary key \(account_id, project_id\)/i);
+  assert.match(sql, /current_revision integer not null/i);
+  assert.match(sql, /binding_generation bigint not null default 1/i);
+  assert.match(sql, /available_evidence_ids jsonb not null/i);
+  assert.match(sql, /alter table public\.project_ai_local_contexts enable row level security/i);
+  assert.match(sql, /project_ai_local_contexts_owner_read[\s\S]*auth\.uid\(\)/i);
+  assert.match(fs.readFileSync(rlsSmokePath, 'utf8'), /PROJECT_AI_LOCAL_CONTEXT_OWNER_RLS_PASS/);
+  assert.match(sql, /project_ai_activity[\s\S]*references public\.project_ai_local_contexts/i);
+  assert.match(sql, /on delete cascade/i);
+  assert.match(sql, /purge_project_ai_activity_on_account_deletion[\s\S]*delete from public\.project_ai_local_contexts/i);
+  assert.doesNotMatch(sql, /assignment_brief|selected_field_values|prompt\s+text|response\s+text|transcript\s+text|summary\s+text/i);
 });

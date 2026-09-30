@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/account-export.v2.json",
+  "title": "Evidrilo complete account export v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "accountId", "generatedAt", "data", "requestId"],
+  "properties": {
+    "schema": { "const": "evidrilo.account-export" },
+    "version": { "const": "2" },
+    "accountId": { "type": "string", "format": "uuid" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "localDrafts", "profile", "attemptCommands", "syncChanges", "analyticsEvents",
+        "recommendationEvents", "aiAuditEvents", "aiCreditConsent", "aiCreditGrants",
+        "aiCreditReservations", "notificationPreferences", "entitlements", "entitlementEvents",
+        "progressDaily", "studentProjects", "studentProjectRevisions", "studentProjectCloudConsent",
+        "studentProjectCloudConsentEvents", "projectAiConsent", "projectAiConsentEvents",
+        "projectAiActivity", "aiConversationSessions", "aiConversationTurnRequests"
+      ],
+      "properties": {
+        "localDrafts": { "const": "not_on_server" },
+        "profile": { "type": "object" },
+        "attemptCommands": { "type": "array", "items": { "type": "object" } },
+        "syncChanges": { "type": "array", "items": { "type": "object" } },
+        "analyticsEvents": { "type": "array", "items": { "type": "object" } },
+        "recommendationEvents": { "type": "array", "items": { "type": "object" } },
+        "aiAuditEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requestId", "promptVersion", "provider", "outcome", "reasonCode", "createdAt"],
+            "properties": {
+              "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+              "promptVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "provider": { "type": ["string", "null"] },
+              "outcome": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "reasonCode": { "type": ["string", "null"], "pattern": "^[A-Z0-9_]{1,64}$" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "aiCreditConsent": { "type": "object" },
+        "aiCreditGrants": { "type": "array", "items": { "type": "object" } },
+        "aiCreditReservations": { "type": "array", "items": { "type": "object" } },
+        "notificationPreferences": { "type": "object" },
+        "entitlements": { "type": "array", "items": { "type": "object" } },
+        "entitlementEvents": { "type": "array", "items": { "type": "object" } },
+        "progressDaily": { "type": "array", "items": { "type": "object" } },
+        "studentProjects": { "type": "array", "items": { "type": "object" } },
+        "studentProjectRevisions": { "type": "array", "items": { "type": "object" } },
+        "studentProjectCloudConsent": { "$ref": "account-export.v1.json#/properties/data/properties/studentProjectCloudConsent" },
+        "studentProjectCloudConsentEvents": { "$ref": "account-export.v1.json#/properties/data/properties/studentProjectCloudConsentEvents" },
+        "projectAiConsent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policyVersion", "granted", "grantedAt", "revokedAt", "consentGeneration", "updatedAt"],
+          "properties": {
+            "policyVersion": { "type": ["string", "null"], "pattern": "^project-ai-data\\.v[0-9]+$" },
+            "granted": { "type": ["boolean", "null"] },
+            "grantedAt": { "type": ["string", "null"], "format": "date-time" },
+            "revokedAt": { "type": ["string", "null"], "format": "date-time" },
+            "consentGeneration": { "type": ["integer", "null"], "minimum": 1 },
+            "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+          }
+        },
+        "projectAiConsentEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventId", "policyVersion", "decision", "consentGeneration", "decidedAt"],
+            "properties": {
+              "eventId": { "type": "string", "format": "uuid" },
+              "policyVersion": { "type": "string", "pattern": "^project-ai-data\\.v[0-9]+$" },
+              "decision": { "enum": ["grant", "revoke"] },
+              "consentGeneration": { "type": "integer", "minimum": 1 },
+              "decidedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "projectAiActivity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["activityId", "installationId", "requestId", "mode", "projectId", "stageId", "operationId", "baseProjectRevision", "consentGeneration", "resultProjectRevision", "outcome", "requestedSettlementOutcome", "createdAt", "updatedAt"],
+            "properties": {
+              "activityId": { "type": "string", "format": "uuid" },
+              "installationId": { "type": "string", "format": "uuid" },
+              "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+              "mode": { "enum": ["PROJECT", "GENERAL"] },
+              "projectId": { "type": ["string", "null"], "format": "uuid" },
+              "stageId": { "type": ["string", "null"] },
+              "operationId": { "type": ["string", "null"] },
+              "baseProjectRevision": { "type": ["integer", "null"], "minimum": 1 },
+              "consentGeneration": { "type": ["integer", "null"], "minimum": 1 },
+              "resultProjectRevision": { "type": ["integer", "null"], "minimum": 1 },
+              "outcome": { "enum": ["PENDING", "APPLIED", "EDITED", "DISMISSED", "STALE", "FAILED", "COMPLETED"] },
+              "requestedSettlementOutcome": { "type": ["string", "null"], "enum": ["APPLIED", "EDITED", "DISMISSED", "STALE", null] },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "aiConversationSessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sessionId", "creationRequestId", "caseVersionId", "turnCount", "createdAt", "updatedAt", "expiresAt"],
+            "properties": {
+              "sessionId": { "type": "string", "format": "uuid" },
+              "creationRequestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+              "caseVersionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "turnCount": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "expiresAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "aiConversationTurnRequests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sessionId", "requestId", "turnIndex", "status", "startedAt", "leaseExpiresAt", "completedAt"],
+            "properties": {
+              "sessionId": { "type": "string", "format": "uuid" },
+              "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+              "turnIndex": { "type": "integer", "minimum": 1, "maximum": 5 },
+              "status": { "enum": ["reserved", "completed", "released"] },
+              "startedAt": { "type": "string", "format": "date-time" },
+              "leaseExpiresAt": { "type": "string", "format": "date-time" },
+              "completedAt": { "type": ["string", "null"], "format": "date-time" }
+            }
+          }
+        }
+      },
+      "not": {
+        "anyOf": [
+          { "required": ["prompts"] },
+          { "required": ["responses"] },
+          { "required": ["requestHash"] },
+          { "required": ["settlementHash"] },
+          { "required": ["activeRequestHash"] }
+        ]
+      }
+    },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" }
+  }
+}

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = path.resolve(scriptsDirectory, '..', '..');
 const checker = path.join(scriptsDirectory, 'check-public-package.sh');
 
 function createCandidate() {
@@ -97,6 +98,21 @@ test('accepts a minimal clean public package', () => {
   } finally {
     fs.rmSync(candidate, { recursive: true, force: true });
   }
+});
+
+test('GitHub verification installs ripgrep before running repo checks that require it', () => {
+  const workflow = fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'verify.yml'), 'utf8');
+  const contractsStart = workflow.indexOf('\n  contracts:');
+  const platformStart = workflow.indexOf('\n  platform:', contractsStart);
+  const publicStart = workflow.indexOf('\n  public-package:');
+  assert.notEqual(contractsStart, -1);
+  assert.notEqual(platformStart, -1);
+  assert.notEqual(publicStart, -1);
+
+  const contractsJob = workflow.slice(contractsStart, platformStart);
+  const publicJob = workflow.slice(publicStart);
+  assert.match(contractsJob, /apt-get update[\s\S]*apt-get install[^\n]*ripgrep/);
+  assert.match(publicJob, /apt-get update[\s\S]*apt-get install[^\n]*ripgrep/);
 });
 
 test('rejects private media directories', () => {

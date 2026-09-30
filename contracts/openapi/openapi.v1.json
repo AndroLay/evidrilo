@@ -253,8 +253,8 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "required": false,
-            "description": "Optional request key; the server-generated request ID is used when omitted.",
+            "required": true,
+            "description": "Stable operation key required to prevent duplicate dispatch and credit charges on retries.",
             "schema": {
               "type": "string",
               "minLength": 8,
@@ -1589,6 +1589,115 @@
         }
       }
     },
+    "/v1/project-ai/projects/{projectId}/local-context": {
+      "put": {
+        "operationId": "put_v1_project_ai_projects_projectIdguid_local_context",
+        "tags": [
+          "project-ai"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/project-ai-local-project-context.v1"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+          "anchor": "/v1/project-ai/projects/"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/project-ai-local-project-context-request.v1"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Evidrilo-Project-AI-Consent",
+            "in": "header",
+            "required": true,
+            "description": "Versioned explicit confirmation for this selected project-context request.",
+            "schema": {
+              "type": "string",
+              "const": "project-ai.v1"
+            }
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "operationId": "delete_v1_project_ai_projects_projectIdguid_local_context",
+        "tags": [
+          "project-ai"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/project-ai-local-project-context-delete.v1"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/ProjectAiScaffoldFlowTests.cs",
+          "anchor": "/v1/project-ai/projects/"
+        }
+      }
+    },
     "/v1/project-ai/scaffold": {
       "post": {
         "operationId": "post_v1_project_ai_scaffold",
@@ -1775,6 +1884,16 @@
               "minLength": 8,
               "maxLength": 128,
               "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "X-Evidrilo-Project-AI-Consent",
+            "in": "header",
+            "required": true,
+            "description": "Versioned explicit confirmation for this selected project-context request.",
+            "schema": {
+              "type": "string",
+              "const": "project-ai.v1"
             }
           }
         ]
@@ -2765,6 +2884,197 @@
         }
       ]
     },
+    "/v2/account/exports": {
+      "post": {
+        "operationId": "post_v2_account_exports",
+        "tags": [
+          "v2"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful response.",
+            "content": {
+              "application/vnd.evidrilo.account-export-job.v2+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/account-export-job.v2"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+          "anchor": "/v2/account/exports"
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Stable key for replaying the same empty-body export creation request.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 80,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ]
+      },
+      "parameters": []
+    },
+    "/v2/account/exports/{exportId}": {
+      "get": {
+        "operationId": "get_v2_account_exports_exportIdguid",
+        "tags": [
+          "v2"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Successful response.",
+            "content": {
+              "application/vnd.evidrilo.account-export-job.v2+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/account-export-job.v2"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+          "anchor": "/v2/account/exports/{exportId:guid}"
+        }
+      },
+      "parameters": [
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "operationId": "delete_v2_account_exports_exportIdguid",
+        "tags": [
+          "v2"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Successful response.",
+            "content": {
+              "application/vnd.evidrilo.account-export-job.v2+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/account-export-job.v2"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+          "anchor": "/v2/account/exports/{exportId:guid}"
+        }
+      }
+    },
+    "/v2/account/exports/{exportId}/download": {
+      "get": {
+        "operationId": "get_v2_account_exports_exportIdguid_download",
+        "tags": [
+          "v2"
+        ],
+        "security": [
+          {
+            "SupabaseBearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Successful response.",
+            "content": {
+              "application/vnd.evidrilo.account-export.v2+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/account-export.v2"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/http-errors.v1"
+                }
+              }
+            }
+          }
+        },
+        "x-evidrilo-test": {
+          "file": "platform/api.Tests/AccountExportJobEndpointTests.cs",
+          "anchor": "/v2/account/exports/{exportId:guid}/download"
+        }
+      },
+      "parameters": [
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
     "/v2/project-ai/general-chat": {
       "post": {
         "operationId": "post_v2_project_ai_general_chat",
@@ -2824,6 +3134,16 @@
               "maxLength": 128,
               "pattern": "^[A-Za-z0-9_-]+$"
             }
+          },
+          {
+            "name": "X-Evidrilo-General-Chat-Consent",
+            "in": "header",
+            "required": true,
+            "description": "Must equal general-chat.v1 to confirm the current General chat notice for this request.",
+            "schema": {
+              "type": "string",
+              "const": "general-chat.v1"
+            }
           }
         ]
       },
@@ -2877,6 +3197,68 @@
           "requestId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{8,128}$"
+          }
+        }
+      },
+      "account-export-job.v2": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://evidrilo.dev/contracts/account-export-job.v2.json",
+        "title": "Evidrilo account export job v2",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "version",
+          "exportId",
+          "status",
+          "requestId",
+          "createdAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "schema": {
+            "const": "evidrilo.account-export-job"
+          },
+          "version": {
+            "const": "2"
+          },
+          "exportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,128}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "artifactBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "errorCode": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]{1,64}$"
           }
         }
       },
@@ -3066,6 +3448,542 @@
             "not": {
               "required": [
                 "studentProjectCommands"
+              ]
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,128}$"
+          }
+        }
+      },
+      "account-export.v2": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://evidrilo.dev/contracts/account-export.v2.json",
+        "title": "Evidrilo complete account export v2",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "version",
+          "accountId",
+          "generatedAt",
+          "data",
+          "requestId"
+        ],
+        "properties": {
+          "schema": {
+            "const": "evidrilo.account-export"
+          },
+          "version": {
+            "const": "2"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "localDrafts",
+              "profile",
+              "attemptCommands",
+              "syncChanges",
+              "analyticsEvents",
+              "recommendationEvents",
+              "aiAuditEvents",
+              "aiCreditConsent",
+              "aiCreditGrants",
+              "aiCreditReservations",
+              "notificationPreferences",
+              "entitlements",
+              "entitlementEvents",
+              "progressDaily",
+              "studentProjects",
+              "studentProjectRevisions",
+              "studentProjectCloudConsent",
+              "studentProjectCloudConsentEvents",
+              "projectAiConsent",
+              "projectAiConsentEvents",
+              "projectAiActivity",
+              "aiConversationSessions",
+              "aiConversationTurnRequests"
+            ],
+            "properties": {
+              "localDrafts": {
+                "const": "not_on_server"
+              },
+              "profile": {
+                "type": "object"
+              },
+              "attemptCommands": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "syncChanges": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "analyticsEvents": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "recommendationEvents": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "aiAuditEvents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "requestId",
+                    "promptVersion",
+                    "provider",
+                    "outcome",
+                    "reasonCode",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "requestId": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{8,128}$"
+                    },
+                    "promptVersion": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "provider": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "reasonCode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[A-Z0-9_]{1,64}$"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "aiCreditConsent": {
+                "type": "object"
+              },
+              "aiCreditGrants": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "aiCreditReservations": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "notificationPreferences": {
+                "type": "object"
+              },
+              "entitlements": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "entitlementEvents": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "progressDaily": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "studentProjects": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "studentProjectRevisions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "studentProjectCloudConsent": {
+                "$ref": "#/components/schemas/account-export.v1/properties/data/properties/studentProjectCloudConsent"
+              },
+              "studentProjectCloudConsentEvents": {
+                "$ref": "#/components/schemas/account-export.v1/properties/data/properties/studentProjectCloudConsentEvents"
+              },
+              "projectAiConsent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "policyVersion",
+                  "granted",
+                  "grantedAt",
+                  "revokedAt",
+                  "consentGeneration",
+                  "updatedAt"
+                ],
+                "properties": {
+                  "policyVersion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^project-ai-data\\.v[0-9]+$"
+                  },
+                  "granted": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "grantedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "revokedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "consentGeneration": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "updatedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                }
+              },
+              "projectAiConsentEvents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "eventId",
+                    "policyVersion",
+                    "decision",
+                    "consentGeneration",
+                    "decidedAt"
+                  ],
+                  "properties": {
+                    "eventId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "policyVersion": {
+                      "type": "string",
+                      "pattern": "^project-ai-data\\.v[0-9]+$"
+                    },
+                    "decision": {
+                      "enum": [
+                        "grant",
+                        "revoke"
+                      ]
+                    },
+                    "consentGeneration": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "decidedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "projectAiActivity": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "activityId",
+                    "installationId",
+                    "requestId",
+                    "mode",
+                    "projectId",
+                    "stageId",
+                    "operationId",
+                    "baseProjectRevision",
+                    "consentGeneration",
+                    "resultProjectRevision",
+                    "outcome",
+                    "requestedSettlementOutcome",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "activityId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "installationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{8,128}$"
+                    },
+                    "mode": {
+                      "enum": [
+                        "PROJECT",
+                        "GENERAL"
+                      ]
+                    },
+                    "projectId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "uuid"
+                    },
+                    "stageId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "operationId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "baseProjectRevision": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1
+                    },
+                    "consentGeneration": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1
+                    },
+                    "resultProjectRevision": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1
+                    },
+                    "outcome": {
+                      "enum": [
+                        "PENDING",
+                        "APPLIED",
+                        "EDITED",
+                        "DISMISSED",
+                        "STALE",
+                        "FAILED",
+                        "COMPLETED"
+                      ]
+                    },
+                    "requestedSettlementOutcome": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "APPLIED",
+                        "EDITED",
+                        "DISMISSED",
+                        "STALE",
+                        null
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "aiConversationSessions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sessionId",
+                    "creationRequestId",
+                    "caseVersionId",
+                    "turnCount",
+                    "createdAt",
+                    "updatedAt",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "sessionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "creationRequestId": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{8,128}$"
+                    },
+                    "caseVersionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "turnCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "aiConversationTurnRequests": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sessionId",
+                    "requestId",
+                    "turnIndex",
+                    "status",
+                    "startedAt",
+                    "leaseExpiresAt",
+                    "completedAt"
+                  ],
+                  "properties": {
+                    "sessionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{8,128}$"
+                    },
+                    "turnIndex": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 5
+                    },
+                    "status": {
+                      "enum": [
+                        "reserved",
+                        "completed",
+                        "released"
+                      ]
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "leaseExpiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "completedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "prompts"
+                  ]
+                },
+                {
+                  "required": [
+                    "responses"
+                  ]
+                },
+                {
+                  "required": [
+                    "requestHash"
+                  ]
+                },
+                {
+                  "required": [
+                    "settlementHash"
+                  ]
+                },
+                {
+                  "required": [
+                    "activeRequestHash"
+                  ]
+                }
               ]
             }
           },
@@ -4773,6 +5691,12 @@
             "minLength": 8,
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "creditCost": {
+            "description": "Present only when verified provider usage was charged even though the requested response was withheld.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
           }
         }
       },
@@ -5471,7 +6395,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://evidrilo.dev/contracts/project-ai-general-chat-result.v2.json",
         "title": "Evidrilo isolated Project AI General chat result v2",
-        "description": "Structured answer and token-priced credit cost. The message and answer are not part of activity history.",
+        "description": "Structured answer, standalone suggested follow-up prompts, and token-priced credit cost. The message, answer, and prompts are not part of activity history.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -5480,6 +6404,7 @@
           "mode",
           "status",
           "answer",
+          "recommendedNextPrompts",
           "requestId",
           "creditCost"
         ],
@@ -5501,6 +6426,16 @@
             "minLength": 1,
             "maxLength": 8000
           },
+          "recommendedNextPrompts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            }
+          },
           "requestId": {
             "type": "string",
             "minLength": 8,
@@ -5513,6 +6448,142 @@
             "maximum": 200
           }
         }
+      },
+      "project-ai-local-project-context-delete.v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://evidrilo.dev/contracts/project-ai-local-project-context-delete.v1.json",
+        "title": "Evidrilo deleted owner-bound local Project AI metadata binding",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema": {
+            "const": "evidrilo.project-ai-local-project-context"
+          },
+          "version": {
+            "const": "1"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "const": "deleted"
+          }
+        },
+        "required": [
+          "schema",
+          "version",
+          "projectId",
+          "status"
+        ]
+      },
+      "project-ai-local-project-context-request.v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://evidrilo.dev/contracts/project-ai-local-project-context-request.v1.json",
+        "title": "Evidrilo metadata-only local project binding for Project AI",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema": {
+            "const": "evidrilo.project-ai-local-project-context"
+          },
+          "version": {
+            "const": "1"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "maxLength": 96
+          },
+          "templateVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "projectRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "availableEvidenceIds": {
+            "type": "array",
+            "maxItems": 2048,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            }
+          }
+        },
+        "required": [
+          "schema",
+          "version",
+          "installationId",
+          "templateId",
+          "templateVersion",
+          "projectRevision",
+          "availableEvidenceIds"
+        ]
+      },
+      "project-ai-local-project-context.v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://evidrilo.dev/contracts/project-ai-local-project-context.v1.json",
+        "title": "Evidrilo owner-bound local Project AI metadata binding",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema": {
+            "const": "evidrilo.project-ai-local-project-context"
+          },
+          "version": {
+            "const": "1"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bindingGeneration": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "templateId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "maxLength": 96
+          },
+          "templateVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "registered",
+              "unchanged"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "schema",
+          "version",
+          "projectId",
+          "projectRevision",
+          "bindingGeneration",
+          "templateId",
+          "templateVersion",
+          "status",
+          "requestId"
+        ]
       },
       "project-ai-scaffold-request.v1": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5947,7 +7018,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist-request.v1.json",
         "title": "Evidrilo stage-bound Project AI request v1",
-        "description": "A project request binds one authenticated account, one installation, one owned project, one published template stage, and only student-selected allowlisted fields. GENERAL is accepted as a choice but remains unavailable until its cost, limit, and retention policy is approved.",
+        "description": "A project request binds an authenticated account, installation, project revision, published template stage, and explicitly selected context. Server-owned cloud projects and account-bound local projects use distinct request branches. GENERAL remains unavailable until its separate policy is approved.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -5962,12 +7033,18 @@
           "stageId": {},
           "operationId": {},
           "baseProjectRevision": {},
+          "projectBindingGeneration": {},
           "selectedFieldIds": {},
-          "selectedEvidenceIds": {}
+          "selectedEvidenceIds": {},
+          "selectedFields": {},
+          "selectedEvidence": {}
         },
         "oneOf": [
           {
             "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/projectRequest"
+          },
+          {
+            "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/localProjectRequest"
           },
           {
             "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/generalRequest"
@@ -6013,90 +7090,206 @@
                 "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/common"
               },
               {
+                "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/projectPayload"
+              },
+              {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "projectBindingGeneration"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "selectedFields"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "selectedEvidence"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "localProjectRequest": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/common"
+              },
+              {
+                "$ref": "#/components/schemas/project-ai-stage-assist-request.v1/$defs/projectPayload"
+              },
+              {
                 "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "schema": {
-                    "const": "evidrilo.project-ai-stage-assist"
-                  },
-                  "version": {
-                    "const": "1"
-                  },
-                  "mode": {
-                    "const": "PROJECT"
-                  },
-                  "installationId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "locale": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
-                    "maxLength": 32
-                  },
-                  "projectId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "templateId": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-                    "maxLength": 96
-                  },
-                  "templateVersion": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "stageId": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-                    "maxLength": 80
-                  },
-                  "operationId": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-                    "maxLength": 80
-                  },
-                  "baseProjectRevision": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "selectedFieldIds": {
-                    "type": "array",
-                    "maxItems": 32,
-                    "uniqueItems": true,
-                    "items": {
+                "required": [
+                  "projectBindingGeneration",
+                  "selectedFields",
+                  "selectedEvidence"
+                ]
+              }
+            ]
+          },
+          "projectPayload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schema": {
+                "const": "evidrilo.project-ai-stage-assist"
+              },
+              "version": {
+                "const": "1"
+              },
+              "mode": {
+                "const": "PROJECT"
+              },
+              "installationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "locale": {
+                "type": "string",
+                "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+                "maxLength": 32
+              },
+              "projectId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "templateId": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                "maxLength": 96
+              },
+              "templateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "stageId": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                "maxLength": 80
+              },
+              "operationId": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                "maxLength": 80
+              },
+              "baseProjectRevision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "projectBindingGeneration": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "selectedFieldIds": {
+                "type": "array",
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                  "maxLength": 80
+                }
+              },
+              "selectedEvidenceIds": {
+                "type": "array",
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                }
+              },
+              "selectedFields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
                       "type": "string",
                       "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
                       "maxLength": 80
+                    },
+                    "value": {
+                      "type": "string",
+                      "maxLength": 8000
                     }
                   },
-                  "selectedEvidenceIds": {
-                    "type": "array",
-                    "maxItems": 32,
-                    "uniqueItems": true,
-                    "items": {
+                  "required": [
+                    "id",
+                    "value"
+                  ]
+                }
+              },
+              "selectedEvidence": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
                       "type": "string",
                       "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                    },
+                    "kind": {
+                      "enum": [
+                        "SOURCE",
+                        "DATA",
+                        "OBSERVATION"
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "summary": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 8000
+                    },
+                    "origin": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 500
                     }
-                  }
-                },
-                "required": [
-                  "schema",
-                  "version",
-                  "mode",
-                  "installationId",
-                  "locale",
-                  "projectId",
-                  "templateId",
-                  "templateVersion",
-                  "stageId",
-                  "operationId",
-                  "baseProjectRevision",
-                  "selectedFieldIds",
-                  "selectedEvidenceIds"
-                ]
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "label",
+                    "summary",
+                    "origin"
+                  ]
+                }
               }
+            },
+            "required": [
+              "schema",
+              "version",
+              "mode",
+              "installationId",
+              "locale",
+              "projectId",
+              "templateId",
+              "templateVersion",
+              "stageId",
+              "operationId",
+              "baseProjectRevision",
+              "selectedFieldIds",
+              "selectedEvidenceIds"
             ]
           },
           "generalRequest": {
@@ -6133,6 +7326,14 @@
                   "selectedEvidenceIds": {
                     "type": "array",
                     "maxItems": 0
+                  },
+                  "selectedFields": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "selectedEvidence": {
+                    "type": "array",
+                    "maxItems": 0
                   }
                 },
                 "required": [
@@ -6151,7 +7352,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist-settlement-request.v1.json",
         "title": "Evidrilo stage-assist settlement request v1",
-        "description": "The Idempotency-Key header must match requestId from the preview. Reuse the identical body and key for retries. Applied or edited outcomes must name the resulting server project revision.",
+        "description": "The Idempotency-Key header must match requestId from the preview. Reuse the identical body and key for retries. Applied or edited local-project outcomes must name the resulting revision and metadata binding generation.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -6187,6 +7388,10 @@
           "resultProjectRevision": {
             "type": "integer",
             "minimum": 2
+          },
+          "resultProjectBindingGeneration": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "allOf": [
@@ -6206,7 +7411,8 @@
             },
             "then": {
               "required": [
-                "resultProjectRevision"
+                "resultProjectRevision",
+                "resultProjectBindingGeneration"
               ]
             }
           },
@@ -6226,8 +7432,17 @@
             },
             "then": {
               "not": {
-                "required": [
-                  "resultProjectRevision"
+                "anyOf": [
+                  {
+                    "required": [
+                      "resultProjectRevision"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "resultProjectBindingGeneration"
+                    ]
+                  }
                 ]
               }
             }
@@ -6277,7 +7492,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://evidrilo.dev/contracts/project-ai-stage-assist.v1.json",
         "title": "Evidrilo stage-bound Project AI preview response v1",
-        "description": "A non-mutating, typed proposal bound to one server-owned project revision and one declared template operation. References are limited to the student's selected project evidence. The client must review and apply through its project workflow.",
+        "description": "A non-mutating, typed proposal bound to the authenticated account's registered local project revision and context generation. References are limited to the student's explicitly selected project evidence. The client must review and apply through its project workflow.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -6287,6 +7502,8 @@
           "mode",
           "projectId",
           "baseProjectRevision",
+          "projectBindingGeneration",
+          "consentGeneration",
           "stageId",
           "operationId",
           "assist",
@@ -6312,6 +7529,17 @@
             "format": "uuid"
           },
           "baseProjectRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "projectBindingGeneration": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "consentGeneration": {
             "type": "integer",
             "minimum": 1
           },

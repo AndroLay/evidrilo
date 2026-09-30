@@ -6,6 +6,26 @@ import kotlin.test.assertIs
 
 class ProjectAiScaffoldRulesTest {
     @Test
+    fun `built in structure starters do not bypass reviewed template gate for AI`() {
+        val template = ProjectStarterTemplateCatalog.templates.first()
+        val proposal = ProjectAiScaffoldProposal(
+            templateId = template.id,
+            templateVersion = template.version,
+            baseProjectRevision = null,
+            promptVersion = ProjectAiScaffoldRules.PROMPT_VERSION,
+            guidanceText = "A bounded proposal.",
+            fieldSuggestions = emptyList(),
+            clarificationQuestions = listOf("What does the assignment require?"),
+            recommendedNextPrompts = emptyList(),
+        )
+
+        assertEquals(
+            "TEMPLATE_NOT_READY",
+            ProjectAiScaffoldRules.validate(template, proposal, expectedBaseRevision = null),
+        )
+    }
+
+    @Test
     fun `validated suggestions remain a preview until selected and applied`() {
         val template = publishedTemplate()
         val proposal = proposal(template)

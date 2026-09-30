@@ -4,6 +4,7 @@ import dev.nextgen.mobile.domain.project.ManualLiteratureSynthesisFields
 import dev.nextgen.mobile.domain.project.ProjectTemplateDefinition
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
 import dev.nextgen.mobile.domain.project.ProjectTemplatePublication
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
 import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
 import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
@@ -23,6 +24,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StudentProjectExportFormatterTest {
+    @Test
+    fun `markdown export identifies local starter as structure only and not method reviewed`() {
+        val project = manualProject().copy(
+            templateSnapshot = ProjectStarterTemplateCatalog.templates.first(),
+        )
+
+        val content = StudentProjectExportFormatter.markdown(project).content
+
+        assertTrue(content.contains("Template: Local starter guide: Plan and record an experiment"))
+        assertTrue(content.contains("structure only; not method\\-reviewed"))
+    }
+
     @Test
     fun `markdown export is a bounded snapshot and labels student entered content honestly`() {
         val project = manualProject().copy(
@@ -49,6 +62,7 @@ class StudentProjectExportFormatterTest {
                 ),
             ),
             claimEvidenceSourceIds = setOf("source-a"),
+            deadlineDate = "2026-10-15",
         )
 
         val artifact = StudentProjectExportFormatter.markdown(project)
@@ -57,6 +71,7 @@ class StudentProjectExportFormatterTest {
         assertEquals("text/markdown", artifact.mimeType)
         assertTrue(artifact.content.contains("# My literature project"))
         assertTrue(artifact.content.contains("Snapshot revision: 1"))
+        assertTrue(artifact.content.contains("Optional deadline: 2026-10-15"))
         assertTrue(artifact.content.contains("not been independently verified by Evidrilo"))
         assertTrue(artifact.content.contains("The sources suggest a possible pattern\\."))
         assertTrue(artifact.content.contains("Possible pattern"))
@@ -126,7 +141,7 @@ class StudentProjectExportFormatterTest {
 
         val content = StudentProjectExportFormatter.markdown(project).content
 
-        assertTrue(content.contains("Template: \\# &lt;unsafe&gt; · version 1"))
+        assertTrue(content.contains("Template: Published catalog template: \\# &lt;unsafe&gt; · version 1"))
         assertTrue(!content.contains("Template: # <unsafe>"))
     }
 

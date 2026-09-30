@@ -17,6 +17,7 @@ public sealed record ProjectAiGeneralChatResponse(
     [property: JsonPropertyName("mode")] string Mode,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("answer")] string Answer,
+    [property: JsonPropertyName("recommendedNextPrompts")] IReadOnlyList<string> RecommendedNextPrompts,
     [property: JsonPropertyName("requestId")] string RequestId,
     [property: JsonPropertyName("creditCost")] int CreditCost);
 
@@ -26,7 +27,7 @@ public sealed record ProjectAiGeneralChatProviderRequest(
     string Message,
     string Locale);
 
-public sealed record ProjectAiGeneralChatOutput(string Answer)
+public sealed record ProjectAiGeneralChatOutput(string Answer, IReadOnlyList<string> RecommendedNextPrompts)
 {
     [JsonIgnore]
     public AiProviderTokenUsage? Usage { get; init; }
@@ -37,9 +38,12 @@ public static partial class ProjectAiGeneralChatValidator
     public const string Schema = "evidrilo.project-ai-general-chat";
     public const string Version = "2";
     public const string Mode = "GENERAL";
-    public const string PromptVersion = "project-ai-general-chat-v2.1";
+    public const string PromptVersion = "project-ai-general-chat-v2.2";
     public const int MaximumMessageLength = 4_000;
     public const int MaximumAnswerLength = 8_000;
+    public const int MinimumRecommendedNextPrompts = 1;
+    public const int MaximumRecommendedNextPrompts = 3;
+    public const int MaximumRecommendedNextPromptLength = 240;
 
     [GeneratedRegex("\\A[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*\\z", RegexOptions.CultureInvariant)]
     private static partial Regex LocalePattern();

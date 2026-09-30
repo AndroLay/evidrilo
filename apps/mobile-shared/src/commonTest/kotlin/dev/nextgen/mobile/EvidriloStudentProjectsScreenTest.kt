@@ -7,6 +7,7 @@ import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
 import dev.nextgen.mobile.domain.project.ProjectTemplateInputField
 import dev.nextgen.mobile.domain.project.ProjectTemplateInputKind
 import dev.nextgen.mobile.domain.project.ProjectTemplatePublication
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.ProjectTemplateStep
 import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
 import dev.nextgen.mobile.domain.project.StudentProjectClaimReviewStatus
@@ -111,6 +112,32 @@ class EvidriloStudentProjectsScreenTest {
         assertEquals(listOf("evidence"), sections[2].fieldIds)
         assertEquals(listOf("extra"), sections.single { it.kind == StudentProjectEditorSectionKind.TEMPLATE_ADDITIONAL_FIELDS }.fieldIds)
         assertEquals("Review", sections.last().title)
+    }
+
+    @Test
+    fun everyOfflineFamilyStarterExposesAllFieldsInItsProjectEditorSections() {
+        ProjectStarterTemplateCatalog.templates.forEach { template ->
+            val sections = studentProjectEditorSections(removalDraft(templateSnapshot = template))
+            val templateFields = sections
+                .filter {
+                    it.kind == StudentProjectEditorSectionKind.TEMPLATE_STEP ||
+                        it.kind == StudentProjectEditorSectionKind.TEMPLATE_ADDITIONAL_FIELDS
+                }
+                .flatMap(StudentProjectEditorSection::fieldIds)
+
+            assertEquals(
+                template.inputFields.map(ProjectTemplateInputField::id).toSet(),
+                templateFields.toSet(),
+                template.id,
+            )
+            assertEquals(
+                template.steps.map(ProjectTemplateStep::id),
+                sections.filter { it.kind == StudentProjectEditorSectionKind.TEMPLATE_STEP }
+                    .map(StudentProjectEditorSection::id),
+                template.id,
+            )
+            assertEquals("Review", sections.last().title, template.id)
+        }
     }
 
     @Test

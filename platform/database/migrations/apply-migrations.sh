@@ -59,7 +59,10 @@ for migration in "$migrations_dir"/[0-9][0-9][0-9]_*.sql; do
 
     checksum=$(checksum_for "$migration")
     {
-        printf '%s\n' 'select pg_advisory_xact_lock(814235);'
+        # A migration may contain its own COMMIT. Keep the session lock until
+        # psql commits the ledger transaction and exits, preventing a runner
+        # from observing an uncommitted ledger row as absent.
+        printf '%s\n' 'select pg_advisory_lock(814235);'
         printf '%s\n' "select exists (select 1 from public.evidrilo_schema_migrations where version = :'migration_version') as already_applied, coalesce((select checksum from public.evidrilo_schema_migrations where version = :'migration_version') = :'migration_checksum', true) as checksum_ok;"
         printf '%s\n' '\gset migration_'
         printf '%s\n' '\if :migration_checksum_ok'

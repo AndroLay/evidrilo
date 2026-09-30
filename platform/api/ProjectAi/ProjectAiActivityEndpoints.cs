@@ -75,7 +75,8 @@ public static class ProjectAiActivityEndpoints
                         page.NextCursor),
                     options: ResponseJsonOptions);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("api");
 
         endpoints.MapDelete(
             "/v1/project-ai/activity/general",
@@ -100,7 +101,8 @@ public static class ProjectAiActivityEndpoints
                     new ProjectAiActivityClearResponse(Schema, Version, clearedCount),
                     options: ResponseJsonOptions);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("api");
 
         return endpoints;
     }

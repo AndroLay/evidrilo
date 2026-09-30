@@ -2,6 +2,7 @@ package dev.nextgen.mobile
 
 import dev.nextgen.mobile.billing.BillingUiState
 import dev.nextgen.mobile.domain.conclusion.ConclusionCheck
+import dev.nextgen.mobile.domain.conclusion.ConclusionFact
 import dev.nextgen.mobile.domain.conclusion.ConclusionFactType
 import dev.nextgen.mobile.domain.conclusion.ConclusionField
 import dev.nextgen.mobile.domain.conclusion.ConclusionStatus
@@ -50,4 +51,10 @@ internal fun ConclusionFactType.displayLabel(): String = when (this) {
     ConclusionFactType.OBSERVATION -> "Observation"
     ConclusionFactType.LIMITATION -> "Limitation"
     ConclusionFactType.BOUNDARY -> "Boundary"
+}
+
+/** Replaces opaque fact IDs with the supplied case label and fact type in learner-facing results. */
+internal fun ConclusionFact.learnerFacingEvidenceLabel(): String {
+    val readableLabel = displayLabel?.trim()?.takeIf { it.isNotEmpty() }
+    return readableLabel?.let { "$it · ${type.displayLabel()}" } ?: type.displayLabel()
 }

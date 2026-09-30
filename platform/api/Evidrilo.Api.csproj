@@ -15,5 +15,6 @@
 
   <ItemGroup>
     <Compile Include="../shared/DatabaseConnectionStringParser.cs" Link="Configuration/DatabaseConnectionStringParser.cs" />
+    <Compile Include="../shared/AccountExportDataWriter.cs" Link="Account/AccountExportDataWriter.cs" />
   </ItemGroup>
 </Project>

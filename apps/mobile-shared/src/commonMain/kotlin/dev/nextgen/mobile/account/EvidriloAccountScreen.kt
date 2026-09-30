@@ -24,7 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
-import dev.nextgen.mobile.EvidriloBackButton
+import dev.nextgen.mobile.EvidriloBackGesture
 import dev.nextgen.mobile.EvidriloColors
 import dev.nextgen.mobile.EvidriloContentColumn
 import dev.nextgen.mobile.EvidriloPrimaryButton
@@ -64,8 +64,8 @@ internal fun EvidriloAccountScreen(
 ) {
     if (!accountRestoreComplete) {
         EvidriloContentColumn {
-            EvidriloBackButton(label = "Back", onClick = onBack)
-            Text("Checking saved account", style = MaterialTheme.typography.displayLarge)
+            EvidriloBackGesture(label = "Back", onClick = onBack)
+            Text("Checking saved account", style = MaterialTheme.typography.headlineLarge)
             Text(
                 "Your local projects remain available. We are securely checking whether this device already has an account session.",
                 style = MaterialTheme.typography.bodyLarge,
@@ -103,9 +103,9 @@ internal fun EvidriloAccountScreen(
     val showSignedOutAuthIntro = session == AccountSession.SignedOut && showAccountAuthForm
 
     EvidriloContentColumn {
-        EvidriloBackButton(label = "Back", onClick = onBack)
+        EvidriloBackGesture(label = "Back", onClick = onBack)
         if (showSignedOutAuthIntro) {
-            Text(accountAuthHeading(mode), style = MaterialTheme.typography.displayLarge)
+            Text(accountAuthHeading(mode), style = MaterialTheme.typography.headlineLarge)
             if (mode != AccountAuthMode.RESET_PASSWORD) {
                 Text(
                     "Sign-in is optional. Your projects stay on this device and are never uploaded by signing in.",
@@ -113,7 +113,7 @@ internal fun EvidriloAccountScreen(
                 )
             }
         } else {
-            Text(presentation.title, style = MaterialTheme.typography.displayLarge)
+            Text(presentation.title, style = MaterialTheme.typography.headlineLarge)
             Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
         }
         persistenceNotice?.takeIf { it.isError }?.let { notice -> EvidriloRecoveryNotice(notice) }
@@ -447,7 +447,7 @@ private fun ResetPasswordForm(
         enabled = !isBusy && accountConfigured && emailError == null,
     )
     TextButton(onClick = onBackToSignIn, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Back to sign in")
+        Text("Sign in instead")
     }
 }
 

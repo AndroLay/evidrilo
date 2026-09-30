@@ -51,7 +51,7 @@ sealed interface ProjectDraftEncodingResult {
 
 object StudentProjectDraftStoreCodec {
     private const val SCHEMA = "evidrilo.local-project-drafts"
-    private const val VERSION = "9"
+    private const val VERSION = "11"
     private val json = Json { isLenient = false }
     private val rootKeys = setOf("schema", "version", "projects")
     private val draftKeysV1 = setOf(
@@ -65,6 +65,9 @@ object StudentProjectDraftStoreCodec {
     private val draftKeysV6 = draftKeysV4 + "attachments"
     private val draftKeysV7 = draftKeysV6 + "claims"
     private val draftKeysV8 = draftKeysV7 + "limitationActions"
+    private val draftKeysV9 = draftKeysV8
+    private val draftKeysV10 = draftKeysV9 + "deadlineDate"
+    private val draftKeysV11 = draftKeysV10
     private val templateKeys = setOf(
         "id", "version", "family", "title", "summary", "intendedOutput", "inputFields", "steps",
         "methodSpecificLimitations", "provenanceRequirements", "accessibilityExpectations", "examples", "publication",
@@ -91,6 +94,9 @@ object StudentProjectDraftStoreCodec {
     private val revisionSnapshotKeysV6 = revisionSnapshotKeysV5 + "attachments"
     private val revisionSnapshotKeysV7 = revisionSnapshotKeysV6 + "claims"
     private val revisionSnapshotKeysV8 = revisionSnapshotKeysV7 + "limitationActions"
+    private val revisionSnapshotKeysV9 = revisionSnapshotKeysV8
+    private val revisionSnapshotKeysV10 = revisionSnapshotKeysV9 + "deadlineDate"
+    private val revisionSnapshotKeysV11 = revisionSnapshotKeysV10
     private val claimKeys = setOf("id", "statement", "scopeNote", "limitationsNote", "reviewStatus")
     private val limitationActionKeys = setOf(
         "id", "boundary", "reason", "nextAction", "affectedFindingIds", "affectedClaimIds",
@@ -133,7 +139,7 @@ object StudentProjectDraftStoreCodec {
             require(root.keys == rootKeys)
             require(root.requiredString("schema") == SCHEMA)
             val version = root.requiredString("version")
-            require(version in setOf("1", "2", "3", "4", "5", "6", "7", "8", VERSION))
+            require(version in setOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", VERSION))
             val projects = root["projects"]?.jsonArray ?: error("projects required")
             require(projects.size <= StudentProjectDraftRules.MAX_STORED_PROJECTS)
             val drafts = projects.map { element ->
@@ -168,6 +174,7 @@ object StudentProjectDraftStoreCodec {
         putJsonArray("attachments") { attachments.forEach { add(it.toJson()) } }
         putJsonArray("claims") { claims.forEach { add(it.toJson()) } }
         putJsonArray("limitationActions") { limitationActions.forEach { add(it.toJson()) } }
+        put("deadlineDate", deadlineDate?.let(::JsonPrimitive) ?: JsonNull)
     }
 
     private fun StudentProjectSourceRecord.toJson(): JsonObject = buildJsonObject {
@@ -264,6 +271,7 @@ object StudentProjectDraftStoreCodec {
         putJsonArray("attachments") { attachments.forEach { add(it.toJson()) } }
         putJsonArray("claims") { claims.forEach { add(it.toJson()) } }
         putJsonArray("limitationActions") { limitationActions.forEach { add(it.toJson()) } }
+        put("deadlineDate", deadlineDate?.let(::JsonPrimitive) ?: JsonNull)
     }
 
     private fun ProjectTemplateDefinition.toJson(): JsonObject = buildJsonObject {
@@ -317,7 +325,11 @@ object StudentProjectDraftStoreCodec {
             "4", "5" -> draftKeysV4
             "6" -> draftKeysV6
             "7" -> draftKeysV7
-            else -> draftKeysV8
+            "8" -> draftKeysV8
+            "9" -> draftKeysV9
+            "10" -> draftKeysV10
+            VERSION -> draftKeysV11
+            else -> error("unsupported project draft version")
         })
         val fieldValues = getValue("fieldValues").jsonObject.mapValues { (_, value) ->
             value.primitiveString()
@@ -353,18 +365,23 @@ object StudentProjectDraftStoreCodec {
             evidenceRelations = if (version == "1" || version == "2") emptyList() else getValue("evidenceRelations").jsonArray.map {
                 it.jsonObject.toEvidenceRelation()
             },
-            revisionSnapshots = if (version !in setOf("4", "5", "6", "7", "8", "9")) emptyList() else getValue("revisionSnapshots").jsonArray.map {
+            revisionSnapshots = if (version !in setOf("4", "5", "6", "7", "8", "9", "10", "11")) emptyList() else getValue("revisionSnapshots").jsonArray.map {
                 it.jsonObject.toRevisionSnapshot(version)
             },
-            attachments = if (version !in setOf("6", "7", "8", "9")) emptyList() else getValue("attachments").jsonArray.map {
+            attachments = if (version !in setOf("6", "7", "8", "9", "10", "11")) emptyList() else getValue("attachments").jsonArray.map {
                 it.jsonObject.toAttachmentRef()
             },
-            claims = if (version in setOf("7", "8", "9")) getValue("claims").jsonArray.map { it.jsonObject.toClaim() }
+            claims = if (version in setOf("7", "8", "9", "10", "11")) getValue("claims").jsonArray.map { it.jsonObject.toClaim() }
             else legacyClaims(fieldValues),
-            limitationActions = if (version in setOf("8", "9")) {
+            limitationActions = if (version in setOf("8", "9", "10", "11")) {
                 getValue("limitationActions").jsonArray.map { it.jsonObject.toLimitationAction() }
             } else {
                 emptyList()
+            },
+            deadlineDate = if (version in setOf("10", "11") && getValue("deadlineDate") != JsonNull) {
+                getValue("deadlineDate").primitiveString()
+            } else {
+                null
             },
         )
     }
@@ -446,6 +463,8 @@ object StudentProjectDraftStoreCodec {
             "6" -> revisionSnapshotKeysV6
             "7" -> revisionSnapshotKeysV7
             "8", "9" -> revisionSnapshotKeysV8
+            "10" -> revisionSnapshotKeysV10
+            "11" -> revisionSnapshotKeysV11
             else -> revisionSnapshotKeysV5
         })
         return StudentProjectRevisionSnapshot(
@@ -463,14 +482,19 @@ object StudentProjectDraftStoreCodec {
             evidenceItems = getValue("evidenceItems").jsonArray.map { it.jsonObject.toEvidenceItem() },
             findings = getValue("findings").jsonArray.map { it.jsonObject.toFinding() },
             evidenceRelations = getValue("evidenceRelations").jsonArray.map { it.jsonObject.toEvidenceRelation() },
-            attachments = if (version in setOf("6", "7", "8", "9")) getValue("attachments").jsonArray.map { it.jsonObject.toAttachmentRef() }
+            attachments = if (version in setOf("6", "7", "8", "9", "10", "11")) getValue("attachments").jsonArray.map { it.jsonObject.toAttachmentRef() }
             else emptyList(),
-            claims = if (version in setOf("7", "8", "9")) getValue("claims").jsonArray.map { it.jsonObject.toClaim() }
+            claims = if (version in setOf("7", "8", "9", "10", "11")) getValue("claims").jsonArray.map { it.jsonObject.toClaim() }
             else legacyClaims(getValue("fieldValues").jsonObject.mapValues { (_, value) -> value.primitiveString() }),
-            limitationActions = if (version in setOf("8", "9")) {
+            limitationActions = if (version in setOf("8", "9", "10", "11")) {
                 getValue("limitationActions").jsonArray.map { it.jsonObject.toLimitationAction() }
             } else {
                 emptyList()
+            },
+            deadlineDate = if (version in setOf("10", "11") && getValue("deadlineDate") != JsonNull) {
+                getValue("deadlineDate").primitiveString()
+            } else {
+                null
             },
         )
     }
@@ -535,8 +559,8 @@ object StudentProjectDraftStoreCodec {
         }
         val steps = getValue("steps").jsonArray.map { element ->
             val step = element.jsonObject
-            require(if (version == "9") step.keys == stepKeysV9 else step.keys == stepKeysV8)
-            val aiOperations = if (version == "9") {
+            require(if (version in setOf("9", "10", "11")) step.keys == stepKeysV9 else step.keys == stepKeysV8)
+            val aiOperations = if (version in setOf("9", "10", "11")) {
                 step.getValue("aiOperations").jsonArray.map { operationElement ->
                     val operation = operationElement.jsonObject
                     require(operation.keys == aiOperationKeys)

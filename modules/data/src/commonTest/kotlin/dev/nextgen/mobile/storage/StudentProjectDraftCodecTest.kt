@@ -1,6 +1,7 @@
 package dev.nextgen.mobile.storage
 
 import dev.nextgen.mobile.domain.project.ProjectTemplateDefinition
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.ProjectTemplateExample
 import dev.nextgen.mobile.domain.project.ProjectTemplateExampleKind
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
@@ -52,10 +53,56 @@ class StudentProjectDraftCodecTest {
     }
 
     @Test
+    fun `codec round trips a bundled starter snapshot without changing its source status`() {
+        val template = ProjectStarterTemplateCatalog.forFamily(
+            dev.nextgen.mobile.domain.project.ProjectTemplateFamily.DESIGN_ENGINEERING,
+        )
+        val project = assertIs<dev.nextgen.mobile.domain.project.StudentProjectDraftCreateResult.Created>(
+            StudentProjectDraftRules.create("starter-codec-roundtrip", template, template.title, 200),
+        ).draft
+
+        val encoded = assertIs<ProjectDraftEncodingResult.Encoded>(
+            StudentProjectDraftStoreCodec.encode(listOf(project)),
+        ).value
+        val decoded = assertIs<LocalStorageReadResult.Success<List<StudentProjectDraft>>>(
+            StudentProjectDraftStoreCodec.decode(encoded),
+        ).value.orEmpty().single()
+
+        assertEquals(project, decoded)
+        assertEquals(ProjectTemplatePublication.BUILT_IN_STARTER, decoded.templateSnapshot?.publication)
+    }
+
+    @Test
+    fun `codec migrates version nine drafts without inventing a project deadline`() {
+        val project = StudentProjectDraftRules.initializeRevisionHistory(draft())
+        val current = assertIs<ProjectDraftEncodingResult.Encoded>(
+            StudentProjectDraftStoreCodec.encode(listOf(project)),
+        ).value
+        val root = Json.parseToJsonElement(current).jsonObject
+        val projectV9 = root.getValue("projects").jsonArray.single().jsonObject.withoutProjectDeadline()
+        val encodedV9 = buildJsonObject {
+            put("schema", root.getValue("schema"))
+            put("version", "9")
+            put("projects", JsonArray(listOf(projectV9)))
+        }.toString()
+
+        val migrated = assertIs<LocalStorageReadResult.Success<List<StudentProjectDraft>>>(
+            StudentProjectDraftStoreCodec.decode(encodedV9),
+        ).value.orEmpty().single()
+        val rewritten = assertIs<ProjectDraftEncodingResult.Encoded>(
+            StudentProjectDraftStoreCodec.encode(listOf(migrated)),
+        )
+
+        assertEquals(null, migrated.deadlineDate)
+        assertEquals(null, migrated.revisionSnapshots.single().deadlineDate)
+        assertEquals("11", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
+    }
+
+    @Test
     fun `codec rejects unsupported schema and malformed payload`() {
         assertIs<LocalStorageReadResult.Corrupt>(StudentProjectDraftStoreCodec.decode("not-json"))
         assertIs<LocalStorageReadResult.Corrupt>(StudentProjectDraftStoreCodec.decode(
-            """{"schema":"evidrilo.local-project-drafts","version":"10","projects":[]}""",
+            """{"schema":"evidrilo.local-project-drafts","version":"12","projects":[]}""",
         ))
     }
 
@@ -73,7 +120,7 @@ class StudentProjectDraftCodecTest {
         val project = root.getValue("projects").jsonArray.single().jsonObject
         val attachment = project.getValue("attachments").jsonArray.single().jsonObject
 
-        assertEquals("9", root.getValue("version").jsonPrimitive.content)
+        assertEquals("11", root.getValue("version").jsonPrimitive.content)
         assertEquals("study-notes.txt", attachment.getValue("fileName").jsonPrimitive.content)
         assertEquals(12, attachment.getValue("sizeBytes").jsonPrimitive.content.toInt())
         assertEquals(setOf("id", "fileName", "mimeType", "sizeBytes", "sha256"), attachment.keys)
@@ -89,7 +136,7 @@ class StudentProjectDraftCodecTest {
 
         assertEquals(emptyList(), decoded.attachments)
         val rewritten = assertIs<ProjectDraftEncodingResult.Encoded>(StudentProjectDraftStoreCodec.encode(listOf(decoded)))
-        assertEquals("9", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
+        assertEquals("11", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
     }
 
     @Test
@@ -259,7 +306,7 @@ class StudentProjectDraftCodecTest {
             StudentProjectDraftStoreCodec.decode(encoded.value),
         )
 
-        assertEquals("9", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").toString().trim('"'))
+        assertEquals("11", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").toString().trim('"'))
         assertEquals(listOf(project), decoded.value)
     }
 
@@ -287,7 +334,7 @@ class StudentProjectDraftCodecTest {
             StudentProjectDraftStoreCodec.decode(encoded.value),
         )
 
-        assertEquals("9", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").toString().trim('"'))
+        assertEquals("11", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").toString().trim('"'))
         assertEquals(project.claims, decoded.value.orEmpty().single().claims)
     }
 
@@ -316,7 +363,7 @@ class StudentProjectDraftCodecTest {
             StudentProjectDraftStoreCodec.decode(encoded.value),
         )
 
-        assertEquals("9", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").jsonPrimitive.content)
+        assertEquals("11", Json.parseToJsonElement(encoded.value).jsonObject.getValue("version").jsonPrimitive.content)
         assertEquals(project, decoded.value.orEmpty().single())
     }
 
@@ -326,6 +373,7 @@ class StudentProjectDraftCodecTest {
         val root = Json.parseToJsonElement(current).jsonObject
         val projectV7 = JsonObject(root.getValue("projects").jsonArray.single().jsonObject
             .filterKeys { it != "limitationActions" })
+            .withoutProjectDeadline()
             .withoutTemplateAiOperations()
         val encodedV7 = buildJsonObject {
             put("schema", root.getValue("schema"))
@@ -339,7 +387,7 @@ class StudentProjectDraftCodecTest {
 
         assertEquals(emptyList(), decoded.limitationActions)
         val rewritten = assertIs<ProjectDraftEncodingResult.Encoded>(StudentProjectDraftStoreCodec.encode(listOf(decoded)))
-        assertEquals("9", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
+        assertEquals("11", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
     }
 
     @Test
@@ -358,8 +406,9 @@ class StudentProjectDraftCodecTest {
         )
         val current = assertIs<ProjectDraftEncodingResult.Encoded>(StudentProjectDraftStoreCodec.encode(listOf(legacy))).value
         val root = Json.parseToJsonElement(current).jsonObject
-        val project = root.getValue("projects").jsonArray.single().jsonObject
-            .filterKeys { it != "claims" && it != "limitationActions" }
+        val project = JsonObject(root.getValue("projects").jsonArray.single().jsonObject
+            .filterKeys { it != "claims" && it != "limitationActions" })
+            .withoutProjectDeadline()
         val encodedV6 = buildJsonObject {
             put("schema", root.getValue("schema"))
             put("version", "6")
@@ -393,6 +442,7 @@ class StudentProjectDraftCodecTest {
         ).jsonObject
         val v3Project = JsonObject(root.getValue("projects").jsonArray.single().jsonObject
             .filterKeys { it != "revisionSnapshots" && it != "attachments" && it != "claims" && it != "limitationActions" })
+            .withoutProjectDeadline()
             .withoutTemplateAiOperations()
         val encodedV3 = buildJsonObject {
             put("schema", root.getValue("schema"))
@@ -437,7 +487,9 @@ class StudentProjectDraftCodecTest {
             StudentProjectDraftStoreCodec.encode(listOf(original)),
         ).value
         val root = Json.parseToJsonElement(current).jsonObject
-        val legacyProject = root.getValue("projects").jsonArray.single().jsonObject.withoutTemplateAiOperations()
+        val legacyProject = root.getValue("projects").jsonArray.single().jsonObject
+            .withoutProjectDeadline()
+            .withoutTemplateAiOperations()
         val encodedV8 = buildJsonObject {
             put("schema", root.getValue("schema"))
             put("version", "8")
@@ -450,11 +502,11 @@ class StudentProjectDraftCodecTest {
 
         assertEquals(listOf(original), decoded.value)
         val rewritten = assertIs<ProjectDraftEncodingResult.Encoded>(StudentProjectDraftStoreCodec.encode(decoded.value.orEmpty()))
-        assertEquals("9", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
+        assertEquals("11", Json.parseToJsonElement(rewritten.value).jsonObject.getValue("version").jsonPrimitive.content)
     }
 
     @Test
-    fun `codec persists stage scoped AI capabilities in version nine snapshots`() {
+    fun `codec persists stage scoped AI capabilities in version ten snapshots`() {
         val capability = ProjectTemplateAiOperationCapability(
             id = "explain_template_step",
             inputFieldIds = emptyList(),
@@ -499,7 +551,8 @@ class StudentProjectDraftCodecTest {
     fun `codec reads version four template examples without inferring their scenario kind`() {
         val current = assertIs<ProjectDraftEncodingResult.Encoded>(StudentProjectDraftStoreCodec.encode(listOf(draft()))).value
         val legacy = current
-            .replace("\"version\":\"9\"", "\"version\":\"4\"")
+            .replace("\"version\":\"11\"", "\"version\":\"4\"")
+            .replace(Regex(",\"deadlineDate\":(?:null|\"[^\"]*\")"), "")
             .replace(Regex(",\"aiOperations\":\\[\\]"), "")
             .replace(Regex(",\"attachments\":\\[\\]"), "")
             .replace(Regex(",\"claims\":\\[\\]"), "")
@@ -527,6 +580,14 @@ class StudentProjectDraftCodecTest {
         })
         return JsonObject(toMutableMap().apply { this["templateSnapshot"] = legacyTemplate })
     }
+
+    private fun JsonObject.withoutProjectDeadline(): JsonObject = JsonObject(toMutableMap().apply {
+        remove("deadlineDate")
+        val revisions = this["revisionSnapshots"] as? JsonArray ?: return@apply
+        this["revisionSnapshots"] = JsonArray(revisions.map { revision ->
+            JsonObject(revision.jsonObject.filterKeys { it != "deadlineDate" })
+        })
+    })
 
     private fun draft(id: String = "local-project-1") = StudentProjectDraft(
         id = id,

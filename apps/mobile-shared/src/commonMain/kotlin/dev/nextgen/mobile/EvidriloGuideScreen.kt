@@ -54,9 +54,9 @@ internal fun EvidriloGuideScreen(
     var questionsExpanded by remember { mutableStateOf(false) }
 
     EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
+        EvidriloBackGesture(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Evidence guide", style = MaterialTheme.typography.displayMedium)
+            Text("Evidence guide", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "A short way to move from an observation to a claim you can explain.",
                 style = MaterialTheme.typography.bodyLarge,

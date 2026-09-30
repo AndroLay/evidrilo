@@ -1,7 +1,7 @@
 # Render + Supabase staging handoff
 
-API staging status: `CONFIGURED FOR FREE / NOT DEPLOYED / RENDER ACCESS AND DATABASE MIGRATION REQUIRED`.
-Full API-and-worker staging status: `NOT READY`.
+API staging status: `BLUEPRINT AND LOCAL GATES VERIFIED / NOT DEPLOYED / CANDIDATE AND DATABASE ROLE GATES REMAIN`.
+Full API-and-worker staging status: `NOT READY — no Render services, frozen candidate, runtime database roles, or applied migrations`.
 
 The landing page has a separate Cloudflare Pages setup in
 [`cloudflare-pages-landing.md`](cloudflare-pages-landing.md). The default API
@@ -14,15 +14,16 @@ Supabase snapshot and the environment-switch procedure.
 
 ## Chosen staging shape and limits
 
-The current owner choice is Render Free with manual database migrations. The
-default Blueprint therefore creates only the API as a Free web service in
-Singapore. Auto-deploy and preview generation are disabled.
+The approved staging shape is a Free API plus one paid `0.5c-512mb` background
+worker in Singapore, with manual database migrations. The worker uses the
+owner's Render promotional credit. Auto-deploy and preview generation are
+disabled. Neither service has been created yet.
 
 | Component | Plan | What it supports |
 | --- | --- | --- |
 | API | Render Free web service | Health and bounded API staging; 512 MB RAM, low CPU, sleeps after 15 minutes without inbound traffic, and may take about a minute to wake |
 | Database/Auth | Separate Supabase Free project | Synthetic, disposable staging data only; Free projects can pause after 7 days of low activity and do not include managed database backups |
-| Worker | Not included in the Free Blueprint | Account-auth deletion and asynchronous projections remain queued until the optional paid worker is enabled |
+| Worker | Paid `0.5c-512mb` | Approved for staging; processes account-auth deletion and asynchronous projections. It is not yet created. |
 | Landing | Cloudflare Pages | Independent static landing deployment; does not depend on this API |
 
 Render's Free plan is intended for previews and hobby use. Free web services
@@ -31,11 +32,11 @@ and no managed backup retention. Do not put real learner data in this staging
 environment. Keep any test data disposable and export it before a project is
 paused or reset if it must be retained.
 
-The optional worker uses Render's paid `0.5c-512mb` compute plan. Current
-published pricing lists this plan at about US$7/month while running; confirm
-the current amount and available promo credit in the owner dashboard before
-creating it. The worker is not included or authorized by the Free default. It
-must not be synced until the owner elects to use paid compute.
+The worker uses Render's paid `0.5c-512mb` plan. The owner approved using the
+available US$50 promotional credit for it. The credit is applied to invoices,
+so it is not a hard spend cap; confirm the current balance and rate before
+activation. Keep the worker off until its database role and the frozen
+migration set are ready.
 
 ## What the Free API Blueprint configures
 
@@ -100,15 +101,15 @@ commit, review the migration set, and use only that SHA for staging.
 Keep the migration/owner credential outside Render and GitHub Actions. Do not
 put credentials in a checked-in `.env` file, image, log, or screenshot.
 
-### 3. Optional paid worker
+### 3. Paid worker (approved, not yet created)
 
-Only after the owner chooses paid compute, create a separate Blueprint from
-`infra/deployment/render-worker-paid.yaml`. Confirm its current price and the
-available credit in Render Billing first. The worker must use its own reviewed
-least-privilege database login and the Supabase `sb_secret_...` key. Put those
-values only in the worker's protected Render settings. Never configure the
-Supabase secret key on the API or mobile app. Deploy the worker from the same
-migration-compatible commit as the API.
+After the migration set and worker database role are ready, create a separate
+Blueprint from `infra/deployment/render-worker-paid.yaml`. Confirm its current
+price and available credit in Render Billing first. The worker must use its
+own reviewed least-privilege database login and the Supabase `sb_secret_...`
+key. Put those values only in the worker's protected Render settings. Never
+configure the Supabase secret key on the API or mobile app. Deploy the worker
+from the same migration-compatible commit as the API.
 
 The worker processes account-auth deletion and progress projections. Verify
 that it processes only synthetic staging jobs, records safe error codes, and
@@ -143,8 +144,9 @@ approval, product consent, cost limits, and live runtime gates are not complete.
 4. Manually sync/deploy the API with protected secrets and auto-deploy off.
 5. Confirm `/health/live` and `/health/ready`, request IDs, redacted errors,
    CORS, and TLS behavior using synthetic data.
-6. Do not accept worker-dependent account deletion or projection flows unless
-   the paid worker is deployed from the same SHA and passes its smoke checks.
+6. Do not accept worker-dependent account deletion or projection flows until
+   the approved paid worker is deployed from the same SHA and passes its smoke
+   checks.
 7. Exercise the RevenueCat Test Store only if its separate project/products and
    protected client configuration are ready.
 
@@ -161,25 +163,114 @@ destination, managed backup/restore rehearsal, or production monitoring provider
 is configured. Those remain explicit operational gates before any production
 use.
 
+### Latest live preflight before candidate freeze (2026-10-01)
+
+- A read-only Supabase Staging check confirmed `Evidrilo Staging`
+  (`cdgzbrrrvlrrgpzbgqog`) remains `ACTIVE_HEALTHY`. The public schema has zero
+  tables and no `public.evidrilo_schema_migrations` ledger, so no repository
+  migrations have been applied. The last observed Auth user count remains the
+  2026-09-30 value of zero.
+- The Render service inventory is empty. No API or worker service, deployment,
+  or Render-side secret configuration exists.
+- Local `main` and `origin/main` still point to
+  `85582b8a920106870ef10d7a59669f5f8b9a5238`, while extensive application and
+  migration changes remain uncommitted, including `053` and `054`. There is no
+  frozen candidate commit.
+- On 2026-10-01, `gh auth status` and a read-only GitHub API check succeeded
+  for `AndroLay` with the `repo` and `workflow` scopes. The current worktree
+  still has no frozen candidate SHA, so no candidate has been pushed and no
+  GitHub `Verify` result exists for these local changes.
+- GitHub's latest checks for the existing `main` SHA
+  `85582b8a920106870ef10d7a59669f5f8b9a5238` are not green: contract/migration,
+  public-package boundary, mobile compile/JVM, and iOS simulator checks failed;
+  ASP.NET/worker checks passed. The CI logs show the Android job calls a Gradle
+  task that does not exist and the public-package job lacks `rg`, which the
+  repository checks require. The local candidate now uses the supported
+  Android source-set tasks and installs `ripgrep` in the affected jobs. These
+  fixes have not yet run on GitHub.
+- A full `scripts/ci/verify-local.sh` run passed earlier on 2026-10-01:
+  Kotlin/JVM and Android tests/build, 168 Node tests, 453 API tests, 30 worker
+  tests, Docker Compose, architecture, audio assets, and deployment checks
+  passed. A fresh rerun could not complete in this restricted Linux workspace:
+  the default Gradle cache is read-only, and a new temporary cache exceeded its
+  disk quota before the Kotlin build. The iOS simulator requires macOS/Xcode.
+- After the CI fixes, the focused workflow checks passed (10 public-package and
+  16 mobile-platform tests); the deterministic 12-file Node check, exported
+  public-package scan, deployment check, GitHub safety scan in a temporary
+  staged public checkout, and `git diff --check` passed. This still is not a hosted GitHub
+  `Verify` result for a frozen candidate.
+- A fail-fast API configuration check now rejects
+  `LOCAL_DEVELOPER_ACCESS_ENABLED=true` in Staging or Production; the focused
+  regression and full API suite pass.
+- API and worker database logins still lack reviewed least-privilege grants.
+  No migrations were applied and no Render service was created because the
+  migration set and runtime-role grants must be tied to the frozen candidate.
+  The temporary `agentctl` Full lease is off. Production was not changed.
+
 The initial credentialless snapshot in this document predates the current
 Supabase connection. As of 2026-09-29, the dedicated Staging project exists and
 its `evidrilo://auth/callback` redirect allowlist was updated and verified.
 Ignored local Android and iOS Debug settings now point to that project's URL
 and publishable key; no secret key was placed in the mobile configuration.
-The database migration ledger remains unknown because its read-only Management
-API query failed, and no migration was applied. Production remains unchanged.
-The temporary agentctl access lease is Off. Render is not deployed. The
-Cloudflare landing deployment record is historical; current public reachability
-and a Git-triggered redeploy were not verified from this environment.
+The database migration ledger could not be read in that earlier session, and
+no migration was applied then. Production remained unchanged.
+An earlier read-only agentctl check on 2026-09-30 reported provider
+connectivity. A later check on the same date found agentctl in `Partial` mode
+with no configured credentials for GitHub, Supabase, Render, RevenueCat, or
+Google, and no API reachability for Supabase, Render, or RevenueCat. Treat the
+earlier check as a record of that point in the session; it is superseded by the
+current live check below. At that earlier point, no provider changes could be
+made and the migration ledger was unknown.
+The Cloudflare landing deployment record is historical; current public
+reachability and a Git-triggered redeploy were not verified from this
+environment.
 
-The Render Blueprints and current application/migration edits are still in the
-local worktree. `infra/deployment/render.yaml` is untracked and is not available
-to a Git-connected Render Blueprint on `main` yet. The `Verify` workflow exists,
-but no run for a frozen candidate SHA has been confirmed. A live Render
-workspace, repository connection, or API service was not verified. Migrations
-`051` and `052` are not part of a frozen candidate. Staging email delivery and
-the mobile sign-up/recovery journeys have not been exercised. These are pending
-activation gates, not completed setup evidence.
+As of 2026-09-30, local `main` matched `origin/main` and both Render Blueprint
+files were tracked. This does not prove that a live Render workspace,
+repository connection, or API service exists; none was verified. The worktree
+has active uncommitted application and migration work. Migrations `053` and
+`054` are untracked, and migrations `051` through `054` have not been frozen
+into a release candidate. The `Verify` workflow exists,
+but no run for a frozen candidate SHA has been confirmed. Staging email
+delivery and the mobile sign-up/recovery journeys have not been exercised.
+These are pending activation gates, not completed setup evidence.
+On 2026-09-30, the owner-provided Google OAuth client pair was applied to the
+Staging Supabase Auth provider and Google sign-in was enabled. A redacted
+read-back confirmed that the configured Client ID matches the private
+credential file and that `evidrilo://auth/callback` remains on the Supabase
+redirect allowlist. The Google Cloud client's Authorized redirect URIs and
+test-user list were not independently verified, and no end-to-end mobile
+sign-in was run. Keep OAuth acceptance pending until the Supabase callback is
+confirmed in Google Cloud and a Debug sign-in succeeds with an authorized test
+user.
+
+### Latest live Staging check (2026-09-30)
+
+- The owner-provided Supabase and Render API credentials are available to
+  `agentctl` through the local OS keyring. The temporary `agentctl` access
+  lease is turned off after each operation.
+- The dedicated Supabase Staging project is `ACTIVE_HEALTHY` in
+  `ap-southeast-1`. It has zero Auth users and zero public tables. The
+  `public.evidrilo_schema_migrations` ledger does not exist, and no repository
+  migrations have been applied. A new Staging-only database-owner password is
+  stored in the local OS keyring; its TLS session-pooler connection was
+  verified. It is not present in Render, GitHub, or the repository.
+- The Render owner workspace is reachable, but its service list is empty. No
+  API or worker service, Git repository connection, or deployment exists yet.
+- Local `main` and `origin/main` are both at
+  `85582b8a920106870ef10d7a59669f5f8b9a5238`. GitHub `Verify` failed for this
+  SHA in contract/migration checks, public-package boundary, and mobile
+  compile/JVM checks; the ASP.NET/worker job passed.
+- The worktree contains extensive uncommitted application changes and
+  untracked migrations `053` and `054`. Migration `054` was amended locally to
+  install its account-deletion cleanup trigger, but this change is not frozen
+  or verified. API/worker least-privilege database grants also remain
+  unproven.
+
+Do not apply migrations or create Render services until the application and
+migration changes are frozen on a commit whose `Verify` workflow passes, and
+separate API and worker database roles have reviewed grants. Production remains
+untouched.
 
 ## Official references
 

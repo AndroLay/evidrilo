@@ -48,4 +48,16 @@ internal fun getStartedPreviewFor(
         title = preview.reviewFocus.previewTitle,
         detail = "You stay in control of the interpretation and any next step.",
     )
+    GetStartedTourStep.ASSISTANCE -> GetStartedPreviewContent(
+        title = "Optional AI help",
+        detail = "Review suggestions before using them. Availability depends on your account and enabled services.",
+    )
+    GetStartedTourStep.PORTABILITY -> GetStartedPreviewContent(
+        title = "History and exports",
+        detail = "Keep local revisions, export a report, or move a project using an Evidrilo archive.",
+    )
+    GetStartedTourStep.READY -> GetStartedPreviewContent(
+        title = "Your next question",
+        detail = "Open My Projects to create your own project explicitly.",
+    )
 }

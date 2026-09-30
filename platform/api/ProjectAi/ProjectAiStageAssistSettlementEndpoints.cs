@@ -30,6 +30,7 @@ public static class ProjectAiStageAssistSettlementEndpoints
                 IProjectAiActivityStore activityStore,
                 IProjectAiConsentStore consentStore,
                 IStudentProjectStore studentProjectStore,
+                IProjectAiLocalProjectContextStore localProjectContextStore,
                 CancellationToken cancellationToken) =>
             {
                 if (!AuthenticatedUser.TryGetAccountId(context.User, out var accountId))
@@ -71,6 +72,9 @@ public static class ProjectAiStageAssistSettlementEndpoints
                     || activity.ProjectId is null
                     || activity.BaseProjectRevision is null)
                     return Error(context, "PROJECT_AI_SETTLEMENT_CONFLICT", "The activity cannot be settled as a project preview.", StatusCodes.Status409Conflict);
+                if ((validRequest.Outcome is "APPLIED" or "EDITED")
+                    && activity.UsesLocalProjectContext != validRequest.ResultProjectBindingGeneration.HasValue)
+                    return Invalid(context, "INVALID_PROJECT_AI_STAGE_ASSIST_SETTLEMENT");
 
                 var settlementHash = ComputeSettlementHash(validRequest);
                 if (activity.Outcome != ProjectAiActivityOutcomes.Pending)
@@ -114,6 +118,25 @@ public static class ProjectAiStageAssistSettlementEndpoints
                         finalOutcome = ProjectAiActivityOutcomes.Stale;
                         finalRevision = null;
                         staleCode = "PROJECT_AI_RESULT_STALE";
+                    }
+                    else if (activity.UsesLocalProjectContext)
+                    {
+                        var resultBindingGeneration = validRequest.ResultProjectBindingGeneration!.Value;
+                        var project = await localProjectContextStore.ReadOwnAsync(
+                            accountId,
+                            activity.ProjectId.Value,
+                            cancellationToken);
+                        if (project is null
+                            || project.CurrentRevision != validRequest.ResultProjectRevision
+                            || project.CurrentRevision <= activity.BaseProjectRevision
+                            || activity.BaseProjectBindingGeneration is null
+                            || project.BindingGeneration != resultBindingGeneration
+                            || resultBindingGeneration <= activity.BaseProjectBindingGeneration.Value)
+                        {
+                            finalOutcome = ProjectAiActivityOutcomes.Stale;
+                            finalRevision = null;
+                            staleCode = "PROJECT_AI_RESULT_STALE";
+                        }
                     }
                     else
                     {
@@ -171,7 +194,7 @@ public static class ProjectAiStageAssistSettlementEndpoints
         return endpoints;
     }
 
-    private static string ComputeSettlementHash(ProjectAiStageAssistSettlementRequest request)
+    internal static string ComputeSettlementHash(ProjectAiStageAssistSettlementRequest request)
     {
         var canonical = string.Concat(
             "project-ai-stage-assist-settlement:v1\n",
@@ -181,7 +204,9 @@ public static class ProjectAiStageAssistSettlementEndpoints
             "\n",
             request.Outcome,
             "\n",
-            request.ResultProjectRevision?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
+            request.ResultProjectRevision?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-",
+            "\n",
+            request.ResultProjectBindingGeneration?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 

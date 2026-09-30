@@ -91,10 +91,15 @@ public sealed class OpenAiProjectAiGeneratorTests
     }
 
     [Fact]
-    public async Task General_chat_generator_sends_only_the_redacted_message_and_a_strict_answer_schema()
+    public async Task General_chat_generator_sends_only_the_redacted_message_and_returns_recommended_next_prompts()
     {
         const string answer = "Repeated measurements help describe variation.";
-        var provider = new RecordingAiProvider(JsonSerializer.Serialize(new { answer }));
+        var recommendedNextPrompts = new[]
+        {
+            "How many repetitions would help compare variation?",
+            "Which limitation could still affect the conclusion?",
+        };
+        var provider = new RecordingAiProvider(JsonSerializer.Serialize(new { answer, recommendedNextPrompts }));
         var generator = CreateGenerator(provider);
         var request = new ProjectAiGeneralChatProviderRequest(
             AccountId,
@@ -107,6 +112,7 @@ public sealed class OpenAiProjectAiGeneratorTests
 
         Assert.NotNull(output);
         Assert.Equal(answer, output.Answer);
+        Assert.Equal(recommendedNextPrompts, output.RecommendedNextPrompts);
         Assert.Equal(Usage, output.Usage);
         Assert.NotNull(provider.Request);
         Assert.NotEqual(request.RequestId, provider.Request.RequestId);
@@ -115,8 +121,13 @@ public sealed class OpenAiProjectAiGeneratorTests
         Assert.DoesNotContain("projectId", provider.Request.RedactedInput, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("project_general_chat_v2", provider.Request.StructuredOutputSchemaName);
         using var schema = JsonDocument.Parse(provider.Request.StructuredOutputSchema!.ToJsonString());
-        Assert.Equal("answer", schema.RootElement.GetProperty("required")[0].GetString());
+        Assert.Equal(
+            new[] { "answer", "recommendedNextPrompts" },
+            schema.RootElement.GetProperty("required").EnumerateArray().Select(item => item.GetString()).ToArray());
         Assert.False(schema.RootElement.GetProperty("additionalProperties").GetBoolean());
+        var promptSchema = schema.RootElement.GetProperty("properties").GetProperty("recommendedNextPrompts");
+        Assert.Equal(1, promptSchema.GetProperty("minItems").GetInt32());
+        Assert.Equal(3, promptSchema.GetProperty("maxItems").GetInt32());
         Assert.Contains("without access to any project", provider.Request.SystemInstructions!, StringComparison.OrdinalIgnoreCase);
     }
 

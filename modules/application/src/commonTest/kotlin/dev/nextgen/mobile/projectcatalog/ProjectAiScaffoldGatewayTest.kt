@@ -145,7 +145,10 @@ class ProjectAiScaffoldGatewayTest {
     @Test
     fun `provider disabled response remains unavailable and is not represented as generated content`() {
         val gateway = gateway(QueueProjectAiTransport(
-            AccountHttpResponse(503, """{"code":"PROJECT_AI_NOT_READY"}"""),
+            AccountHttpResponse(
+                503,
+                """{"schema":"evidrilo.http-error","version":"1","code":"PROJECT_AI_NOT_READY","message":"not ready","requestId":"request-0001"}""",
+            ),
         ))
 
         val result = runSuspendTest {
@@ -190,7 +193,10 @@ class ProjectAiScaffoldGatewayTest {
     @Test
     fun `server consent revocation is not misreported as authentication failure`() {
         val gateway = gateway(QueueProjectAiTransport(
-            AccountHttpResponse(403, """{"code":"PROJECT_AI_CONSENT_REQUIRED"}"""),
+            AccountHttpResponse(
+                403,
+                """{"schema":"evidrilo.http-error","version":"1","code":"PROJECT_AI_CONSENT_REQUIRED","message":"consent required","requestId":"request-0001"}""",
+            ),
         ))
 
         val result = runSuspendTest {

@@ -175,10 +175,7 @@ internal fun EvidriloLoadingScreen(
                 color = EvidriloColors.White.copy(alpha = 0.85f),
             )
             if (presentation.canGoBack && onBack != null) {
-                EvidriloSecondaryButton(
-                    label = "Go back",
-                    onClick = onBack,
-                )
+                EvidriloBackGesture(label = "Leave loading screen", onClick = onBack)
             }
         }
     }

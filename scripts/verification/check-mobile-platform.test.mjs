@@ -184,6 +184,22 @@ test('CI exposes Android release and a separate unsigned iOS host lane', () => {
   assert.match(iosWorkflow, /evidrilo-ios-build/);
 });
 
+test('Linux Verify lane uses Android source-set tasks and leaves iOS builds to the Mac lane', () => {
+  const workflow = read('.github/workflows/verify.yml');
+  const mobileStart = workflow.indexOf('\n  mobile:');
+  const contractsStart = workflow.indexOf('\n  contracts:', mobileStart);
+  assert.notEqual(mobileStart, -1, 'Linux mobile job is missing');
+  assert.notEqual(contractsStart, -1, 'contracts job is missing');
+
+  const mobileJob = workflow.slice(mobileStart, contractsStart);
+  assert.match(mobileJob, /:modules:core:compileAndroidMain/);
+  assert.match(mobileJob, /:modules:application:compileAndroidMain/);
+  assert.match(mobileJob, /:modules:features:compileAndroidMain/);
+  assert.match(mobileJob, /:composeApp:compileAndroidMain/);
+  assert.doesNotMatch(mobileJob, /compileDebugKotlinAndroid/);
+  assert.doesNotMatch(mobileJob, /compileKotlinIosSimulatorArm64/);
+});
+
 test('CI runs an iOS simulator smoke test and uploads evidence', () => {
   const workflow = read('.github/workflows/ios-simulator.yml');
   const smokeScriptPath = path.join(repositoryRoot, 'scripts', 'ios', 'smoke-simulator.sh');

@@ -87,23 +87,28 @@ families adopted in D-112. The backend foundation now provides the versioned
 catalog contract, published-only browse/detail APIs, and a separately
 authorized author/reviewer/publisher lifecycle. Review-selected example IDs
 are server-owned; client-authored `reviewed` flags cannot satisfy publication.
-The current mobile flow includes offline family overviews, published template
-browse/detail, a My Projects list, and local project-draft storage and editing.
+The current mobile flow includes offline family overviews, a bundled
+structure-only starter for each family, published template browse/detail, a My
+Projects list, and local project-draft storage and editing. Each starter opens
+an editable local project containing its versioned fields and stages; its
+method limits, provenance, and accessibility notes can be reopened in the
+project. It does not prefill student work or claim human review.
 Under D-120, Home, anonymous read-only catalog browsing, and manual/local
 project work do not require sign-in; the separate M0 learning workflow remains
-account-gated. Template-backed creation requires an actually published and
-reviewed server detail, while a blank/manual project remains available when
-the catalog is empty. Sign-in does not enable cloud sync or upload, and project
-draft content is not academically evaluated by this path.
+account-gated. Local starter creation does not depend on the remote catalog.
+Creation from a remote method template requires an actually published and
+reviewed server detail, while blank/manual creation remains available. Sign-in
+does not enable cloud sync or upload, and project draft content is not
+academically evaluated by this path.
 
 The five intended families are experimental/laboratory, observational/survey,
 literature review, qualitative interview/field study, and design/engineering.
 Do not expose empty placeholders as usable choices. At the E225 API-linked
 Android smoke observation, the local API was reachable and returned no seeded
-or published template content: all five family counts were zero. No newer API
-read is claimed by this roadmap. Students can
-browse family guidance and the My Projects empty state, but cannot start a
-template-backed project yet. A concrete template must pass scope, input/output,
+or published remote template content: all five server family counts were zero.
+No newer API read is claimed by this roadmap. Students can now start local
+structure-only family projects; E225 says nothing about those newer local
+starters. A remote method template must pass scope, input/output,
 method-limit, provenance, accessibility, and reviewed-example gates. Select the
 first method from evidence about a recurring student task, with appropriate
 human/domain review; no participant contact or real student data is authorized
@@ -224,8 +229,9 @@ freeze.
    credit/cost treatment, D-114 quota enforcement, manual/offline fallback,
    provider failure recovery, and Android end-to-end evidence. AI cannot invent
    sources/data, write a finished academic deliverable, or determine evaluator
-   truth. At the time of this update no catalog template is selectable and the
-   provider is disabled. Local implementation is active; if template review,
+   truth. At the time of this update no reviewed remote template is available
+   and the provider is disabled. Bundled structure-only starters do not qualify
+   as AI templates. Local implementation is active; if template review,
    provider/privacy authorization, quota integration, or runtime proof is still
    open at freeze, mark the feature incomplete and do not claim or depict it as
    live. D-116 does not authorize provider activation, spending, deployment, or
@@ -291,17 +297,17 @@ student consent, privacy, accessibility, and owner authorization requirements.
 
 ### Five-family selectable project-template catalog (D-112, timing advanced by D-113)
 
-The adopted long-term catalog is organized into five student-selectable
-families: experimental and laboratory work; observational and survey studies;
-literature reviews; qualitative interviews and field studies; and design and
-engineering projects. Students may choose the family that fits their task;
-starting from an assignment/question remains a general entry path, not another
-method category. Catalog development is active now under D-113, but this is not
-a claim that five complete templates or evaluators are already available. Only
-a concrete, versioned, reviewed template may appear as an actionable choice.
-Choose the first method-specific template after validating a recurring student
-task, then expand incrementally. Do not silently classify ambiguous
-assignments, merge different methods, or make hypotheses universal.
+The student workspace has five bundled, offline family starters: experimental
+and laboratory work; observational and survey studies; literature reviews;
+qualitative interviews and field studies; and design and engineering
+projects. Each can start an editable local project from a versioned
+structure-only snapshot, with no invented student content. They do not imply
+human review, validated method guidance, or an evaluator. The separate remote
+catalog remains empty of reviewed selectable templates at the last recorded
+observation. Only a concrete, versioned, human/domain-reviewed remote template
+may be described as reviewed method guidance or used for project AI. Do not
+silently classify ambiguous assignments, merge different methods, or make
+hypotheses universal.
 
 The exact first segment, assignment, method, evaluator thresholds, content
 license, and pack format are open validation outcomes. The intended direction

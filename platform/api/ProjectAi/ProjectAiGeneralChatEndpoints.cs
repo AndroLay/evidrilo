@@ -31,6 +31,9 @@ public sealed class DisabledProjectAiGeneralChatGenerator : IProjectAiGeneralCha
 
 public static class ProjectAiGeneralChatEndpoints
 {
+    private const string RequestConsentHeader = "X-Evidrilo-General-Chat-Consent";
+    private const string CurrentRequestConsentVersion = "general-chat.v1";
+
     private static readonly JsonSerializerOptions RequestJsonOptions = new(JsonSerializerDefaults.Web)
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
@@ -62,6 +65,8 @@ public static class ProjectAiGeneralChatEndpoints
                     return Error(context, "FORBIDDEN", "A verified account is required for project AI.", StatusCodes.Status403Forbidden);
                 if (!TryGetRequestId(context, out var requestId))
                     return Invalid(context, "INVALID_IDEMPOTENCY_KEY");
+                if (!HasCurrentRequestConsent(context))
+                    return GeneralChatConsentRequired(context);
                 if (!generator.IsEnabled)
                     return Unavailable(context, "PROJECT_AI_GENERAL_CHAT_NOT_READY");
 
@@ -211,37 +216,25 @@ public static class ProjectAiGeneralChatEndpoints
                     return Unavailable(context, "PROJECT_AI_PROVIDER_UNAVAILABLE");
                 }
 
-                ProjectAiConsentState afterProviderConsent;
+                ProjectAiConsentState? afterProviderConsent = null;
                 try
                 {
-                    afterProviderConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
+                    // The provider has already run. Do not let client cancellation skip the
+                    // post-dispatch consent check or usage settlement.
+                    afterProviderConsent = await consentStore.ReadOwnAsync(accountId, CancellationToken.None);
                 }
                 catch
                 {
-                    await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    throw;
-                }
-                if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent))
-                {
-                    await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return ConsentRequired(context);
+                    // Fail closed on delivery below, but still settle verifiable provider usage.
                 }
 
                 if (output is null)
                 {
                     await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    if (afterProviderConsent is not null && !ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent))
+                        return ConsentRequired(context);
                     return Error(context, "PROJECT_AI_REFUSED", "General chat did not return an answer.", StatusCodes.Status422UnprocessableEntity);
-                }
-
-                if (string.IsNullOrWhiteSpace(output.Answer)
-                    || output.Answer.Length > ProjectAiGeneralChatValidator.MaximumAnswerLength)
-                {
-                    await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The General chat response could not be verified.", StatusCodes.Status502BadGateway);
                 }
 
                 int settledCreditCost;
@@ -266,25 +259,66 @@ public static class ProjectAiGeneralChatEndpoints
                     return Error(context, "PROJECT_AI_COST_LIMIT", "General chat usage exceeded the reserved credit amount.", StatusCodes.Status502BadGateway);
                 }
 
+                var consentStillAuthorizesDelivery = afterProviderConsent is not null &&
+                    ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent);
+                if (!consentStillAuthorizesDelivery)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
+                    return Error(
+                        context,
+                        afterProviderConsent is null
+                            ? "PROJECT_AI_CONSENT_CHECK_UNAVAILABLE_AFTER_PROVIDER"
+                            : "PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER",
+                        afterProviderConsent is null
+                            ? "Consent could not be rechecked after provider processing. The response was withheld; no project data was changed and the credit reservation was released."
+                            : "Consent changed after provider processing. The response was withheld; no project data was changed and the credit reservation was released.",
+                        afterProviderConsent is null ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status403Forbidden);
+                }
+
+                if (string.IsNullOrWhiteSpace(output.Answer)
+                    || output.Answer.Length > ProjectAiGeneralChatValidator.MaximumAnswerLength
+                    || output.RecommendedNextPrompts is null
+                    || output.RecommendedNextPrompts.Count is < ProjectAiGeneralChatValidator.MinimumRecommendedNextPrompts
+                        or > ProjectAiGeneralChatValidator.MaximumRecommendedNextPrompts
+                    || output.RecommendedNextPrompts.Any(prompt =>
+                        string.IsNullOrWhiteSpace(prompt)
+                        || prompt.Length > ProjectAiGeneralChatValidator.MaximumRecommendedNextPromptLength
+                        || prompt.Any(char.IsControl))
+                    || output.RecommendedNextPrompts.Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                        != output.RecommendedNextPrompts.Count)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
+                    return Error(
+                        context,
+                        "PROJECT_AI_INVALID_RESPONSE",
+                        "The response was withheld because it failed validation; the credit reservation was released.",
+                        StatusCodes.Status502BadGateway);
+                }
+
                 bool settled;
                 try
                 {
-                    settled = await creditLedger.CompleteAsync(
-                        accountId,
-                        reservation,
-                        accepted: true,
-                        settledCreditCost,
-                        cancellationToken);
+                    settled = await SettleActualUsageAsync(creditLedger, accountId, reservation, settledCreditCost);
                 }
                 catch
                 {
                     await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
-                    throw;
+                    return Error(
+                        context,
+                        "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN",
+                        "Verified provider usage could not be reconciled. Check the balance before another request.",
+                        StatusCodes.Status503ServiceUnavailable);
                 }
                 if (!settled)
                 {
                     await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Failed);
-                    return Error(context, "PROJECT_AI_RESERVATION_EXPIRED", "The credit reservation expired before the answer was ready.", StatusCodes.Status409Conflict);
+                    return Error(
+                        context,
+                        "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN",
+                        "Verified provider usage could not be reconciled. Check the balance before another request.",
+                        StatusCodes.Status503ServiceUnavailable);
                 }
 
                 await CompleteActivityAsync(logger, activityStore, accountId, installationId, requestId, ProjectAiActivityOutcomes.Completed);
@@ -295,6 +329,7 @@ public static class ProjectAiGeneralChatEndpoints
                         ProjectAiGeneralChatValidator.Mode,
                         "success",
                         output.Answer,
+                        output.RecommendedNextPrompts,
                         requestId,
                         settledCreditCost),
                     options: ResponseJsonOptions);
@@ -309,6 +344,13 @@ public static class ProjectAiGeneralChatEndpoints
     {
         requestId = context.Request.Headers["Idempotency-Key"].ToString();
         return ProjectAiScaffoldValidator.IsValidRequestId(requestId);
+    }
+
+    private static bool HasCurrentRequestConsent(HttpContext context)
+    {
+        var values = context.Request.Headers[RequestConsentHeader];
+        return values.Count == 1
+            && string.Equals(values[0], CurrentRequestConsentVersion, StringComparison.Ordinal);
     }
 
     private static string ComputeRequestHash(
@@ -367,8 +409,32 @@ public static class ProjectAiGeneralChatEndpoints
             settledCreditCost: 0,
             CancellationToken.None);
 
+    private static async Task<bool> SettleActualUsageAsync(
+        IAiCreditLedger creditLedger,
+        Guid accountId,
+        AiCreditReservation reservation,
+        int actualCreditCost)
+    {
+        try
+        {
+            return await creditLedger.CompleteAsync(
+                accountId,
+                reservation,
+                accepted: true,
+                settledCreditCost: actualCreditCost,
+                CancellationToken.None);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static IResult ConsentRequired(HttpContext context) =>
         Error(context, "PROJECT_AI_CONSENT_REQUIRED", "Review and accept the current Project AI data-use policy before using General chat.", StatusCodes.Status403Forbidden);
+
+    private static IResult GeneralChatConsentRequired(HttpContext context) =>
+        Error(context, "GENERAL_CHAT_CONSENT_REQUIRED", "Confirm the current General chat data-use notice before each request.", StatusCodes.Status403Forbidden);
 
     private static IResult Invalid(HttpContext context, string code) =>
         Error(context, code, "The General chat request is invalid.", StatusCodes.Status400BadRequest);
@@ -378,4 +444,5 @@ public static class ProjectAiGeneralChatEndpoints
 
     private static IResult Error(HttpContext context, string code, string message, int statusCode) =>
         Results.Json(ApiErrors.Create(context, code, message), statusCode: statusCode);
+
 }

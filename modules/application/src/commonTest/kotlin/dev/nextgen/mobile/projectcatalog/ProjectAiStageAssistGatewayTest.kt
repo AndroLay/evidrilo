@@ -20,22 +20,26 @@ class ProjectAiStageAssistGatewayTest {
         val request = validRequest()
 
         val result = runSuspendTest {
-            gateway(transport).generatePreview(request, "stage_ai_req_0001")
+            gateway(transport).generatePreview(request, "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         val preview = assertIs<ProjectAiStageAssistResult.Preview>(result).value
         assertEquals("stage_ai_req_0001", preview.requestId)
         assertEquals(3, preview.creditCost)
+        assertEquals(4, preview.consentGeneration)
         assertEquals("NOT_ASSESSED", preview.evaluationPreview.assessmentStatus)
         assertEquals("revised question", preview.items.single().afterValue)
         assertEquals("evidence_01", preview.items.single().referenceIds.single())
         assertEquals("Bearer access-token", transport.headers["Authorization"])
         assertEquals("stage_ai_req_0001", transport.headers["Idempotency-Key"])
+        assertEquals("project-ai.v1", transport.headers["X-Evidrilo-Project-AI-Consent"])
         assertEquals("/v1/project-ai/stage-assist", transport.path)
         assertEquals(true, transport.body?.contains("\"mode\":\"PROJECT\"") == true)
         assertEquals(true, transport.body?.contains("\"selectedFieldIds\":[\"research_question\"]") == true)
+        assertEquals(true, transport.body?.contains("\"selectedFields\":[{\"id\":\"research_question\",\"value\":\"old question\"}]") == true)
         assertEquals(true, transport.body?.contains("\"selectedEvidenceIds\":[\"evidence_01\"]") == true)
-        assertEquals(false, transport.body?.contains("old question") == true)
+        assertEquals(true, transport.body?.contains("\"selectedEvidence\":[{\"id\":\"evidence_01\",\"kind\":\"DATA\",\"label\":\"Collected data\",\"summary\":\"Only the selected observation\",\"origin\":\"Student project\"}]") == true)
+        assertEquals(false, transport.body?.contains("Unselected private note") == true)
     }
 
     @Test
@@ -43,7 +47,7 @@ class ProjectAiStageAssistGatewayTest {
         val result = runSuspendTest {
             gateway(QueueStageAssistTransport(
                 AccountHttpResponse(200, previewJson(referenceId = "evidence_not_selected")),
-            )).generatePreview(validRequest(), "stage_ai_req_0001")
+            )).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(ProjectAiStageAssistResult.Rejected("INVALID_PROJECT_AI_STAGE_ASSIST_RESPONSE"), result)
@@ -56,7 +60,7 @@ class ProjectAiStageAssistGatewayTest {
             .replace("\"proposalsWithoutReferences\":[]", "\"proposalsWithoutReferences\":[\"proposal_01\"]")
         val result = runSuspendTest {
             gateway(QueueStageAssistTransport(AccountHttpResponse(200, response)))
-                .generatePreview(validRequest(), "stage_ai_req_0001")
+                .generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(ProjectAiStageAssistResult.Rejected("INVALID_PROJECT_AI_STAGE_ASSIST_RESPONSE"), result)
@@ -67,7 +71,7 @@ class ProjectAiStageAssistGatewayTest {
         val result = runSuspendTest {
             gateway(QueueStageAssistTransport(
                 AccountHttpResponse(200, previewJson(beforeValue = "stale value")),
-            )).generatePreview(validRequest(), "stage_ai_req_0001")
+            )).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(ProjectAiStageAssistResult.Rejected("PROJECT_AI_CONTEXT_STALE"), result)
@@ -78,27 +82,105 @@ class ProjectAiStageAssistGatewayTest {
         val response = previewJson().replace("\"stageId\":\"question\"", "\"stageId\":\"other_stage\"")
         val result = runSuspendTest {
             gateway(QueueStageAssistTransport(AccountHttpResponse(200, response)))
-                .generatePreview(validRequest(), "stage_ai_req_0001")
+                .generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(ProjectAiStageAssistResult.Rejected("PROJECT_AI_CONTEXT_MISMATCH"), result)
     }
 
     @Test
+    fun `local project context registration sends metadata only under the verified account session`() {
+        val response = """
+            {"schema":"evidrilo.project-ai-local-project-context","version":"1","projectId":"$PROJECT_ID","projectRevision":7,"bindingGeneration":5,"templateId":"reviewed_template","templateVersion":2,"status":"registered","requestId":"server_req_0001"}
+        """.trimIndent()
+        val transport = QueueStageAssistTransport(AccountHttpResponse(200, response))
+
+        val result = runSuspendTest {
+            gateway(transport).registerLocalProjectContext(
+                projectId = PROJECT_ID,
+                installationId = INSTALLATION_ID,
+                templateId = "reviewed_template",
+                templateVersion = 2,
+                projectRevision = 7,
+                availableEvidenceIds = listOf("evidence_01", "source_01"),
+                explicitlyConfirmedForRequest = true,
+            )
+        }
+
+        assertEquals(ProjectAiLocalContextBindingResult.Registered(7, 5), result)
+        assertEquals("PUT", transport.method)
+        assertEquals("/v1/project-ai/projects/$PROJECT_ID/local-context", transport.path)
+        assertEquals("Bearer access-token", transport.headers["Authorization"])
+        assertEquals("project-ai.v1", transport.headers["X-Evidrilo-Project-AI-Consent"])
+        assertEquals(true, transport.body?.contains("\"availableEvidenceIds\":[\"evidence_01\",\"source_01\"]") == true)
+        assertEquals(false, transport.body?.contains("question text") == true)
+        assertEquals(false, transport.body?.contains("summary") == true)
+    }
+
+    @Test
+    fun `local project context registration fails closed for invalid identity and consent`() {
+        val invalidTransport = QueueStageAssistTransport(AccountHttpResponse(200, "{}"))
+        val invalid = runSuspendTest {
+            gateway(invalidTransport).registerLocalProjectContext(
+                projectId = "not-a-uuid",
+                installationId = INSTALLATION_ID,
+                templateId = "reviewed_template",
+                templateVersion = 2,
+                projectRevision = 7,
+                availableEvidenceIds = emptyList(),
+                explicitlyConfirmedForRequest = true,
+            )
+        }
+        val consentTransport = QueueStageAssistTransport(AccountHttpResponse(403, """{"code":"PROJECT_AI_CONSENT_REQUIRED"}"""))
+        val consent = runSuspendTest {
+            gateway(consentTransport).registerLocalProjectContext(
+                projectId = PROJECT_ID,
+                installationId = INSTALLATION_ID,
+                templateId = "reviewed_template",
+                templateVersion = 2,
+                projectRevision = 7,
+                availableEvidenceIds = emptyList(),
+                explicitlyConfirmedForRequest = true,
+            )
+        }
+
+        assertEquals(ProjectAiLocalContextBindingResult.Rejected("INVALID_PROJECT_AI_CONTEXT"), invalid)
+        assertEquals(0, invalidTransport.calls)
+        assertEquals(ProjectAiLocalContextBindingResult.Rejected("PROJECT_AI_CONSENT_REQUIRED"), consent)
+    }
+
+    @Test
     fun `unavailable response never becomes an unknown mutation outcome`() {
         val transport = QueueStageAssistTransport(AccountHttpResponse(503, """{"code":"PROJECT_AI_NOT_READY"}"""))
         val result = runSuspendTest {
-            gateway(transport).generatePreview(validRequest(), "stage_ai_req_0001")
+            gateway(transport).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(ProjectAiStageAssistResult.Unavailable("PROJECT_AI_NOT_READY"), result)
     }
 
     @Test
+    fun `withheld preview exposes verified provider usage cost without returning content`() {
+        val result = runSuspendTest {
+            gateway(QueueStageAssistTransport(
+                AccountHttpResponse(
+                    403,
+                    """{"code":"PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER","creditCost":2}""",
+                ),
+            )).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
+        }
+
+        assertEquals(
+            ProjectAiStageAssistResult.Rejected("PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER", creditCost = 2),
+            result,
+        )
+    }
+
+    @Test
     fun `transient dispatch failure preserves only the same idempotency key for reconciliation`() {
         val result = runSuspendTest {
             gateway(QueueStageAssistTransport(AccountHttpResponse(500, """{"code":"TEMPORARY_ERROR"}""")))
-                .generatePreview(validRequest(), "stage_ai_req_0001")
+                .generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         val failed = assertIs<ProjectAiStageAssistResult.Failed>(result)
@@ -109,16 +191,54 @@ class ProjectAiStageAssistGatewayTest {
     }
 
     @Test
+    fun `stale and invalid requests are rejected instead of treated as unknown outcomes`() {
+        listOf(
+            Triple(409, "PROJECT_AI_CONTEXT_STALE", 2),
+            Triple(422, "INVALID_PROJECT_AI_STAGE_ASSIST", null),
+        ).forEach { (statusCode, errorCode, creditCost) ->
+            val result = runSuspendTest {
+                gateway(
+                    QueueStageAssistTransport(
+                        AccountHttpResponse(
+                            statusCode,
+                            "{\"code\":\"$errorCode\"${creditCost?.let { ",\"creditCost\":$it" }.orEmpty()}}",
+                        ),
+                    ),
+                ).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
+            }
+
+            assertEquals(ProjectAiStageAssistResult.Rejected(errorCode, creditCost), result)
+        }
+    }
+
+    @Test
     fun `unverified account does not dispatch selected project context`() {
         val transport = QueueStageAssistTransport(AccountHttpResponse(200, previewJson()))
         val result = runSuspendTest {
-            gateway(transport, verified = false).generatePreview(validRequest(), "stage_ai_req_0001")
+            gateway(transport, verified = false).generatePreview(validRequest(), "stage_ai_req_0001", explicitlyConfirmedForRequest = true)
         }
 
         assertEquals(
             ProjectAiStageAssistResult.Deferred(ProjectAiStageAssistDeferredReason.AUTH_REQUIRED),
             result,
         )
+        assertEquals(0, transport.calls)
+        assertNull(transport.body)
+    }
+
+    @Test
+    fun `stage assistance is not dispatched without request-specific consent`() {
+        val transport = QueueStageAssistTransport(AccountHttpResponse(200, previewJson()))
+
+        val result = runSuspendTest {
+            gateway(transport).generatePreview(
+                validRequest(),
+                "stage_ai_req_0001",
+                explicitlyConfirmedForRequest = false,
+            )
+        }
+
+        assertEquals(ProjectAiStageAssistResult.Rejected("PROJECT_AI_REQUEST_CONSENT_REQUIRED"), result)
         assertEquals(0, transport.calls)
         assertNull(transport.body)
     }
@@ -132,7 +252,9 @@ class ProjectAiStageAssistGatewayTest {
                 installationId = INSTALLATION_ID,
                 outcome = ProjectAiStageAssistOutcome.APPLIED,
                 baseProjectRevision = 7,
+                baseProjectBindingGeneration = 5,
                 resultProjectRevision = 8,
+                resultProjectBindingGeneration = 6,
                 expectedCreditCost = 3,
             )
         }
@@ -160,7 +282,9 @@ class ProjectAiStageAssistGatewayTest {
                 installationId = INSTALLATION_ID,
                 outcome = ProjectAiStageAssistOutcome.APPLIED,
                 baseProjectRevision = 7,
+                baseProjectBindingGeneration = 5,
                 resultProjectRevision = 7,
+                resultProjectBindingGeneration = 6,
                 expectedCreditCost = 3,
             )
         }
@@ -181,7 +305,9 @@ class ProjectAiStageAssistGatewayTest {
                     installationId = INSTALLATION_ID,
                     outcome = ProjectAiStageAssistOutcome.APPLIED,
                     baseProjectRevision = 7,
+                    baseProjectBindingGeneration = 5,
                     resultProjectRevision = 8,
+                    resultProjectBindingGeneration = 6,
                     expectedCreditCost = 3,
                 )
         }
@@ -201,15 +327,22 @@ class ProjectAiStageAssistGatewayTest {
 
     private fun validRequest() = ProjectAiStageAssistRequest(
         installationId = INSTALLATION_ID,
-        cloudProjectId = PROJECT_ID,
+        projectId = PROJECT_ID,
         templateId = "reviewed_template",
         templateVersion = 2,
         stageId = "question",
         operationId = "refine_question",
-        baseCloudProjectRevision = 7,
+        baseProjectRevision = 7,
+        baseProjectBindingGeneration = 5,
         selectedFieldValues = mapOf("research_question" to "old question"),
         selectedEvidence = listOf(
-            ProjectAiStageAssistSelectedEvidence("evidence_01", "DATA", "Collected data"),
+            ProjectAiStageAssistSelectedEvidence(
+                "evidence_01",
+                "DATA",
+                "Collected data",
+                summary = "Only the selected observation",
+                origin = "Student project",
+            ),
         ),
         locale = "en-US",
     )
@@ -224,7 +357,9 @@ class ProjectAiStageAssistGatewayTest {
           "status":"preview",
           "mode":"PROJECT",
           "projectId":"$PROJECT_ID",
-          "baseProjectRevision":7,
+            "baseProjectRevision":7,
+            "projectBindingGeneration":5,
+            "consentGeneration":4,
           "stageId":"question",
           "operationId":"refine_question",
           "assist":{
@@ -271,6 +406,7 @@ class ProjectAiStageAssistGatewayTest {
         private val response: AccountHttpResponse,
     ) : AccountHttpTransport {
         var calls = 0
+        var method: String? = null
         var path: String? = null
         var headers: Map<String, String> = emptyMap()
         var body: String? = null
@@ -282,6 +418,7 @@ class ProjectAiStageAssistGatewayTest {
             body: String,
         ): AccountHttpResponse {
             calls += 1
+            this.method = method
             this.path = url.substringAfter("api.example.test")
             this.headers = headers
             this.body = body

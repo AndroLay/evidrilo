@@ -56,6 +56,15 @@ issue reports.
 - Account-scoped rows use database controls in addition to API authorization.
   Local PostgreSQL tests are not proof of managed grants or hosted policy
   configuration.
+- Account export v1 remains synchronous with its 128 KiB response ceiling.
+  Verified-account export v2 requires an idempotency key, limits each account
+  to one active export, scopes status/download/cancellation by account, and
+  sends `no-store` headers. Its database-backed queue is capped at 100 jobs;
+  the worker holds one global advisory lock, fences 60-second renewable leases,
+  allows at most three attempts, caps each artifact at 64 MiB and ready storage
+  at 512 MiB, then purges jobs after 24 hours. V2 includes Project AI consent,
+  activity, and conversation metadata but excludes prompts, responses, and
+  provider request hashes. Account deletion purges the export rows and payloads.
 - Sensitive lifecycle events are append-only and actor-bound; account
   deletion follows explicit confirmation and preserves only deletion-safe
   audit records.
@@ -117,7 +126,9 @@ issue reports.
   General chat additionally requires `PROJECT_AI_GENERAL_CHAT_POLICY_APPROVED`,
   which defaults to false. It accepts only a bounded redacted message and keeps
   metadata-only history; the separate gate represents approval of its cost,
-  limit, and provider-retention policy.
+  limit, and provider-retention policy. Each request also requires the exact
+  `X-Evidrilo-General-Chat-Consent: general-chat.v1` header before credit
+  reservation or provider dispatch.
 
 ## Billing
 

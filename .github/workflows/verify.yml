@@ -35,26 +35,25 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache
           :modules:core:jvmTest
           :modules:core:compileKotlinJvm
-          :modules:core:compileKotlinIosSimulatorArm64
-          :modules:core:compileDebugKotlinAndroid
+          :modules:core:compileAndroidMain
           :modules:domain:jvmTest
           :modules:domain:compileKotlinJvm
           :modules:data:jvmTest
           :modules:data:compileKotlinJvm
+          :modules:data:testAndroidHostTest
           :modules:design-system:jvmTest
           :modules:design-system:compileKotlinJvm
           :modules:application:jvmTest
           :modules:application:compileKotlinJvm
-          :modules:application:compileKotlinIosSimulatorArm64
-          :modules:application:compileDebugKotlinAndroid
+          :modules:application:compileAndroidMain
+          :modules:application:testAndroidHostTest
           :modules:features:jvmTest
           :modules:features:compileKotlinJvm
-          :modules:features:compileKotlinIosSimulatorArm64
-          :modules:features:compileDebugKotlinAndroid
+          :modules:features:compileAndroidMain
           :composeApp:jvmTest
           :composeApp:compileKotlinJvm
-          :composeApp:compileKotlinIosSimulatorArm64
-          :composeApp:compileDebugKotlinAndroid
+          :composeApp:compileAndroidMain
+          :composeApp:testAndroidHostTest
 
       - name: Validate mobile release configuration
         run: bash scripts/release/check-mobile-release.sh "$GITHUB_WORKSPACE"
@@ -79,6 +78,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes ripgrep
 
       - name: Run deterministic contract checks
         run: >-
@@ -125,6 +127,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes ripgrep
 
       - name: Check public package
         run: bash scripts/verification/check-public-package.sh "$GITHUB_WORKSPACE"

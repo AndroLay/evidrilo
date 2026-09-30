@@ -21,6 +21,9 @@ enum class GetStartedTourStep {
     WELCOME,
     ORGANIZE,
     REVIEW,
+    ASSISTANCE,
+    PORTABILITY,
+    READY,
 }
 
 sealed interface GetStartedTourEvent {
@@ -28,7 +31,7 @@ sealed interface GetStartedTourEvent {
     data object Back : GetStartedTourEvent
 }
 
-/** A short, field-neutral walkthrough. It never creates project or research data. */
+/** A self-paced product introduction. It never creates project or research data. */
 data class GetStartedTourState(
     val step: GetStartedTourStep = GetStartedTourStep.WELCOME,
     val isComplete: Boolean = false,

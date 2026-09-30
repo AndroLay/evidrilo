@@ -42,9 +42,9 @@ internal fun EvidriloHistoryScreen(
         EvidriloContentColumn(
             includeBottomSafeArea = !shouldShowTargetBottomNavigation(selectedSection),
         ) {
-            EvidriloBackButton(label = backLabel, onClick = onBack)
+            EvidriloBackGesture(label = backLabel, onClick = onBack)
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("History", style = MaterialTheme.typography.displayMedium)
+                Text("History", style = MaterialTheme.typography.headlineMedium)
                 Text(
                     "A quiet record of the latest evidence-change comparison on this device.",
                     style = MaterialTheme.typography.bodyLarge,

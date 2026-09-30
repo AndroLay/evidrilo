@@ -18,9 +18,23 @@ public sealed record ProjectAiStageAssistRequest(
     [property: JsonPropertyName("stageId")] string? StageId,
     [property: JsonPropertyName("operationId")] string? OperationId,
     [property: JsonPropertyName("baseProjectRevision")] int? BaseProjectRevision,
+    [property: JsonPropertyName("projectBindingGeneration")] long? ProjectBindingGeneration,
     [property: JsonPropertyName("selectedFieldIds")] IReadOnlyList<string>? SelectedFieldIds,
     [property: JsonPropertyName("selectedEvidenceIds")] IReadOnlyList<string>? SelectedEvidenceIds,
-    [property: JsonRequired, JsonPropertyName("locale")] string? Locale);
+    [property: JsonRequired, JsonPropertyName("locale")] string? Locale,
+    [property: JsonPropertyName("selectedFields")] IReadOnlyList<ProjectAiStageAssistSelectedFieldValue>? SelectedFields = null,
+    [property: JsonPropertyName("selectedEvidence")] IReadOnlyList<ProjectAiStageAssistSelectedEvidenceValue>? SelectedEvidence = null);
+
+public sealed record ProjectAiStageAssistSelectedFieldValue(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("value")] string? Value);
+
+public sealed record ProjectAiStageAssistSelectedEvidenceValue(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("kind")] string? Kind,
+    [property: JsonPropertyName("label")] string? Label,
+    [property: JsonPropertyName("summary")] string? Summary,
+    [property: JsonPropertyName("origin")] string? Origin);
 
 public sealed record ProjectAiStageAssistResponse(
     [property: JsonPropertyName("schema")] string Schema,
@@ -29,6 +43,8 @@ public sealed record ProjectAiStageAssistResponse(
     [property: JsonPropertyName("mode")] string Mode,
     [property: JsonPropertyName("projectId")] string ProjectId,
     [property: JsonPropertyName("baseProjectRevision")] int BaseProjectRevision,
+    [property: JsonPropertyName("projectBindingGeneration")] long? ProjectBindingGeneration,
+    [property: JsonPropertyName("consentGeneration")] int ConsentGeneration,
     [property: JsonPropertyName("stageId")] string StageId,
     [property: JsonPropertyName("operationId")] string OperationId,
     [property: JsonPropertyName("assist")] ProjectAiStageAssistOutput Assist,
@@ -117,7 +133,8 @@ public sealed record ProjectAiStageAssistSettlementRequest(
     [property: JsonRequired, JsonPropertyName("installationId")] string? InstallationId,
     [property: JsonRequired, JsonPropertyName("requestId")] string? RequestId,
     [property: JsonRequired, JsonPropertyName("outcome")] string? Outcome,
-    [property: JsonPropertyName("resultProjectRevision")] int? ResultProjectRevision);
+    [property: JsonPropertyName("resultProjectRevision")] int? ResultProjectRevision,
+    [property: JsonPropertyName("resultProjectBindingGeneration")] long? ResultProjectBindingGeneration);
 
 public sealed record ProjectAiStageAssistSettlementResponse(
     [property: JsonPropertyName("schema")] string Schema,
@@ -134,6 +151,15 @@ public static partial class ProjectAiStageAssistValidator
     public const string GeneralMode = "GENERAL";
     public const string SettlementSchema = "evidrilo.project-ai-stage-assist-settlement";
     public const string PromptVersion = "project-ai-stage-assist.v1";
+    public const string RequestConsentHeader = "X-Evidrilo-Project-AI-Consent";
+    public const string RequestConsentVersion = "project-ai.v1";
+
+    public static bool HasExplicitRequestConsent(HttpContext context)
+    {
+        var values = context.Request.Headers[RequestConsentHeader];
+        return values.Count == 1
+            && string.Equals(values[0], RequestConsentVersion, StringComparison.Ordinal);
+    }
 
     private static readonly Regex IdentifierPattern = new(
         "\\A[a-z0-9]+(?:[._-][a-z0-9]+)*\\z",
@@ -166,8 +192,11 @@ public static partial class ProjectAiStageAssistValidator
                 && request.StageId is null
                 && request.OperationId is null
                 && request.BaseProjectRevision is null
+                && request.ProjectBindingGeneration is null
                 && (request.SelectedFieldIds is null || request.SelectedFieldIds.Count == 0)
                 && (request.SelectedEvidenceIds is null || request.SelectedEvidenceIds.Count == 0)
+                && (request.SelectedFields is null || request.SelectedFields.Count == 0)
+                && (request.SelectedEvidence is null || request.SelectedEvidence.Count == 0)
                     ? null
                     : "PROJECT_AI_GENERAL_CONTEXT_NOT_ALLOWED";
         }
@@ -176,6 +205,8 @@ public static partial class ProjectAiStageAssistValidator
             || !ProjectTemplateDocumentValidator.IsValidTemplateId(request.TemplateId)
             || request.TemplateVersion is null or < 1
             || request.BaseProjectRevision is null or < 1
+            || (request.SelectedFields is null && request.ProjectBindingGeneration is not null)
+            || (request.SelectedFields is not null && (request.ProjectBindingGeneration is null or < 1))
             || !IsIdentifier(request.StageId)
             || !IsIdentifier(request.OperationId)
             || request.SelectedFieldIds is null or { Count: > 32 }
@@ -183,12 +214,42 @@ public static partial class ProjectAiStageAssistValidator
             || request.SelectedFieldIds.Distinct(StringComparer.Ordinal).Count() != request.SelectedFieldIds.Count
             || request.SelectedEvidenceIds is null or { Count: > 32 }
             || request.SelectedEvidenceIds.Any(id => !IsProjectEvidenceId(id))
-            || request.SelectedEvidenceIds.Distinct(StringComparer.Ordinal).Count() != request.SelectedEvidenceIds.Count)
+            || request.SelectedEvidenceIds.Distinct(StringComparer.Ordinal).Count() != request.SelectedEvidenceIds.Count
+            || !ValidateExplicitSelectedContext(request))
         {
             return "INVALID_PROJECT_AI_STAGE_ASSIST";
         }
 
         return null;
+    }
+
+    private static bool ValidateExplicitSelectedContext(ProjectAiStageAssistRequest request)
+    {
+        if (request.SelectedFields is null && request.SelectedEvidence is null) return true;
+        if (request.SelectedFields is null or { Count: > 32 }
+            || request.SelectedEvidence is null or { Count: > 32 }
+            || request.SelectedFields.Any(field =>
+                field is null || !IsIdentifier(field.Id) || field.Value is null
+                    || field.Value.Length > 8_000 || field.Value.Contains('\0'))
+            || request.SelectedEvidence.Any(evidence =>
+                evidence is null || !IsProjectEvidenceId(evidence.Id)
+                    || evidence.Kind is not ("SOURCE" or "DATA" or "OBSERVATION")
+                    || !HasText(evidence.Label, 160)
+                    || evidence.Summary is { Length: > 8_000 } || evidence.Summary?.Contains('\0') == true
+                    || evidence.Origin is { Length: > 500 } || evidence.Origin?.Contains('\0') == true))
+            return false;
+
+        var fieldIds = request.SelectedFields.Select(field => field.Id!).ToHashSet(StringComparer.Ordinal);
+        var evidenceIds = request.SelectedEvidence.Select(evidence => evidence.Id!).ToHashSet(StringComparer.Ordinal);
+        if (fieldIds.Count != request.SelectedFields.Count
+            || evidenceIds.Count != request.SelectedEvidence.Count
+            || !fieldIds.SetEquals(request.SelectedFieldIds!)
+            || !evidenceIds.SetEquals(request.SelectedEvidenceIds!))
+            return false;
+
+        return JsonSerializer.SerializeToUtf8Bytes(
+            new { request.SelectedFields, request.SelectedEvidence },
+            OutputJsonOptions).Length <= 128 * 1024;
     }
 
     public static string? ValidateSettlementRequest(ProjectAiStageAssistSettlementRequest? request)
@@ -203,8 +264,10 @@ public static partial class ProjectAiStageAssistValidator
 
         return request.Outcome switch
         {
-            "APPLIED" or "EDITED" when request.ResultProjectRevision is >= 2 => null,
-            "DISMISSED" or "STALE" when request.ResultProjectRevision is null => null,
+            "APPLIED" or "EDITED" when request.ResultProjectRevision is >= 2
+                && (request.ResultProjectBindingGeneration is null or > 0) => null,
+            "DISMISSED" or "STALE" when request.ResultProjectRevision is null
+                && request.ResultProjectBindingGeneration is null => null,
             _ => "INVALID_PROJECT_AI_STAGE_ASSIST_SETTLEMENT",
         };
     }
@@ -306,6 +369,7 @@ public static partial class ProjectAiStageAssistValidator
             return "PROJECT_AI_CONTEXT_NOT_READY";
 
         var fieldsById = template.Template.InputFields!.ToDictionary(field => field.Id!, StringComparer.Ordinal);
+        var explicitValues = request.SelectedFields?.ToDictionary(field => field.Id!, field => field.Value!, StringComparer.Ordinal);
         var selectedContexts = new List<ProjectAiStageAssistSelectedFieldContext>(request.SelectedFieldIds!.Count);
         var selectedKinds = new HashSet<ProjectTemplateInputKind>();
         foreach (var fieldId in request.SelectedFieldIds)
@@ -316,8 +380,16 @@ public static partial class ProjectAiStageAssistValidator
                 return "PROJECT_AI_FIELD_MAPPING_AMBIGUOUS";
             if (field.Kind is ProjectTemplateInputKind.Source or ProjectTemplateInputKind.Data)
                 return "PROJECT_AI_EVIDENCE_SELECTION_REQUIRES_IDS";
-            if (!TryGetStoredFieldValue(field.Kind, project.Document, out var value))
+            string value;
+            if (explicitValues is not null)
+            {
+                if (!explicitValues.TryGetValue(fieldId, out value!))
+                    return "PROJECT_AI_FIELD_NOT_ALLOWED_FOR_OPERATION";
+            }
+            else if (!TryGetStoredFieldValue(field.Kind, project.Document, out value))
+            {
                 return "PROJECT_AI_FIELD_KIND_NOT_SUPPORTED";
+            }
             if (value.Length > 8_000 || value.Contains('\0'))
                 return "PROJECT_AI_CONTEXT_TOO_LARGE";
 

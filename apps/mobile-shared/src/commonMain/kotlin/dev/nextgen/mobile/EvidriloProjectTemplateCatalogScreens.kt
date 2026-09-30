@@ -48,6 +48,7 @@ import dev.nextgen.mobile.domain.project.ProjectTemplateCatalogSnapshot
 import dev.nextgen.mobile.domain.project.ProjectTemplateExample
 import dev.nextgen.mobile.domain.project.ProjectTemplateExampleKind
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.TemplateSelectionResult
 import dev.nextgen.mobile.domain.project.ProjectAiScaffoldProposal
 import dev.nextgen.mobile.projectcatalog.ProjectTemplateCatalogGatewayResult
@@ -67,7 +68,7 @@ internal const val projectTemplateCatalogBrowseInstructions =
     "Swipe sideways or choose a type. Screen readers move focus through cards and activate one."
 
 internal const val projectTemplateFamilyEvaluationBoundaryCopy =
-    "Orientation only—not an evaluation or grade. Ask an educator about method, ethics, or evidence quality when needed."
+    "Structure only, not an evaluation or grade. Confirm method, evidence quality, and ethics with your instructor."
 
 internal fun <T> ProjectTemplateCatalogGatewayResult<T>.toRemoteUiState(): ProjectTemplateRemoteUiState<T> = when (this) {
     is ProjectTemplateCatalogGatewayResult.Loaded -> ProjectTemplateRemoteUiState.Loaded(value)
@@ -224,11 +225,11 @@ internal fun EvidriloProjectTemplateCatalogScreen(
     }
 
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn(includeBottomSafeArea = false) {
-            EvidriloBackButton(label = "Home", onClick = onBack)
+        EvidriloContentColumn() {
+            EvidriloBackGesture(label = "Home", onClick = onBack)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Explore project types",
+                    "Start with your idea",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.headlineLarge,
                 )
@@ -242,25 +243,16 @@ internal fun EvidriloProjectTemplateCatalogScreen(
                 }
             }
             Text(
-                "Choose an overview based on your assignment.",
+                "Choose a structure that fits your assignment, or start blank.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = EvidriloColors.Slate,
             )
             ProjectTemplateCatalogStatus(remoteFamilies, onRetryRemoteFamilies)
             EvidriloPrimaryButton(label = "Start a blank project", onClick = onStartBlankProject)
-            LazyRow(
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(projectTemplateFamilyOverviews, key = { it.family.id }) { overview ->
-                    ProjectTemplateFamilyCard(
-                        overview = overview,
-                        selectableTemplateCount = (remoteFamilies as? ProjectTemplateRemoteUiState.Loaded)
-                            ?.value?.singleOrNull { it.family == overview.family }?.selectableTemplateCount,
-                        onClick = { onSelectFamily(overview.family) },
-                    )
-                }
+            EvidriloWorkflowScene(EvidriloIconName.FOLDER, listOf("Choose a project structure", "Add your own sources and evidence", "Review, revise, and export"), "catalog")
+            projectTemplateFamilyOverviews.forEach { overview ->
+                EvidriloWorkspaceRow(projectTemplateFamilyCardDesign(overview.family).icon,
+                    projectFamilyShortName(overview.family), overview.selectionCue, { onSelectFamily(overview.family) })
             }
             ProjectFamilyQuickGuide(
                 expanded = quickGuideExpanded,
@@ -292,7 +284,8 @@ internal fun ProjectTemplateFamilyCard(
                     append(overview.summary)
                     append(". ")
                     append(cardDesign.cue)
-                    selectableTemplateCount?.let { append(" $it published templates available to inspect.") }
+                    append(" A local structure-only project starter is available offline.")
+                    selectableTemplateCount?.takeIf { it > 0 }?.let { append(" $it published templates available to inspect.") }
                     append(" Open overview.")
                 }
                 role = Role.Button
@@ -343,7 +336,12 @@ internal fun ProjectTemplateFamilyCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            selectableTemplateCount?.let { count ->
+            Text(
+                "Local starter available",
+                style = MaterialTheme.typography.labelLarge,
+                color = EvidriloColors.Cobalt,
+            )
+            selectableTemplateCount?.takeIf { it > 0 }?.let { count ->
                 Text(
                     "$count published ${if (count == 1) "template" else "templates"}",
                     style = MaterialTheme.typography.labelLarge,
@@ -370,44 +368,72 @@ internal fun EvidriloProjectTemplateFamilyScreen(
     remoteTemplates: ProjectTemplateRemoteUiState<List<ProjectTemplateSummary>>,
     onRetryRemoteTemplates: () -> Unit,
     onInspectTemplate: (ProjectTemplateSummary) -> Unit,
+    onStartStarterProject: (ProjectTemplateDefinition) -> Unit,
     onStartBlankProject: () -> Unit,
     onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn(includeBottomSafeArea = false) {
-            EvidriloBackButton(label = "Project types", onClick = onBack)
-            Text(overview.family.displayName, style = MaterialTheme.typography.headlineLarge)
-            EvidriloTargetCard {
-                Text("Overview only", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    projectTemplateFamilyEvaluationBoundaryCopy,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EvidriloColors.Slate,
-                )
-            }
-            EvidriloPrimaryButton(label = "Start a blank project", onClick = onStartBlankProject)
-            ProjectTemplateFamilySection(
-                title = "When this may fit",
-                description = overview.whenItMayFit,
+        EvidriloContentColumn() {
+            EvidriloBackGesture(label = "Project types", onClick = onBack)
+            EvidriloPageHeading(projectFamilyShortName(overview.family), overview.summary)
+            ProjectStarterTemplateCard(
+                template = ProjectStarterTemplateCatalog.forFamily(overview.family), onStart = onStartStarterProject,
             )
-            ProjectTemplateFamilySection(
-                title = "What you may organize",
-                items = overview.workToOrganize,
-            )
-            ProjectTemplateFamilySection(
-                title = "Points to check",
-                items = overview.pointsToCheck,
-            )
+            EvidriloExplanation("When this fits", overview.whenItMayFit)
+            EvidriloExplanation("What you will organize", overview.workToOrganize.joinToString("\n\n"))
+            EvidriloExplanation("Check before you begin", overview.pointsToCheck.joinToString("\n\n") + "\n\n" + projectTemplateFamilyEvaluationBoundaryCopy)
+            EvidriloSecondaryButton(label = "Start blank instead", onClick = onStartBlankProject)
             PublishedTemplateList(
                 family = overview.family,
                 state = remoteTemplates,
                 onRetry = onRetryRemoteTemplates,
                 onInspect = onInspectTemplate,
             )
-            EvidriloSecondaryButton(label = "Browse other project types", onClick = onBack)
+
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun ProjectStarterTemplateCard(
+    template: ProjectTemplateDefinition,
+    onStart: (ProjectTemplateDefinition) -> Unit,
+) {
+    var notesExpanded by remember(template.id, template.version) { mutableStateOf(false) }
+    EvidriloTargetCard {
+        Text("Offline project starter", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+        Text(template.title, style = MaterialTheme.typography.titleLarge)
+        Text(template.summary, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+        Text("Creates", style = MaterialTheme.typography.titleSmall)
+        Text(template.intendedOutput, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+        EvidriloExplanation("See project sections", template.steps.mapIndexed { index, step -> "${index + 1}. ${step.title}" }.joinToString("\n"))
+        Text(
+            "Structure only. It adds no sources, observations, findings, or claims and does not evaluate your work.",
+            style = MaterialTheme.typography.bodySmall,
+            color = EvidriloColors.Slate,
+        )
+        TextButton(onClick = { notesExpanded = !notesExpanded }) {
+            Text(if (notesExpanded) "Hide guide notes" else "View limits and recording notes")
+        }
+        if (notesExpanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Limits", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.methodSpecificLimitations.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+                Text("Provenance", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.provenanceRequirements.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+                Text("Accessibility", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.accessibilityExpectations.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+            }
+        }
+        EvidriloPrimaryButton(label = "Create my project", onClick = { onStart(template) })
     }
 }
 
@@ -417,9 +443,11 @@ internal fun EvidriloProjectTemplateDetailScreen(
     state: ProjectTemplateRemoteUiState<ProjectTemplateDefinition>,
     notice: String?,
     projectAiAccountKey: String?,
+    aiCreditBalance: AiCreditBalancePresentation = AiCreditBalancePresentation.SignInRequired,
     projectAiState: ProjectAiScaffoldUiState,
     projectAiConsentState: ProjectAiConsentUiState,
     onRetry: () -> Unit,
+    onRefreshAiCreditBalance: () -> Unit = {},
     onRefreshProjectAiConsent: () -> Unit,
     onGrantProjectAiConsent: () -> Unit,
     onRevokeProjectAiConsent: () -> Unit,
@@ -433,8 +461,8 @@ internal fun EvidriloProjectTemplateDetailScreen(
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn(includeBottomSafeArea = false) {
-            EvidriloBackButton(label = "Template list", onClick = onBack)
+        EvidriloContentColumn() {
+            EvidriloBackGesture(label = "Template list", onClick = onBack)
             notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
             Text(
                 (state as? ProjectTemplateRemoteUiState.Loaded)?.value?.title
@@ -465,7 +493,8 @@ internal fun EvidriloProjectTemplateDetailScreen(
                 )
 
                 is ProjectTemplateRemoteUiState.Loaded -> {
-                    val canStartProject = isProjectTemplateSelectable(state.value)
+                    val canStartProject = state.value.publication == dev.nextgen.mobile.domain.project.ProjectTemplatePublication.PUBLISHED &&
+                        isProjectTemplateSelectable(state.value)
                     ProjectTemplateDetails(state.value, canStartProject)
                     if (canStartProject) {
                         EvidriloProjectAiScaffoldPanel(
@@ -475,8 +504,10 @@ internal fun EvidriloProjectTemplateDetailScreen(
                         existingProjectRevision = null,
                         projectTitle = state.value.title,
                         projectAiAccountKey = projectAiAccountKey,
+                        aiCreditBalance = aiCreditBalance,
                         state = projectAiState,
-                            consentState = projectAiConsentState,
+                        consentState = projectAiConsentState,
+                            onRefreshAiCreditBalance = onRefreshAiCreditBalance,
                             onRefreshConsent = onRefreshProjectAiConsent,
                             onGrantConsent = onGrantProjectAiConsent,
                             onRevokeConsent = onRevokeProjectAiConsent,
@@ -617,7 +648,7 @@ private fun PublishedTemplateList(
             if (state.value.isEmpty()) {
                 ProjectTemplateRemoteMessage(
                     title = "No published templates yet",
-                    message = "This project type has an overview, but no published template is available to inspect yet.",
+                    message = "The offline starter above can create a local project. No remote published template is available to inspect yet.",
                 )
             } else {
                 Text("Published templates", style = MaterialTheme.typography.titleLarge)
@@ -666,15 +697,15 @@ private fun ProjectTemplateCatalogStatus(
                 ProjectTemplateCatalogUnavailableReason.OFFLINE -> "You’re offline"
             },
             message = when (state.reason) {
-                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "You can still start a blank project."
-                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "These overviews remain available."
+                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "Offline family starters and blank projects remain available."
+                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "Offline family starters and overviews remain available."
             },
             retryable = state.reason == ProjectTemplateCatalogUnavailableReason.OFFLINE,
             onRetry = onRetry,
         )
         is ProjectTemplateRemoteUiState.Failed -> ProjectTemplateRemoteMessage(
             title = "Couldn’t check templates",
-            message = "Family overviews remain available.",
+            message = "Offline family starters and overviews remain available. No remote template has been assumed available.",
             retryable = state.retryable,
             onRetry = onRetry,
         )
@@ -683,7 +714,7 @@ private fun ProjectTemplateCatalogStatus(
             ProjectTemplateRemoteMessage(
                 title = if (count == 0) "No published templates yet" else "$count ${if (count == 1) "template" else "templates"} to inspect",
                 message = if (count == 0) {
-                    "Browse an overview or start blank."
+                    "Each family has an offline project starter. Start blank if you prefer."
                 } else {
                     "Select a type to view them."
                 },

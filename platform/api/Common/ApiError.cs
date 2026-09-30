@@ -9,7 +9,9 @@ public sealed record ApiErrorResponse(
     [property: JsonPropertyName("version")] string Version,
     [property: JsonPropertyName("code")] string Code,
     [property: JsonPropertyName("message")] string Message,
-    [property: JsonPropertyName("requestId")] string RequestId);
+    [property: JsonPropertyName("requestId")] string RequestId,
+    [property: JsonPropertyName("creditCost")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? CreditCost = null);
 
 public sealed class ApiException : Exception
 {

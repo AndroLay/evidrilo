@@ -113,6 +113,14 @@ insert into public.account_deletion_requests (account_id, status)
 values ('d1450000-0000-4000-8000-000000000003', 'in_progress');
 insert into public.student_projects (project_id, account_id, version, document)
 values ('d1490000-0000-4000-8000-000000000003', 'd1450000-0000-4000-8000-000000000003', 1, '{}'::jsonb);
+insert into public.project_ai_local_contexts (
+    account_id, project_id, current_revision, available_evidence_ids
+) values (
+    'd1450000-0000-4000-8000-000000000003',
+    'd1490000-0000-4000-8000-000000000003',
+    1,
+    '[]'::jsonb
+);
 insert into public.project_ai_activity (
     activity_id, account_id, installation_id, request_id, mode, project_id,
     stage_id, operation_id, base_project_revision, consent_generation, outcome
@@ -199,6 +207,14 @@ declare
 begin
     insert into public.student_projects (project_id, account_id, version, document)
     values (project_id, 'd1450000-0000-4000-8000-000000000001', 1, valid_document);
+    insert into public.project_ai_local_contexts (
+        account_id, project_id, current_revision, available_evidence_ids
+    ) values (
+        'd1450000-0000-4000-8000-000000000001',
+        project_id,
+        1,
+        '[]'::jsonb
+    );
     insert into public.student_project_revisions (revision_id, project_id, account_id, version, document)
     values (
         'd1480000-0000-4000-8000-000000000002',

@@ -1722,3 +1722,35 @@ configured-provider gate. If the app later targets App Store distribution while
 using Google for its primary account login, review Apple's current
 [Guideline 4.8](https://developer.apple.com/app-store/review/guidelines/) and
 applicability before release.
+
+## D-133 — Make all five project-family guides usable as local structure starters
+
+Owner-directed decision, 30 September 2026: all five project-family guides
+must be directly usable when creating a local project. Bundle one immutable,
+versioned structure-only starter for each existing family: experimental and
+laboratory work; observational and survey studies; literature reviews;
+qualitative interviews and field studies; and design and engineering.
+
+Selecting **Use this guide in a project** creates and opens a local editable
+project with that exact starter snapshot. It begins with empty student fields,
+source/data records, findings, themes, and claims. The starter supplies
+field-specific prompts, ordered sections, method limits, provenance reminders,
+and accessibility notes. Those notes must remain reachable from inside the
+project so the student can consult them while working. The starter never
+silently classifies an assignment; the student selects the family. Blank/manual
+creation remains available, and all five starters remain Free.
+
+The bundled starter state is explicitly distinct from a remote
+`PUBLISHED`/human-reviewed method template. A starter is organizational
+scaffolding, not validated methodological advice, an evaluator, an academic
+grade, or approval to conduct participant research. Project AI must reject
+these starter snapshots; AI remains limited to separately approved, published
+templates. Server catalog authoring, human/domain review, and publication gates
+remain unchanged. Existing projects and `.evproj` imports retain the exact
+starter version they used.
+
+D-133 supersedes only D-112/D-113/D-124 wording that made reviewed publication
+a prerequisite for any actionable family choice. It does not waive review for
+remote method guidance, evaluation, or AI, and it does not authorize provider
+activation, participant-data collection, or a claim that the five methods have
+been validated with students or domain reviewers.

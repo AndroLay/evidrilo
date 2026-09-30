@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-local-project-context-delete.v1.json",
+  "title": "Evidrilo deleted owner-bound local Project AI metadata binding",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-local-project-context" },
+    "version": { "const": "1" },
+    "projectId": { "type": "string", "format": "uuid" },
+    "status": { "const": "deleted" }
+  },
+  "required": ["schema", "version", "projectId", "status"]
+}

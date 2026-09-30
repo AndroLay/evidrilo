@@ -10,3 +10,5 @@ internal actual fun EvidriloSystemBackHandler(
 ) {
     BackHandler(enabled = enabled, onBack = onBack)
 }
+
+internal actual val evidriloUsesEdgeBackGesture: Boolean = false

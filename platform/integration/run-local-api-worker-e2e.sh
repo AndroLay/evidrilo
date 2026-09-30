@@ -128,6 +128,8 @@ if ! EVIDRILO_E2E_DATABASE_URL="$database_url" \
     EVIDRILO_REPO_ROOT="$repo_root" \
     EVIDRILO_WORKER_ASSEMBLY="$worker_dll" \
     "$dotnet_root/dotnet" "$integration_dll" >"$artifacts_dir/e2e.log" 2>&1; then
+    echo '--- worker diagnostics ---' >&2
+    rg '^E2E_WORKER ' "$artifacts_dir/e2e.log" | tail -40 >&2 || true
     tail -80 "$artifacts_dir/e2e.log" >&2
     exit 1
 fi

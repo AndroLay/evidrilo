@@ -23,6 +23,8 @@ data class StudentProjectDraft(
     val claims: List<StudentProjectClaimRecord> = emptyList(),
     /** Student-authored limitations/actions with explicit affected finding/claim links. */
     val limitationActions: List<StudentProjectLimitationActionRecord> = emptyList(),
+    /** Optional date-only deadline in ISO-8601 form (yyyy-MM-dd); it carries no reminder or timezone behavior. */
+    val deadlineDate: String? = null,
 )
 
 /** Stable metadata pointer to a separately stored local file; it is not a trust or safety verdict. */
@@ -182,7 +184,61 @@ data class StudentProjectRevisionSnapshot(
     val attachments: List<StudentProjectAttachmentRef> = emptyList(),
     val claims: List<StudentProjectClaimRecord> = emptyList(),
     val limitationActions: List<StudentProjectLimitationActionRecord> = emptyList(),
+    val deadlineDate: String? = null,
 )
+
+/** Date-only conversion helpers shared by local persistence and the Compose date picker. */
+object StudentProjectDeadlineDate {
+    private const val MIN_EPOCH_DAY = -719_162 // 0001-01-01
+    private const val MAX_EPOCH_DAY = 2_932_896 // 9999-12-31
+    private const val EPOCH_DAY_OFFSET = 719_468
+    private val isoDatePattern = Regex("([0-9]{4})-([0-9]{2})-([0-9]{2})")
+
+    fun parse(value: String): Int? {
+        val match = isoDatePattern.matchEntire(value) ?: return null
+        val year = match.groupValues[1].toIntOrNull() ?: return null
+        val month = match.groupValues[2].toIntOrNull() ?: return null
+        val day = match.groupValues[3].toIntOrNull() ?: return null
+        if (year !in 1..9_999 || month !in 1..12) return null
+        val daysInMonth = when (month) {
+            2 -> if (isLeapYear(year)) 29 else 28
+            4, 6, 9, 11 -> 30
+            else -> 31
+        }
+        if (day !in 1..daysInMonth) return null
+
+        var adjustedYear = year
+        if (month <= 2) adjustedYear -= 1
+        val era = adjustedYear / 400
+        val yearOfEra = adjustedYear - era * 400
+        val adjustedMonth = month + if (month > 2) -3 else 9
+        val dayOfYear = (153 * adjustedMonth + 2) / 5 + day - 1
+        val dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+        return (era * 146_097 + dayOfEra - EPOCH_DAY_OFFSET).takeIf { it in MIN_EPOCH_DAY..MAX_EPOCH_DAY }
+    }
+
+    fun format(epochDay: Int): String? {
+        if (epochDay !in MIN_EPOCH_DAY..MAX_EPOCH_DAY) return null
+        val shiftedDay = epochDay + EPOCH_DAY_OFFSET
+        val era = shiftedDay / 146_097
+        val dayOfEra = shiftedDay - era * 146_097
+        val yearOfEra = (dayOfEra - dayOfEra / 1_460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
+        var year = yearOfEra + era * 400
+        val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+        val monthPart = (5 * dayOfYear + 2) / 153
+        val day = dayOfYear - (153 * monthPart + 2) / 5 + 1
+        val month = monthPart + if (monthPart < 10) 3 else -9
+        if (month <= 2) year += 1
+        return "${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
+    }
+
+    private fun isLeapYear(year: Int): Boolean = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+sealed interface StudentProjectDeadlineChange {
+    data object Keep : StudentProjectDeadlineChange
+    data class Set(val deadlineDate: String?) : StudentProjectDeadlineChange
+}
 
 data class StudentProjectFieldDefinition(
     val id: String,
@@ -346,12 +402,15 @@ object StudentProjectDraftRules {
         if (draft.createdAtEpochMillis < 0 || draft.updatedAtEpochMillis < draft.createdAtEpochMillis) {
             add("INVALID_PROJECT_TIMESTAMP")
         }
+        if (draft.deadlineDate != null && StudentProjectDeadlineDate.parse(draft.deadlineDate) == null) {
+            add("PROJECT_DEADLINE_INVALID")
+        }
         val knownFieldIds = if (draft.templateSnapshot == null) {
             ManualLiteratureSynthesisFields.byId.keys
         } else {
             val template = draft.templateSnapshot
             if (template.inputFields.size > MAX_FIELD_COUNT) add("TOO_MANY_TEMPLATE_FIELDS")
-            if (ProjectTemplateCatalog.validateReadablePublishedTemplate(template).isNotEmpty()) {
+            if (ProjectTemplateCatalog.validateReadableProjectTemplateSnapshot(template).isNotEmpty()) {
                 add("INVALID_PROJECT_TEMPLATE_SNAPSHOT")
             }
             template.inputFields.map(ProjectTemplateInputField::id).toSet()
@@ -482,6 +541,7 @@ object StudentProjectDraftRules {
                 attachments = snapshot.attachments,
                 claims = snapshot.claims,
                 limitationActions = snapshot.limitationActions,
+                deadlineDate = snapshot.deadlineDate,
                 revisionSnapshots = emptyList(),
                 status = StudentProjectStatus.DRAFT,
                 trashedAtEpochMillis = null,
@@ -530,6 +590,7 @@ object StudentProjectDraftRules {
         attachments = draft.attachments.toList(),
         claims = draft.claims.toList(),
         limitationActions = draft.limitationActions.toList(),
+        deadlineDate = draft.deadlineDate,
     )
 
     fun initializeRevisionHistory(
@@ -547,7 +608,8 @@ object StudentProjectDraftRules {
             latest.claimEvidenceSourceIds != draft.claimEvidenceSourceIds ||
             latest.evidenceItems != draft.evidenceItems || latest.findings != draft.findings ||
             latest.evidenceRelations != draft.evidenceRelations || latest.attachments != draft.attachments ||
-            latest.claims != draft.claims || latest.limitationActions != draft.limitationActions
+            latest.claims != draft.claims || latest.limitationActions != draft.limitationActions ||
+            latest.deadlineDate != draft.deadlineDate
     }
 
     fun retainRevisionSnapshots(snapshots: List<StudentProjectRevisionSnapshot>): List<StudentProjectRevisionSnapshot> {
@@ -746,6 +808,7 @@ object StudentProjectDraftRules {
 
         text(draft.id)
         text(draft.title)
+        text(draft.deadlineDate.orEmpty())
         fields(draft.fieldValues)
         draft.templateSnapshot?.let { template ->
             record(4_096L)
@@ -780,6 +843,7 @@ object StudentProjectDraftRules {
         draft.revisionSnapshots.forEach { snapshot ->
             record(2_048L)
             text(snapshot.title)
+            text(snapshot.deadlineDate.orEmpty())
             fields(snapshot.fieldValues)
             collections(
                 snapshot.sources,

@@ -142,7 +142,7 @@ internal fun EvidriloSettingsScreen(
     }
 
     EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
+        EvidriloBackGesture(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 when (section) {
@@ -151,7 +151,7 @@ internal fun EvidriloSettingsScreen(
                     EvidriloSettingsSection.WORKSPACE_PREFERENCES -> "Workspace preferences"
                     EvidriloSettingsSection.PRIVACY_DATA -> "Privacy & data"
                 },
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineMedium,
             )
             Text(
                 when (section) {

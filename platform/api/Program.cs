@@ -113,6 +113,51 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true,
             });
     });
+    options.AddPolicy("account-export-create", context =>
+    {
+        var key = context.User.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"account-export-create:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 2,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+    options.AddPolicy("account-export-status", context =>
+    {
+        var key = context.User.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"account-export-status:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+    options.AddPolicy("account-export-download", context =>
+    {
+        var key = context.User.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"account-export-download:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
 });
 if (platformOptions.TrustedProxyAddresses.Count > 0)
 {
@@ -186,6 +231,8 @@ if (platformOptions.DatabaseConfigured)
         new NpgsqlProjectAiConsentStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IProjectAiActivityStore>(_ =>
         new NpgsqlProjectAiActivityStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IProjectAiLocalProjectContextStore>(_ =>
+        new NpgsqlProjectAiLocalProjectContextStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IStudentProjectStore>(_ =>
         new NpgsqlStudentProjectStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<ISyncStore>(_ =>
@@ -216,6 +263,8 @@ if (platformOptions.DatabaseConfigured)
         new NpgsqlAccountLifecycleStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IAccountExportStore>(_ =>
         new NpgsqlAccountExportStore(platformOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IAccountExportJobStore>(_ =>
+        new NpgsqlAccountExportJobStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<IMembershipStore>(_ =>
         new NpgsqlMembershipStore(platformOptions.DatabaseConnectionString!));
     builder.Services.AddSingleton<INotificationPreferencesStore>(_ =>
@@ -227,6 +276,7 @@ else
 {
     builder.Services.AddSingleton<IProjectAiConsentStore, DatabaseUnavailableProjectAiConsentStore>();
     builder.Services.AddSingleton<IProjectAiActivityStore, DatabaseUnavailableProjectAiActivityStore>();
+    builder.Services.AddSingleton<IProjectAiLocalProjectContextStore, DatabaseUnavailableProjectAiLocalProjectContextStore>();
     builder.Services.AddSingleton<IStudentProjectStore, DatabaseUnavailableStudentProjectStore>();
     builder.Services.AddSingleton<ISyncStore, DatabaseUnavailableSyncStore>();
     builder.Services.AddSingleton<IAnalyticsStore, DatabaseUnavailableAnalyticsStore>();
@@ -242,6 +292,7 @@ else
     builder.Services.AddSingleton<IEntitlementStore, DatabaseUnavailableEntitlementStore>();
     builder.Services.AddSingleton<IAccountLifecycleStore, DatabaseUnavailableAccountLifecycleStore>();
     builder.Services.AddSingleton<IAccountExportStore, DatabaseUnavailableAccountExportStore>();
+    builder.Services.AddSingleton<IAccountExportJobStore, DatabaseUnavailableAccountExportJobStore>();
     builder.Services.AddSingleton<IMembershipStore, DatabaseUnavailableMembershipStore>();
     builder.Services.AddSingleton<INotificationPreferencesStore, DatabaseUnavailableNotificationPreferencesStore>();
     builder.Services.AddSingleton<IProjectTemplateStore, DatabaseUnavailableProjectTemplateStore>();
@@ -251,6 +302,16 @@ builder.Services.AddSingleton<BillingWebhookService>();
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseMiddleware<RequestIdMiddleware>();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/v2/account/exports"))
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "0";
+    }
+    await next();
+});
 if (platformOptions.TrustedProxyAddresses.Count > 0)
 {
     app.UseForwardedHeaders();
@@ -269,6 +330,7 @@ if (platformOptions.DatabaseConfigured)
 
 app.MapHealthEndpoints();
 app.MapAccountEndpoints();
+app.MapAccountExportJobEndpoints();
 app.MapSyncEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapProgressEndpoints();
@@ -286,6 +348,7 @@ app.MapNotificationEndpoints();
 app.MapStudentProjectEndpoints();
 app.MapProjectTemplateEndpoints();
 app.MapProjectAiConsentEndpoints();
+app.MapProjectAiLocalProjectContextEndpoints();
 app.MapProjectAiScaffoldEndpoints();
 app.MapProjectAiStageAssistEndpoints();
 app.MapProjectAiGeneralChatEndpoints();

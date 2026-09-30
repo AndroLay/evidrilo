@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.project.ProjectTemplateInputField
 import dev.nextgen.mobile.domain.project.ProjectTemplateInputKind
 import dev.nextgen.mobile.domain.project.ProjectTemplateDefinition
+import dev.nextgen.mobile.domain.project.ProjectTemplatePublication
 import dev.nextgen.mobile.domain.project.ProjectAiScaffoldProposal
 import dev.nextgen.mobile.domain.project.ManualLiteratureSynthesisFields
 import dev.nextgen.mobile.domain.project.RequiredProjectFieldProgress
@@ -76,6 +78,7 @@ import dev.nextgen.mobile.projectcatalog.StudentProjectDraftFlowResult
 import dev.nextgen.mobile.projectcatalog.StudentProjectExportArtifact
 import dev.nextgen.mobile.projectcatalog.StudentProjectExportFormatter
 import dev.nextgen.mobile.projectcatalog.StudentProjectImportReceipt
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistSelectedEvidence
 import dev.nextgen.mobile.projectcatalog.readStudentProjectAttachmentForPreview
 import dev.nextgen.mobile.storage.StudentProjectAttachmentStore
 import kotlin.math.roundToInt
@@ -484,6 +487,37 @@ internal fun studentProjectEditorSections(draft: StudentProjectDraft): List<Stud
     add(StudentProjectEditorSection("review", "Review", StudentProjectEditorSectionKind.REVIEW))
 }
 
+@Composable
+private fun ProjectStarterMethodNotes(template: ProjectTemplateDefinition) {
+    if (template.publication != ProjectTemplatePublication.BUILT_IN_STARTER) return
+    var expanded by remember(template.id, template.version) { mutableStateOf(false) }
+
+    EvidriloTargetCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Method notes", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(if (expanded) "Hide notes" else "View notes")
+            }
+        }
+        if (expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Limits", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.methodSpecificLimitations.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+                Text("Record provenance", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.provenanceRequirements.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+                Text("Accessibility", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+                template.accessibilityExpectations.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+            }
+        }
+    }
+}
+
 internal fun studentProjectEditorProgress(sectionIndex: Int, sectionCount: Int): Float =
     if (sectionCount <= 0) 0f else (sectionIndex.coerceIn(0, sectionCount - 1) + 1f) / sectionCount
 
@@ -553,6 +587,7 @@ internal fun EvidriloStudentProjectsScreen(
     onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
+    var libraryFilter by remember { mutableStateOf(0) }
     var confirmTarget by remember { mutableStateOf<Pair<StudentProjectDraft, Boolean>?>(null) }
     var archiveImportDialog by remember { mutableStateOf<StudentProjectArchiveImportDialogState>(StudentProjectArchiveImportDialogState.Hidden) }
     val archiveImportScope = rememberCoroutineScope()
@@ -645,13 +680,8 @@ internal fun EvidriloStudentProjectsScreen(
 
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
         EvidriloContentColumn(includeBottomSafeArea = false) {
-            EvidriloBackButton(label = "Home", onClick = onBack)
-            Text("My projects", style = MaterialTheme.typography.headlineLarge)
-            Text(
-                "Your project drafts stay on this device. They are not uploaded or evaluated for academic quality.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = EvidriloColors.Slate,
-            )
+            EvidriloBackGesture(label = "Home", onClick = onBack)
+            EvidriloPageHeading("Your projects", "All your work. On this device.")
             notice?.let {
                 EvidriloTargetCard {
                     Text(it, style = MaterialTheme.typography.bodyMedium)
@@ -663,10 +693,7 @@ internal fun EvidriloStudentProjectsScreen(
                 }
                 is StudentProjectListUiState.Loaded -> {
                     if (isStudentProjectFileImportAvailable) {
-                        EvidriloSecondaryButton(
-                            label = "Import project archive (.evproj)",
-                            onClick = selectProjectArchive.select,
-                        )
+                        TextButton(onClick = selectProjectArchive.select) { Text("Import a backup (.evproj)", color = EvidriloColors.Cobalt) }
                     }
                     if (state.projects.isEmpty()) {
                         EvidriloTargetCard {
@@ -677,7 +704,7 @@ internal fun EvidriloStudentProjectsScreen(
                                 color = EvidriloColors.Slate,
                             )
                             EvidriloPrimaryButton(label = "Create a project", onClick = onCreateManualProject)
-                            EvidriloSecondaryButton(label = "Explore project types", onClick = onOpenCatalog)
+                            TextButton(onClick = onOpenCatalog) { Text("Choose a project structure", color = EvidriloColors.Cobalt) }
                         }
                     } else {
                         val active = state.projects.filter {
@@ -685,12 +712,9 @@ internal fun EvidriloStudentProjectsScreen(
                         }
                         val archived = state.projects.filter { it.status == StudentProjectStatus.ARCHIVED || it.status == StudentProjectStatus.COMPLETED }
                         val trash = state.projects.filter { it.status == StudentProjectStatus.TRASHED }
-                        Text("${active.size} of $activeLimit active projects", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "Active project capacity is per installation. Your saved projects stay on this device.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = EvidriloColors.Slate,
-                        )
+                        Text("${active.size} of $activeLimit active", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                        if (libraryFilter == 1 && archived.isEmpty()) Text("Completed and archived projects appear here.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+                        if (libraryFilter == 2 && trash.isEmpty()) Text("Trash is empty.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                         if (active.size >= activeLimit) {
                             EvidriloTargetCard {
                                 Text("Active project limit reached", style = MaterialTheme.typography.titleMedium)
@@ -700,11 +724,13 @@ internal fun EvidriloStudentProjectsScreen(
                         } else {
                             EvidriloPrimaryButton(label = "Create a project", onClick = onCreateManualProject)
                         }
-                        EvidriloSecondaryButton(label = "Explore project types", onClick = onOpenCatalog)
-                        if (active.isNotEmpty()) {
+                        TextButton(onClick = onOpenCatalog) { Text("Choose a project structure", color = EvidriloColors.Cobalt) }
+                        GetStartedChoices(listOf("In progress", "Saved", "Trash"), libraryFilter, { libraryFilter = it }, "Filter local projects")
+                        if (libraryFilter == 0 && active.isEmpty()) Text("No projects in progress. Start a new idea or open saved work.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+                        if (libraryFilter == 0 && active.isNotEmpty()) {
                             Text("In progress", style = MaterialTheme.typography.titleLarge)
                         }
-                        active.forEach { project ->
+                        if (libraryFilter == 0) active.forEach { project ->
                             StudentProjectCard(
                                 project = project,
                                 onResume = { onResume(project) },
@@ -716,7 +742,7 @@ internal fun EvidriloStudentProjectsScreen(
                                 onPermanentlyDelete = {},
                             )
                         }
-                        if (archived.isNotEmpty()) {
+                        if (libraryFilter == 1 && archived.isNotEmpty()) {
                             Text("Archived and completed", style = MaterialTheme.typography.titleLarge)
                             archived.forEach { project ->
                                 StudentProjectCard(
@@ -731,7 +757,7 @@ internal fun EvidriloStudentProjectsScreen(
                                 )
                             }
                         }
-                        if (trash.isNotEmpty()) {
+                        if (libraryFilter == 2 && trash.isNotEmpty()) {
                             Text("Trash · recoverable for 30 days", style = MaterialTheme.typography.titleLarge)
                             trash.forEach { project ->
                                 StudentProjectCard(
@@ -940,6 +966,7 @@ private fun studentProjectArchiveChangedAreas(
 ): List<String> = buildList {
     if (local.templateSnapshot != archived.templateSnapshot) add("method template")
     if (local.title != archived.title) add("project title")
+    if (local.deadlineDate != archived.deadlineDate) add("project deadline")
     if (local.fieldValues != archived.fieldValues) add("assignment and project fields")
     if (local.sources != archived.sources) add("sources")
     if (local.themes != archived.themes) add("synthesis themes")
@@ -972,19 +999,17 @@ private fun StudentProjectCard(
 ) {
     var actionsExpanded by remember(project.id) { mutableStateOf(false) }
     val progress = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.requiredFieldProgress(project)
+    val templateSnapshot = project.templateSnapshot
     EvidriloTargetCard {
-        Text(project.title, style = MaterialTheme.typography.titleLarge)
-        Text(
-            project.templateSnapshot?.title ?: "Directed literature synthesis · Manual project",
-            style = MaterialTheme.typography.bodyMedium,
-            color = EvidriloColors.Slate,
-        )
-        Text(project.status.name.lowercase().replaceFirstChar(Char::uppercase), style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
-        Text(
-            requiredProjectProgressLabel(progress),
-            style = MaterialTheme.typography.labelLarge,
-            color = EvidriloColors.Cobalt,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            EvidriloIcon(EvidriloIconName.FOLDER, tint = EvidriloColors.Cobalt, modifier = Modifier.size(30.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(project.title, style = MaterialTheme.typography.titleLarge)
+                Text(if (templateSnapshot?.publication == ProjectTemplatePublication.BUILT_IN_STARTER) "Local starter" else if (templateSnapshot == null) "Blank project" else "Published template", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+            }
+        }
+        Text("${progress.filledRequired}/${progress.totalRequired} required fields · structure only", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
+        project.deadlineDate?.let { Text("Due $it", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
         val primaryAction = studentProjectPrimaryAction(project.status)
         EvidriloPrimaryButton(
             label = primaryAction.label,
@@ -1044,6 +1069,7 @@ internal fun EvidriloStudentProjectEditorScreen(
     draft: StudentProjectDraft,
     attachmentStore: StudentProjectAttachmentStore,
     projectAiAccountKey: String?,
+    aiCreditBalance: AiCreditBalancePresentation = AiCreditBalancePresentation.SignInRequired,
     projectAiState: ProjectAiScaffoldUiState,
     projectAiConsentState: ProjectAiConsentUiState,
     notice: String?,
@@ -1062,6 +1088,7 @@ internal fun EvidriloStudentProjectEditorScreen(
         List<StudentProjectEvidenceRelation>,
         List<StudentProjectClaimRecord>,
         List<StudentProjectLimitationActionRecord>,
+        String?,
     ) -> StudentProjectDraft?,
     onAutosave: (
         String,
@@ -1074,17 +1101,30 @@ internal fun EvidriloStudentProjectEditorScreen(
         List<StudentProjectEvidenceRelation>,
         List<StudentProjectClaimRecord>,
         List<StudentProjectLimitationActionRecord>,
+        String?,
     ) -> StudentProjectDraft?,
     onAddAttachment: suspend (String, ByteArray, () -> Unit) -> StudentProjectDraftFlowResult<StudentProjectAttachmentAddReceipt>,
     onRemoveAttachment: suspend (String) -> StudentProjectDraftFlowResult<StudentProjectAttachmentRemoveReceipt>,
     onRestoreRevision: (Int) -> StudentProjectDraft?,
     onRequestProjectAi: (String?, String, String?, Map<String, String>, Int?, Boolean) -> Unit,
+    onRefreshAiCreditBalance: () -> Unit = {},
     onRefreshProjectAiConsent: () -> Unit,
     onGrantProjectAiConsent: () -> Unit,
     onRevokeProjectAiConsent: () -> Unit,
     onApplyProjectAi: (ProjectAiScaffoldProposal, Set<String>, Map<String, String>, Set<String>, String, Int) -> StudentProjectDraft?,
     onDiscardProjectAiPreview: (String, Int) -> Unit,
     onRetryProjectAiSettlement: (ProjectAiScaffoldUiState.SettlementFailed) -> Unit,
+    projectAiStageAssistState: ProjectAiStageAssistUiState,
+    projectAiAccountAvailable: Boolean,
+    projectAiAccountMessage: String?,
+    onRequestProjectAiStageAssist: (String, String, Map<String, String>, List<ProjectAiStageAssistSelectedEvidence>) -> Unit,
+    onApplyProjectAiStageAssist: (ProjectAiStageAssistSession, Set<String>, Map<String, String>) -> Unit,
+    onDismissProjectAiStageAssist: (ProjectAiStageAssistSession) -> Unit,
+    onRetryProjectAiStageAssistSettlement: (ProjectAiStageAssistUiState.SettlementFailed) -> Unit,
+    projectAiActivityHistoryState: ProjectAiActivityHistoryUiState,
+    onRefreshProjectAiActivity: (String?) -> Unit,
+    onLoadMoreProjectAiActivity: (String?, String) -> Unit,
+    onRetryUnknownProjectAiStageAssist: (ProjectAiStageAssistUiState.OutcomeUnknown) -> Unit,
     onRequestClose: () -> Unit,
     onSaveAndLeave: () -> Unit,
     onDiscardAndLeave: () -> Unit,
@@ -1102,6 +1142,7 @@ internal fun EvidriloStudentProjectEditorScreen(
         mutableStateOf(dev.nextgen.mobile.domain.project.StudentProjectDraftRules.effectiveClaims(draft))
     }
     var savedLimitationActions by remember(draft.id, draft.revision) { mutableStateOf(draft.limitationActions.toList()) }
+    var savedDeadlineDate by remember(draft.id, draft.revision) { mutableStateOf(draft.deadlineDate) }
     var title by remember(draft.id) { mutableStateOf(draft.title) }
     var values by remember(draft.id) { mutableStateOf(draft.fieldValues.toMap()) }
     var sources by remember(draft.id) { mutableStateOf(draft.sources.toList()) }
@@ -1114,6 +1155,7 @@ internal fun EvidriloStudentProjectEditorScreen(
         mutableStateOf(dev.nextgen.mobile.domain.project.StudentProjectDraftRules.effectiveClaims(draft))
     }
     var limitationActions by remember(draft.id) { mutableStateOf(draft.limitationActions.toList()) }
+    var deadlineDate by remember(draft.id) { mutableStateOf(draft.deadlineDate) }
     var sourceSequence by remember(draft.id) { mutableStateOf(draft.sources.size + 1) }
     var themeSequence by remember(draft.id) { mutableStateOf(draft.themes.size + 1) }
     var evidenceSequence by remember(draft.id) { mutableStateOf(draft.evidenceItems.size + 1) }
@@ -1150,10 +1192,12 @@ internal fun EvidriloStudentProjectEditorScreen(
         evidenceRelations = evidenceRelations,
         claims = claims,
         limitationActions = limitationActions,
+        deadlineDate = deadlineDate,
     )
     val structure = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.structureReport(manualDraft)
     val editorSections = remember(draft.id, draft.templateSnapshot) { studentProjectEditorSections(draft) }
     var editorSectionIndex by remember(draft.id) { mutableStateOf(0) }
+    var showProjectSections by remember(draft.id) { mutableStateOf(false) }
     val activeEditorSectionIndex = editorSectionIndex.coerceIn(0, editorSections.lastIndex)
     val activeEditorSection = editorSections[activeEditorSectionIndex]
     val editorProgress = studentProjectEditorProgress(activeEditorSectionIndex, editorSections.size)
@@ -1174,13 +1218,14 @@ internal fun EvidriloStudentProjectEditorScreen(
         nextEvidenceRelations: List<StudentProjectEvidenceRelation> = evidenceRelations,
         nextClaims: List<StudentProjectClaimRecord> = claims,
         nextLimitationActions: List<StudentProjectLimitationActionRecord> = limitationActions,
+        nextDeadlineDate: String? = deadlineDate,
     ) {
         val dirty =
             nextTitle != savedTitle || nextValues != savedValues || nextSources != savedSources ||
                 nextThemes != savedThemes || nextClaimLinks != savedClaimLinks ||
                 nextEvidenceItems != savedEvidenceItems || nextFindings != savedFindings ||
                 nextEvidenceRelations != savedEvidenceRelations || nextClaims != savedClaims ||
-                nextLimitationActions != savedLimitationActions
+                nextLimitationActions != savedLimitationActions || nextDeadlineDate != savedDeadlineDate
         onDirtyChanged(dirty)
         if (dirty) autosaveStatus = "Changes will be saved locally shortly."
     }
@@ -1252,6 +1297,7 @@ internal fun EvidriloStudentProjectEditorScreen(
         evidenceRelations = saved.evidenceRelations.toList()
         claims = saved.claims.toList()
         limitationActions = saved.limitationActions.toList()
+        deadlineDate = saved.deadlineDate
         savedTitle = saved.title
         savedValues = saved.fieldValues.toMap()
         savedSources = saved.sources.toList()
@@ -1262,6 +1308,7 @@ internal fun EvidriloStudentProjectEditorScreen(
         savedEvidenceRelations = saved.evidenceRelations.toList()
         savedClaims = saved.claims.toList()
         savedLimitationActions = saved.limitationActions.toList()
+        savedDeadlineDate = saved.deadlineDate
         localError = null
         autosaveStatus = "Saved on this device."
         onDirtyChanged(false)
@@ -1279,6 +1326,7 @@ internal fun EvidriloStudentProjectEditorScreen(
             snapshot.evidenceRelations,
             snapshot.claims,
             snapshot.limitationActions,
+            snapshot.deadlineDate,
         )
         if (saved != null) {
             acceptSavedProject(saved)
@@ -1303,6 +1351,7 @@ internal fun EvidriloStudentProjectEditorScreen(
             evidenceRelations,
             claims,
             limitationActions,
+            deadlineDate,
         )
         if (saved == null) {
             localError = "Your changes could not be saved. They remain on this screen; retry before continuing."
@@ -1483,12 +1532,16 @@ internal fun EvidriloStudentProjectEditorScreen(
         evidenceRelations,
         claims,
         limitationActions,
+        deadlineDate,
         isDirty,
     ) {
         if (!isDirty) return@LaunchedEffect
         autosaveStatus = "Saving on this device…"
         delay(PROJECT_AUTOSAVE_DEBOUNCE_MILLIS)
-        val autosaved = onAutosave(title, values, sources, themes, claimLinks, evidenceItems, findings, evidenceRelations, claims, limitationActions)
+        val autosaved = onAutosave(
+            title, values, sources, themes, claimLinks, evidenceItems, findings, evidenceRelations, claims,
+            limitationActions, deadlineDate,
+        )
         if (autosaved != null) {
             savedTitle = title
             savedValues = values.toMap()
@@ -1500,6 +1553,7 @@ internal fun EvidriloStudentProjectEditorScreen(
             savedEvidenceRelations = evidenceRelations.toList()
             savedClaims = claims.toList()
             savedLimitationActions = limitationActions.toList()
+            savedDeadlineDate = deadlineDate
             localError = null
             autosaveStatus = "Saved on this device."
             onDirtyChanged(false)
@@ -1577,82 +1631,21 @@ internal fun EvidriloStudentProjectEditorScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(EvidriloColors.Canvas)) {
+    EvidriloBackGesture("My projects", onRequestClose)
+    EvidriloProjectEditorScaffold(
+        projectTitle = title, sectionTitle = activeEditorSection.title, sectionKey = activeEditorSectionIndex,
+        progress = editorProgress, progressDescription = editorProgressDescription,
+        saveStatus = autosaveStatus, onChooseSection = { showProjectSections = true },
+        nextLabel = if (activeEditorSectionIndex < editorSections.lastIndex) {
+            if (editorSections[activeEditorSectionIndex + 1].kind == StudentProjectEditorSectionKind.REVIEW) "Review" else "Continue"
+        } else null,
+        onNext = { navigateToEditorSection(activeEditorSectionIndex + 1) },
+    ) {
         key(activeEditorSectionIndex) {
-        EvidriloContentColumn {
-            EvidriloBackButton(label = "My projects", onClick = onRequestClose)
-            LinearProgressIndicator(
-                progress = { editorProgress },
-                modifier = Modifier.fillMaxWidth().semantics {
-                    contentDescription = editorProgressDescription
-                    progressBarRangeInfo = ProgressBarRangeInfo(editorProgress, 0f..1f)
-                },
-            )
-            Text(
-                "Section progress · Not a grade",
-                style = MaterialTheme.typography.labelMedium,
-                color = EvidriloColors.Slate,
-            )
-            Text(activeEditorSection.title, style = MaterialTheme.typography.headlineLarge)
-            Text(title.ifBlank { "Untitled project" }, style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Slate)
-            Text(autosaveStatus, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
             notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
             removalReviewNotice?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Cobalt)
             }
-            if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
-                Text(
-                    draft.templateSnapshot?.title ?: "Blank project",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = EvidriloColors.Slate,
-                )
-                EvidriloTargetCard {
-                    Text(if (manual) "Start from your own task" else "Local project draft", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        if (manual) {
-                            "Nothing is prefilled. Add only the instructions, sources, and notes you actually have. Progress tracks required structure, not research quality or truth. This project stays on this device."
-                        } else {
-                            "Use this reviewed template to organize your work. Required-field progress tracks presence only; it is not a grade or a judgment of research quality. Your draft stays on this device."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = EvidriloColors.Slate,
-                    )
-                    Text(requiredProjectProgressLabel(requiredFieldProgress), style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
-                }
-            }
-
-            if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
-                draft.templateSnapshot?.let { template ->
-                EvidriloProjectAiScaffoldPanel(
-                    template = template,
-                    existingProjectId = draft.id,
-                    currentFieldValues = values,
-                    existingProjectRevision = draft.revision,
-                    projectTitle = title,
-                    projectAiAccountKey = projectAiAccountKey,
-                    state = projectAiState,
-                    consentState = projectAiConsentState,
-                    allowRequest = !isDirty,
-                    onRefreshConsent = onRefreshProjectAiConsent,
-                    onGrantConsent = onGrantProjectAiConsent,
-                    onRevokeConsent = onRevokeProjectAiConsent,
-                    onRequest = onRequestProjectAi,
-                    onCreateProject = { _, _, _, _, _, _ -> Unit },
-                    onApplyToProject = { proposal, selected, edited, replaced, requestId, creditCost ->
-                        onApplyProjectAi(proposal, selected, edited, replaced, requestId, creditCost)?.also { updated ->
-                            title = updated.title
-                            savedTitle = updated.title
-                            values = updated.fieldValues.toMap()
-                            savedValues = updated.fieldValues.toMap()
-                            onDirtyChanged(false)
-                        }
-                    },
-                    onDiscardPreview = onDiscardProjectAiPreview,
-                    onRetrySettlement = onRetryProjectAiSettlement,
-                )
-                }
-            }
-
             if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
                 OutlinedTextField(
                 value = title,
@@ -1667,6 +1660,13 @@ internal fun EvidriloStudentProjectEditorScreen(
                 supportingText = { Text("A short name to find this draft later.") },
                 singleLine = true,
                 isError = title.isBlank() || title.length > 160,
+                )
+                StudentProjectDeadlineEditor(
+                    deadlineDate = deadlineDate,
+                    onDeadlineDateChange = { nextDate ->
+                        deadlineDate = nextDate
+                        reportDirty(nextDeadlineDate = nextDate)
+                    },
                 )
             }
 
@@ -1687,6 +1687,67 @@ internal fun EvidriloStudentProjectEditorScreen(
                     )
                     }
             }
+            if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
+                Text(
+                    draft.templateSnapshot?.title ?: "Blank project",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = EvidriloColors.Slate,
+                )
+                EvidriloExplanation("About this project", when {
+                    manual -> "Nothing is prefilled. Add your own task, sources, and notes. Progress tracks structure, not quality or truth. This project stays on this device."
+                    draft.templateSnapshot?.publication == ProjectTemplatePublication.BUILT_IN_STARTER -> "This starter adds editable sections, not research content or a reviewed method. Confirm method and ethics requirements with your instructor. Structure progress is not a grade."
+                    else -> "Required-field progress tracks presence, not research quality. Your draft stays on this device."
+                })
+                draft.templateSnapshot?.let { ProjectStarterMethodNotes(it) }
+            }
+
+            if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
+                draft.templateSnapshot
+                    ?.takeIf { it.publication == ProjectTemplatePublication.PUBLISHED }
+                    ?.let { template ->
+                EvidriloProjectAiScaffoldPanel(
+                    template = template,
+                    existingProjectId = draft.id,
+                    currentFieldValues = values,
+                    existingProjectRevision = draft.revision,
+                    projectTitle = title,
+                    projectAiAccountKey = projectAiAccountKey,
+                    aiCreditBalance = aiCreditBalance,
+                    state = projectAiState,
+                    consentState = projectAiConsentState,
+                    allowRequest = !isDirty,
+                    allowApply = !isDirty,
+                    onRefreshAiCreditBalance = onRefreshAiCreditBalance,
+                    onRefreshConsent = onRefreshProjectAiConsent,
+                    onGrantConsent = onGrantProjectAiConsent,
+                    onRevokeConsent = onRevokeProjectAiConsent,
+                    onRequest = onRequestProjectAi,
+                    onCreateProject = { _, _, _, _, _, _ -> Unit },
+                    onApplyToProject = { proposal, selected, edited, replaced, requestId, creditCost ->
+                        onApplyProjectAi(proposal, selected, edited, replaced, requestId, creditCost)?.also { updated ->
+                            title = updated.title
+                            savedTitle = updated.title
+                            values = updated.fieldValues.toMap()
+                            savedValues = updated.fieldValues.toMap()
+                            onDirtyChanged(false)
+                        }
+                    },
+                    onDiscardPreview = onDiscardProjectAiPreview,
+                    onRetrySettlement = onRetryProjectAiSettlement,
+                )
+                }
+            }
+
+            if (activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS && projectAiAccountKey != null) {
+                EvidriloProjectAiActivityHistory(
+                    state = projectAiActivityHistoryState,
+                    accountId = projectAiAccountKey,
+                    projectId = draft.id,
+                    onRefresh = { onRefreshProjectAiActivity(draft.id) },
+                    onLoadMore = { cursor -> onLoadMoreProjectAiActivity(draft.id, cursor) },
+                )
+            }
+
             if (activeEditorSection.kind == StudentProjectEditorSectionKind.SOURCES_AND_FILES) {
                 Text(
                     "Enter source details yourself. Evidrilo does not search the web, verify DOI/URLs, or decide whether a source is credible.",
@@ -1703,34 +1764,36 @@ internal fun EvidriloStudentProjectEditorScreen(
                     },
                 )
                 sources.forEach { source ->
-                    ProjectSourceEditor(
-                        source = source,
-                        removalImpact = projectSourceRemovalImpact(
+                    key(source.id) {
+                        ProjectSourceEditor(
                             source = source,
-                            draft = manualDraft,
-                        ),
-                        onChange = { updated ->
-                            val nextSources = sources.map { if (it.id == source.id) updated else it }
-                            sources = nextSources
-                            reportDirty(nextSources = nextSources)
-                        },
-                        onAddEvidence = {
-                            val id = "evidence-${draft.id.take(56)}-${evidenceSequence++}"
-                            val nextEvidence = evidenceItems + StudentProjectEvidenceItem(id = id, sourceId = source.id)
-                            evidenceItems = nextEvidence
-                            reportDirty(nextEvidenceItems = nextEvidence)
-                        },
-                        onRemove = {
-                            val candidate = StudentProjectDraftRules.removeSource(manualDraft, source.id)
-                            val saved = saveProjectSnapshot(candidate)
-                            if (saved != null) {
-                                removalReviewNotice = "Saved revision ${saved.revision}. Review the affected claims and any retained free-text analysis/output before relying on or exporting this project."
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                    )
+                            removalImpact = projectSourceRemovalImpact(
+                                source = source,
+                                draft = manualDraft,
+                            ),
+                            onChange = { updated ->
+                                val nextSources = sources.map { if (it.id == source.id) updated else it }
+                                sources = nextSources
+                                reportDirty(nextSources = nextSources)
+                            },
+                            onAddEvidence = {
+                                val id = "evidence-${draft.id.take(56)}-${evidenceSequence++}"
+                                val nextEvidence = evidenceItems + StudentProjectEvidenceItem(id = id, sourceId = source.id)
+                                evidenceItems = nextEvidence
+                                reportDirty(nextEvidenceItems = nextEvidence)
+                            },
+                            onRemove = {
+                                val candidate = StudentProjectDraftRules.removeSource(manualDraft, source.id)
+                                val saved = saveProjectSnapshot(candidate)
+                                if (saved != null) {
+                                    removalReviewNotice = "Saved revision ${saved.revision}. Review the affected claims and any retained free-text analysis/output before relying on or exporting this project."
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                        )
+                    }
                 }
                 EvidriloTargetCard {
                     Text("Project files", style = MaterialTheme.typography.titleMedium)
@@ -1795,26 +1858,28 @@ internal fun EvidriloStudentProjectEditorScreen(
                 evidenceItems.forEach { evidence ->
                     val source = sources.singleOrNull { it.id == evidence.sourceId }
                     if (source != null) {
-                        ProjectEvidenceItemEditor(
-                            evidence = evidence,
-                            sourceLabel = source.title.ifBlank { "Untitled source · ${source.id}" },
-                            removalImpact = projectEvidenceRemovalImpact(evidence, manualDraft),
-                            onChange = { updated ->
-                                val nextEvidence = evidenceItems.map { if (it.id == evidence.id) updated else it }
-                                evidenceItems = nextEvidence
-                                reportDirty(nextEvidenceItems = nextEvidence)
-                            },
-                            onRemove = {
-                                val candidate = StudentProjectDraftRules.removeEvidenceNote(manualDraft, evidence.id)
-                                val saved = saveProjectSnapshot(candidate)
-                                if (saved != null) {
-                                    removalReviewNotice = "Saved revision ${saved.revision}. Review the affected claims and any retained free-text analysis/output before relying on or exporting this project."
-                                    true
-                                } else {
-                                    false
-                                }
-                            },
-                        )
+                        key(evidence.id) {
+                            ProjectEvidenceItemEditor(
+                                evidence = evidence,
+                                sourceLabel = source.title.ifBlank { "Untitled source · ${source.id}" },
+                                removalImpact = projectEvidenceRemovalImpact(evidence, manualDraft),
+                                onChange = { updated ->
+                                    val nextEvidence = evidenceItems.map { if (it.id == evidence.id) updated else it }
+                                    evidenceItems = nextEvidence
+                                    reportDirty(nextEvidenceItems = nextEvidence)
+                                },
+                                onRemove = {
+                                    val candidate = StudentProjectDraftRules.removeEvidenceNote(manualDraft, evidence.id)
+                                    val saved = saveProjectSnapshot(candidate)
+                                    if (saved != null) {
+                                        removalReviewNotice = "Saved revision ${saved.revision}. Review the affected claims and any retained free-text analysis/output before relying on or exporting this project."
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -1852,24 +1917,26 @@ internal fun EvidriloStudentProjectEditorScreen(
                     },
                 )
                 findings.forEach { finding ->
-                    ProjectFindingEditor(
-                        finding = finding,
-                        evidenceItems = evidenceItems,
-                        evidenceRelations = evidenceRelations,
-                        onChange = { updated ->
-                            val nextFindings = findings.map { if (it.id == finding.id) updated else it }
-                            findings = nextFindings
-                            reportDirty(nextFindings = nextFindings)
-                        },
-                        onRelationsChange = { nextRelations ->
-                            evidenceRelations = nextRelations
-                            reportDirty(nextEvidenceRelations = nextRelations)
-                        },
-                        onRemove = {
-                            val nextFindings = findings.filterNot { it.id == finding.id }
-                            changeFindings(nextFindings)
-                        },
-                    )
+                    key(finding.id) {
+                        ProjectFindingEditor(
+                            finding = finding,
+                            evidenceItems = evidenceItems,
+                            evidenceRelations = evidenceRelations,
+                            onChange = { updated ->
+                                val nextFindings = findings.map { if (it.id == finding.id) updated else it }
+                                findings = nextFindings
+                                reportDirty(nextFindings = nextFindings)
+                            },
+                            onRelationsChange = { nextRelations ->
+                                evidenceRelations = nextRelations
+                                reportDirty(nextEvidenceRelations = nextRelations)
+                            },
+                            onRemove = {
+                                val nextFindings = findings.filterNot { it.id == finding.id }
+                                changeFindings(nextFindings)
+                            },
+                        )
+                    }
                 }
                 if (themes.isNotEmpty()) {
                     Text("Earlier cross-source comparison notes", style = MaterialTheme.typography.titleMedium)
@@ -1884,20 +1951,22 @@ internal fun EvidriloStudentProjectEditorScreen(
                     },
                 )
                 themes.forEach { theme ->
-                    ProjectSynthesisThemeEditor(
-                        theme = theme,
-                        sources = sources,
-                        onChange = { updated ->
-                            val nextThemes = themes.map { if (it.id == theme.id) updated else it }
-                            themes = nextThemes
-                            reportDirty(nextThemes = nextThemes)
-                        },
-                        onRemove = {
-                            val nextThemes = themes.filterNot { it.id == theme.id }
-                            themes = nextThemes
-                            reportDirty(nextThemes = nextThemes)
-                        },
-                    )
+                    key(theme.id) {
+                        ProjectSynthesisThemeEditor(
+                            theme = theme,
+                            sources = sources,
+                            onChange = { updated ->
+                                val nextThemes = themes.map { if (it.id == theme.id) updated else it }
+                                themes = nextThemes
+                                reportDirty(nextThemes = nextThemes)
+                            },
+                            onRemove = {
+                                val nextThemes = themes.filterNot { it.id == theme.id }
+                                themes = nextThemes
+                                reportDirty(nextThemes = nextThemes)
+                            },
+                        )
+                    }
                 }
             }
             if (!manual) {
@@ -1906,28 +1975,83 @@ internal fun EvidriloStudentProjectEditorScreen(
                     activeEditorSection.kind == StudentProjectEditorSectionKind.TEMPLATE_ADDITIONAL_FIELDS
                 ) {
                     val step = template.steps.singleOrNull { it.id == activeEditorSection.id }
-                    step?.let {
+                    step?.let { currentStep ->
                         Text(
                             "Work through the fields for this part of your project. You can move between sections without completing them first.",
                             style = MaterialTheme.typography.bodySmall,
                             color = EvidriloColors.Slate,
                         )
-                    }
-                    template.inputFields.filter { it.id in activeEditorSection.fieldIds }.forEach { field ->
-                    ProjectDraftField(
-                        label = field.label,
-                        prompt = field.kind.editorPrompt(),
-                        placeholder = field.kind.editorHint(),
-                        required = field.required,
-                        value = values[field.id].orEmpty(),
-                        onValueChange = { next ->
-                            if (next.length <= 8_000) {
-                                val nextValues = values + (field.id to next)
-                                values = nextValues
-                                reportDirty(nextValues = nextValues)
-                            }
-                        },
-                    )
+                        template.inputFields.filter { it.id in activeEditorSection.fieldIds }.forEach { field ->
+                            ProjectDraftField(
+                                label = field.label,
+                                prompt = field.kind.editorPrompt(),
+                                placeholder = field.kind.editorHint(),
+                                required = field.required,
+                                value = values[field.id].orEmpty(),
+                                onValueChange = { next ->
+                                    if (next.length <= 8_000) {
+                                        val nextValues = values + (field.id to next)
+                                        values = nextValues
+                                        reportDirty(nextValues = nextValues)
+                                    }
+                                },
+                            )
+                        }
+                        if (currentStep.aiOperations.isNotEmpty()) {
+                            val sourceById = sources.associateBy(StudentProjectSourceRecord::id)
+                            val evidenceChoices = buildList {
+                                sources.forEach { source ->
+                                    add(
+                                        ProjectAiStageAssistSelectedEvidence(
+                                            id = source.id,
+                                            kind = "SOURCE",
+                                            label = source.title.ifBlank { "Project source" },
+                                            summary = source.studentNotes.ifBlank { source.reportedFindings }.takeIf(String::isNotBlank),
+                                            origin = source.doiOrUrl.ifBlank { source.citationText }.takeIf(String::isNotBlank),
+                                        ),
+                                    )
+                                }
+                                evidenceItems.forEach { item ->
+                                    val source = sourceById[item.sourceId]
+                                    add(
+                                        ProjectAiStageAssistSelectedEvidence(
+                                            id = item.id,
+                                            kind = "OBSERVATION",
+                                            label = source?.title?.takeIf(String::isNotBlank) ?: "Evidence note",
+                                            summary = item.excerpt.takeIf(String::isNotBlank),
+                                            origin = listOfNotNull(source?.doiOrUrl?.takeIf(String::isNotBlank), item.locator.takeIf(String::isNotBlank))
+                                                .joinToString(" · ").takeIf(String::isNotBlank),
+                                        ),
+                                    )
+                                }
+                            }.distinctBy(ProjectAiStageAssistSelectedEvidence::id)
+                            Spacer(Modifier.height(8.dp))
+                            EvidriloProjectAiStageAssistPanel(
+                                draft = draft,
+                                accountId = projectAiAccountKey,
+                                step = currentStep,
+                                fields = template.inputFields,
+                                values = values,
+                                evidenceChoices = evidenceChoices,
+                                state = projectAiStageAssistState,
+                                aiCreditBalance = aiCreditBalance,
+                                consentState = projectAiConsentState,
+                                isDirty = isDirty,
+                                accountAvailable = projectAiAccountAvailable,
+                                accountMessage = projectAiAccountMessage,
+                                onRefreshAiCreditBalance = onRefreshAiCreditBalance,
+                                onRefreshConsent = onRefreshProjectAiConsent,
+                                onGrantConsent = onGrantProjectAiConsent,
+                                onRevokeConsent = onRevokeProjectAiConsent,
+                                onRequest = { operationId, selectedValues, selectedEvidence ->
+                                    onRequestProjectAiStageAssist(currentStep.id, operationId, selectedValues, selectedEvidence)
+                                },
+                                onApply = onApplyProjectAiStageAssist,
+                                onDismiss = onDismissProjectAiStageAssist,
+                                onRetrySettlement = onRetryProjectAiStageAssistSettlement,
+                                onRetryUnknownRequest = onRetryUnknownProjectAiStageAssist,
+                            )
+                        }
                     }
                 }
             }
@@ -1956,18 +2080,20 @@ internal fun EvidriloStudentProjectEditorScreen(
                     }
                 }
                 claims.forEach { claim ->
-                    ProjectClaimEditor(
-                        claim = claim,
-                        evidenceItems = evidenceItems,
-                        evidenceRelations = evidenceRelations,
-                        showScopeField = !manual,
-                        onChange = { updated -> changeClaims(claims.map { if (it.id == claim.id) updated else it }) },
-                        onRelationsChange = { nextRelations ->
-                            evidenceRelations = nextRelations
-                            reportDirty(nextEvidenceRelations = nextRelations)
-                        },
-                        onRemove = { changeClaims(claims.filterNot { it.id == claim.id }) },
-                    )
+                    key(claim.id) {
+                        ProjectClaimEditor(
+                            claim = claim,
+                            evidenceItems = evidenceItems,
+                            evidenceRelations = evidenceRelations,
+                            showScopeField = !manual,
+                            onChange = { updated -> changeClaims(claims.map { if (it.id == claim.id) updated else it }) },
+                            onRelationsChange = { nextRelations ->
+                                evidenceRelations = nextRelations
+                                reportDirty(nextEvidenceRelations = nextRelations)
+                            },
+                            onRemove = { changeClaims(claims.filterNot { it.id == claim.id }) },
+                        )
+                    }
                 }
                 EvidriloSecondaryButton(
                     label = "Add a claim",
@@ -2048,25 +2174,28 @@ internal fun EvidriloStudentProjectEditorScreen(
                 )
             }
             limitationActions.forEach { action ->
-                ProjectLimitationActionEditor(
-                    action = action,
-                    findings = findings,
-                    claims = claims,
-                    onChange = { updated ->
-                        val nextActions = limitationActions.map { if (it.id == action.id) updated else it }
-                        limitationActions = nextActions
-                        reportDirty(nextLimitationActions = nextActions)
-                    },
-                    onRemove = {
-                        val nextActions = limitationActions.filterNot { it.id == action.id }
-                        limitationActions = nextActions
-                        reportDirty(nextLimitationActions = nextActions)
-                    },
-                )
+                key(action.id) {
+                    ProjectLimitationActionEditor(
+                        action = action,
+                        findings = findings,
+                        claims = claims,
+                        onChange = { updated ->
+                            val nextActions = limitationActions.map { if (it.id == action.id) updated else it }
+                            limitationActions = nextActions
+                            reportDirty(nextLimitationActions = nextActions)
+                        },
+                        onRemove = {
+                            val nextActions = limitationActions.filterNot { it.id == action.id }
+                            limitationActions = nextActions
+                            reportDirty(nextLimitationActions = nextActions)
+                        },
+                    )
+                }
             }
             }
 
             if (activeEditorSection.kind == StudentProjectEditorSectionKind.REVIEW) {
+                EvidriloProjectRecordCard("Review your material", "${manualDraft.sources.size} sources · ${manualDraft.evidenceItems.size} evidence notes · ${manualDraft.claims.size} claims") {
                 StudentProjectReviewContent(
                     draft = manualDraft,
                     fields = studentProjectReviewFields(manualDraft),
@@ -2082,6 +2211,7 @@ internal fun EvidriloStudentProjectEditorScreen(
                         evidenceRelations = restored.evidenceRelations.toList()
                         claims = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.effectiveClaims(restored)
                         limitationActions = restored.limitationActions.toList()
+                        deadlineDate = restored.deadlineDate
                         savedTitle = title
                         savedValues = values.toMap()
                         savedSources = sources.toList()
@@ -2092,6 +2222,7 @@ internal fun EvidriloStudentProjectEditorScreen(
                         savedEvidenceRelations = evidenceRelations.toList()
                         savedClaims = claims.toList()
                         savedLimitationActions = limitationActions.toList()
+                        savedDeadlineDate = deadlineDate
                         autosaveStatus = "Revision ${restored.revision} restored as a new revision."
                         localError = null
                         onDirtyChanged(false)
@@ -2105,66 +2236,24 @@ internal fun EvidriloStudentProjectEditorScreen(
                     isDirty = isDirty,
                     structure = structure,
                 )
+                }
                 Text(
                     "Review the project details above before choosing an export. Exports contain your recorded material; Evidrilo does not verify the sources, methods, or conclusions.",
                     style = MaterialTheme.typography.bodySmall,
                     color = EvidriloColors.Slate,
                 )
                 if (isStudentProjectFileExportAvailable) {
-                EvidriloSecondaryButton(
-                    label = "Export report as Markdown",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::markdown) },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export report as PDF",
-                    onClick = {
-                        exportSnapshot { project ->
-                            StudentProjectExportFormatter.markdown(project).toPdfReportInput()
-                        }
-                    },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export report as DOCX",
-                    onClick = {
-                        exportSnapshot { project ->
-                            StudentProjectExportFormatter.markdown(project).toDocxReportInput()
-                        }
-                    },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export project archive (.evproj)",
-                    onClick = ::exportArchiveSnapshot,
-                )
-                Text(
-                    "The archive preserves project data, selected revision history, and verified file attachments for recovery. Exporting does not validate research quality.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EvidriloColors.Slate,
-                )
-                EvidriloSecondaryButton(
-                    label = "Export source matrix as CSV",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::sourceMatrixCsv) },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export synthesis themes as CSV",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::synthesisThemesCsv) },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export evidence notes as CSV",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::evidenceItemsCsv) },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export findings as CSV",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::findingsCsv) },
-                )
-                EvidriloSecondaryButton(
-                    label = "Export evidence relationships as CSV",
-                    onClick = { exportSnapshot(StudentProjectExportFormatter::evidenceRelationsCsv) },
-                )
-                Text(
-                    "CSV cells that may be treated as formulas are prefixed with an apostrophe. Spreadsheet behavior varies; review the exported values before using them.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EvidriloColors.Slate,
-                )
+                EvidriloExportChooser(listOf(
+                    "Markdown report" to { exportSnapshot(StudentProjectExportFormatter::markdown) },
+                    "PDF report" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toPdfReportInput() } },
+                    "Word document" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toDocxReportInput() } },
+                    "Project backup (.evproj)" to { exportArchiveSnapshot() },
+                    "Source matrix (CSV)" to { exportSnapshot(StudentProjectExportFormatter::sourceMatrixCsv) },
+                    "Synthesis themes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::synthesisThemesCsv) },
+                    "Evidence notes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceItemsCsv) },
+                    "Findings (CSV)" to { exportSnapshot(StudentProjectExportFormatter::findingsCsv) },
+                    "Evidence relationships (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceRelationsCsv) },
+                ))
                 } else {
                 Text(
                     "File export is not available in this build. Your project remains saved locally.",
@@ -2186,27 +2275,14 @@ internal fun EvidriloStudentProjectEditorScreen(
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                 }
             }
-            if (activeEditorSectionIndex > 0) {
-                EvidriloSecondaryButton(
-                    label = "Back",
-                    onClick = { navigateToEditorSection(activeEditorSectionIndex - 1) },
-                )
-            }
-            if (activeEditorSectionIndex < editorSections.lastIndex) {
-                val nextTitle = editorSections[activeEditorSectionIndex + 1].title
-                EvidriloPrimaryButton(
-                    label = if (nextTitle == "Review") "Review project" else "Continue",
-                    onClick = { navigateToEditorSection(activeEditorSectionIndex + 1) },
-                )
-            }
-            Text(
-                "Your draft stays on this device. It is not submitted, uploaded, or automatically evaluated.",
-                style = MaterialTheme.typography.bodySmall,
-                color = EvidriloColors.Slate,
-            )
-            Spacer(Modifier.height(12.dp))
         }
-        }
+    }
+    if (showProjectSections) {
+        EvidriloProjectSectionsDialog(editorSections, activeEditorSectionIndex, localError ?: saveError,
+            onSelect = { index ->
+                navigateToEditorSection(index)
+                if (editorSectionIndex == index) showProjectSections = false
+            }, onDismiss = { showProjectSections = false })
     }
 
     if (attachmentTextReadInProgress != null) {
@@ -2409,7 +2485,7 @@ private fun ProjectDraftField(
             label = { Text(prompt) },
             placeholder = { Text(placeholder) },
             supportingText = {
-                Text(if (required) "Required section; presence is not a quality score." else "Optional section.")
+                Text(if (required) "Required" else "Optional")
             },
             minLines = 3,
             maxLines = 7,
@@ -2428,8 +2504,8 @@ private fun ProjectSourceEditor(
 ) {
     var showRemoveConfirmation by remember(source.id) { mutableStateOf(false) }
     var removalError by remember(source.id) { mutableStateOf(false) }
-    EvidriloTargetCard {
-        Text(source.title.ifBlank { "New source" }, style = MaterialTheme.typography.titleMedium)
+    EvidriloProjectRecordCard(title = source.title.ifBlank { "New source" }, detail = "Source · ${source.selectionStatus.label()}", initiallyExpanded = source.title.isBlank()) {
+
         SourceTextInput("Title", source.title, onValueChange = { onChange(source.copy(title = it)) })
         SourceTextInput("Author or organization", source.authors, onValueChange = { onChange(source.copy(authors = it)) })
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2509,7 +2585,7 @@ private fun ProjectEvidenceItemEditor(
 ) {
     var showRemoveConfirmation by remember(evidence.id) { mutableStateOf(false) }
     var removalError by remember(evidence.id) { mutableStateOf(false) }
-    EvidriloTargetCard {
+    EvidriloProjectRecordCard(title = evidence.excerpt.ifBlank { "New evidence note" }.take(100), detail = sourceLabel, initiallyExpanded = evidence.excerpt.isBlank()) {
         Text("Evidence from: $sourceLabel", style = MaterialTheme.typography.titleSmall)
         SourceTextInput("Your excerpt or paraphrase", evidence.excerpt, multiline = true) {
             onChange(evidence.copy(excerpt = it))
@@ -2567,8 +2643,8 @@ private fun ProjectFindingEditor(
     onRelationsChange: (List<StudentProjectEvidenceRelation>) -> Unit,
     onRemove: () -> Unit,
 ) {
-    EvidriloTargetCard {
-        Text(finding.statement.ifBlank { "New finding" }, style = MaterialTheme.typography.titleMedium)
+    EvidriloProjectRecordCard(title = finding.statement.ifBlank { "New finding" }.take(100), detail = "Finding · evidence links inside", initiallyExpanded = finding.statement.isBlank()) {
+
         SourceTextInput("Your finding or synthesis statement", finding.statement, multiline = true) {
             onChange(finding.copy(statement = it))
         }
@@ -2600,8 +2676,8 @@ private fun ProjectClaimEditor(
     onRelationsChange: (List<StudentProjectEvidenceRelation>) -> Unit,
     onRemove: () -> Unit,
 ) {
-    EvidriloTargetCard {
-        Text(claim.statement.ifBlank { "New claim" }, style = MaterialTheme.typography.titleMedium)
+    EvidriloProjectRecordCard(title = claim.statement.ifBlank { "New claim" }.take(100), detail = "Claim · ${claim.reviewStatus.claimReviewLabel()}", initiallyExpanded = claim.statement.isBlank()) {
+
         ProjectDraftField(
             label = "Claim statement",
             prompt = "What bounded statement are you making?",
@@ -2656,12 +2732,7 @@ private fun ProjectLimitationActionEditor(
     onChange: (StudentProjectLimitationActionRecord) -> Unit,
     onRemove: () -> Unit,
 ) {
-    EvidriloTargetCard {
-        Text(
-            action.boundary.ifBlank { "New limitation or next action" },
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text("Record ID: ${action.id}", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+    EvidriloProjectRecordCard(title = action.boundary.ifBlank { "New limitation or next action" }.take(100), detail = "Boundary and next action", initiallyExpanded = action.boundary.isBlank()) {
         ProjectDraftField(
             label = "Boundary or limitation",
             prompt = "What does this project not establish?",
@@ -2813,8 +2884,8 @@ private fun ProjectSynthesisThemeEditor(
     onChange: (StudentProjectSynthesisTheme) -> Unit,
     onRemove: () -> Unit,
 ) {
-    EvidriloTargetCard {
-        Text(theme.title.ifBlank { "Synthesis theme" }, style = MaterialTheme.typography.titleMedium)
+    EvidriloProjectRecordCard(title = theme.title.ifBlank { "New synthesis theme" }, detail = "Synthesis · ${theme.sourceIds.size} sources", initiallyExpanded = theme.title.isBlank()) {
+
         SourceTextInput("Theme label", theme.title, onValueChange = { onChange(theme.copy(title = it)) })
         SourceTextInput("Your synthesis", theme.synthesis, onValueChange = { onChange(theme.copy(synthesis = it)) }, multiline = true)
         Text("Sources you used for this theme", style = MaterialTheme.typography.labelLarge)
@@ -2885,12 +2956,20 @@ private fun StudentProjectReviewContent(
     val findingsById = draft.findings.associateBy(StudentProjectFindingRecord::id)
     val claims = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.effectiveClaims(draft)
     val claimsById = claims.associateBy(StudentProjectClaimRecord::id)
+    val templateSnapshot = draft.templateSnapshot
 
     EvidriloTargetCard {
         Text("Project overview", style = MaterialTheme.typography.titleLarge)
         ProjectReviewValue("Project name", draft.title)
-        ProjectReviewValue("Starting point", draft.templateSnapshot?.title ?: "Your own task")
+        ProjectReviewValue(
+            "Starting point",
+            when (templateSnapshot?.publication) {
+                ProjectTemplatePublication.BUILT_IN_STARTER -> "${templateSnapshot.title} · local structure-only guide"
+                else -> templateSnapshot?.title ?: "Your own task"
+            },
+        )
         ProjectReviewValue("Project status", draft.status.name.lowercase().replace('_', ' '))
+        ProjectReviewValue("Optional deadline", draft.deadlineDate ?: "Not set")
         ProjectReviewValue("Saved revision", draft.revision.toString())
         Text(
             "This review records what is in the local draft. It is not an academic grade or a verification of research quality.",

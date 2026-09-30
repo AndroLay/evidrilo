@@ -840,6 +840,109 @@ public static class EntryPoint
             RequireString(await ReadJsonAsync(oversizedExport), "code", "ACCOUNT_EXPORT_TOO_LARGE");
         }
 
+        await AssertAccountExportQueueLimitAsync(client, databaseConnectionString, OtherAccountId);
+        await SeedProjectAiExportFixtureAsync(databaseConnectionString);
+        var exportId = await CreateAccountExportAsync(client, AccountId, "account_export_e2e_0001");
+        var replayedExportId = await CreateAccountExportAsync(client, AccountId, "account_export_e2e_0001");
+        if (replayedExportId != exportId)
+            throw new InvalidOperationException("Account export idempotency replay returned a different export ID.");
+
+        var ready = false;
+        string? lastExportStatus = null;
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            using var status = await SendAccountExportAsync(
+                client,
+                HttpMethod.Get,
+                $"/v2/account/exports/{exportId:D}",
+                AccountId);
+            RequireStatus(status, HttpStatusCode.OK, "account export job status");
+            var statusBody = await ReadJsonAsync(status);
+            var jobStatus = statusBody.GetProperty("status").GetString();
+            lastExportStatus = jobStatus;
+            if (jobStatus == "ready")
+            {
+                ready = true;
+                break;
+            }
+            if (jobStatus == "failed")
+            {
+                throw new InvalidOperationException(
+                    $"Account export worker failed with safe code {statusBody.GetProperty("errorCode").GetString()}.");
+            }
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+        if (!ready)
+            throw new InvalidOperationException(
+                $"Account export worker did not complete the job within 30 seconds; last status was {lastExportStatus ?? "unknown"}.");
+
+        using (var download = await SendAccountExportAsync(
+            client,
+            HttpMethod.Get,
+            $"/v2/account/exports/{exportId:D}/download",
+            AccountId))
+        {
+            RequireStatus(download, HttpStatusCode.OK, "owner account export download");
+            if (download.Headers.CacheControl?.NoStore != true
+                || download.Content.Headers.ContentDisposition?.FileName?.Contains(
+                    "evidrilo-account-export-v2.json",
+                    StringComparison.Ordinal) != true)
+            {
+                throw new InvalidOperationException("Account export download cache or attachment headers were unsafe.");
+            }
+
+            var body = await ReadJsonAsync(download);
+            RequireString(body, "schema", "evidrilo.account-export");
+            RequireString(body, "version", "2");
+            RequireString(body, "accountId", AccountId.ToString("D"));
+            var data = body.GetProperty("data");
+            if (!data.GetProperty("projectAiConsent").GetProperty("granted").GetBoolean()
+                || data.GetProperty("projectAiConsentEvents").GetArrayLength() != 1
+                || data.GetProperty("projectAiActivity").GetArrayLength() != 1
+                || data.GetProperty("aiConversationSessions").GetArrayLength() != 1
+                || data.GetProperty("aiConversationTurnRequests").GetArrayLength() != 1
+                || ContainsForbiddenExportFields(body))
+            {
+                throw new InvalidOperationException(
+                    "Account export v2 omitted AI metadata or included transcript or request-fingerprint fields.");
+            }
+        }
+
+        foreach (var path in new[]
+        {
+            $"/v2/account/exports/{exportId:D}",
+            $"/v2/account/exports/{exportId:D}/download",
+        })
+        {
+            using var hidden = await SendAccountExportAsync(client, HttpMethod.Get, path, OtherAccountId);
+            RequireStatus(hidden, HttpStatusCode.NotFound, "cross-account export lookup");
+        }
+        using (var hiddenCancel = await SendAccountExportAsync(
+            client,
+            HttpMethod.Delete,
+            $"/v2/account/exports/{exportId:D}",
+            OtherAccountId))
+        {
+            RequireStatus(hiddenCancel, HttpStatusCode.NotFound, "cross-account export cancellation");
+        }
+        using (var cancelled = await SendAccountExportAsync(
+            client,
+            HttpMethod.Delete,
+            $"/v2/account/exports/{exportId:D}",
+            AccountId))
+        {
+            RequireStatus(cancelled, HttpStatusCode.OK, "owner account export cancellation");
+            RequireString(await ReadJsonAsync(cancelled), "status", "cancelled");
+        }
+        using (var deletedDownload = await SendAccountExportAsync(
+            client,
+            HttpMethod.Get,
+            $"/v2/account/exports/{exportId:D}/download",
+            AccountId))
+        {
+            RequireStatus(deletedDownload, HttpStatusCode.NotFound, "cancelled account export download");
+        }
+
         using (var otherExport = await SendAsync(
             client,
             HttpMethod.Get,
@@ -857,7 +960,7 @@ public static class EntryPoint
             }
         }
 
-        Console.WriteLine("EVIDRILO_NOTIFICATION_EXPORT_PASS");
+        Console.WriteLine("EVIDRILO_NOTIFICATION_ACCOUNT_EXPORT_V1_V2_PASS");
     }
 
     private static async Task AssertStudentProjectFlowAsync(
@@ -1532,6 +1635,189 @@ public static class EntryPoint
         command.Parameters.AddWithValue("first_event", firstEvent);
         command.Parameters.AddWithValue("event_count", eventCount);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task AssertAccountExportQueueLimitAsync(
+        HttpClient client,
+        string databaseConnectionString,
+        Guid accountId)
+    {
+        await SeedAccountExportQueueCapacityAsync(databaseConnectionString);
+        try
+        {
+            using var limited = await SendAccountExportAsync(
+                client,
+                HttpMethod.Post,
+                "/v2/account/exports",
+                accountId,
+                "export_queue_limit_0001");
+            RequireStatus(limited, HttpStatusCode.TooManyRequests, "account export queue capacity");
+            RequireString(await ReadJsonAsync(limited), "code", "EXPORT_CAPACITY_LIMITED");
+        }
+        finally
+        {
+            await ClearAccountExportQueueCapacityAsync(databaseConnectionString);
+        }
+    }
+
+    private static async Task SeedAccountExportQueueCapacityAsync(string databaseConnectionString)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            insert into auth.users (id)
+            select md5('account-export-queue-user-' || user_number::text)::uuid
+              from generate_series(1, 100) as user_number
+            on conflict (id) do nothing;
+
+            insert into public.account_export_jobs (
+                account_id, idempotency_key_hash, request_id, status
+            )
+            select
+                md5('account-export-queue-user-' || user_number::text)::uuid,
+                md5('account-export-queue-key-a-' || user_number::text)
+                    || md5('account-export-queue-key-b-' || user_number::text),
+                'queue-limit-smoke-' || lpad(user_number::text, 4, '0'),
+                'queued'
+              from generate_series(1, 100) as user_number;
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ClearAccountExportQueueCapacityAsync(string databaseConnectionString)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            delete from public.account_export_jobs where request_id like 'queue-limit-smoke-%';
+            delete from auth.users
+             where id in (
+                 select md5('account-export-queue-user-' || user_number::text)::uuid
+                   from generate_series(1, 100) as user_number
+             );
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task SeedProjectAiExportFixtureAsync(string databaseConnectionString)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(databaseConnectionString);
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            insert into public.project_ai_consents (
+                account_id, policy_version, granted, granted_at, revoked_at,
+                consent_generation, updated_at
+            ) values (
+                @account_id, 'project-ai-data.v1', true, now(), null, 1, now()
+            );
+
+            insert into public.project_ai_consent_events (
+                event_id, account_id, policy_version, decision, consent_generation, decided_at
+            ) values (
+                '99999999-0000-0000-0000-000000000995',
+                @account_id, 'project-ai-data.v1', 'grant', 1, now()
+            );
+
+            insert into public.project_ai_activity (
+                activity_id, account_id, installation_id, request_id, mode, outcome
+            ) values (
+                '99999999-0000-0000-0000-000000000996',
+                @account_id,
+                '99999999-0000-0000-0000-000000000997',
+                'export_activity_req_0001',
+                'GENERAL',
+                'PENDING'
+            );
+
+            insert into public.ai_conversation_sessions (
+                session_id, account_id, creation_request_id, case_version_id,
+                context_fingerprint, turn_count, created_at, updated_at, expires_at
+            ) values (
+                '99999999-0000-0000-0000-000000000998',
+                @account_id,
+                'export_session_req_0001',
+                'M0_T2:1',
+                repeat('a', 64),
+                1,
+                now(),
+                now(),
+                now() + interval '1 day'
+            );
+
+            insert into public.ai_conversation_turn_requests (
+                account_id, session_id, request_id, request_hash, turn_index,
+                status, started_at, lease_expires_at, completed_at
+            ) values (
+                @account_id,
+                '99999999-0000-0000-0000-000000000998',
+                'export_turn_req_0001',
+                repeat('b', 64),
+                1,
+                'completed',
+                now(),
+                now() + interval '1 minute',
+                now()
+            );
+            """;
+        command.Parameters.AddWithValue("account_id", AccountId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<Guid> CreateAccountExportAsync(
+        HttpClient client,
+        Guid accountId,
+        string idempotencyKey)
+    {
+        using var created = await SendAccountExportAsync(
+            client,
+            HttpMethod.Post,
+            "/v2/account/exports",
+            accountId,
+            idempotencyKey);
+        RequireStatus(created, HttpStatusCode.Accepted, "account export creation");
+        if (created.Headers.CacheControl?.NoStore != true)
+            throw new InvalidOperationException("Account export job response was cacheable.");
+        var body = await ReadJsonAsync(created);
+        RequireString(body, "schema", "evidrilo.account-export-job");
+        RequireString(body, "version", "2");
+        if (!Guid.TryParse(body.GetProperty("exportId").GetString(), out var exportId))
+            throw new InvalidOperationException("Account export job returned an invalid opaque ID.");
+        return exportId;
+    }
+
+    private static async Task<HttpResponseMessage> SendAccountExportAsync(
+        HttpClient client,
+        HttpMethod method,
+        string path,
+        Guid accountId,
+        string? idempotencyKey = null)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        request.Headers.Add("X-Test-User", $"{accountId}|true");
+        if (idempotencyKey is not null)
+            request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(request);
+    }
+
+    private static bool ContainsForbiddenExportFields(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+            return element.EnumerateArray().Any(ContainsForbiddenExportFields);
+        if (element.ValueKind != JsonValueKind.Object)
+            return false;
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name is "prompt" or "prompts" or "response" or "responses"
+                or "requestHash" or "settlementHash" or "activeRequestHash")
+                return true;
+            if (ContainsForbiddenExportFields(property.Value))
+                return true;
+        }
+        return false;
     }
 
     private static async Task<HttpResponseMessage> SendAiAsync(
@@ -3143,8 +3429,16 @@ public static class EntryPoint
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException(
                 "The local projection worker could not be started.");
-        _ = process.StandardOutput.ReadToEndAsync();
-        _ = process.StandardError.ReadToEndAsync();
+        process.OutputDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data is not null) Console.WriteLine($"E2E_WORKER {eventArgs.Data}");
+        };
+        process.ErrorDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data is not null) Console.Error.WriteLine($"E2E_WORKER {eventArgs.Data}");
+        };
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         return process;
     }
 

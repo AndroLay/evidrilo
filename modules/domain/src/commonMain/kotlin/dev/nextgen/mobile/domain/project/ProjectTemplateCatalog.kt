@@ -18,6 +18,8 @@ enum class ProjectTemplatePublication {
     DRAFT,
     PUBLISHED,
     RETIRED,
+    /** Bundled structure-only guide. This is not a server-published or human-reviewed method template. */
+    BUILT_IN_STARTER,
 }
 
 enum class ProjectTemplateInputKind {
@@ -121,8 +123,9 @@ sealed interface TemplateSelectionResult {
 
 /**
  * Pure catalog rules shared by bundled content, the application layer, and UI.
- * A family is browseable even when it has no released template; only complete,
- * reviewed, published templates can be selected for a student project.
+ * A family remains browseable without a server template. Exact bundled
+ * structure-only starters and complete, reviewed, published templates may be
+ * selected through distinct publication states.
  */
 object ProjectTemplateCatalog {
     val families: List<ProjectTemplateFamily> = ProjectTemplateFamily.values().toList()
@@ -153,6 +156,11 @@ object ProjectTemplateCatalog {
                 .asSequence()
                 .filter { it.publication == ProjectTemplatePublication.PUBLISHED }
                 .forEach { template -> addAll(issuesForPublishedTemplate(template)) }
+            snapshot.templates
+                .asSequence()
+                .filter { it.publication == ProjectTemplatePublication.BUILT_IN_STARTER }
+                .filterNot(ProjectStarterTemplateCatalog::isCanonical)
+                .forEach { add(ProjectTemplateCatalogIssue("BUILT_IN_STARTER_MISMATCH", it.id)) }
         }
         return ProjectTemplateCatalogValidation(issues)
     }
@@ -173,6 +181,13 @@ object ProjectTemplateCatalog {
         val template = matches.single()
         if (template.version != expectedVersion) {
             return TemplateSelectionResult.Unavailable("TEMPLATE_VERSION_MISMATCH")
+        }
+        if (template.publication == ProjectTemplatePublication.BUILT_IN_STARTER) {
+            return if (ProjectStarterTemplateCatalog.isCanonical(template)) {
+                TemplateSelectionResult.Selected(template)
+            } else {
+                TemplateSelectionResult.Unavailable("BUILT_IN_STARTER_MISMATCH")
+            }
         }
         if (template.publication != ProjectTemplatePublication.PUBLISHED) {
             return TemplateSelectionResult.Unavailable("TEMPLATE_NOT_READY")
@@ -196,6 +211,15 @@ object ProjectTemplateCatalog {
             template.examples.all { it.kind == ProjectTemplateExampleKind.UNSPECIFIED }
         return issuesForPublishedTemplate(template, allowLegacyUnclassified = isLegacyUnclassified)
             .map(ProjectTemplateCatalogIssue::code)
+    }
+
+    /** Validate immutable built-in snapshots without treating them as reviewed catalog content. */
+    fun validateReadableProjectTemplateSnapshot(template: ProjectTemplateDefinition): List<String> = when {
+        template.publication == ProjectTemplatePublication.PUBLISHED -> validateReadablePublishedTemplate(template)
+        template.publication == ProjectTemplatePublication.BUILT_IN_STARTER &&
+            ProjectStarterTemplateCatalog.isCanonical(template) -> emptyList()
+        template.publication == ProjectTemplatePublication.BUILT_IN_STARTER -> listOf("BUILT_IN_STARTER_MISMATCH")
+        else -> listOf("TEMPLATE_NOT_READY")
     }
 
     private fun issuesForPublishedTemplate(

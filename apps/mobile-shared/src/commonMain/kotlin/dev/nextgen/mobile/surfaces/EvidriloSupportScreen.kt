@@ -32,11 +32,11 @@ internal fun EvidriloSupportScreen(
     var contactLaunchFailed by remember { mutableStateOf(false) }
 
     EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
+        EvidriloBackGesture(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Support and billing", style = MaterialTheme.typography.displayMedium)
+            Text("How can we help?", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Find the right next step without losing your local workflow.",
+                "Help with your account, data, and purchases.",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -47,44 +47,11 @@ internal fun EvidriloSupportScreen(
             onStopAudio = onStopAudio,
         )
 
-        EvidriloTintPanel {
-            Text("Restore a purchase", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Open Premium and choose Restore purchase. The store account, not Evidrilo, is the source of truth for a completed transaction.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        EvidriloTintPanel {
-            Text("Manage or cancel a subscription", style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (customerCenterAvailable) {
-                    "Open Customer Center for self-service subscription management. The store remains the source of truth for billing and cancellation."
-                } else {
-                    "Use Apple Account subscriptions on iOS or Google Play subscriptions on Android. Evidrilo does not claim a provider-neutral management link on this build."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (customerCenterAvailable) {
-                EvidriloSecondaryButton(
-                    label = "Manage subscription",
-                    onClick = onOpenCustomerCenter,
-                )
-            }
-        }
-        EvidriloTintPanel {
-            Text("Refund guidance", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Refund requests must be made through the store that processed the purchase. Include the store order or transaction reference; never send a password or payment credential to support.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        EvidriloTintPanel {
-            Text("Privacy and deletion", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Free drafts remain local. A signed-in user can request server-account deletion from Account; local workflow and history are cleared separately so the action is explicit.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+        EvidriloExplanation("Restore a purchase", "Open Premium and choose Restore purchase. The store account holds the completed transaction.")
+        EvidriloExplanation("Manage a subscription", if (customerCenterAvailable) "Use Customer Center. The store controls billing and cancellation." else "Use Apple Account subscriptions on iOS or Google Play subscriptions on Android.")
+        if (customerCenterAvailable) EvidriloSecondaryButton("Manage subscription", onOpenCustomerCenter)
+        EvidriloExplanation("Request a refund", "Contact the store that processed your purchase. Include the order or transaction reference. Never send passwords or payment credentials to support.")
+        EvidriloExplanation("Privacy and deletion", "Local projects stay on this device. Request server-account deletion from Account; local workflow and history are cleared separately.")
         EvidriloTintPanel {
             Text("Contact", style = MaterialTheme.typography.titleMedium)
             Text(

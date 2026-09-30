@@ -83,6 +83,15 @@ versioned details when the API is configured. A failed or unavailable request
 does not block those overviews; this read path does not create or sync a student
 project or persist a durable catalog cache.
 
+Account export v1 remains a synchronous compatibility route capped at 128 KiB.
+The verified-account v2 route queues one export per account and replays creation
+by its idempotency key. Status and download access are account-scoped and marked
+`no-store`; ready artifacts expire after 24 hours. The worker uses a fenced
+lease and one global database lock, with a 64 MiB per-artifact cap and a 512
+MiB aggregate ready-artifact cap. V2 adds Project AI consent, activity, and
+conversation metadata but excludes prompts, responses, and provider request
+payloads. Account deletion purges queued and retained export jobs.
+
 ## Local verification
 
 From the repository root, run the canonical check:
@@ -155,9 +164,12 @@ transport, token accounting, and provider-spend ledger. They remain off unless
 provider configuration. Each request still requires the account's current
 Project AI consent. General chat also requires the separate
 `PROJECT_AI_GENERAL_CHAT_POLICY_APPROVED` setting, which defaults to false.
-Its route sends only a bounded redacted message, stores no transcript, and writes
-metadata-only activity. General chat remains unavailable until its separate cost,
-limit, and retention policy is approved. These settings do not prove that
+Every General chat request must also include
+`X-Evidrilo-General-Chat-Consent: general-chat.v1`; the API checks this before
+credit reservation or provider dispatch. Its route sends only a bounded redacted
+message, stores no transcript, and writes metadata-only activity. General chat
+remains unavailable until its separate cost, limit, and retention policy is
+approved. These settings do not prove that
 provider terms, retention controls, privacy review, or hosted configuration
 have been approved.
 
@@ -170,7 +182,7 @@ but that does not guarantee zero retention at the gateway or upstream provider.
 Review the Experiential organization capture setting and provider route before
 using real student content. Provider terms, retention controls, privacy
 approval, and live runtime evidence remain open; keep the adapter disabled until
-those gates are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
+those gates are explicitly approved. See the AI assistance contract.
 
 Deployment preparation and ownership boundaries are described in
 [infra/README.md](../infra/README.md).

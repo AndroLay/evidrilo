@@ -343,15 +343,6 @@ public static class ProjectAiScaffoldEndpoints
                         statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                var outputError = ProjectAiScaffoldValidator.ValidateOutput(template, output);
-                if (outputError is not null)
-                {
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Results.Json(
-                        ApiErrors.Create(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified."),
-                        statusCode: StatusCodes.Status502BadGateway);
-                }
-
                 int settledCreditCost;
                 try
                 {
@@ -375,6 +366,77 @@ public static class ProjectAiScaffoldEndpoints
                         statusCode: StatusCodes.Status502BadGateway);
                 }
 
+                ProjectAiConsentState? afterProviderConsent = null;
+                try
+                {
+                    afterProviderConsent = await consentStore.ReadOwnAsync(accountId, CancellationToken.None);
+                }
+                catch
+                {
+                    // Fail closed below. The verified provider usage still needs settlement.
+                }
+
+                IResult? projectStateError = null;
+                var projectStateReadFailed = false;
+                if (assistProjectId is { } currentProjectId)
+                {
+                    try
+                    {
+                        var currentProject = await studentProjectStore.ReadOwnAsync(
+                            accountId,
+                            currentProjectId,
+                            CancellationToken.None);
+                        projectStateError = ProjectContextError(
+                            context,
+                            currentProject,
+                            validRequest.BaseProjectRevision);
+                    }
+                    catch
+                    {
+                        projectStateReadFailed = true;
+                    }
+                }
+
+                var consentStillAuthorizesDelivery = afterProviderConsent is not null &&
+                    ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent);
+                var projectStillMatches = !projectStateReadFailed && projectStateError is null;
+                if (!consentStillAuthorizesDelivery)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return afterProviderConsent is null
+                        ? Unavailable(context, "PROJECT_AI_CONSENT_CHECK_UNAVAILABLE_AFTER_PROVIDER")
+                        : Results.Json(
+                            ApiErrors.Create(
+                                context,
+                                "PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER",
+                                "Consent changed during provider processing. The response was withheld and no project changes were made."),
+                            statusCode: StatusCodes.Status403Forbidden);
+                }
+                if (projectStateReadFailed)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Unavailable(context, "PROJECT_AI_CONTEXT_CHECK_UNAVAILABLE_AFTER_PROVIDER");
+                }
+                if (!projectStillMatches)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Results.Json(
+                        ApiErrors.Create(
+                            context,
+                            "PROJECT_AI_CONTEXT_STALE_AFTER_PROVIDER",
+                            "The project changed during provider processing. The response was withheld and the reservation was released."),
+                        statusCode: StatusCodes.Status409Conflict);
+                }
+
+                var outputError = ProjectAiScaffoldValidator.ValidateOutput(template, output);
+                if (outputError is not null)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Results.Json(
+                        ApiErrors.Create(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified."),
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+
                 bool reservationStillHeld;
                 try
                 {
@@ -384,19 +446,15 @@ public static class ProjectAiScaffoldEndpoints
                         requestHash,
                         maximumCreditCost,
                         settledCreditCost,
-                        cancellationToken);
+                        CancellationToken.None);
                 }
                 catch
                 {
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    throw;
+                    return Unavailable(context, "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN");
                 }
                 if (!reservationStillHeld)
                 {
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Results.Json(
-                        ApiErrors.Create(context, "PROJECT_AI_RESERVATION_EXPIRED", "The project-AI reservation expired before a preview was ready."),
-                        statusCode: StatusCodes.Status409Conflict);
+                    return Unavailable(context, "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN");
                 }
 
                 return Results.Json(
@@ -568,4 +626,5 @@ public static class ProjectAiScaffoldEndpoints
     private static IResult Unavailable(HttpContext context, string code) => Results.Json(
         ApiErrors.Create(context, code, "Project AI is unavailable. Your manual project workflow remains available."),
         statusCode: StatusCodes.Status503ServiceUnavailable);
+
 }

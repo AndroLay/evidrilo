@@ -126,6 +126,14 @@ public sealed class PlatformOptions
     {
         var environment = NormalizeEnvironment(
             First(configuration["Platform:Environment"], configuration["NODE_ENV"], hostingEnvironment));
+        if (environment is "staging" or "production"
+            && bool.TryParse(configuration["LOCAL_DEVELOPER_ACCESS_ENABLED"], out var localDeveloperAccessEnabled)
+            && localDeveloperAccessEnabled)
+        {
+            throw new PlatformConfigurationException(
+                "Local developer access (LOCAL_DEVELOPER_ACCESS_ENABLED) must remain disabled in staging and production.");
+        }
+
         var port = ParsePort(First(configuration["Platform:Port"], configuration["PORT"]));
         var configuredOrigins = First(
             configuration["Platform:CorsAllowedOrigins"],

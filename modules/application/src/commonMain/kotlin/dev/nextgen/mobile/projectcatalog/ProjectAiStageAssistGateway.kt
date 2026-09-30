@@ -25,18 +25,21 @@ data class ProjectAiStageAssistSelectedEvidence(
     val id: String,
     val kind: String,
     val label: String,
+    val summary: String? = null,
+    val origin: String? = null,
 )
 
 data class ProjectAiStageAssistRequest(
     val installationId: String,
-    /** Server-owned project identity from an explicit cloud-project flow, never a local draft ID. */
-    val cloudProjectId: String,
+    /** Local project identity, bound to the authenticated owner by metadata-only registration. */
+    val projectId: String,
     val templateId: String,
     val templateVersion: Int,
     val stageId: String,
     val operationId: String,
-    /** Revision of [cloudProjectId], not the independent local revision counter. */
-    val baseCloudProjectRevision: Int,
+    /** Current local draft revision registered with the API before dispatch. */
+    val baseProjectRevision: Int,
+    val baseProjectBindingGeneration: Long,
     /** Local snapshot used only to reject a stale server proposal; values are never sent in this request. */
     val selectedFieldValues: Map<String, String>,
     val selectedEvidence: List<ProjectAiStageAssistSelectedEvidence>,
@@ -83,6 +86,8 @@ data class ProjectAiStageAssistEvaluationPreview(
 data class ProjectAiStageAssistPreview(
     val projectId: String,
     val baseProjectRevision: Int,
+    val projectBindingGeneration: Long,
+    val consentGeneration: Int,
     val stageId: String,
     val operationId: String,
     val templateId: String,
@@ -99,7 +104,7 @@ sealed interface ProjectAiStageAssistResult {
     data class Preview(val value: ProjectAiStageAssistPreview) : ProjectAiStageAssistResult
     data class Deferred(val reason: ProjectAiStageAssistDeferredReason) : ProjectAiStageAssistResult
     data class Unavailable(val code: String) : ProjectAiStageAssistResult
-    data class Rejected(val code: String) : ProjectAiStageAssistResult
+    data class Rejected(val code: String, val creditCost: Int? = null) : ProjectAiStageAssistResult
     data class Failed(
         val code: String,
         val retryable: Boolean,
@@ -114,6 +119,13 @@ enum class ProjectAiStageAssistDeferredReason {
     AUTH_REQUIRED,
     SESSION_EXPIRED,
     SECURE_STORAGE,
+}
+
+sealed interface ProjectAiLocalContextBindingResult {
+    data class Registered(val projectRevision: Int, val bindingGeneration: Long) : ProjectAiLocalContextBindingResult
+    data class Deferred(val reason: ProjectAiStageAssistDeferredReason) : ProjectAiLocalContextBindingResult
+    data class Unavailable(val code: String) : ProjectAiLocalContextBindingResult
+    data class Rejected(val code: String) : ProjectAiLocalContextBindingResult
 }
 
 enum class ProjectAiStageAssistOutcome(val wireValue: String) {
@@ -150,10 +162,100 @@ class ProjectAiStageAssistGateway(
     private val nowEpochSeconds: () -> Long,
     private val json: Json = Json { isLenient = false },
 ) {
+    suspend fun registerLocalProjectContext(
+        projectId: String,
+        installationId: String,
+        templateId: String,
+        templateVersion: Int,
+        projectRevision: Int,
+        availableEvidenceIds: List<String>,
+        explicitlyConfirmedForRequest: Boolean,
+    ): ProjectAiLocalContextBindingResult {
+        if (!explicitlyConfirmedForRequest) {
+            return ProjectAiLocalContextBindingResult.Rejected("PROJECT_AI_REQUEST_CONSENT_REQUIRED")
+        }
+        if (!uuidPattern.matches(projectId)
+            || !uuidPattern.matches(installationId)
+            || !templateIdPattern.matches(templateId)
+            || templateId.length > 96
+            || templateVersion < 1
+            || projectRevision < 1
+            || availableEvidenceIds.size > MAX_REGISTERED_EVIDENCE_IDS
+            || availableEvidenceIds.distinct().size != availableEvidenceIds.size
+            || availableEvidenceIds.any { !evidenceIdPattern.matches(it) }
+        ) return ProjectAiLocalContextBindingResult.Rejected("INVALID_PROJECT_AI_CONTEXT")
+
+        val session = when (val state = readSession()) {
+            is SessionResult.Ready -> state.value
+            is SessionResult.Deferred -> return ProjectAiLocalContextBindingResult.Deferred(state.reason)
+        }
+        val body = buildJsonObject {
+            put("schema", LOCAL_CONTEXT_SCHEMA)
+            put("version", "1")
+            put("installationId", installationId)
+            put("templateId", templateId)
+            put("templateVersion", templateVersion)
+            put("projectRevision", projectRevision)
+            put("availableEvidenceIds", buildJsonArray {
+                availableEvidenceIds.sorted().forEach { add(JsonPrimitive(it)) }
+            })
+        }.toString()
+        if (body.encodeToByteArray().size > MAX_LOCAL_CONTEXT_REQUEST_BYTES) {
+            return ProjectAiLocalContextBindingResult.Rejected("INVALID_PROJECT_AI_CONTEXT")
+        }
+        val response = try {
+            transport.request(
+                method = "PUT",
+                url = "${configuration.normalizedApiBaseUrl}/v1/project-ai/projects/$projectId/local-context",
+                headers = mapOf(
+                    "Accept" to "application/json",
+                    "Authorization" to "Bearer ${session.accessToken}",
+                    PROJECT_AI_REQUEST_CONSENT_HEADER to PROJECT_AI_REQUEST_CONSENT_VERSION,
+                    "Content-Type" to "application/json",
+                ),
+                body = body,
+            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            return ProjectAiLocalContextBindingResult.Unavailable("PROJECT_AI_CONTEXT_SYNC_FAILED")
+        }
+        if (response.body.encodeToByteArray().size > MAX_LOCAL_CONTEXT_RESPONSE_BYTES) {
+            return ProjectAiLocalContextBindingResult.Rejected("INVALID_PROJECT_AI_CONTEXT_RESPONSE")
+        }
+        when (response.statusCode) {
+            401 -> return ProjectAiLocalContextBindingResult.Deferred(ProjectAiStageAssistDeferredReason.AUTH_REQUIRED)
+            403 -> return ProjectAiLocalContextBindingResult.Rejected(errorCode(response) ?: "PROJECT_AI_CONSENT_REQUIRED")
+            404 -> return ProjectAiLocalContextBindingResult.Rejected(errorCode(response) ?: "PROJECT_AI_TEMPLATE_NOT_READY")
+            409 -> return ProjectAiLocalContextBindingResult.Rejected(errorCode(response) ?: "PROJECT_AI_CONTEXT_STALE")
+            503 -> return ProjectAiLocalContextBindingResult.Unavailable(errorCode(response) ?: "PROJECT_AI_CONTEXT_UNAVAILABLE")
+            in 200..299 -> Unit
+            else -> return ProjectAiLocalContextBindingResult.Rejected(errorCode(response) ?: "PROJECT_AI_CONTEXT_REJECTED")
+        }
+        val registration = runCatching {
+            val root = json.parseToJsonElement(response.body) as? JsonObject ?: error("context response object required")
+            require(root.keys == LOCAL_CONTEXT_RESPONSE_KEYS)
+            require(root.requiredString("schema") == LOCAL_CONTEXT_SCHEMA)
+            require(root.requiredString("version") == "1")
+            require(root.requiredString("projectId") == projectId)
+            require(root.requiredString("templateId") == templateId)
+            require(root.requiredInt("templateVersion") == templateVersion)
+            require(root.requiredString("status") in setOf("registered", "unchanged"))
+            val revision = root.requiredInt("projectRevision").also { require(it == projectRevision) }
+            val generation = root.requiredLong("bindingGeneration").also { require(it > 0) }
+            revision to generation
+        }.getOrNull() ?: return ProjectAiLocalContextBindingResult.Rejected("INVALID_PROJECT_AI_CONTEXT_RESPONSE")
+        return ProjectAiLocalContextBindingResult.Registered(registration.first, registration.second)
+    }
+
     suspend fun generatePreview(
         request: ProjectAiStageAssistRequest,
         idempotencyKey: String,
+        explicitlyConfirmedForRequest: Boolean,
     ): ProjectAiStageAssistResult {
+        if (!explicitlyConfirmedForRequest) {
+            return ProjectAiStageAssistResult.Rejected("PROJECT_AI_REQUEST_CONSENT_REQUIRED")
+        }
         if (!isValidRequest(request) || !requestIdPattern.matches(idempotencyKey)) {
             return ProjectAiStageAssistResult.Rejected("INVALID_PROJECT_AI_STAGE_ASSIST")
         }
@@ -172,6 +274,7 @@ class ProjectAiStageAssistGateway(
                 headers = mapOf(
                     "Accept" to "application/json",
                     "Authorization" to "Bearer ${session.accessToken}",
+                    PROJECT_AI_REQUEST_CONSENT_HEADER to PROJECT_AI_REQUEST_CONSENT_VERSION,
                     "Content-Type" to "application/json",
                     "Idempotency-Key" to idempotencyKey,
                 ),
@@ -193,6 +296,11 @@ class ProjectAiStageAssistGateway(
             401 -> return ProjectAiStageAssistResult.Deferred(ProjectAiStageAssistDeferredReason.AUTH_REQUIRED)
             403 -> {
                 val code = errorCode(response)
+                val chargedCost = errorCreditCost(response)
+                if (chargedCost != null) return ProjectAiStageAssistResult.Rejected(
+                    code ?: "PROJECT_AI_RESPONSE_WITHHELD_AFTER_PROVIDER",
+                    chargedCost,
+                )
                 return if (code == "PROJECT_AI_CONSENT_REQUIRED" || code == "PROJECT_AI_CONSENT_POLICY_STALE") {
                     ProjectAiStageAssistResult.Rejected(code)
                 } else {
@@ -203,6 +311,7 @@ class ProjectAiStageAssistGateway(
             in 200..299 -> Unit
             else -> return ProjectAiStageAssistResult.Rejected(
                 errorCode(response) ?: "PROJECT_AI_STAGE_ASSIST_REJECTED",
+                errorCreditCost(response),
             )
         }
 
@@ -211,8 +320,9 @@ class ProjectAiStageAssistGateway(
         if (parsed.requestId != idempotencyKey) {
             return ProjectAiStageAssistResult.Rejected("PROJECT_AI_REQUEST_ID_MISMATCH")
         }
-        if (parsed.projectId != request.cloudProjectId
-            || parsed.baseProjectRevision != request.baseCloudProjectRevision
+        if (parsed.projectId != request.projectId
+            || parsed.baseProjectRevision != request.baseProjectRevision
+            || parsed.projectBindingGeneration != request.baseProjectBindingGeneration
             || parsed.stageId != request.stageId
             || parsed.operationId != request.operationId
             || parsed.templateId != request.templateId
@@ -235,20 +345,24 @@ class ProjectAiStageAssistGateway(
         installationId: String,
         outcome: ProjectAiStageAssistOutcome,
         baseProjectRevision: Int,
+        baseProjectBindingGeneration: Long,
         resultProjectRevision: Int?,
+        resultProjectBindingGeneration: Long?,
         expectedCreditCost: Int,
     ): ProjectAiStageAssistSettlementResult {
         if (!requestIdPattern.matches(requestId)
             || !uuidPattern.matches(installationId)
             || baseProjectRevision < 1
+            || baseProjectBindingGeneration < 1
             || expectedCreditCost !in 1..PROJECT_AI_MAX_CREDITS_PER_REQUEST
             || when (outcome) {
                 ProjectAiStageAssistOutcome.APPLIED,
                 ProjectAiStageAssistOutcome.EDITED,
                 -> resultProjectRevision?.let { it > baseProjectRevision } != true
+                    || resultProjectBindingGeneration?.let { it > baseProjectBindingGeneration } != true
                 ProjectAiStageAssistOutcome.DISMISSED,
                 ProjectAiStageAssistOutcome.STALE,
-                -> resultProjectRevision != null
+                -> resultProjectRevision != null || resultProjectBindingGeneration != null
             }
         ) {
             return ProjectAiStageAssistSettlementResult.Rejected("INVALID_PROJECT_AI_STAGE_ASSIST_SETTLEMENT")
@@ -264,6 +378,7 @@ class ProjectAiStageAssistGateway(
             put("requestId", requestId)
             put("outcome", outcome.wireValue)
             resultProjectRevision?.let { put("resultProjectRevision", it) }
+            resultProjectBindingGeneration?.let { put("resultProjectBindingGeneration", it) }
         }.toString()
         if (body.encodeToByteArray().size > MAX_SETTLEMENT_REQUEST_BYTES) {
             return ProjectAiStageAssistSettlementResult.Rejected("INVALID_PROJECT_AI_STAGE_ASSIST_SETTLEMENT")
@@ -343,17 +458,37 @@ class ProjectAiStageAssistGateway(
         put("mode", "PROJECT")
         put("installationId", request.installationId)
         put("locale", request.locale)
-        put("projectId", request.cloudProjectId)
+        put("projectId", request.projectId)
         put("templateId", request.templateId)
         put("templateVersion", request.templateVersion)
         put("stageId", request.stageId)
         put("operationId", request.operationId)
-        put("baseProjectRevision", request.baseCloudProjectRevision)
+        put("baseProjectRevision", request.baseProjectRevision)
+        put("projectBindingGeneration", request.baseProjectBindingGeneration)
         put("selectedFieldIds", buildJsonArray {
             request.selectedFieldValues.keys.sorted().forEach { add(JsonPrimitive(it)) }
         })
+        put("selectedFields", buildJsonArray {
+            request.selectedFieldValues.toSortedMap().forEach { (id, value) ->
+                add(buildJsonObject {
+                    put("id", id)
+                    put("value", value)
+                })
+            }
+        })
         put("selectedEvidenceIds", buildJsonArray {
             request.selectedEvidence.map(ProjectAiStageAssistSelectedEvidence::id).sorted().forEach { add(JsonPrimitive(it)) }
+        })
+        put("selectedEvidence", buildJsonArray {
+            request.selectedEvidence.sortedBy(ProjectAiStageAssistSelectedEvidence::id).forEach { evidence ->
+                add(buildJsonObject {
+                    put("id", evidence.id)
+                    put("kind", evidence.kind)
+                    put("label", evidence.label)
+                    put("summary", evidence.summary?.let(::JsonPrimitive) ?: JsonNull)
+                    put("origin", evidence.origin?.let(::JsonPrimitive) ?: JsonNull)
+                })
+            }
         })
     }.toString()
 
@@ -428,6 +563,8 @@ class ProjectAiStageAssistGateway(
         ProjectAiStageAssistPreview(
             projectId = root.requiredString("projectId").also { require(uuidPattern.matches(it)) },
             baseProjectRevision = root.requiredInt("baseProjectRevision").also { require(it > 0) },
+            projectBindingGeneration = root.requiredLong("projectBindingGeneration").also { require(it > 0) },
+            consentGeneration = root.requiredInt("consentGeneration").also { require(it > 0) },
             stageId = root.requiredString("stageId").also {
                 require(it.length <= 80 && identifierPattern.matches(it))
             },
@@ -512,7 +649,7 @@ class ProjectAiStageAssistGateway(
 
     private fun isValidRequest(request: ProjectAiStageAssistRequest): Boolean =
         uuidPattern.matches(request.installationId)
-            && uuidPattern.matches(request.cloudProjectId)
+            && uuidPattern.matches(request.projectId)
             && request.templateId.length <= 96
             && templateIdPattern.matches(request.templateId)
             && request.templateVersion > 0
@@ -520,7 +657,8 @@ class ProjectAiStageAssistGateway(
             && identifierPattern.matches(request.stageId)
             && request.operationId.length <= 80
             && identifierPattern.matches(request.operationId)
-            && request.baseCloudProjectRevision > 0
+            && request.baseProjectRevision > 0
+            && request.baseProjectBindingGeneration > 0
             && request.selectedFieldValues.size <= 32
             && request.selectedFieldValues.all { (id, value) ->
                 id.length <= 80 && identifierPattern.matches(id) && value.length <= 8_000 && '\u0000' !in value
@@ -533,12 +671,14 @@ class ProjectAiStageAssistGateway(
                     && evidence.label.isNotBlank()
                     && evidence.label.length <= 160
                     && '\u0000' !in evidence.label
+                    && (evidence.summary == null || evidence.summary.length <= 8_000 && '\u0000' !in evidence.summary)
+                    && (evidence.origin == null || evidence.origin.length <= 500 && '\u0000' !in evidence.origin)
             }
             && request.locale.length <= 32
             && localePattern.matches(request.locale)
 
     private fun isTransientStatus(statusCode: Int): Boolean =
-        statusCode in 408..429 || (statusCode in 500..599 && statusCode != 503)
+        statusCode in setOf(408, 425, 429) || (statusCode in 500..599 && statusCode != 503)
 
     private fun failed(
         key: String,
@@ -599,6 +739,11 @@ class ProjectAiStageAssistGateway(
         root.string("code")?.takeIf(reasonCodePattern::matches)
     }.getOrNull()
 
+    private fun errorCreditCost(response: AccountHttpResponse): Int? = runCatching {
+        val root = json.parseToJsonElement(response.body) as? JsonObject ?: return@runCatching null
+        root.requiredInt("creditCost").takeIf { it in 1..PROJECT_AI_MAX_CREDITS_PER_REQUEST }
+    }.getOrNull()
+
     private data class ParsedSettlement(
         val requestId: String,
         val outcome: ProjectAiStageAssistOutcome,
@@ -624,6 +769,9 @@ class ProjectAiStageAssistGateway(
     private fun JsonObject.requiredInt(name: String): Int =
         (this[name] as? JsonPrimitive)?.content?.toIntOrNull() ?: error("$name required")
 
+    private fun JsonObject.requiredLong(name: String): Long =
+        (this[name] as? JsonPrimitive)?.content?.toLongOrNull() ?: error("$name required")
+
     private fun JsonObject.objectValue(name: String): JsonObject =
         this[name] as? JsonObject ?: error("$name object required")
 
@@ -643,13 +791,19 @@ class ProjectAiStageAssistGateway(
     private companion object {
         const val REQUEST_SCHEMA = "evidrilo.project-ai-stage-assist"
         const val SETTLEMENT_SCHEMA = "evidrilo.project-ai-stage-assist-settlement"
+        const val LOCAL_CONTEXT_SCHEMA = "evidrilo.project-ai-local-project-context"
+        const val PROJECT_AI_REQUEST_CONSENT_HEADER = "X-Evidrilo-Project-AI-Consent"
+        const val PROJECT_AI_REQUEST_CONSENT_VERSION = "project-ai.v1"
         const val PROMPT_VERSION = "project-ai-stage-assist.v1"
         const val MAX_REQUEST_BYTES = 16 * 1024
         const val MAX_RESPONSE_BYTES = 320 * 1024
         const val MAX_SETTLEMENT_REQUEST_BYTES = 4 * 1024
         const val MAX_SETTLEMENT_RESPONSE_BYTES = 16 * 1024
+        const val MAX_LOCAL_CONTEXT_REQUEST_BYTES = 64 * 1024
+        const val MAX_LOCAL_CONTEXT_RESPONSE_BYTES = 4 * 1024
+        const val MAX_REGISTERED_EVIDENCE_IDS = 2_048
         val RESPONSE_KEYS = setOf(
-            "schema", "version", "status", "mode", "projectId", "baseProjectRevision",
+            "schema", "version", "status", "mode", "projectId", "baseProjectRevision", "projectBindingGeneration", "consentGeneration",
             "stageId", "operationId", "assist", "evaluationPreview", "requestId", "creditCost",
         )
         val ASSIST_KEYS = setOf(
@@ -666,6 +820,9 @@ class ProjectAiStageAssistGateway(
         )
         val EVIDENCE_REFERENCE_KEYS = setOf("id", "kind", "label")
         val SETTLEMENT_RESPONSE_KEYS = setOf("schema", "version", "outcome", "requestId", "creditCost")
+        val LOCAL_CONTEXT_RESPONSE_KEYS = setOf(
+            "schema", "version", "projectId", "projectRevision", "bindingGeneration", "templateId", "templateVersion", "status", "requestId",
+        )
         val EVIDENCE_KINDS = setOf("SOURCE", "DATA", "OBSERVATION")
         val UNAVAILABLE_CHECKS = listOf(
             "ACADEMIC_TRUTH", "SEMANTIC_REFERENCE_SUPPORT", "SOURCE_QUALITY", "POST_APPLY_STRUCTURE",

@@ -382,6 +382,24 @@ public sealed class ConfigurationTests
         Assert.False(jwtOptions.MapInboundClaims);
     }
 
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Deployed_environments_reject_local_developer_access_flag(string environment)
+    {
+        var configuration = BuildConfiguration(
+            ("Platform:SupabaseUrl", "https://example.supabase.co"),
+            ("Platform:SupabasePublishableKey", "synthetic-public-key"),
+            ("Platform:DatabaseConnectionString", "Host=example.invalid;Database=evidrilo;Username=student;SSL Mode=Require"),
+            ("CORS_ALLOWED_ORIGINS", "https://staging.evidrilo.example"),
+            ("LOCAL_DEVELOPER_ACCESS_ENABLED", "true"));
+
+        var exception = Assert.Throws<PlatformConfigurationException>(
+            () => PlatformOptions.From(configuration, environment));
+
+        Assert.Contains("local developer", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IConfiguration BuildConfiguration(params (string Key, string Value)[] values)
     {
         return new ConfigurationBuilder()

@@ -13,6 +13,8 @@ const schemaFiles = [
   'http-errors.v1.json',
   'account-summary.v1.json',
   'account-export.v1.json',
+  'account-export-job.v2.json',
+  'account-export.v2.json',
   'sync-command.v1.json',
   'sync-push-request.v1.json',
   'sync-push-result.v1.json',
@@ -60,6 +62,9 @@ const schemaFiles = [
     'project-ai-stage-assist-request.v1.json',
     'project-ai-stage-assist-settlement.v1.json',
     'project-ai-stage-assist-settlement-request.v1.json',
+    'project-ai-local-project-context-request.v1.json',
+    'project-ai-local-project-context.v1.json',
+    'project-ai-local-project-context-delete.v1.json',
   'project-ai-activity-history.v1.json',
   'project-ai-activity-clear.v1.json',
   'project-ai-general-chat-request.v2.json',
@@ -157,7 +162,7 @@ test('registered API routes map to response schemas and endpoint tests', () => {
   );
   assert.equal(manifest.schema, 'evidrilo.api-route-manifest');
   assert.equal(manifest.version, '1');
-  assert.equal(manifest.routes.length, 55);
+  assert.equal(manifest.routes.length, 61);
 
   const routeKeys = (routes) => routes
     .map((route) => `${route.method} ${route.path}`)
@@ -253,6 +258,11 @@ test('General chat v2 is isolated and exposes only a bounded message contract', 
   assert.equal(route.requestSchema, 'project-ai-general-chat-request.v2.json');
   assert.equal(route.responseSchema, 'project-ai-general-chat-result.v2.json');
   assert.equal(route.headerParameters.find((parameter) => parameter.name === 'Idempotency-Key')?.required, true);
+  assert.equal(route.headerParameters.find((parameter) => parameter.name === 'X-Evidrilo-General-Chat-Consent')?.required, true);
+  assert.equal(
+    route.headerParameters.find((parameter) => parameter.name === 'X-Evidrilo-General-Chat-Consent')?.schema.const,
+    'general-chat.v1',
+  );
 
   const request = readSchema(route.requestSchema);
   assert.equal(request.additionalProperties, false);
@@ -267,9 +277,15 @@ test('General chat v2 is isolated and exposes only a bounded message contract', 
 
   const response = readSchema(route.responseSchema);
   assert.equal(response.additionalProperties, false);
-  assert.deepEqual(response.required, ['schema', 'version', 'mode', 'status', 'answer', 'requestId', 'creditCost']);
+  assert.deepEqual(response.required, [
+    'schema', 'version', 'mode', 'status', 'answer', 'recommendedNextPrompts', 'requestId', 'creditCost',
+  ]);
   assert.equal(response.properties.mode.const, 'GENERAL');
   assert.ok(response.required.includes('answer'));
+  assert.equal(response.properties.recommendedNextPrompts.type, 'array');
+  assert.equal(response.properties.recommendedNextPrompts.minItems, 1);
+  assert.equal(response.properties.recommendedNextPrompts.maxItems, 3);
+  assert.equal(response.properties.recommendedNextPrompts.items.maxLength, 240);
   assert.ok(response.required.includes('requestId'));
   assert.ok(response.required.includes('creditCost'));
   for (const privateField of ['message', 'projectId', 'selectedFieldIds', 'selectedEvidenceIds']) {
@@ -334,7 +350,7 @@ test('the committed OpenAPI document is reproducible from the route and schema c
     parameter.name === 'installationId' && parameter.required));
   assert.ok(document.paths['/v1/project-ai/stage-assist'].post.parameters.some((parameter) =>
     parameter.name === 'Idempotency-Key' && parameter.in === 'header' && parameter.required));
-  assert.equal(document.paths['/v1/ai/assist'].post.parameters[0].required, false);
+  assert.equal(document.paths['/v1/ai/assist'].post.parameters[0].required, true);
   assert.equal(document.paths['/v1/account/me'].delete.parameters[0].schema.const, 'delete-my-account');
   assert.ok(document.components.schemas['student-project.v1'].$defs.projectDocument);
   assert.ok(document.paths['/v1/project-ai/stage-assist'].post.requestBody.content['application/json']);
@@ -448,13 +464,18 @@ test('D-119 stage assistance and activity contracts stay project-bound and metad
   const activity = readSchema('project-ai-activity-history.v1.json');
   const clear = readSchema('project-ai-activity-clear.v1.json');
 
-  assert.deepEqual(request.oneOf.map((entry) => entry.$ref), ['#/$defs/projectRequest', '#/$defs/generalRequest']);
-  assert.equal(request.$defs.projectRequest.allOf[1].properties.projectId.format, 'uuid');
-  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedFieldIds.maxItems, 32);
-  assert.ok(request.$defs.projectRequest.allOf[1].properties.selectedEvidenceIds, 'Project requests must identify selected evidence items.');
-  assert.equal(request.$defs.projectRequest.allOf[1].properties.selectedEvidenceIds.maxItems, 32);
-  assert.equal(request.$defs.projectRequest.allOf[1].required.includes('selectedEvidenceIds'), true);
-  assert.equal(Object.hasOwn(request.$defs.projectRequest.allOf[1].properties, 'selectedFields'), false);
+  assert.deepEqual(request.oneOf.map((entry) => entry.$ref), [
+    '#/$defs/projectRequest', '#/$defs/localProjectRequest', '#/$defs/generalRequest',
+  ]);
+  assert.equal(request.$defs.projectPayload.properties.projectId.format, 'uuid');
+  assert.equal(request.$defs.projectPayload.properties.selectedFieldIds.maxItems, 32);
+  assert.ok(request.$defs.projectPayload.properties.selectedEvidenceIds, 'Project requests must identify selected evidence items.');
+  assert.equal(request.$defs.projectPayload.properties.selectedEvidenceIds.maxItems, 32);
+  assert.equal(request.$defs.projectPayload.required.includes('selectedEvidenceIds'), true);
+  assert.equal(Object.hasOwn(request.$defs.projectPayload.properties, 'selectedFields'), true);
+  assert.equal(request.$defs.projectRequest.allOf[2].not.anyOf.some((condition) => condition.required.includes('selectedFields')), true);
+  assert.equal(request.$defs.localProjectRequest.allOf[2].required.includes('projectBindingGeneration'), true);
+  assert.equal(request.$defs.localProjectRequest.allOf[2].required.includes('selectedFields'), true);
   assert.equal(request.$defs.generalRequest.allOf[1].properties.mode.const, 'GENERAL');
   assert.equal(request.$defs.generalRequest.allOf[1].properties.selectedFieldIds.maxItems, 0);
   assert.equal(request.$defs.generalRequest.allOf[1].properties.selectedEvidenceIds.maxItems, 0);
@@ -1188,7 +1209,7 @@ test('RevenueCat architecture documentation does not overclaim dashboard state',
 
 test('account export streams database rows instead of aggregating an account-sized JSON value', () => {
   const accountExport = fs.readFileSync(
-    path.join(repositoryRoot, 'platform', 'api', 'Account', 'AccountExport.cs'),
+    path.join(repositoryRoot, 'platform', 'shared', 'AccountExportDataWriter.cs'),
     'utf8',
   );
 
@@ -1274,5 +1295,50 @@ test('nullable response contracts keep null keys without changing unrelated API 
     const source = fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
     assert.match(source, /ResponseJsonOptions[\s\S]*?DefaultIgnoreCondition\s*=\s*JsonIgnoreCondition\.Never/);
     assert.match(source, /Results\.Json\([\s\S]*?options:\s*ResponseJsonOptions/);
+  }
+});
+
+test('account export v2 routes require idempotency and expose bounded metadata-only artifacts', () => {
+  const manifest = readJson('routes.v1.json');
+  const openapi = readJson('openapi/openapi.v1.json');
+  const createRoute = manifest.routes.find((route) => route.method === 'POST' && route.path === '/v2/account/exports');
+  const statusRoute = manifest.routes.find((route) => route.method === 'GET' && route.path === '/v2/account/exports/{exportId:guid}');
+  const downloadRoute = manifest.routes.find((route) => route.method === 'GET' && route.path === '/v2/account/exports/{exportId:guid}/download');
+  const deleteRoute = manifest.routes.find((route) => route.method === 'DELETE' && route.path === '/v2/account/exports/{exportId:guid}');
+  const exportSchema = readSchema('account-export.v2.json');
+  const jobSchema = readSchema('account-export-job.v2.json');
+
+  assert.equal(createRoute?.authentication, 'supabase_bearer');
+  assert.equal(createRoute?.successStatusCode, 202);
+  assert.equal(createRoute?.headerParameters.find((parameter) => parameter.name === 'Idempotency-Key')?.required, true);
+  assert.equal(statusRoute?.responseSchema, 'account-export-job.v2.json');
+  assert.equal(downloadRoute?.responseSchema, 'account-export.v2.json');
+  assert.equal(deleteRoute?.responseSchema, 'account-export-job.v2.json');
+  assert.equal(
+    openapi.paths['/v2/account/exports'].post.responses['202'].content[
+      'application/vnd.evidrilo.account-export-job.v2+json'].schema.$ref,
+    '#/components/schemas/account-export-job.v2',
+  );
+  assert.equal(
+    openapi.paths['/v2/account/exports/{exportId}/download'].get.responses['2XX'].content[
+      'application/vnd.evidrilo.account-export.v2+json'].schema.$ref,
+    '#/components/schemas/account-export.v2',
+  );
+  assert.ok(exportSchema.properties.data.required.includes('projectAiConsent'));
+  assert.ok(exportSchema.properties.data.required.includes('projectAiActivity'));
+  assert.ok(exportSchema.properties.data.required.includes('aiConversationTurnRequests'));
+  assert.equal(jobSchema.properties.artifactBytes.maximum, 67108864);
+  for (const propertyName of ['prompt', 'response', 'requestHash', 'settlementHash', 'activeRequestHash']) {
+    assert.equal(Object.hasOwn(exportSchema.properties.data.properties, propertyName), false);
+    for (const metadataCollection of [
+      'projectAiConsentEvents',
+      'projectAiActivity',
+      'aiConversationSessions',
+      'aiConversationTurnRequests',
+    ]) {
+      const schema = exportSchema.properties.data.properties[metadataCollection];
+      const itemProperties = schema.items?.properties ?? schema.properties;
+      assert.equal(Object.hasOwn(itemProperties, propertyName), false);
+    }
   }
 });

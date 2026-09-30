@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/project-ai-local-project-context.v1.json",
+  "title": "Evidrilo owner-bound local Project AI metadata binding",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "evidrilo.project-ai-local-project-context" },
+    "version": { "const": "1" },
+    "projectId": { "type": "string", "format": "uuid" },
+    "projectRevision": { "type": "integer", "minimum": 1 },
+    "bindingGeneration": { "type": "integer", "minimum": 1 },
+    "templateId": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$", "maxLength": 96 },
+    "templateVersion": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["registered", "unchanged"] },
+    "requestId": { "type": "string", "minLength": 8, "maxLength": 128 }
+  },
+  "required": ["schema", "version", "projectId", "projectRevision", "bindingGeneration", "templateId", "templateVersion", "status", "requestId"]
+}

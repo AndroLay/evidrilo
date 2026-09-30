@@ -13,13 +13,13 @@ fun evidriloOnboardingPresentation(
     forceShow: Boolean = false,
 ): EvidriloOnboardingPresentation = EvidriloOnboardingPresentation(
     isVisible = forceShow,
-    title = "Preview reasoning from evidence.",
-    body = "Evidrilo helps students connect project requirements, sources, findings, and claims. This guided preview uses synthetic examples, stays separate from real work, and does not create a project.",
-    primaryLabel = "Start guided preview",
+    title = "Meet your student workspace.",
+    body = "Discover projects, evidence links, optional AI, and exports in about 1–2 minutes. This introduction uses synthetic examples and does not create a project.",
+    primaryLabel = "Meet Evidrilo",
     secondaryLabel = "Skip Get Started",
     freeBenefits = listOf(
-        "No reviewed template is currently selectable; the walkthrough is clearly labeled as a demo.",
-        "Follow one synthetic source through a finding, a bounded claim, and a next action.",
+        "Choose a project structure, connect your notes, and keep the limits of a claim in view.",
+        "Explore optional AI help and local history. AI needs an eligible account and enabled services.",
         "Create and edit local projects without an account. Sign-in is only for account-bound services; cloud sync needs separate consent.",
     ),
 )

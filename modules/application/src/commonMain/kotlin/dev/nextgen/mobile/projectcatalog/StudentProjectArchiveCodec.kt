@@ -95,16 +95,20 @@ private class ProjectArchiveValidationFailure(val code: String) : Exception()
 object StudentProjectArchiveCodec {
     private const val MANIFEST_SCHEMA = "evidrilo.project-archive-manifest"
     private const val PROJECT_SCHEMA = "evidrilo.student-project"
-    private const val ARCHIVE_VERSION = "5"
-    private const val PREVIOUS_ARCHIVE_VERSION = "4"
-    private const val EARLIER_ARCHIVE_VERSION = "3"
-    private const val OLDER_ARCHIVE_VERSION = "2"
-    private const val LEGACY_ARCHIVE_VERSION = "1"
-    private const val PROJECT_PAYLOAD_VERSION = "9"
-    private const val PREVIOUS_PROJECT_PAYLOAD_VERSION = "8"
-    private const val EARLIER_PROJECT_PAYLOAD_VERSION = "7"
-    private const val OLDER_PROJECT_PAYLOAD_VERSION = "6"
-    private const val LEGACY_PROJECT_PAYLOAD_VERSION = "5"
+    private const val ARCHIVE_VERSION = "7"
+    private const val PREVIOUS_ARCHIVE_VERSION = "6"
+    private const val EARLIER_ARCHIVE_VERSION = "5"
+    private const val OLDER_ARCHIVE_VERSION = "4"
+    private const val OLDEST_ARCHIVE_VERSION = "3"
+    private const val LEGACY_ARCHIVE_VERSION = "2"
+    private const val OLDEST_LEGACY_ARCHIVE_VERSION = "1"
+    private const val PROJECT_PAYLOAD_VERSION = "11"
+    private const val PREVIOUS_PROJECT_PAYLOAD_VERSION = "10"
+    private const val EARLIER_PROJECT_PAYLOAD_VERSION = "9"
+    private const val OLDER_PROJECT_PAYLOAD_VERSION = "8"
+    private const val OLDEST_PROJECT_PAYLOAD_VERSION = "7"
+    private const val LEGACY_PROJECT_PAYLOAD_VERSION = "6"
+    private const val OLDEST_LEGACY_PROJECT_PAYLOAD_VERSION = "5"
     private const val MIME_TYPE = "application/vnd.evidrilo.project+zip"
     private const val JSON_MIME_TYPE = "application/json"
     private const val MAX_COMPRESSED_BYTES = 50 * 1024 * 1024
@@ -417,7 +421,7 @@ object StudentProjectArchiveCodec {
         }.getOrElse { return StudentProjectArchiveReadResult.Rejected("PROJECT_ARCHIVE_PROJECT_INVALID") }
         val archiveVersion = projectDocument.optionalString("version")
         if (projectDocument.keys != projectFileKeys || projectDocument.requiredString("schema") != PROJECT_SCHEMA ||
-            archiveVersion !in setOf(LEGACY_ARCHIVE_VERSION, OLDER_ARCHIVE_VERSION, EARLIER_ARCHIVE_VERSION, PREVIOUS_ARCHIVE_VERSION, ARCHIVE_VERSION) ||
+            archiveVersion !in setOf(OLDEST_LEGACY_ARCHIVE_VERSION, LEGACY_ARCHIVE_VERSION, OLDEST_ARCHIVE_VERSION, OLDER_ARCHIVE_VERSION, EARLIER_ARCHIVE_VERSION, PREVIOUS_ARCHIVE_VERSION, ARCHIVE_VERSION) ||
             archiveVersion != manifest.requiredString("version")
         ) {
             return StudentProjectArchiveReadResult.Rejected("PROJECT_ARCHIVE_SCHEMA_UNSUPPORTED")
@@ -435,7 +439,9 @@ object StudentProjectArchiveCodec {
         val restoredPayload = runCatching { archivedProject.toLocalDraft() }
             .getOrElse { return StudentProjectArchiveReadResult.Rejected("PROJECT_ARCHIVE_PROJECT_INVALID") }
         val localPayloadVersion = when (archiveVersion) {
+            OLDEST_LEGACY_ARCHIVE_VERSION -> OLDEST_LEGACY_PROJECT_PAYLOAD_VERSION
             LEGACY_ARCHIVE_VERSION -> LEGACY_PROJECT_PAYLOAD_VERSION
+            OLDEST_ARCHIVE_VERSION -> OLDEST_PROJECT_PAYLOAD_VERSION
             OLDER_ARCHIVE_VERSION -> OLDER_PROJECT_PAYLOAD_VERSION
             EARLIER_ARCHIVE_VERSION -> EARLIER_PROJECT_PAYLOAD_VERSION
             PREVIOUS_ARCHIVE_VERSION -> PREVIOUS_PROJECT_PAYLOAD_VERSION
@@ -692,7 +698,7 @@ object StudentProjectArchiveCodec {
         require(manifest.keys == manifestKeys)
         require(manifest.requiredString("schema") == MANIFEST_SCHEMA)
         val version = manifest.requiredString("version")
-        require(version in setOf(LEGACY_ARCHIVE_VERSION, OLDER_ARCHIVE_VERSION, EARLIER_ARCHIVE_VERSION, PREVIOUS_ARCHIVE_VERSION, ARCHIVE_VERSION))
+        require(version in setOf(OLDEST_LEGACY_ARCHIVE_VERSION, LEGACY_ARCHIVE_VERSION, OLDEST_ARCHIVE_VERSION, OLDER_ARCHIVE_VERSION, EARLIER_ARCHIVE_VERSION, PREVIOUS_ARCHIVE_VERSION, ARCHIVE_VERSION))
         val projectId = manifest.requiredString("projectId")
         require(uuidPattern.matches(projectId))
         val appVersion = manifest.requiredString("appVersion")
@@ -713,7 +719,7 @@ object StudentProjectArchiveCodec {
         require(firstRevision?.let { it > 0 } != false && lastRevision?.let { it >= firstRevision!! } != false)
         val attachmentItems = manifest["attachments"]?.jsonArray ?: error("attachments required")
         require(attachmentItems.size <= StudentProjectAttachmentRules.MAX_ATTACHMENTS)
-        if (version == LEGACY_ARCHIVE_VERSION) require(attachmentItems.isEmpty() && attachmentScans.isEmpty())
+        if (version == OLDEST_LEGACY_ARCHIVE_VERSION) require(attachmentItems.isEmpty() && attachmentScans.isEmpty())
         val seenAttachmentIds = mutableSetOf<String>()
         val seenAttachmentPaths = mutableSetOf<String>()
         val attachments = attachmentItems.map { element ->

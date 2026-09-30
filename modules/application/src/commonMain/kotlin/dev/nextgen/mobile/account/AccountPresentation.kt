@@ -6,7 +6,7 @@ enum class AccountPresentationAction {
 }
 
 /** Temporary client-only release switch. It does not change or bypass API authorization. */
-const val TEMPORARY_GUEST_MODE_ENABLED = true
+const val TEMPORARY_GUEST_MODE_ENABLED = false
 
 /** Account identity remains optional and available while local guest work is enabled. */
 const val ACCOUNT_AUTH_ENABLED = true

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidrilo.dev/contracts/account-export-job.v2.json",
+  "title": "Evidrilo account export job v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "exportId", "status", "requestId", "createdAt", "expiresAt"],
+  "properties": {
+    "schema": { "const": "evidrilo.account-export-job" },
+    "version": { "const": "2" },
+    "exportId": { "type": "string", "format": "uuid" },
+    "status": { "enum": ["queued", "running", "ready", "failed", "cancelled"] },
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "artifactBytes": { "type": "integer", "minimum": 1, "maximum": 67108864 },
+    "errorCode": { "type": "string", "pattern": "^[A-Z0-9_]{1,64}$" }
+  }
+}

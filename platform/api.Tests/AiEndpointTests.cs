@@ -148,6 +148,23 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Ai_assistance_requires_idempotency_before_dispatch()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/ai/assist")
+        {
+            Content = JsonContent.Create(ValidRequest(optedIn: false)),
+        };
+        request.Headers.Add("X-Test-User", $"{UserId}|true");
+
+        using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("INVALID_IDEMPOTENCY_KEY", body.GetProperty("code").GetString());
+        Assert.False(body.TryGetProperty("status", out _));
+    }
+
+    [Fact]
     public async Task Ai_assistance_rejects_an_invalid_idempotency_key_at_the_api_boundary()
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/ai/assist")
@@ -172,6 +189,7 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
             Content = JsonContent.Create(ValidRequest(optedIn: false)),
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
+        request.Headers.Add("Idempotency-Key", "assist_req_0001");
 
         using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
@@ -192,6 +210,7 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
             Content = JsonContent.Create(ValidRequest(optedIn: false)),
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
+        request.Headers.Add("Idempotency-Key", "assist_req_0002");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(
             "application/vnd.evidrilo.ai-assist-result.v2+json"));
 
@@ -218,6 +237,7 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
             }),
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
+        request.Headers.Add("Idempotency-Key", "assist_req_0003");
 
         using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
@@ -234,6 +254,7 @@ public sealed class AiEndpointTests : IClassFixture<ApiFactory>
             Content = JsonContent.Create(ValidRequest(optedIn: true)),
         };
         request.Headers.Add("X-Test-User", $"{UserId}|true");
+        request.Headers.Add("Idempotency-Key", "assist_req_0004");
 
         using var response = await client.SendAsync(request, cancellationToken: TestContext.Current.CancellationToken);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);

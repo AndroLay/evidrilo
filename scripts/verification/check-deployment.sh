@@ -53,6 +53,7 @@ done
 
 require_text .dockerignore local.properties local.properties
 require_text .dockerignore environment-files '*.env'
+require_text .dockerignore local-development-settings '**/appsettings.Development.json'
 require_text .dockerignore private-research research/
 require_text .dockerignore private-internal internal/
 require_text .dockerignore private-media Gurwi/

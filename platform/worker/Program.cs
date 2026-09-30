@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Evidrilo.Worker;
+using Npgsql;
 
 var builder = Host.CreateApplicationBuilder(args);
 var workerOptions = WorkerOptions.From(builder.Configuration, builder.Environment.EnvironmentName);
@@ -9,6 +10,10 @@ if (workerOptions.DatabaseConfigured)
 {
     builder.Services.AddSingleton<IProjectionJobStore>(_ =>
         new NpgsqlProjectionJobStore(workerOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(workerOptions.DatabaseConnectionString!));
+    builder.Services.AddSingleton<IAccountExportWorkerStore, NpgsqlAccountExportWorkerStore>();
+    builder.Services.AddSingleton<IAccountExportSnapshotBuilder, NpgsqlAccountExportSnapshotBuilder>();
+    builder.Services.AddHostedService<AccountExportWorker>();
 }
 else
 {

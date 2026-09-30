@@ -4,5 +4,21 @@
     <!-- Debug-only local API access. Release keeps cleartext disabled. -->
     <application
         android:usesCleartextTraffic="true"
-        tools:replace="android:usesCleartextTraffic" />
+        tools:replace="android:usesCleartextTraffic">
+        <!-- Developer preview renders only the synthetic, in-memory practice fixture. -->
+        <activity
+            android:name=".PracticePreviewActivity"
+            android:exported="true"
+            android:label="Practice UI preview" />
+        <!-- Disabled-provider visual fixture; never connects to billing or account services. -->
+        <activity
+            android:name=".ProPreviewActivity"
+            android:exported="true"
+            android:label="Pro UI preview" />
+        <!-- Only temporary tour state; no account or project storage is accessed. -->
+        <activity
+            android:name=".GetStartedPreviewActivity"
+            android:exported="true"
+            android:label="Get Started UI preview" />
+    </application>
 </manifest>

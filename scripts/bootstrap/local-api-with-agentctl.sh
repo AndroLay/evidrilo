@@ -21,13 +21,23 @@ if [[ -z "$project_ref" ]]; then
 fi
 supabase_url=$(evidrilo_supabase_url "$project_ref")
 publishable_key=$(evidrilo_agentctl_supabase_publishable_key "$project_ref")
-api_port=${EVIDRILO_API_PORT:-5080}
+local_api_port_file="$repository_root/.local/api-port"
+api_port=${EVIDRILO_API_PORT:-}
+if [[ -z "$api_port" && -f "$local_api_port_file" ]]; then
+  IFS= read -r api_port < "$local_api_port_file" || true
+fi
+api_port=${api_port:-5080}
 if [[ ! "$api_port" =~ ^[0-9]+$ || "$api_port" -lt 1 || "$api_port" -gt 65535 ]]; then
   printf '%s\n' 'EVIDRILO_API_PORT must be between 1 and 65535.' >&2
   exit 1
 fi
 
 compose_file="$repository_root/infra/environments/local/docker-compose.yml"
+compose_files=(-f "$compose_file")
+local_ai_compose_file="$repository_root/.local/docker-compose.ai.yml"
+if [[ -f "$local_ai_compose_file" ]]; then
+  compose_files+=(-f "$local_ai_compose_file")
+fi
 compose_build=()
 if [[ ${EVIDRILO_LOCAL_SKIP_BUILD:-0} != 1 ]]; then
   compose_build+=(--build)
@@ -36,7 +46,7 @@ fi
 EVIDRILO_API_PORT="$api_port" \
 SUPABASE_URL="$supabase_url" \
 SUPABASE_PUBLISHABLE_KEY="$publishable_key" \
-docker compose -f "$compose_file" up "${compose_build[@]}" -d
+docker compose "${compose_files[@]}" up "${compose_build[@]}" -d
 
 readiness_json=''
 api_ready=0

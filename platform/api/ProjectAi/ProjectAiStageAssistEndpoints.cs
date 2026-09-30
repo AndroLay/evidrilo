@@ -58,6 +58,7 @@ public static class ProjectAiStageAssistEndpoints
                 IProjectTemplateStore templateStore,
                 IProjectAiConsentStore consentStore,
                 IStudentProjectStore studentProjectStore,
+                IProjectAiLocalProjectContextStore localProjectContextStore,
                 IProjectAiActivityStore activityStore,
                 ILoggerFactory loggerFactory,
                 CancellationToken cancellationToken) =>
@@ -67,6 +68,8 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "AUTH_REQUIRED", "Authentication is required.", StatusCodes.Status401Unauthorized);
                 if (!AuthenticatedUser.IsEmailVerified(context.User))
                     return Error(context, "FORBIDDEN", "A verified account is required for project AI.", StatusCodes.Status403Forbidden);
+                if (!ProjectAiStageAssistValidator.HasExplicitRequestConsent(context))
+                    return Error(context, "PROJECT_AI_REQUEST_CONSENT_REQUIRED", "Confirm the selected project context for this request.", StatusCodes.Status403Forbidden);
                 if (!TryGetRequestId(context, out var requestId))
                     return Invalid(context, "INVALID_IDEMPOTENCY_KEY");
 
@@ -118,8 +121,20 @@ public static class ProjectAiStageAssistEndpoints
                 }
 
                 var projectId = Guid.Parse(validRequest.ProjectId!);
-                var savedProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
-                var projectError = ProjectContextError(context, savedProject, validRequest.BaseProjectRevision);
+                var usesLocalProjectContext = validRequest.SelectedFields is not null;
+                StudentProjectRecord? savedProject;
+                IResult? projectError;
+                if (usesLocalProjectContext)
+                {
+                    var localContext = await localProjectContextStore.ReadOwnAsync(accountId, projectId, cancellationToken);
+                    projectError = LocalProjectContextError(context, localContext, validRequest);
+                    savedProject = projectError is null ? CreateSelectedContextProject(projectId, validRequest) : null;
+                }
+                else
+                {
+                    savedProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
+                    projectError = ProjectContextError(context, savedProject, validRequest.BaseProjectRevision);
+                }
                 if (projectError is not null) return projectError;
                 var evidenceError = ProjectAiStageAssistValidator.ValidateSelectedEvidence(validRequest, template, savedProject);
                 if (evidenceError is not null) return Invalid(context, evidenceError);
@@ -241,7 +256,16 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_RESERVATION_CONFLICT", "The credit reservation is no longer available.", StatusCodes.Status409Conflict);
                 }
 
-                var beforeDispatchConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
+                ProjectAiConsentState beforeDispatchConsent;
+                try
+                {
+                    beforeDispatchConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
+                }
+                catch
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    throw;
+                }
                 if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, beforeDispatchConsent))
                 {
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
@@ -249,16 +273,32 @@ public static class ProjectAiStageAssistEndpoints
                 }
 
                 StudentProjectRecord? currentProject;
+                IResult? currentProjectError;
                 try
                 {
-                    currentProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
+                    if (usesLocalProjectContext)
+                    {
+                        var currentLocalContext = await localProjectContextStore.ReadOwnAsync(
+                            accountId,
+                            projectId,
+                            cancellationToken);
+                        currentProjectError = LocalProjectContextError(context, currentLocalContext, validRequest);
+                        currentProject = currentProjectError is null
+                            ? CreateSelectedContextProject(projectId, validRequest)
+                            : null;
+                    }
+                    else
+                    {
+                        currentProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
+                        currentProjectError = ProjectContextError(context, currentProject, validRequest.BaseProjectRevision);
+                    }
                 }
                 catch
                 {
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
                     throw;
                 }
-                projectError = ProjectContextError(context, currentProject, validRequest.BaseProjectRevision);
+                projectError = currentProjectError;
                 if (projectError is not null)
                 {
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
@@ -287,6 +327,40 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_CONTEXT_STALE", "The selected project context changed before dispatch.", StatusCodes.Status409Conflict);
                 }
 
+                // Project activity now references a metadata-only owner/project registry so
+                // both local-first and server-stored projects can have auditable AI activity.
+                // Cloud project content remains in its existing store; only identity and
+                // evidence IDs are mirrored here.
+                if (!usesLocalProjectContext)
+                {
+                    ProjectAiLocalContextWriteOutcome bindingOutcome;
+                    try
+                    {
+                        bindingOutcome = await localProjectContextStore.UpsertOwnAsync(
+                            accountId,
+                            projectId,
+                            currentProject!.Version,
+                            template!.TemplateId,
+                            template.TemplateVersion,
+                            currentProject.Document.EvidenceItems?.Select(item => item.Id!).ToArray() ?? [],
+                            cancellationToken);
+                    }
+                    catch
+                    {
+                        await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                        throw;
+                    }
+                    if (bindingOutcome is ProjectAiLocalContextWriteOutcome.Stale or ProjectAiLocalContextWriteOutcome.Conflict)
+                    {
+                        await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                        return Error(
+                            context,
+                            "PROJECT_AI_CONTEXT_STALE",
+                            "The project metadata changed before activity could be recorded. No provider request was sent.",
+                            StatusCodes.Status409Conflict);
+                    }
+                }
+
                 bool historyCreated;
                 try
                 {
@@ -300,7 +374,9 @@ public static class ProjectAiStageAssistEndpoints
                             validRequest.StageId,
                             validRequest.OperationId,
                             validRequest.BaseProjectRevision,
-                            consent.Generation),
+                            consent.Generation,
+                            UsesLocalProjectContext: usesLocalProjectContext,
+                            BaseProjectBindingGeneration: validRequest.ProjectBindingGeneration),
                         cancellationToken);
                 }
                 catch
@@ -312,6 +388,38 @@ public static class ProjectAiStageAssistEndpoints
                 {
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
                     return Error(context, "PROJECT_AI_REQUEST_REPLAYED", "This request key has already been used. Start a new request.", StatusCodes.Status409Conflict);
+                }
+
+                ProjectAiConsentState immediatelyBeforeProviderConsent;
+                try
+                {
+                    immediatelyBeforeProviderConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
+                }
+                catch
+                {
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Failed,
+                        null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    throw;
+                }
+                if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, immediatelyBeforeProviderConsent))
+                {
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Stale,
+                        null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return ConsentRequired(context);
                 }
 
                 ProjectAiStageAssistOutput? output;
@@ -347,41 +455,78 @@ public static class ProjectAiStageAssistEndpoints
                     return Unavailable(context, "PROJECT_AI_PROVIDER_UNAVAILABLE");
                 }
 
-                ProjectAiConsentState afterProviderConsent;
-                StudentProjectRecord? afterProviderProject;
+                ProjectAiConsentState? afterProviderConsent = null;
+                var afterProviderConsentReadFailed = false;
+                StudentProjectRecord? afterProviderProject = null;
+                IResult? afterProviderProjectError = null;
+                var afterProviderProjectReadFailed = false;
                 try
                 {
-                    afterProviderConsent = await consentStore.ReadOwnAsync(accountId, cancellationToken);
-                    afterProviderProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, cancellationToken);
+                    afterProviderConsent = await consentStore.ReadOwnAsync(accountId, CancellationToken.None);
                 }
                 catch
                 {
-                    await CompleteActivityAsync(
-                        logger,
-                        activityStore,
-                        accountId,
-                        validRequest,
-                        requestId,
-                        ProjectAiActivityOutcomes.Failed,
-                        null);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    throw;
+                    afterProviderConsentReadFailed = true;
                 }
-                if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent)
-                    || afterProviderProject?.Version != validRequest.BaseProjectRevision)
+                try
                 {
-                    await CompleteActivityAsync(
-                        logger,
-                        activityStore,
-                        accountId,
-                        validRequest,
-                        requestId,
-                        ProjectAiActivityOutcomes.Stale,
-                        null);
+                    if (usesLocalProjectContext)
+                    {
+                        var afterProviderLocalContext = await localProjectContextStore.ReadOwnAsync(
+                            accountId,
+                            projectId,
+                            CancellationToken.None);
+                        afterProviderProjectError = LocalProjectContextError(
+                            context,
+                            afterProviderLocalContext,
+                            validRequest);
+                        afterProviderProject = afterProviderProjectError is null
+                            ? CreateSelectedContextProject(projectId, validRequest)
+                            : null;
+                    }
+                    else
+                    {
+                        afterProviderProject = await studentProjectStore.ReadOwnAsync(accountId, projectId, CancellationToken.None);
+                        afterProviderProjectError = ProjectContextError(
+                            context,
+                            afterProviderProject,
+                            validRequest.BaseProjectRevision);
+                    }
+                }
+                catch
+                {
+                    afterProviderProjectReadFailed = true;
+                }
+
+                var consentStillAuthorizesDelivery = afterProviderConsent is not null
+                    && ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent);
+                if (!consentStillAuthorizesDelivery)
+                {
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    if (!ProjectAiConsentPolicy.StillAuthorizesDispatch(consent, afterProviderConsent))
-                        return ConsentRequired(context);
-                    return ProjectContextError(context, afterProviderProject, validRequest.BaseProjectRevision)!;
+                    await CompleteActivityAsync(logger, activityStore, accountId, validRequest, requestId, ProjectAiActivityOutcomes.Stale, null);
+                    return afterProviderConsentReadFailed
+                        ? Unavailable(context, "PROJECT_AI_CONSENT_CHECK_UNAVAILABLE_AFTER_PROVIDER")
+                        : Error(
+                            context,
+                            "PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER",
+                            "Consent changed during provider processing. The response was withheld and the reservation was released.",
+                            StatusCodes.Status403Forbidden);
+                }
+                if (afterProviderProjectReadFailed)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    await CompleteActivityAsync(logger, activityStore, accountId, validRequest, requestId, ProjectAiActivityOutcomes.Failed, null);
+                    return Unavailable(context, "PROJECT_AI_CONTEXT_CHECK_UNAVAILABLE_AFTER_PROVIDER");
+                }
+                if (afterProviderProjectError is not null)
+                {
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    await CompleteActivityAsync(logger, activityStore, accountId, validRequest, requestId, ProjectAiActivityOutcomes.Stale, null);
+                    return Error(
+                        context,
+                        "PROJECT_AI_CONTEXT_STALE_AFTER_PROVIDER",
+                        "The project changed during provider processing. The response was withheld and the reservation was released.",
+                        StatusCodes.Status409Conflict);
                 }
 
                 if (output is null)
@@ -396,37 +541,6 @@ public static class ProjectAiStageAssistEndpoints
                         null);
                     await ReleaseReservationAsync(creditLedger, accountId, reservation);
                     return Error(context, "PROJECT_AI_REFUSED", "Project AI did not return a proposal.", StatusCodes.Status422UnprocessableEntity);
-                }
-
-                if (ProjectAiStageAssistValidator.ValidateOutput(validRequest, template, afterProviderProject, output) is not null)
-                {
-                    await CompleteActivityAsync(
-                        logger,
-                        activityStore,
-                        accountId,
-                        validRequest,
-                        requestId,
-                        ProjectAiActivityOutcomes.Failed,
-                        null);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
-                }
-
-                var rawSelectedFields = selectedFieldValues
-                    .ToDictionary(field => field.Id, field => field.Value, StringComparer.Ordinal);
-                var responseOutput = ProjectAiStageAssistValidator.BindBeforeValues(rawSelectedFields, output);
-                if (!ProjectAiStageAssistValidator.IsBoundResponseWithinLimits(responseOutput))
-                {
-                    await CompleteActivityAsync(
-                        logger,
-                        activityStore,
-                        accountId,
-                        validRequest,
-                        requestId,
-                        ProjectAiActivityOutcomes.Failed,
-                        null);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
                 }
 
                 int settledCreditCost;
@@ -464,6 +578,23 @@ public static class ProjectAiStageAssistEndpoints
                     return Error(context, "PROJECT_AI_COST_LIMIT", "Project AI usage exceeded the reserved credit amount.", StatusCodes.Status502BadGateway);
                 }
 
+                if (ProjectAiStageAssistValidator.ValidateOutput(validRequest, template, afterProviderProject, output) is not null)
+                {
+                    await CompleteActivityAsync(logger, activityStore, accountId, validRequest, requestId, ProjectAiActivityOutcomes.Failed, null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
+                }
+
+                var rawSelectedFields = selectedFieldValues
+                    .ToDictionary(field => field.Id, field => field.Value, StringComparer.Ordinal);
+                var responseOutput = ProjectAiStageAssistValidator.BindBeforeValues(rawSelectedFields, output);
+                if (!ProjectAiStageAssistValidator.IsBoundResponseWithinLimits(responseOutput))
+                {
+                    await CompleteActivityAsync(logger, activityStore, accountId, validRequest, requestId, ProjectAiActivityOutcomes.Failed, null);
+                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
+                    return Error(context, "PROJECT_AI_INVALID_RESPONSE", "The project-AI response could not be verified.", StatusCodes.Status502BadGateway);
+                }
+
                 bool previewReady;
                 try
                 {
@@ -473,12 +604,19 @@ public static class ProjectAiStageAssistEndpoints
                         requestHash,
                         maximumCreditCost,
                         settledCreditCost,
-                        cancellationToken);
+                        CancellationToken.None);
                 }
                 catch
                 {
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    throw;
+                    await CompleteActivityAsync(
+                        logger,
+                        activityStore,
+                        accountId,
+                        validRequest,
+                        requestId,
+                        ProjectAiActivityOutcomes.Failed,
+                        null);
+                    return Unavailable(context, "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN");
                 }
                 if (!previewReady)
                 {
@@ -490,8 +628,7 @@ public static class ProjectAiStageAssistEndpoints
                         requestId,
                         ProjectAiActivityOutcomes.Failed,
                         null);
-                    await ReleaseReservationAsync(creditLedger, accountId, reservation);
-                    return Error(context, "PROJECT_AI_RESERVATION_EXPIRED", "The credit reservation expired before the preview was ready.", StatusCodes.Status409Conflict);
+                    return Unavailable(context, "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN");
                 }
 
                 return Results.Json(
@@ -502,6 +639,8 @@ public static class ProjectAiStageAssistEndpoints
                         ProjectAiStageAssistValidator.ProjectMode,
                         validRequest.ProjectId!,
                         validRequest.BaseProjectRevision!.Value,
+                        validRequest.ProjectBindingGeneration,
+                        consent.Generation,
                         validRequest.StageId!,
                         validRequest.OperationId!,
                         responseOutput,
@@ -558,6 +697,64 @@ public static class ProjectAiStageAssistEndpoints
         return null;
     }
 
+    private static IResult? LocalProjectContextError(
+        HttpContext context,
+        ProjectAiLocalProjectContext? project,
+        ProjectAiStageAssistRequest request)
+    {
+        if (project is null)
+            return Error(context, "PROJECT_NOT_FOUND", "The account-bound local project was not registered.", StatusCodes.Status404NotFound);
+        if (project.CurrentRevision != request.BaseProjectRevision)
+            return Error(context, "PROJECT_AI_CONTEXT_STALE", "The local project revision changed. Save and retry assistance.", StatusCodes.Status409Conflict);
+        if (project.BindingGeneration != request.ProjectBindingGeneration)
+            return Error(context, "PROJECT_AI_CONTEXT_STALE", "The local project context changed. Review the saved project and retry assistance.", StatusCodes.Status409Conflict);
+        if (!string.Equals(project.TemplateId, request.TemplateId, StringComparison.Ordinal)
+            || project.TemplateVersion != request.TemplateVersion)
+            return Error(context, "PROJECT_AI_TEMPLATE_MISMATCH", "The local project method changed. Reload the project before requesting assistance.", StatusCodes.Status409Conflict);
+        if (request.SelectedEvidenceIds!.Any(id => !project.AvailableEvidenceIds.Contains(id, StringComparer.Ordinal)))
+            return Error(context, "PROJECT_AI_EVIDENCE_NOT_FOUND", "One or more selected evidence items are no longer available in this project.", StatusCodes.Status400BadRequest);
+        return null;
+    }
+
+    private static StudentProjectRecord CreateSelectedContextProject(
+        Guid projectId,
+        ProjectAiStageAssistRequest request)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var selectedEvidence = request.SelectedEvidence!.Select(item => new StudentProjectEvidenceItem(
+            item.Id,
+            item.Kind switch
+            {
+                "SOURCE" => StudentProjectEvidenceKind.Source,
+                "DATA" => StudentProjectEvidenceKind.Data,
+                "OBSERVATION" => StudentProjectEvidenceKind.Observation,
+                _ => throw new InvalidOperationException("Validated Project AI evidence kind expected."),
+            },
+            item.Label,
+            item.Summary,
+            item.Origin)).ToArray();
+        var document = new StudentProjectDocument(
+            Title: null,
+            TaskBrief: null,
+            Question: null,
+            Method: null,
+            Hypothesis: null,
+            Criteria: null,
+            EvidenceItems: selectedEvidence,
+            CriterionEvidenceLinks: null,
+            Analysis: null,
+            Claim: null,
+            ClaimEvidenceIds: null,
+            Limitations: null,
+            NextAction: null);
+        return new StudentProjectRecord(
+            projectId,
+            request.BaseProjectRevision!.Value,
+            document,
+            now,
+            now);
+    }
+
     private static Task<bool> ReleaseReservationAsync(
         IAiCreditLedger creditLedger,
         Guid accountId,
@@ -576,7 +773,9 @@ public static class ProjectAiStageAssistEndpoints
         ProjectAiStageAssistRequest request,
         string requestId,
         string outcome,
-        int? resultProjectRevision)
+        int? resultProjectRevision,
+        string? requestedSettlementOutcome = null,
+        string? settlementHash = null)
     {
         try
         {
@@ -586,8 +785,8 @@ public static class ProjectAiStageAssistEndpoints
                 requestId,
                 outcome,
                 resultProjectRevision,
-                requestedSettlementOutcome: null,
-                settlementHash: null,
+                requestedSettlementOutcome,
+                settlementHash,
                 cancellationToken: CancellationToken.None);
         }
         catch

@@ -7,6 +7,7 @@ import dev.nextgen.mobile.domain.project.ProjectAiScaffoldRules
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
 import dev.nextgen.mobile.domain.project.StudentProjectDraftCreateResult
 import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
+import dev.nextgen.mobile.domain.project.StudentProjectDeadlineChange
 import dev.nextgen.mobile.domain.project.StudentProjectAttachmentRef
 import dev.nextgen.mobile.domain.project.StudentProjectAttachmentRules
 import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
@@ -262,6 +263,78 @@ class StudentProjectDraftFlow(
             title = current.title,
             fieldValues = updatedValues,
             revisionActor = StudentProjectRevisionActor.CONFIRMED_ASSISTANCE,
+        )
+    }
+
+    /**
+     * Applies only explicitly confirmed field proposals from a stage-bound AI
+     * preview. Template capability, project revision, and before-values are
+     * rechecked against the persisted draft immediately before the reducer
+     * writes a revision marked as confirmed assistance.
+     */
+    fun applyAiStageAssistToProject(
+        projectId: String,
+        expectedTemplateId: String,
+        expectedTemplateVersion: Int,
+        stageId: String,
+        operationId: String,
+        expectedBaseRevision: Int,
+        expectedBeforeValues: Map<String, String>,
+        confirmedValues: Map<String, String>,
+    ): StudentProjectDraftFlowResult<StudentProjectDraft> {
+        val current = when (val loaded = store.load()) {
+            is LocalStorageReadResult.Success -> loaded.value.orEmpty().singleOrNull { it.id == projectId }
+            else -> return loaded.toFlowFailure()
+        } ?: return StudentProjectDraftFlowResult.NotFound
+
+        if (current.revision != expectedBaseRevision) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_STALE_REVISION")
+        }
+        val template = current.templateSnapshot
+            ?: return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_TEMPLATE_REQUIRED")
+        if (template.id != expectedTemplateId || template.version != expectedTemplateVersion) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_TEMPLATE_MISMATCH")
+        }
+        val operation = template.steps.singleOrNull { it.id == stageId }
+            ?.aiOperations?.singleOrNull { it.id == operationId }
+            ?: return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_OPERATION_NOT_SUPPORTED")
+        if (confirmedValues.isEmpty() || expectedBeforeValues.keys != confirmedValues.keys) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_NO_CHANGES")
+        }
+        val fieldsById = template.inputFields.associateBy { it.id }
+        if (confirmedValues.keys.any { fieldId ->
+                fieldId !in operation.outputFieldIds ||
+                    fieldsById[fieldId]?.kind in setOf(
+                        dev.nextgen.mobile.domain.project.ProjectTemplateInputKind.SOURCE,
+                        dev.nextgen.mobile.domain.project.ProjectTemplateInputKind.DATA,
+                    )
+            }
+        ) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_FIELD_NOT_ALLOWED")
+        }
+        if (expectedBeforeValues.any { (fieldId, value) ->
+                current.fieldValues[fieldId].orEmpty() != value
+            }
+        ) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_STALE_CONTEXT")
+        }
+        if (confirmedValues.any { (fieldId, value) ->
+                value.length > StudentProjectDraftRules.MAX_FIELD_CHARS || '\u0000' in value ||
+                    fieldId !in fieldsById
+            }
+        ) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_INVALID_PROPOSAL")
+        }
+        if (confirmedValues.all { (fieldId, value) -> current.fieldValues[fieldId].orEmpty() == value }) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_NO_CHANGES")
+        }
+
+        return update(
+            projectId = projectId,
+            title = current.title,
+            fieldValues = current.fieldValues + confirmedValues,
+            revisionActor = StudentProjectRevisionActor.CONFIRMED_ASSISTANCE,
+            changeSummary = "Applied AI suggestions for $stageId",
         )
     }
 
@@ -539,6 +612,7 @@ class StudentProjectDraftFlow(
             claims = snapshot.claims.toList(),
             limitationActions = snapshot.limitationActions.toList(),
             attachments = snapshot.attachments.toList(),
+            deadlineDate = snapshot.deadlineDate,
             revision = current.revision + 1,
             updatedAtEpochMillis = restoredAt,
         )
@@ -577,6 +651,7 @@ class StudentProjectDraftFlow(
         changeSummary: String? = null,
         attachments: List<StudentProjectAttachmentRef>? = null,
         limitationActions: List<StudentProjectLimitationActionRecord>? = null,
+        deadlineChange: StudentProjectDeadlineChange = StudentProjectDeadlineChange.Keep,
     ): StudentProjectDraftFlowResult<StudentProjectDraft> {
         val current = when (val loaded = store.load()) {
             is LocalStorageReadResult.Success -> loaded.value.orEmpty().singleOrNull { it.id == projectId }
@@ -611,6 +686,10 @@ class StudentProjectDraftFlow(
             claims = nextClaims,
             limitationActions = limitationActions?.toList() ?: current.limitationActions,
             attachments = attachments?.toList() ?: current.attachments,
+            deadlineDate = when (deadlineChange) {
+                StudentProjectDeadlineChange.Keep -> current.deadlineDate
+                is StudentProjectDeadlineChange.Set -> deadlineChange.deadlineDate
+            },
             updatedAtEpochMillis = updatedAt,
         )
         val shouldCheckpoint = checkpoint && StudentProjectDraftRules.needsRevisionCheckpoint(proposed)
@@ -969,6 +1048,9 @@ class StudentProjectDraftFlow(
             if ((previous?.themes ?: current.themes) != proposed.themes) add("comparison notes")
             if ((previous?.claimEvidenceSourceIds ?: current.claimEvidenceSourceIds) != proposed.claimEvidenceSourceIds) {
                 add("claim source links")
+            }
+            if ((if (previous == null) current.deadlineDate else previous.deadlineDate) != proposed.deadlineDate) {
+                add("project deadline")
             }
         }
         return fields.joinToString(", ").ifBlank { "Project checkpoint" }

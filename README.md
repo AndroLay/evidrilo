@@ -45,7 +45,7 @@ local; signing in does not upload or merge project data.
 
 ### Guided Case Practice
 
-These Android screenshots show the separate, sign-in-gated M0 tablet-dissolution
+These Android screenshots show the separate, guest-accessible M0 tablet-dissolution
 case. Its supplied observations are synthetic, not student projects or research
 submissions. Feedback is deterministic and bounded to the case.
 
@@ -105,27 +105,42 @@ Free/Pro active-project limits are applied per installation.
 
 [Project lifecycle and history →](docs/product/workflows.md)
 
-### Deadlines and Local Reminders
+### Optional Project Deadline
 
-Add a due date and schedule a local reminder to keep the next step visible.
-Permission and cancellation flows are in source; delivery across restarts and
-project/account changes still needs device acceptance.
+Set or clear a calendar date in Project Basics. It is saved with the local
+project, revision history, and `.evproj` export; setting a date does not schedule
+a notification.
 
-[Reminder and notification flows →](docs/product/workflows.md)
+[Project workflow →](docs/product/workflows.md)
 
-### Reviewed Template Catalog
+### Project Guides and Reviewed Templates
 
-The API and authoring workflow support draft, review, approval, and publication.
-Students only see selectable content after it has passed human/domain review;
-there is currently no reviewed template available in the catalog.
+Five offline family starters can create editable local project structures for
+lab experiments, observational or survey work, literature synthesis, qualitative
+field studies, and design/engineering work. They add prompts and sections only;
+they are not human-reviewed method templates or evaluators. The separate server
+catalog supports draft, review, approval, and publication, and currently has no
+reviewed student-selectable template.
 
 [Catalog workstream →](docs/roadmap.md)
 
 ### Bounded AI Assistance
 
-AI is designed to offer contextual suggestions for student review. Provider,
-privacy, and credit gates remain closed, so live project generation is disabled;
-deterministic checks retain authority over case feedback.
+The mobile/API source includes project scaffolding from a reviewed template,
+stage assistance for templates that explicitly declare supported operations,
+and a separate unlinked General Chat. Home's AI entry asks the student to
+choose General Chat or one eligible project; only active projects with a
+published template and declared AI operation appear. Project requests show
+selected context and return proposals for review before reducer-mediated
+application; General Chat sends only the current message and never receives
+project context. The server stores activity metadata rather than chat
+transcripts; the app can inspect account AI activity without retrieving
+transcripts, with General Chat explicitly labeled unlinked. These source paths
+are not proof of a live provider flow:
+provider/privacy flags are default-off, and method-specific help still
+requires a genuinely reviewed, published template. Manual local project work
+remains available, and the deterministic evaluator—not AI—retains authority
+over case feedback.
 
 [AI assistance boundary →](docs/decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)
 
@@ -150,7 +165,7 @@ Local integration is separate from a hosted production deployment.
 
 ### Static Landing Page
 
-Responsive vanilla HTML/CSS/JavaScript site with a project-first story, an interactive synthetic-case walkthrough, and a five-question FAQ. [Open the live landing page →](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md)
+Responsive vanilla HTML/CSS/JavaScript site with an animated project-workspace phone preview, a clearly gated Project AI story, an interactive synthetic-case walkthrough, and a capability FAQ. [Open the live landing page →](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md)
 
 The production site is hosted on Cloudflare Pages and connected to this GitHub repository. Changes under `apps/landing/` on `main` are configured to trigger a deployment.
 Preview with `python3 -m http.server 8000 --directory apps/landing`; replace the README screenshot gallery with a WebM walkthrough when the demo is recorded.

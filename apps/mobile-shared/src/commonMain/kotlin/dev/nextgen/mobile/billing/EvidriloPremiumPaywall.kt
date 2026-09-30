@@ -1,12 +1,14 @@
 package dev.nextgen.mobile.billing
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,7 +17,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,19 +28,14 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import dev.nextgen.mobile.EvidriloBackButton
-import dev.nextgen.mobile.EvidriloBrandHeader
-import dev.nextgen.mobile.EvidriloCobaltCard
+import dev.nextgen.mobile.EvidriloBackGesture
+import dev.nextgen.mobile.EvidriloProHeader
 import dev.nextgen.mobile.EvidriloColors
 import dev.nextgen.mobile.EvidriloContentColumn
-import dev.nextgen.mobile.EvidriloIcon
-import dev.nextgen.mobile.EvidriloIconName
 import dev.nextgen.mobile.EvidriloPrimaryButton
 import dev.nextgen.mobile.EvidriloSecondaryButton
 import dev.nextgen.mobile.EvidriloStatusChip
-import dev.nextgen.mobile.EvidriloStatusTone
 import dev.nextgen.mobile.EvidriloTargetCard
-import dev.nextgen.mobile.EvidriloTintPanel
 import dev.nextgen.mobile.evidriloChoiceColors
 
 @Composable
@@ -57,116 +53,79 @@ internal fun EvidriloPremiumPaywall(
 ) {
     val model = premiumPaywallModel(billing.copy(isBusy = isBusy))
 
-    EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
-        Text(model.title, style = MaterialTheme.typography.displayLarge)
-        Text(
-            "Unlock two additional evidence-linked cases when the free case is not enough. The free workflow remains usable offline.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
+    Box(Modifier.fillMaxSize().background(EvidriloColors.Canvas)) {
+        EvidriloContentColumn {
+            EvidriloBackGesture(label = backLabel, onClick = onBack)
+            EvidriloProHeader()
 
-        EvidriloCobaltCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier.size(48.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    color = EvidriloColors.White.copy(alpha = 0.18f),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        EvidriloIcon(EvidriloIconName.CROWN, tint = EvidriloColors.White)
+            EvidriloTargetCard {
+                Text("Subscription status", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
+                EvidriloStatusChip(label = model.state.displayLabel(), tone = model.state.tone())
+                Text(model.title, style = MaterialTheme.typography.titleMedium)
+                Text(model.message, style = MaterialTheme.typography.bodyMedium)
+                if (model.state == PremiumPaywallState.LOADING) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = EvidriloColors.Cobalt,
+                            strokeWidth = 3.dp,
+                        )
+                        Text("Checking provider access…", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-                Column(
-                    modifier = Modifier.padding(start = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text("Evidrilo Pro", style = MaterialTheme.typography.titleLarge, color = EvidriloColors.White)
-                    Text("Unlock deeper analysis.", style = MaterialTheme.typography.bodyLarge, color = EvidriloColors.White)
-                }
             }
-            Text(
-                "Access is granted only by the configured entitlement. This screen never grants access locally.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = EvidriloColors.White.copy(alpha = 0.9f),
-            )
-        }
 
-        EvidriloTargetCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Access status", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                EvidriloStatusChip(label = model.state.displayLabel(), tone = model.state.tone())
-            }
-            Text(model.message, style = MaterialTheme.typography.bodyMedium)
-            if (model.state == PremiumPaywallState.LOADING) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = EvidriloColors.Cobalt,
-                        strokeWidth = 3.dp,
+            if (model.offers.isNotEmpty() && model.state != PremiumPaywallState.UNLOCKED) {
+                Text("Choose a plan", style = MaterialTheme.typography.titleLarge)
+                model.offers.forEach { offer ->
+                    PremiumOfferChoice(
+                        offer = offer,
+                        selected = offer.productId == model.selectedProductId,
+                        enabled = !model.isBusy,
+                        onClick = { onSelectOffer(offer.productId) },
                     )
-                    Text("Checking provider access…", style = MaterialTheme.typography.bodyMedium)
                 }
             }
-        }
 
-        if (model.offers.isNotEmpty() && model.state != PremiumPaywallState.UNLOCKED) {
-            Text("Choose a plan", style = MaterialTheme.typography.titleLarge)
-            model.offers.forEach { offer ->
-                PremiumOfferChoice(
-                    offer = offer,
-                    selected = offer.productId == model.selectedProductId,
+            if (model.canPurchase) {
+                EvidriloPrimaryButton(
+                    label = if (model.isBusy) "Processing purchase…" else "Continue with Pro",
+                    onClick = onPurchase,
                     enabled = !model.isBusy,
-                    onClick = { onSelectOffer(offer.productId) },
                 )
             }
-        } else if (model.state == PremiumPaywallState.EMPTY) {
-            EvidriloTintPanel {
-                Text("No approved plans are available", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Only monthly and yearly subscriptions can appear here. Try again when the provider is configured.",
-                    style = MaterialTheme.typography.bodyMedium,
+            if (model.canRestore) {
+                EvidriloSecondaryButton(
+                    label = if (model.isBusy) "Restoring purchase…" else "Restore purchase",
+                    onClick = onRestore,
+                    enabled = !model.isBusy,
                 )
             }
-        }
-
-        if (model.canPurchase) {
-            EvidriloPrimaryButton(
-                label = if (model.isBusy) "Processing purchase…" else "Unlock evidence cases",
-                onClick = onPurchase,
-                enabled = !model.isBusy,
+            if (model.showRetry) {
+                EvidriloSecondaryButton(
+                    label = "Try again",
+                    onClick = onRetry,
+                    enabled = !model.isBusy,
+                )
+            }
+            if (managedPaywallAvailable && model.state != PremiumPaywallState.UNLOCKED) {
+                EvidriloSecondaryButton(
+                    label = "View subscription plans",
+                    onClick = onOpenManagedPaywall,
+                    enabled = !model.isBusy,
+                )
+            }
+            EvidriloSecondaryButton(label = "Continue with Free", onClick = onBack)
+            Spacer(modifier = Modifier.size(4.dp))
+            Text(
+                "Three synthetic Practice cases are included with Free. Additional Practice for Pro is planned. Purchases and access follow your account's subscription status.",
+                style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (model.canRestore) {
-            EvidriloSecondaryButton(
-                label = if (model.isBusy) "Restoring purchase…" else "Restore purchase",
-                onClick = onRestore,
-                enabled = !model.isBusy,
-            )
-        }
-        if (model.showRetry) {
-            EvidriloSecondaryButton(
-                label = "Try again",
-                onClick = onRetry,
-                enabled = !model.isBusy,
-            )
-        }
-        if (managedPaywallAvailable && model.state != PremiumPaywallState.UNLOCKED) {
-            EvidriloSecondaryButton(
-                label = "Open managed RevenueCat plans",
-                onClick = onOpenManagedPaywall,
-                enabled = !model.isBusy,
-            )
-        }
-        EvidriloSecondaryButton(label = "Keep the free case", onClick = onBack)
-        Spacer(modifier = Modifier.size(4.dp))
-        Text(
-            "The signed-in Free core does not require a subscription, AI, or a network connection for its bundled case.",
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }
 
@@ -238,8 +197,9 @@ private fun PremiumPaywallState.tone(): dev.nextgen.mobile.EvidriloStatusTone = 
     PremiumPaywallState.OFFERS_AVAILABLE,
     PremiumPaywallState.UNLOCKED,
     -> dev.nextgen.mobile.EvidriloStatusTone.INFO
-    PremiumPaywallState.LOCKED -> dev.nextgen.mobile.EvidriloStatusTone.NEUTRAL
+    PremiumPaywallState.LOCKED,
     PremiumPaywallState.EMPTY,
+    -> dev.nextgen.mobile.EvidriloStatusTone.NEUTRAL
     PremiumPaywallState.PENDING,
     PremiumPaywallState.CANCELLED,
     -> dev.nextgen.mobile.EvidriloStatusTone.WARNING

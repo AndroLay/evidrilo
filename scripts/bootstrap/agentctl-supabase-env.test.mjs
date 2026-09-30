@@ -47,3 +47,11 @@ test('local compose exposure is loopback-only', () => {
   );
   assert.match(compose, /127\.0\.0\.1:\$\{EVIDRILO_API_PORT:-5080\}:5080/);
 });
+
+test('local API bootstrap preserves checkout-specific port and AI override', () => {
+  const apiBootstrap = fs.readFileSync(apiBootstrapPath, 'utf8');
+  assert.match(apiBootstrap, /\.local\/api-port/);
+  assert.match(apiBootstrap, /\.local\/docker-compose\.ai\.yml/);
+  assert.match(apiBootstrap, /docker compose "\$\{compose_files\[@\]\}"/);
+  assert.match(fs.readFileSync(path.join(repositoryRoot, '.gitignore'), 'utf8'), /^\.local\/$/m);
+});

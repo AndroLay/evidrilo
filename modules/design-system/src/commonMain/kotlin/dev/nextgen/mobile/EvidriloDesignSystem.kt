@@ -1061,7 +1061,7 @@ public fun EvidriloTargetCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
-        border = BorderStroke(2.dp, EvidriloColors.Separator),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -1211,7 +1211,7 @@ public fun EvidriloSettingsGroup(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = EvidriloColors.Card),
-        border = BorderStroke(2.dp, EvidriloColors.Separator),
+        border = BorderStroke(1.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         content = {
             Column(content = rows)

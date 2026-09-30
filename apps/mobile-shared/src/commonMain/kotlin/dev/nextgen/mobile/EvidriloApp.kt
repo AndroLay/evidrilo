@@ -133,9 +133,15 @@ import dev.nextgen.mobile.domain.project.StudentProjectSourceRecord
 import dev.nextgen.mobile.domain.project.StudentProjectStatus
 import dev.nextgen.mobile.domain.project.StudentProjectSynthesisTheme
 import dev.nextgen.mobile.domain.project.StudentProjectDraft
+import dev.nextgen.mobile.domain.project.StudentProjectDeadlineChange
 import dev.nextgen.mobile.domain.project.StudentProjectClaimRecord
 import dev.nextgen.mobile.domain.project.StudentProjectLimitationActionRecord
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatRequest
+import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatDeferredReason
+import dev.nextgen.mobile.projectcatalog.createProjectAiInstallationIdStore
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldGatewayResult
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldDecision
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldSettlementGateway
@@ -143,6 +149,16 @@ import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldSettlementResult
 import dev.nextgen.mobile.projectcatalog.ProjectAiConsentGateway
 import dev.nextgen.mobile.projectcatalog.ProjectAiConsentGatewayResult
 import dev.nextgen.mobile.projectcatalog.PROJECT_AI_CONSENT_POLICY_VERSION
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistRequest
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistDeferredReason
+import dev.nextgen.mobile.projectcatalog.ProjectAiLocalContextBindingResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistSelectedEvidence
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistOutcome
+import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistSettlementResult
+import dev.nextgen.mobile.projectcatalog.ProjectAiActivityGateway
+import dev.nextgen.mobile.projectcatalog.ProjectAiActivityHistoryResult
 import dev.nextgen.mobile.projectcatalog.ProjectAiScaffoldRequest
 import dev.nextgen.mobile.domain.project.ProjectAiScaffoldRules
 import dev.nextgen.mobile.projectcatalog.StudentProjectDraftFlow
@@ -223,6 +239,16 @@ internal fun EvidriloApp(
     billingGateway: BillingGateway,
     themeController: EvidriloThemeController = remember { EvidriloThemeController() },
 ) {
+    dev.nextgen.mobile.navigation.EvidriloBackGestureHost {
+        EvidriloAppContent(billingGateway, themeController)
+    }
+}
+
+@Composable
+private fun EvidriloAppContent(
+    billingGateway: BillingGateway,
+    themeController: EvidriloThemeController = remember { EvidriloThemeController() },
+) {
     val bundledBaseCase = ConclusionCases.M0_T2
     var remoteBaseCase by remember { mutableStateOf<ConclusionCase?>(null) }
     val baseCase = remoteBaseCase ?: bundledBaseCase
@@ -274,6 +300,31 @@ internal fun EvidriloApp(
             nowEpochSeconds = { Clock.System.now().epochSeconds },
         )
     }
+    val projectAiGeneralChatGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiGeneralChatGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectAiStageAssistGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiStageAssistGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectAiActivityGateway = remember(accountConfiguration, secureSessionStore) {
+        ProjectAiActivityGateway(
+            configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
+            transport = createAccountHttpTransport(),
+            secureSessionStore = secureSessionStore,
+            nowEpochSeconds = { Clock.System.now().epochSeconds },
+        )
+    }
+    val projectAiInstallationId = remember { createProjectAiInstallationIdStore().getOrCreate() }
     val projectAiSettlementGateway = remember(accountConfiguration, secureSessionStore) {
         ProjectAiScaffoldSettlementGateway(
             configuration = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl),
@@ -328,6 +379,7 @@ internal fun EvidriloApp(
     }
     val analyticsGateway = remember { createPlatformAnalyticsGateway() }
     val accountScope = rememberCoroutineScope()
+    var projectAiConsentState by remember { mutableStateOf<ProjectAiConsentUiState>(ProjectAiConsentUiState.Unknown) }
     val notificationScheduler = remember { createLocalNotificationScheduler() }
     val notificationPreferencesStore = remember { createNotificationPreferencesStore() }
     val notificationPreferencesGateway = remember(accountConfiguration, secureSessionStore) {
@@ -407,6 +459,10 @@ internal fun EvidriloApp(
     var platformEntitlements by remember { mutableStateOf<PlatformEntitlements?>(null) }
     var platformStatus by remember { mutableStateOf<String?>(null) }
     var aiCredits by remember { mutableStateOf<AiCredits?>(null) }
+    var aiCreditBalanceRefreshing by remember { mutableStateOf(false) }
+    var aiCreditBalanceFailureMessage by remember { mutableStateOf<String?>(null) }
+    var aiCreditBalanceCanRetry by remember { mutableStateOf(true) }
+    var aiCreditBalanceRequestGeneration by remember { mutableStateOf(0L) }
     var aiAssistState by remember {
         mutableStateOf<EvidriloAiAssistUiState>(EvidriloAiAssistUiState.SignInRequired)
     }
@@ -422,6 +478,136 @@ internal fun EvidriloApp(
     val currentAccountSession by rememberUpdatedState(accountSession)
     fun currentBillingAccountId(): String? =
         (accountSession as? AccountSession.SignedIn)?.account?.accountId
+    fun refreshAiCreditBalance(updateAssistState: Boolean = false) {
+        val signedIn = accountSession as? AccountSession.SignedIn
+        val accountId = signedIn?.account?.accountId
+        if (!accountBoundFeaturesEnabled || !accountRestoreComplete ||
+            accountId == null || signedIn.account.emailVerified.not()
+        ) {
+            aiCreditBalanceRefreshing = false
+            if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.SignInRequired
+            return
+        }
+        if (aiCreditBalanceRefreshing) return
+
+        val generation = aiCreditBalanceRequestGeneration + 1
+        aiCreditBalanceRequestGeneration = generation
+        aiCreditBalanceRefreshing = true
+        aiCreditBalanceFailureMessage = null
+        aiCreditBalanceCanRetry = true
+        accountScope.launch {
+            try {
+                val result = try {
+                    aiGateway.getCredits()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    AiGatewayResult.Failed("AI_CREDITS_UNAVAILABLE", retryable = true)
+                }
+                if (generation != aiCreditBalanceRequestGeneration ||
+                    !accountRestoreComplete || currentBillingAccountId() != accountId
+                ) return@launch
+
+                when (result) {
+                    is AiGatewayResult.CreditsFound -> {
+                        aiCredits = result.value
+                        aiCreditBalanceFailureMessage = null
+                        aiCreditBalanceCanRetry = false
+                        if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.Ready(result.value)
+                    }
+                    is AiGatewayResult.Deferred -> {
+                        aiCreditBalanceFailureMessage = "AI credits require an available verified account and API session."
+                        aiCreditBalanceCanRetry = false
+                        if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = aiCreditBalanceFailureMessage.orEmpty(),
+                            retryable = false,
+                        )
+                    }
+                    is AiGatewayResult.Fallback -> {
+                        aiCreditBalanceFailureMessage = "The current AI credit balance could not be confirmed. Try refreshing before another request."
+                        aiCreditBalanceCanRetry = true
+                        if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = "AI credits could not be loaded; deterministic feedback remains available.",
+                            retryable = true,
+                        )
+                    }
+                    is AiGatewayResult.Failed -> {
+                        aiCreditBalanceFailureMessage = if (result.outcomeUnknown) {
+                            "The latest AI credit balance could not be confirmed. It may be out of date."
+                        } else {
+                            "AI credits are temporarily unavailable. Your manual project workflow remains available."
+                        }
+                        aiCreditBalanceCanRetry = result.retryable || result.outcomeUnknown
+                        if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = "AI credits are temporarily unavailable; deterministic feedback remains available.",
+                            retryable = result.retryable,
+                        )
+                    }
+                    is AiGatewayResult.AssistFound -> {
+                        aiCreditBalanceFailureMessage = "The API returned an unexpected response for AI credits."
+                        aiCreditBalanceCanRetry = false
+                        if (updateAssistState) aiAssistState = EvidriloAiAssistUiState.Unavailable(
+                            message = aiCreditBalanceFailureMessage.orEmpty(),
+                            retryable = false,
+                        )
+                    }
+                }
+            } finally {
+                if (generation == aiCreditBalanceRequestGeneration) aiCreditBalanceRefreshing = false
+            }
+        }
+    }
+    val projectAiGeneralChatRequestCoordinator = remember(accountScope, projectAiGeneralChatGateway, aiGateway) {
+        ProjectAiGeneralChatRequestCoordinator(
+            scope = accountScope,
+            currentAccountId = { currentBillingAccountId() },
+            sendMessage = { request, key -> projectAiGeneralChatGateway.sendMessage(request, key) },
+            refreshCredits = {
+                (aiGateway.getCredits() as? AiGatewayResult.CreditsFound)?.value
+            },
+            onCreditsUpdated = {
+                aiCredits = it
+                aiCreditBalanceFailureMessage = null
+                aiCreditBalanceCanRetry = false
+            },
+        )
+    }
+    fun requestGeneralChatMessage(
+        message: String,
+        locale: String,
+        onResult: (ProjectAiGeneralChatResult) -> Unit,
+    ) {
+        if (!accountBoundFeaturesEnabled) {
+            onResult(ProjectAiGeneralChatResult.Deferred(ProjectAiGeneralChatDeferredReason.AUTH_REQUIRED))
+            return
+        }
+        val session = accountSession as? AccountSession.SignedIn
+        if (!accountRestoreComplete || session == null || !session.account.emailVerified) {
+            onResult(ProjectAiGeneralChatResult.Deferred(ProjectAiGeneralChatDeferredReason.AUTH_REQUIRED))
+            return
+        }
+        if (projectAiConsentState !is ProjectAiConsentUiState.Granted) {
+            onResult(ProjectAiGeneralChatResult.Rejected("PROJECT_AI_CONSENT_REQUIRED"))
+            return
+        }
+        val installationId = projectAiInstallationId
+        if (installationId == null) {
+            onResult(ProjectAiGeneralChatResult.Deferred(ProjectAiGeneralChatDeferredReason.SECURE_STORAGE))
+            return
+        }
+        val requestAccountId = session.account.accountId
+        projectAiGeneralChatRequestCoordinator.send(
+            accountId = requestAccountId,
+            request = ProjectAiGeneralChatRequest(
+                installationId = installationId,
+                locale = locale,
+                message = message,
+                consentConfirmed = true,
+            ),
+            idempotencyKey = newAnalyticsEventId(),
+            onResult = onResult,
+        )
+    }
     fun canUseRevenueCatForCurrentAccount(): Boolean =
         REVENUECAT_PRO_FEATURE_ENABLED &&
             accountRestoreComplete &&
@@ -630,9 +816,12 @@ internal fun EvidriloApp(
     var projectTemplateFamilyReload by remember { mutableStateOf(0) }
     var projectTemplateDetailReload by remember { mutableStateOf(0) }
     var projectAiScaffoldState by remember { mutableStateOf<ProjectAiScaffoldUiState>(ProjectAiScaffoldUiState.Idle) }
+    var projectAiStageAssistState by remember { mutableStateOf<ProjectAiStageAssistUiState>(ProjectAiStageAssistUiState.Idle) }
+    var projectAiStageAssistRequestToken by remember { mutableStateOf<String?>(null) }
+    var projectAiActivityHistoryState by remember { mutableStateOf<ProjectAiActivityHistoryUiState>(ProjectAiActivityHistoryUiState.NotRequested) }
+    var projectAiActivityRequestGeneration by remember { mutableStateOf(0L) }
     var projectAiRequestToken by remember { mutableStateOf<String?>(null) }
     var projectAiRequestInFlight by remember { mutableStateOf(false) }
-    var projectAiConsentState by remember { mutableStateOf<ProjectAiConsentUiState>(ProjectAiConsentUiState.Unknown) }
     var projectAiConsentRequestGeneration by remember { mutableStateOf(0L) }
     var projectAiBoundAccountId by remember { mutableStateOf<String?>(null) }
     var studentProjectListState by remember {
@@ -677,6 +866,88 @@ internal fun EvidriloApp(
                 .sortedByDescending(StudentProjectDraft::updatedAtEpochMillis),
         )
     }
+
+    fun refreshProjectAiActivity(projectId: String?, cursor: String? = null) {
+        val signedIn = accountSession as? AccountSession.SignedIn
+        val accountId = signedIn?.account?.accountId
+        val installationId = projectAiInstallationId
+        val previousPage = projectAiActivityHistoryState as? ProjectAiActivityHistoryUiState.Loaded
+        val loadingMore = cursor != null
+        if (TEMPORARY_GUEST_MODE_ENABLED || !accountRestoreComplete || accountId == null ||
+            signedIn?.account?.emailVerified != true || installationId == null
+        ) {
+            projectAiActivityHistoryState = ProjectAiActivityHistoryUiState.Unavailable(
+                accountId = accountId,
+                projectId = projectId,
+                message = "A verified account session is required to view server activity metadata.",
+            )
+            return
+        }
+        if (loadingMore && (previousPage == null || previousPage.accountId != accountId ||
+                previousPage.projectId != projectId || previousPage.nextCursor != cursor || previousPage.loadingMore)
+        ) return
+        val requestGeneration = projectAiActivityRequestGeneration + 1
+        projectAiActivityRequestGeneration = requestGeneration
+        projectAiActivityHistoryState = if (loadingMore) {
+            previousPage!!.copy(loadingMore = true, loadMoreError = null)
+        } else {
+            ProjectAiActivityHistoryUiState.Loading(accountId, projectId)
+        }
+        accountScope.launch {
+            val result = try {
+                projectAiActivityGateway.list(installationId, projectId, limit = 20, cursor = cursor)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiActivityHistoryResult.Unavailable("PROJECT_AI_ACTIVITY_UNAVAILABLE")
+            }
+            if (projectAiActivityRequestGeneration != requestGeneration) return@launch
+            if (projectId != null && activeStudentProjectDraft?.id != projectId) {
+                projectAiActivityHistoryState = if (loadingMore && previousPage != null) {
+                    previousPage.copy(loadingMore = false, loadMoreError = "PROJECT_CONTEXT_CHANGED")
+                } else {
+                    ProjectAiActivityHistoryUiState.NotRequested
+                }
+                return@launch
+            }
+            if (!projectAiSessionMatchesOwner(accountId, currentBillingAccountId())) return@launch
+            projectAiActivityHistoryState = when (result) {
+                is ProjectAiActivityHistoryResult.Loaded -> {
+                    val entries = if (loadingMore) previousPage!!.entries + result.activities else result.activities
+                    ProjectAiActivityHistoryUiState.Loaded(
+                        accountId = accountId,
+                        projectId = projectId,
+                        entries = entries.distinctBy { it.activityId },
+                        nextCursor = result.nextCursor,
+                    )
+                }
+                is ProjectAiActivityHistoryResult.Deferred -> if (loadingMore) {
+                    previousPage!!.copy(loadingMore = false, loadMoreError = "AUTH_REQUIRED")
+                } else {
+                    ProjectAiActivityHistoryUiState.Unavailable(
+                        accountId, projectId, "Sign in again with a verified account to view activity metadata.",
+                    )
+                }
+                is ProjectAiActivityHistoryResult.Unavailable -> if (loadingMore) {
+                    previousPage!!.copy(loadingMore = false, loadMoreError = result.code)
+                } else {
+                    ProjectAiActivityHistoryUiState.Unavailable(
+                        accountId, projectId, "Activity metadata is temporarily unavailable (${result.code}).",
+                    )
+                }
+                is ProjectAiActivityHistoryResult.Rejected -> if (loadingMore) {
+                    previousPage!!.copy(loadingMore = false, loadMoreError = result.code)
+                } else {
+                    ProjectAiActivityHistoryUiState.Unavailable(
+                        accountId, projectId, "The activity request was rejected (${result.code}).",
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadMoreProjectAiActivity(projectId: String?, cursor: String) =
+        refreshProjectAiActivity(projectId, cursor)
 
     fun settleProjectAiScaffold(
         requestId: String,
@@ -860,8 +1131,11 @@ internal fun EvidriloApp(
         }
     }
 
-    fun startStudentProject(template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition) {
-        if (!requireDestinationAccess(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)) return
+    fun createStudentProjectFromTemplate(
+        template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition,
+        accessDestination: EvidriloDestination,
+    ) {
+        if (!requireDestinationAccess(accessDestination)) return
         releaseActiveProjectAiPreview()
         when (val result = studentProjectDraftFlow.start(template, template.title.trim().take(160).ifBlank { "My project" })) {
             is StudentProjectDraftFlowResult.Value -> {
@@ -876,6 +1150,12 @@ internal fun EvidriloApp(
             else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
         }
     }
+
+    fun startStudentProject(template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition) =
+        createStudentProjectFromTemplate(template, EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
+
+    fun startStarterStudentProject(template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition) =
+        createStudentProjectFromTemplate(template, EvidriloDestination.PROJECT_FAMILY_DETAIL)
 
     fun startManualStudentProject() {
         if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) return
@@ -926,7 +1206,10 @@ internal fun EvidriloApp(
         val requestAccountId = currentBillingAccountId()
         if (requestAccountId == null) {
             projectAiScaffoldState = ProjectAiScaffoldUiState.Unavailable(
-                "Project AI is temporarily unavailable in local guest mode. Your local project remains available; no context was sent.",
+                projectAiAccountRequirementMessage(
+                    guestModeEnabled = TEMPORARY_GUEST_MODE_ENABLED,
+                    consentManagement = false,
+                ),
             )
             return
         }
@@ -1081,6 +1364,24 @@ internal fun EvidriloApp(
                 else -> {
                     projectAiRequestToken = null
                     projectAiScaffoldState = result.toProjectAiScaffoldUiState()
+                    val creditOutcomeNeedsRefresh =
+                        (result is ProjectAiScaffoldGatewayResult.Unavailable &&
+                            result.code == "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN") ||
+                            (result is ProjectAiScaffoldGatewayResult.Failed && result.outcomeUnknown)
+                    if (creditOutcomeNeedsRefresh) {
+                        val credits = try {
+                            aiGateway.getCredits()
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            null
+                        }
+                        if (credits is dev.nextgen.mobile.ai.AiGatewayResult.CreditsFound &&
+                            projectAiSessionMatchesOwner(requestAccountId, currentBillingAccountId())
+                        ) {
+                            aiCredits = credits.value
+                        }
+                    }
                 }
             }
         }
@@ -1090,7 +1391,10 @@ internal fun EvidriloApp(
         val accountId = currentBillingAccountId()
         if (TEMPORARY_GUEST_MODE_ENABLED || accountId == null) {
             projectAiConsentState = ProjectAiConsentUiState.Unavailable(
-                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+                projectAiAccountRequirementMessage(
+                    guestModeEnabled = TEMPORARY_GUEST_MODE_ENABLED,
+                    consentManagement = true,
+                ),
             )
             return
         }
@@ -1117,7 +1421,10 @@ internal fun EvidriloApp(
         val accountId = currentBillingAccountId()
         if (TEMPORARY_GUEST_MODE_ENABLED || accountId == null) {
             projectAiConsentState = ProjectAiConsentUiState.Unavailable(
-                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+                projectAiAccountRequirementMessage(
+                    guestModeEnabled = TEMPORARY_GUEST_MODE_ENABLED,
+                    consentManagement = true,
+                ),
             )
             return
         }
@@ -1144,7 +1451,10 @@ internal fun EvidriloApp(
         val accountId = currentBillingAccountId()
         if (TEMPORARY_GUEST_MODE_ENABLED || accountId == null) {
             projectAiConsentState = ProjectAiConsentUiState.Unavailable(
-                "Project AI consent management is paused in guest mode. Local project work remains available; no context was sent.",
+                projectAiAccountRequirementMessage(
+                    guestModeEnabled = TEMPORARY_GUEST_MODE_ENABLED,
+                    consentManagement = true,
+                ),
             )
             return
         }
@@ -1168,6 +1478,643 @@ internal fun EvidriloApp(
         }
     }
 
+    fun finishProjectAiStageAssistRequest(
+        result: ProjectAiStageAssistResult,
+        accountId: String,
+        identity: ProjectAiStageAssistContextIdentity,
+        stageTitle: String,
+        request: ProjectAiStageAssistRequest,
+        idempotencyKey: String,
+        consentGeneration: Long,
+        uiRequestToken: String,
+    ) {
+        if (projectAiStageAssistRequestToken != uiRequestToken) return
+        projectAiStageAssistRequestToken = null
+        val accountStillMatches = projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+        projectAiStageAssistState = when (result) {
+            is ProjectAiStageAssistResult.Preview -> {
+                val preview = result.value
+                if (preview.projectId != request.projectId || preview.baseProjectRevision != request.baseProjectRevision ||
+                    preview.projectBindingGeneration != request.baseProjectBindingGeneration ||
+                    preview.consentGeneration.toLong() != consentGeneration || preview.stageId != request.stageId ||
+                    preview.operationId != request.operationId || preview.templateId != request.templateId ||
+                    preview.templateVersion != request.templateVersion
+                ) {
+                    ProjectAiStageAssistUiState.Rejected(
+                        "The server response did not match the selected project revision. It was not applied.",
+                        identity,
+                    )
+                } else {
+                    // Keep a response bound to its originating account/revision even if either
+                    // changed while the request was in flight. The panel hides cross-account
+                    // content and exposes same-account stale previews only for dismissal.
+                    ProjectAiStageAssistUiState.Preview(
+                        ProjectAiStageAssistSession(
+                            accountId = accountId,
+                            projectId = request.projectId,
+                            templateId = request.templateId,
+                            templateVersion = request.templateVersion,
+                            projectRevision = request.baseProjectRevision,
+                            bindingGeneration = request.baseProjectBindingGeneration,
+                            stageId = request.stageId,
+                            operationId = request.operationId,
+                            selectedFieldValues = request.selectedFieldValues,
+                            selectedEvidence = request.selectedEvidence,
+                            preview = preview,
+                        ),
+                    )
+                }
+            }
+            is ProjectAiStageAssistResult.Deferred -> if (result.reason == ProjectAiStageAssistDeferredReason.AUTH_REQUIRED ||
+                result.reason == ProjectAiStageAssistDeferredReason.SESSION_EXPIRED
+            ) {
+                ProjectAiStageAssistUiState.Unavailable(
+                    "The verified account session is unavailable. No suggestion was applied; manual work remains available.",
+                    identity,
+                )
+            } else {
+                ProjectAiStageAssistUiState.Unavailable("Project AI is not configured for this request.", identity)
+            }
+            is ProjectAiStageAssistResult.Unavailable -> {
+                if (result.code == "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN" && accountStillMatches) {
+                    accountScope.launch {
+                        val credits = try { aiGateway.getCredits() } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) { null }
+                        if (credits is AiGatewayResult.CreditsFound &&
+                            projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+                        ) aiCredits = credits.value
+                    }
+                }
+                ProjectAiStageAssistUiState.Unavailable(
+                    if (result.code == "PROJECT_AI_USAGE_SETTLEMENT_UNKNOWN") {
+                        "Project AI could not confirm the credit settlement. Check your shared balance before retrying; the project was not changed."
+                    } else {
+                        "Project AI is unavailable (${result.code}). Your saved project is unchanged; continue manually or retry later."
+                    },
+                    identity,
+                )
+            }
+            is ProjectAiStageAssistResult.Rejected -> {
+                val replayConflict = result.code in setOf("PROJECT_AI_REQUEST_REPLAYED", "PROJECT_AI_REQUEST_IN_PROGRESS")
+                if (replayConflict) {
+                    if (accountStillMatches) {
+                        accountScope.launch {
+                            val credits = try { aiGateway.getCredits() } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (_: Exception) { null }
+                            if (credits is AiGatewayResult.CreditsFound &&
+                                projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+                            ) aiCredits = credits.value
+                        }
+                    }
+                    ProjectAiStageAssistUiState.OutcomeUnknown(
+                        accountId = accountId,
+                        context = identity,
+                        stageTitle = stageTitle,
+                        request = request,
+                        idempotencyKey = idempotencyKey,
+                        consentGeneration = consentGeneration,
+                    )
+                } else {
+                    if (accountStillMatches) {
+                        result.creditCost?.let { cost ->
+                            studentProjectNotice = "Consent or project state changed after provider processing. The response was withheld; actual provider usage cost $cost shared AI credit${if (cost == 1) "" else "s"}. No project change was applied."
+                            refreshProjectAiActivity(request.projectId)
+                            accountScope.launch {
+                                val credits = try { aiGateway.getCredits() } catch (cancellation: CancellationException) {
+                                    throw cancellation
+                                } catch (_: Exception) { null }
+                                if (credits is AiGatewayResult.CreditsFound &&
+                                    projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+                                ) aiCredits = credits.value
+                            }
+                        }
+                    }
+                    ProjectAiStageAssistUiState.Rejected(
+                        if (result.creditCost != null) {
+                            "The response was withheld because consent or the project changed during processing. ${result.creditCost} credit${if (result.creditCost == 1) "" else "s"} was charged for verified provider usage; no project change was applied."
+                        } else {
+                            "Project AI rejected this request (${result.code}). Your saved project is unchanged."
+                        },
+                        identity,
+                    )
+                }
+            }
+            is ProjectAiStageAssistResult.Failed -> if (result.outcomeUnknown || result.sameIntentReplayAllowed) {
+                if (accountStillMatches) {
+                    accountScope.launch {
+                        val credits = try { aiGateway.getCredits() } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) { null }
+                        if (credits is AiGatewayResult.CreditsFound &&
+                            projectAiSessionMatchesOwner(accountId, currentBillingAccountId())
+                        ) aiCredits = credits.value
+                    }
+                }
+                ProjectAiStageAssistUiState.OutcomeUnknown(
+                    accountId = accountId,
+                    context = identity,
+                    stageTitle = stageTitle,
+                    request = request,
+                    idempotencyKey = result.idempotencyKey,
+                    consentGeneration = consentGeneration,
+                )
+            } else {
+                ProjectAiStageAssistUiState.Unavailable(
+                    "The request could not be completed (${result.code}). Your saved project is unchanged.",
+                    identity,
+                )
+            }
+        }
+    }
+
+    fun requestProjectAiStageAssist(
+        stageId: String,
+        operationId: String,
+        selectedFields: Map<String, String>,
+        selectedEvidence: List<ProjectAiStageAssistSelectedEvidence>,
+    ) {
+        val draft = activeStudentProjectDraft
+        val template = draft?.templateSnapshot
+        val signedIn = accountSession as? AccountSession.SignedIn
+        val accountId = signedIn?.account?.accountId
+        val unresolvedOwner = when (val current = projectAiStageAssistState) {
+            is ProjectAiStageAssistUiState.Requesting -> current.context.accountId
+            is ProjectAiStageAssistUiState.OutcomeUnknown -> current.accountId
+            is ProjectAiStageAssistUiState.Preview -> current.session.accountId
+            is ProjectAiStageAssistUiState.Settling -> current.context?.accountId
+            is ProjectAiStageAssistUiState.SettlementFailed -> current.session.accountId
+            ProjectAiStageAssistUiState.Idle,
+            is ProjectAiStageAssistUiState.Unavailable,
+            is ProjectAiStageAssistUiState.Rejected,
+            -> null
+        }
+        if (unresolvedOwner != null) {
+            studentProjectNotice = if (unresolvedOwner == accountId) {
+                "Review, apply, or dismiss the previous Project AI result before requesting another one."
+            } else {
+                "A prior Project AI result is private to another signed-in account. Sign in to that account to reconcile it before starting another Project AI request."
+            }
+            return
+        }
+        if (TEMPORARY_GUEST_MODE_ENABLED || !accountRestoreComplete || signedIn == null ||
+            accountId == null || !signedIn.account.emailVerified
+        ) {
+            projectAiStageAssistState = ProjectAiStageAssistUiState.Unavailable(
+                "Sign in with a verified account before using Project AI. Your project remains local and manual editing is still available.",
+            )
+            return
+        }
+        if (draft == null || template == null ||
+            template.publication != dev.nextgen.mobile.domain.project.ProjectTemplatePublication.PUBLISHED ||
+            studentProjectEditorIsDirty
+        ) {
+            projectAiStageAssistState = ProjectAiStageAssistUiState.Unavailable(
+                "Save a project created from a published method before requesting stage assistance. No context was sent.",
+            )
+            return
+        }
+        val stage = template.steps.singleOrNull { it.id == stageId }
+        val operation = stage?.aiOperations?.singleOrNull { it.id == operationId }
+        if (operation == null || selectedFields.isEmpty() && selectedEvidence.isEmpty() ||
+            selectedFields.keys.any { it !in operation.inputFieldIds } ||
+            selectedFields.values.any { it.length > 8_000 || '\u0000' in it } ||
+            selectedEvidence.size > 32 || selectedEvidence.map(ProjectAiStageAssistSelectedEvidence::id).distinct().size != selectedEvidence.size
+        ) {
+            projectAiStageAssistState = ProjectAiStageAssistUiState.Rejected(
+                "The selected project context does not match this stage. Review the selections and try again.",
+            )
+            return
+        }
+        val identity = ProjectAiStageAssistContextIdentity(
+            accountId = accountId,
+            projectId = draft.id,
+            templateId = template.id,
+            templateVersion = template.version,
+            projectRevision = draft.revision,
+            stageId = stageId,
+            operationId = operationId,
+        )
+        val requestToken = newAnalyticsEventId()
+        projectAiStageAssistRequestToken = requestToken
+        projectAiStageAssistState = ProjectAiStageAssistUiState.Requesting(identity, stage.title)
+        accountScope.launch {
+            val consentResult = try {
+                projectAiConsentGateway.refresh()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiStageAssistRequestToken != requestToken) return@launch
+            if (!projectAiSessionMatchesOwner(accountId, currentBillingAccountId())) {
+                projectAiStageAssistRequestToken = null
+                projectAiStageAssistState = ProjectAiStageAssistUiState.Idle
+                return@launch
+            }
+            val consent = (consentResult as? ProjectAiConsentGatewayResult.State)?.value
+            if (consent == null || !consent.granted || consent.policyVersion != PROJECT_AI_CONSENT_POLICY_VERSION) {
+                projectAiConsentState = consentResult.toProjectAiConsentUiState()
+                projectAiStageAssistState = ProjectAiStageAssistUiState.Unavailable(
+                    "Current account consent could not be verified. No project content was sent; review consent and retry.",
+                    identity,
+                )
+                projectAiStageAssistRequestToken = null
+                return@launch
+            }
+            projectAiConsentState = ProjectAiConsentUiState.Granted
+            val installationId = projectAiInstallationId
+            if (installationId == null) {
+                projectAiStageAssistState = ProjectAiStageAssistUiState.Unavailable(
+                    "Secure installation storage is unavailable. No project content was sent.",
+                    identity,
+                )
+                projectAiStageAssistRequestToken = null
+                return@launch
+            }
+            val selectedEvidenceIds = selectedEvidence.map(ProjectAiStageAssistSelectedEvidence::id).sorted()
+            val binding = try {
+                projectAiStageAssistGateway.registerLocalProjectContext(
+                    projectId = draft.id,
+                    installationId = installationId,
+                    templateId = template.id,
+                    templateVersion = template.version,
+                    projectRevision = draft.revision,
+                    availableEvidenceIds = selectedEvidenceIds,
+                    explicitlyConfirmedForRequest = true,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiLocalContextBindingResult.Unavailable("PROJECT_AI_CONTEXT_SYNC_FAILED")
+            }
+            if (projectAiStageAssistRequestToken != requestToken) return@launch
+            if (!projectAiSessionMatchesOwner(accountId, currentBillingAccountId()) ||
+                activeStudentProjectDraft?.let { it.id == draft.id && it.revision == draft.revision } != true ||
+                studentProjectEditorIsDirty
+            ) {
+                projectAiStageAssistRequestToken = null
+                projectAiStageAssistState = ProjectAiStageAssistUiState.Idle
+                return@launch
+            }
+            val registered = binding as? ProjectAiLocalContextBindingResult.Registered
+            if (registered == null || registered.projectRevision != draft.revision) {
+                projectAiStageAssistState = ProjectAiStageAssistUiState.Unavailable(
+                    when (binding) {
+                        is ProjectAiLocalContextBindingResult.Deferred -> "A verified account session is required to register this project revision. No AI request was sent."
+                        is ProjectAiLocalContextBindingResult.Unavailable -> "The server could not securely register the selected project context. No AI request was sent."
+                        is ProjectAiLocalContextBindingResult.Rejected -> "The server rejected this project context (${binding.code}). Save or review the project and retry."
+                        is ProjectAiLocalContextBindingResult.Registered -> "The registered project revision did not match the current revision. No AI request was sent."
+                    },
+                    identity,
+                )
+                projectAiStageAssistRequestToken = null
+                return@launch
+            }
+            val request = ProjectAiStageAssistRequest(
+                installationId = installationId,
+                projectId = draft.id,
+                templateId = template.id,
+                templateVersion = template.version,
+                stageId = stageId,
+                operationId = operationId,
+                baseProjectRevision = draft.revision,
+                baseProjectBindingGeneration = registered.bindingGeneration,
+                selectedFieldValues = selectedFields.toMap(),
+                selectedEvidence = selectedEvidence.toList(),
+                locale = "en",
+            )
+            val result = try {
+                projectAiStageAssistGateway.generatePreview(
+                    request = request,
+                    idempotencyKey = requestToken,
+                    explicitlyConfirmedForRequest = true,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiStageAssistResult.Unavailable("PROJECT_AI_UNAVAILABLE")
+            }
+            finishProjectAiStageAssistRequest(
+                result = result,
+                accountId = accountId,
+                identity = identity,
+                stageTitle = stage.title,
+                request = request,
+                idempotencyKey = requestToken,
+                consentGeneration = consent.generation,
+                uiRequestToken = requestToken,
+            )
+        }
+    }
+
+    fun retryProjectAiStageAssistRequest(unknown: ProjectAiStageAssistUiState.OutcomeUnknown) {
+        val signedIn = accountSession as? AccountSession.SignedIn
+        if (unknown.idempotencyKey == null || signedIn?.account?.emailVerified != true ||
+            !projectAiSessionMatchesOwner(unknown.accountId, currentBillingAccountId()) ||
+            projectAiStageAssistState != unknown || projectAiStageAssistRequestToken != null
+        ) return
+
+        val uiRequestToken = newAnalyticsEventId()
+        projectAiStageAssistRequestToken = uiRequestToken
+        projectAiStageAssistState = ProjectAiStageAssistUiState.Requesting(unknown.context, unknown.stageTitle)
+        accountScope.launch {
+            val consentResult = try {
+                projectAiConsentGateway.refresh()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            if (projectAiStageAssistRequestToken != uiRequestToken) return@launch
+            val consent = (consentResult as? ProjectAiConsentGatewayResult.State)?.value
+            if (!projectAiSessionMatchesOwner(unknown.accountId, currentBillingAccountId()) ||
+                consent == null || !consent.granted || consent.policyVersion != PROJECT_AI_CONSENT_POLICY_VERSION ||
+                consent.generation != unknown.consentGeneration
+            ) {
+                projectAiStageAssistRequestToken = null
+                projectAiConsentState = consentResult.toProjectAiConsentUiState()
+                projectAiStageAssistState = unknown
+                return@launch
+            }
+            projectAiConsentState = ProjectAiConsentUiState.Granted
+            val result = try {
+                projectAiStageAssistGateway.generatePreview(
+                    request = unknown.request,
+                    idempotencyKey = requireNotNull(unknown.idempotencyKey),
+                    explicitlyConfirmedForRequest = true,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiStageAssistResult.Failed(
+                    "PROJECT_AI_OUTCOME_UNKNOWN",
+                    retryable = true,
+                    outcomeUnknown = true,
+                    sameIntentReplayAllowed = true,
+                    idempotencyKey = unknown.idempotencyKey,
+                )
+            }
+            finishProjectAiStageAssistRequest(
+                result = result,
+                accountId = unknown.accountId,
+                identity = unknown.context,
+                stageTitle = unknown.stageTitle,
+                request = unknown.request,
+                idempotencyKey = unknown.idempotencyKey,
+                consentGeneration = consent.generation,
+                uiRequestToken = uiRequestToken,
+            )
+        }
+    }
+
+    fun settleProjectAiStageAssist(
+        session: ProjectAiStageAssistSession,
+        outcome: ProjectAiStageAssistOutcome,
+        resultProjectRevision: Int? = null,
+        resultBindingGeneration: Long? = null,
+        message: String = "Recording this AI suggestion outcome…",
+    ) {
+        if (!projectAiSessionMatchesOwner(session.accountId, currentBillingAccountId())) {
+            projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                session, outcome, resultProjectRevision, resultBindingGeneration,
+                "The original account must be active to reconcile this AI activity.", canRetry = true,
+            )
+            return
+        }
+        projectAiStageAssistState = ProjectAiStageAssistUiState.Settling(message, session.contextIdentity)
+        accountScope.launch {
+            var finalBindingGeneration = resultBindingGeneration
+            if (outcome == ProjectAiStageAssistOutcome.APPLIED || outcome == ProjectAiStageAssistOutcome.EDITED) {
+                val resultDraft = activeStudentProjectDraft?.takeIf {
+                    it.id == session.projectId && it.revision == resultProjectRevision
+                }
+                if (resultDraft == null) {
+                    projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                        session, ProjectAiStageAssistOutcome.STALE, null, null,
+                        "The applied revision is no longer the current local project revision.", canRetry = false,
+                    )
+                    return@launch
+                }
+                if (finalBindingGeneration == null) {
+                    val binding = try {
+                        projectAiStageAssistGateway.registerLocalProjectContext(
+                            projectId = resultDraft.id,
+                            installationId = projectAiInstallationId ?: return@launch,
+                            templateId = session.templateId,
+                            templateVersion = session.templateVersion,
+                            projectRevision = resultDraft.revision,
+                            availableEvidenceIds = session.selectedEvidence.map(ProjectAiStageAssistSelectedEvidence::id).sorted(),
+                            explicitlyConfirmedForRequest = true,
+                        )
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        ProjectAiLocalContextBindingResult.Unavailable("PROJECT_AI_CONTEXT_SYNC_FAILED")
+                    }
+                    finalBindingGeneration = (binding as? ProjectAiLocalContextBindingResult.Registered)?.bindingGeneration
+                }
+                if (finalBindingGeneration == null) {
+                    projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                        session, outcome, resultProjectRevision, null,
+                        "The suggestion is saved locally, but the server could not register its new revision. Retry to reconcile activity; the token-based preview charge is already settled.",
+                        canRetry = true,
+                    )
+                    return@launch
+                }
+            }
+            val settled = try {
+                projectAiStageAssistGateway.settle(
+                    requestId = session.preview.requestId,
+                    installationId = projectAiInstallationId ?: return@launch,
+                    outcome = outcome,
+                    baseProjectRevision = session.projectRevision,
+                    baseProjectBindingGeneration = session.bindingGeneration,
+                    resultProjectRevision = resultProjectRevision,
+                    resultProjectBindingGeneration = finalBindingGeneration,
+                    expectedCreditCost = session.preview.creditCost,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiStageAssistSettlementResult.Unavailable("PROJECT_AI_SETTLEMENT_UNAVAILABLE")
+            }
+            if (!projectAiSessionMatchesOwner(session.accountId, currentBillingAccountId())) {
+                projectAiStageAssistState = if (settled is ProjectAiStageAssistSettlementResult.Settled) {
+                    ProjectAiStageAssistUiState.Idle
+                } else {
+                    ProjectAiStageAssistUiState.SettlementFailed(
+                        session, outcome, resultProjectRevision, finalBindingGeneration,
+                        "The original account must be active to reconcile this AI activity outcome.", canRetry = true,
+                    )
+                }
+                return@launch
+            }
+            when (settled) {
+                is ProjectAiStageAssistSettlementResult.Settled -> {
+                    projectAiStageAssistState = ProjectAiStageAssistUiState.Idle
+                    studentProjectNotice = when (settled.outcome) {
+                        ProjectAiStageAssistOutcome.APPLIED, ProjectAiStageAssistOutcome.EDITED ->
+                            "Selected AI suggestions were saved as a new project revision. ${settled.creditCost} shared AI credit${if (settled.creditCost == 1) "" else "s"} reflect actual provider usage."
+                        ProjectAiStageAssistOutcome.DISMISSED, ProjectAiStageAssistOutcome.STALE ->
+                            "AI suggestions were not applied. The valid preview cost ${settled.creditCost} credit${if (settled.creditCost == 1) "" else "s"}; dismissal does not reverse provider usage."
+                    }
+                    refreshProjectAiActivity(session.projectId)
+                    val credits = try { aiGateway.getCredits() } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) { null }
+                    if (credits is AiGatewayResult.CreditsFound &&
+                        projectAiSessionMatchesOwner(session.accountId, currentBillingAccountId())
+                    ) aiCredits = credits.value
+                }
+                is ProjectAiStageAssistSettlementResult.Deferred -> projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                    session, outcome, resultProjectRevision, finalBindingGeneration,
+                    "A verified account session is required to record the AI activity. The preview charge is already settled.", canRetry = true,
+                )
+                is ProjectAiStageAssistSettlementResult.Unavailable -> projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                    session, outcome, resultProjectRevision, finalBindingGeneration,
+                    "The AI activity could not be recorded (${settled.code}). The preview charge is already settled.", canRetry = true,
+                )
+                is ProjectAiStageAssistSettlementResult.Rejected -> projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                    session, outcome, resultProjectRevision, finalBindingGeneration,
+                    "The server rejected the AI activity outcome (${settled.code}). Your local project remains unchanged unless it was already applied.", canRetry = false,
+                )
+                is ProjectAiStageAssistSettlementResult.Failed -> projectAiStageAssistState = ProjectAiStageAssistUiState.SettlementFailed(
+                    session, outcome, resultProjectRevision, finalBindingGeneration,
+                    "The AI activity outcome is uncertain (${settled.code}); its preview charge is already settled.",
+                    canRetry = settled.retryable || settled.sameIntentReplayAllowed,
+                )
+            }
+        }
+    }
+
+    fun applyProjectAiStageAssist(
+        session: ProjectAiStageAssistSession,
+        selectedProposalIds: Set<String>,
+        editedValues: Map<String, String>,
+    ) {
+        val current = activeStudentProjectDraft
+        val proposals = session.preview.items.filter { it.kind == dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistItemKind.PROPOSAL }
+        val selected = proposals.filter { it.id in selectedProposalIds }
+        val targets = selected.mapNotNull { it.targetFieldId }
+        val currentTemplate = current?.templateSnapshot
+        if (!projectAiSessionMatchesOwner(session.accountId, currentBillingAccountId()) || current == null ||
+            current.id != session.projectId || current.revision != session.projectRevision ||
+            currentTemplate?.id != session.templateId || currentTemplate?.version != session.templateVersion ||
+            studentProjectEditorIsDirty || selected.isEmpty() || selected.size != selectedProposalIds.size ||
+            targets.size != selected.size || targets.distinct().size != targets.size
+        ) {
+            settleProjectAiStageAssist(session, ProjectAiStageAssistOutcome.STALE, message = "The saved project changed. The AI suggestions are stale and will not be applied.")
+            return
+        }
+        val beforeValues = selected.associate { item -> item.targetFieldId!! to item.beforeValue.orEmpty() }
+        val confirmedValues = selected.associate { item -> item.targetFieldId!! to editedValues[item.id].orEmpty() }
+        if (beforeValues.keys != confirmedValues.keys || beforeValues.any { (fieldId, value) ->
+                session.selectedFieldValues[fieldId] != value
+            }
+        ) {
+            projectAiStageAssistState = ProjectAiStageAssistUiState.Rejected(
+                "The preview no longer matches the selected saved fields. Nothing was applied.", session.contextIdentity,
+            )
+            settleProjectAiStageAssist(session, ProjectAiStageAssistOutcome.STALE)
+            return
+        }
+        projectAiStageAssistState = ProjectAiStageAssistUiState.Settling(
+            "Rechecking consent and saving only the selected fields…", session.contextIdentity,
+        )
+        accountScope.launch {
+            val consentResult = try { projectAiConsentGateway.refresh() } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiConsentGatewayResult.Failed("PROJECT_AI_CONSENT_UNAVAILABLE", retryable = true)
+            }
+            val consent = (consentResult as? ProjectAiConsentGatewayResult.State)?.value
+            val latest = activeStudentProjectDraft
+            if (consent == null || !consent.granted || consent.policyVersion != PROJECT_AI_CONSENT_POLICY_VERSION ||
+                consent.generation != session.preview.consentGeneration.toLong() ||
+                !projectAiSessionMatchesOwner(session.accountId, currentBillingAccountId()) || latest == null ||
+                latest.id != session.projectId || latest.revision != session.projectRevision || studentProjectEditorIsDirty
+            ) {
+                projectAiConsentState = consentResult.toProjectAiConsentUiState()
+                settleProjectAiStageAssist(
+                    session,
+                    ProjectAiStageAssistOutcome.STALE,
+                    message = "Consent or the saved project changed. No AI suggestion was applied.",
+                )
+                return@launch
+            }
+            val result = studentProjectDraftFlow.applyAiStageAssistToProject(
+                projectId = session.projectId,
+                expectedTemplateId = session.templateId,
+                expectedTemplateVersion = session.templateVersion,
+                stageId = session.stageId,
+                operationId = session.operationId,
+                expectedBaseRevision = session.projectRevision,
+                expectedBeforeValues = beforeValues,
+                confirmedValues = confirmedValues,
+            )
+            if (result !is StudentProjectDraftFlowResult.Value) {
+                studentProjectSaveError = studentProjectDraftFlowMessage(result)
+                settleProjectAiStageAssist(session, ProjectAiStageAssistOutcome.STALE, message = "The project reducer rejected a stale or unsupported proposal; nothing was applied.")
+                return@launch
+            }
+            activeStudentProjectDraft = result.value
+            replaceStudentProjectInList(result.value)
+            studentProjectEditorIsDirty = false
+            studentProjectSaveError = null
+            val binding = try {
+                projectAiStageAssistGateway.registerLocalProjectContext(
+                    projectId = result.value.id,
+                    installationId = projectAiInstallationId ?: return@launch,
+                    templateId = session.templateId,
+                    templateVersion = session.templateVersion,
+                    projectRevision = result.value.revision,
+                    availableEvidenceIds = session.selectedEvidence.map(ProjectAiStageAssistSelectedEvidence::id).sorted(),
+                    explicitlyConfirmedForRequest = true,
+                )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                ProjectAiLocalContextBindingResult.Unavailable("PROJECT_AI_CONTEXT_SYNC_FAILED")
+            }
+            val bindingGeneration = (binding as? ProjectAiLocalContextBindingResult.Registered)
+                ?.takeIf { it.projectRevision == result.value.revision }
+                ?.bindingGeneration
+            settleProjectAiStageAssist(
+                session = session,
+                outcome = if (selected.any { editedValues[it.id].orEmpty() != it.afterValue.orEmpty() }) {
+                    ProjectAiStageAssistOutcome.EDITED
+                } else ProjectAiStageAssistOutcome.APPLIED,
+                resultProjectRevision = result.value.revision,
+                resultBindingGeneration = bindingGeneration,
+                message = "The selected suggestion is saved locally; recording its activity and revision…",
+            )
+        }
+    }
+
+    fun dismissProjectAiStageAssist(session: ProjectAiStageAssistSession) {
+        val currentDraft = activeStudentProjectDraft
+        val outcome = if (currentDraft?.id != session.projectId ||
+            currentDraft.revision != session.projectRevision || studentProjectEditorIsDirty
+        ) ProjectAiStageAssistOutcome.STALE else ProjectAiStageAssistOutcome.DISMISSED
+        settleProjectAiStageAssist(
+            session,
+            outcome,
+            message = "Recording dismissal…",
+        )
+    }
+
+    fun retryProjectAiStageAssistSettlement(failed: ProjectAiStageAssistUiState.SettlementFailed) {
+        settleProjectAiStageAssist(
+            failed.session,
+            failed.outcome,
+            failed.resultProjectRevision,
+            failed.resultBindingGeneration,
+            "Retrying the same activity settlement…",
+        )
+    }
+
     fun createStudentProjectWithAi(
         template: dev.nextgen.mobile.domain.project.ProjectTemplateDefinition,
         title: String,
@@ -1182,7 +2129,7 @@ internal fun EvidriloApp(
             !projectAiSessionMatchesOwner(projectAiBoundAccountId, currentBillingAccountId()) ||
             preview == null || preview.requestId != requestId || preview.proposal != proposal || preview.creditCost != creditCost
         ) {
-            studentProjectNotice = "This AI suggestion is unavailable in local guest mode. No suggestion was applied."
+            studentProjectNotice = "This AI suggestion no longer matches the active account or project. No suggestion was applied."
             return
         }
         when (val result = studentProjectDraftFlow.startWithAiScaffold(
@@ -1224,7 +2171,7 @@ internal fun EvidriloApp(
             !projectAiSessionMatchesOwner(projectAiBoundAccountId, currentBillingAccountId()) ||
             preview == null || preview.requestId != requestId || preview.proposal != proposal || preview.creditCost != creditCost
         ) {
-            studentProjectNotice = "This AI suggestion is unavailable in local guest mode. No suggestion was applied."
+            studentProjectNotice = "This AI suggestion no longer matches the active account or project. No suggestion was applied."
             return null
         }
         val active = activeStudentProjectDraft ?: return null
@@ -1280,6 +2227,7 @@ internal fun EvidriloApp(
         evidenceRelations: List<dev.nextgen.mobile.domain.project.StudentProjectEvidenceRelation>,
         claims: List<StudentProjectClaimRecord>,
         limitationActions: List<StudentProjectLimitationActionRecord>,
+        deadlineDate: String?,
         checkpoint: Boolean = true,
     ): StudentProjectDraft? {
         if (!requireDestinationAccess(EvidriloDestination.PROJECT_EDITOR)) return null
@@ -1296,6 +2244,7 @@ internal fun EvidriloApp(
             evidenceRelations,
             claims,
             limitationActions = limitationActions,
+            deadlineChange = StudentProjectDeadlineChange.Set(deadlineDate),
             checkpoint = checkpoint,
         )) {
             is StudentProjectDraftFlowResult.Value -> {
@@ -1433,6 +2382,7 @@ internal fun EvidriloApp(
         projectAiConsentRequestGeneration += 1
         projectAiConsentState = ProjectAiConsentUiState.Unknown
         if (previousAccountId != null && previousAccountId != nextAccountId) {
+            projectAiGeneralChatRequestCoordinator.cancel()
             projectAiRequestToken = null
             projectAiRequestInFlight = false
             projectAiScaffoldState = ProjectAiScaffoldUiState.Idle
@@ -1643,6 +2593,10 @@ internal fun EvidriloApp(
             aiConversationClearState = EvidriloAiConversationClearState.Idle
         }
         aiCredits = null
+        aiCreditBalanceRequestGeneration += 1
+        aiCreditBalanceRefreshing = false
+        aiCreditBalanceFailureMessage = null
+        aiCreditBalanceCanRetry = true
         aiAssistState = if (accountBoundFeaturesEnabled && accountRestoreComplete && accountSession is AccountSession.SignedIn) {
             EvidriloAiAssistUiState.Loading
         } else {
@@ -1651,36 +2605,7 @@ internal fun EvidriloApp(
         if (!accountBoundFeaturesEnabled || !accountRestoreComplete || accountSession !is AccountSession.SignedIn) {
             return@LaunchedEffect
         }
-        when (val result = aiGateway.getCredits()) {
-            is AiGatewayResult.CreditsFound -> {
-                aiCredits = result.value
-                aiAssistState = EvidriloAiAssistUiState.Ready(result.value)
-            }
-            is AiGatewayResult.Deferred -> {
-                aiAssistState = EvidriloAiAssistUiState.Unavailable(
-                    message = "AI credits are available only to a verified account.",
-                    retryable = false,
-                )
-            }
-            is AiGatewayResult.Fallback -> {
-                aiAssistState = EvidriloAiAssistUiState.Unavailable(
-                    message = "AI credits could not be loaded; deterministic feedback remains available.",
-                    retryable = true,
-                )
-            }
-            is AiGatewayResult.Failed -> {
-                aiAssistState = EvidriloAiAssistUiState.Unavailable(
-                    message = "AI credits are temporarily unavailable; deterministic feedback remains available.",
-                    retryable = result.retryable,
-                )
-            }
-            is AiGatewayResult.AssistFound -> {
-                aiAssistState = EvidriloAiAssistUiState.Unavailable(
-                    message = "AI credits returned an unexpected response.",
-                    retryable = false,
-                )
-            }
-        }
+        refreshAiCreditBalance(updateAssistState = true)
     }
     LaunchedEffect(accountSession, accountRestoreComplete) {
         platformProgress = null
@@ -2758,11 +3683,10 @@ internal fun EvidriloApp(
             EvidriloTargetSection.PROFILE -> navigationState.selectRoot(EvidriloDestination.PROFILE)
         }
     }
+    var practiceTabletContext by remember { mutableStateOf(false) }
+    var practiceLessonOpen by remember { mutableStateOf(false) }
     val startTargetPractice: () -> Unit = {
         if (requireDestinationAccess(EvidriloDestination.PRACTICE)) {
-            if (state is ConclusionState.Intro) {
-                dispatch(ConclusionEvent.Begin)
-            }
             navigationState = navigationState.open(EvidriloDestination.PRACTICE)
         }
     }
@@ -2815,6 +3739,7 @@ internal fun EvidriloApp(
         accountSession !is AccountSession.SignedIn &&
         navigationState.current.requiresAuthenticatedFreeAccess()
     val assistantVisible = !TEMPORARY_GUEST_MODE_ENABLED &&
+        (navigationState.current != EvidriloDestination.PRACTICE || practiceTabletContext) &&
         accountRestoreComplete &&
         accountSession is AccountSession.SignedIn &&
         !onboardingPresentation.isVisible &&
@@ -2823,6 +3748,7 @@ internal fun EvidriloApp(
         !customerCenterVisible &&
         premiumState is PremiumPracticeState.Hidden &&
         navigationState.current !in setOf(
+            EvidriloDestination.HOME,
             EvidriloDestination.SETTINGS,
             EvidriloDestination.PROFILE,
             EvidriloDestination.ACCOUNT,
@@ -2835,6 +3761,40 @@ internal fun EvidriloApp(
             EvidriloDestination.PROJECTS,
             EvidriloDestination.PROJECT_EDITOR,
         )
+    val generalChatAccount = accountSession as? AccountSession.SignedIn
+    val projectAiStageAssistAccountAvailable = accountBoundFeaturesEnabled && accountRestoreComplete &&
+        generalChatAccount?.account?.emailVerified == true
+    val aiCreditBalancePresentation = presentAiCreditBalance(
+        accountReady = accountBoundFeaturesEnabled && accountRestoreComplete &&
+            generalChatAccount?.account?.emailVerified == true,
+        refreshing = aiCreditBalanceRefreshing,
+        credits = aiCredits,
+        failureMessage = aiCreditBalanceFailureMessage,
+        canRetry = aiCreditBalanceCanRetry,
+    )
+    val projectAiStageAssistAccountMessage = when {
+        !accountRestoreComplete -> "Checking the secure account session…"
+        !accountBoundFeaturesEnabled -> "AI is paused in local guest mode. Your project stays available offline."
+        generalChatAccount == null -> "Sign in with a verified account to use Project AI. Manual project work remains available."
+        !generalChatAccount.account.emailVerified -> "Verify your email before sending selected project context to AI."
+        else -> null
+    }
+    val generalChatAccessMessage = when {
+        !accountRestoreComplete -> "Checking your secure account session…"
+        !accountBoundFeaturesEnabled -> "AI is paused in local guest mode. Projects and evidence remain available on this device."
+        generalChatAccount == null -> "Sign in with a verified account to use AI. The rest of Evidrilo remains available without sign-in."
+        !generalChatAccount.account.emailVerified -> "Verify your email before sending a question to AI."
+        else -> null
+    }
+    val generalChatCanOpenAccount = accountBoundFeaturesEnabled &&
+        accountRestoreComplete &&
+        (generalChatAccount == null || !generalChatAccount.account.emailVerified)
+    val generalChatVisible = navigationState.current == EvidriloDestination.HOME &&
+        !onboardingPresentation.isVisible &&
+        !accountGateVisible &&
+        !revenueCatPaywallVisible &&
+        !customerCenterVisible &&
+        premiumState is PremiumPracticeState.Hidden
     val assistantAiState = if (aiAssistRequestContextKey != null &&
         aiAssistRequestContextKey != aiAssistantContextKey
     ) {
@@ -2848,6 +3808,16 @@ internal fun EvidriloApp(
         aiAssistState
     }
     Box(modifier = Modifier.fillMaxSize()) {
+    EvidriloWorkspaceShell(
+        destination = navigationState.current,
+        showNavigation = accountRestoreComplete && !onboardingPresentation.isVisible && !accountGateVisible && !practiceLessonOpen,
+        onSelect = { destination ->
+            if (requireDestinationAccess(destination)) {
+                releaseActiveProjectAiPreview()
+                navigationState = navigationState.resetToHome().open(destination)
+            }
+        },
+    ) {
     if (!accountRestoreComplete) {
         EvidriloLoadingScreen(mode = EvidriloLoadingMode.APP_BOOTSTRAP)
     } else if (onboardingPresentation.isVisible) {
@@ -2874,8 +3844,10 @@ internal fun EvidriloApp(
             storageNotice = onboardingStorageStatus.notice(),
         )
     } else if (revenueCatPaywallVisible) {
+        EvidriloBackGesture("Close purchase options", closeManagedBillingUi)
         RevenueCatManagedPaywall(onDismiss = closeManagedBillingUi)
     } else if (customerCenterVisible) {
+        EvidriloBackGesture("Close subscription management", closeManagedBillingUi)
         RevenueCatCustomerCenter(onDismiss = closeManagedBillingUi)
     } else if (premiumState !is PremiumPracticeState.Hidden) {
         EvidriloPremiumSurface(
@@ -2976,6 +3948,7 @@ internal fun EvidriloApp(
                 projectTemplateDetailState = ProjectTemplateRemoteUiState.NotRequested
                 navigationState = navigationState.open(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
             },
+            onStartStarterProject = ::startStarterStudentProject,
             onStartBlankProject = ::beginManualProjectFromHome,
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
@@ -2986,9 +3959,11 @@ internal fun EvidriloApp(
             state = projectTemplateDetailState,
             notice = studentProjectNotice,
             projectAiAccountKey = currentBillingAccountId(),
+            aiCreditBalance = aiCreditBalancePresentation,
             projectAiState = projectAiScaffoldState,
             projectAiConsentState = projectAiConsentState,
             onRetry = { projectTemplateDetailReload += 1 },
+            onRefreshAiCreditBalance = ::refreshAiCreditBalance,
             onRefreshProjectAiConsent = ::refreshProjectAiConsent,
             onGrantProjectAiConsent = ::grantProjectAiConsent,
             onRevokeProjectAiConsent = ::revokeProjectAiConsent,
@@ -3053,6 +4028,7 @@ internal fun EvidriloApp(
                 draft = draft,
                 attachmentStore = studentProjectAttachmentStore,
                 projectAiAccountKey = currentBillingAccountId(),
+                aiCreditBalance = aiCreditBalancePresentation,
                 projectAiState = projectAiScaffoldState,
                 projectAiConsentState = projectAiConsentState,
                 notice = studentProjectNotice,
@@ -3060,20 +4036,23 @@ internal fun EvidriloApp(
                 showExitConfirmation = studentProjectExitConfirmation,
                 saveError = studentProjectSaveError,
                 onDirtyChanged = { studentProjectEditorIsDirty = it },
-                onSave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions ->
-                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions)
+                onSave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, deadlineDate ->
+                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, deadlineDate)
                 },
-                onAutosave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions ->
-                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, checkpoint = false)
+                onAutosave = { title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, deadlineDate ->
+                    saveStudentProject(title, values, sources, themes, claimLinks, evidence, findings, relations, claims, limitationActions, deadlineDate, checkpoint = false)
                 },
                 onAddAttachment = ::addStudentProjectAttachment,
                 onRemoveAttachment = ::removeStudentProjectAttachment,
                 onRestoreRevision = ::restoreStudentProjectRevision,
+                onRefreshAiCreditBalance = ::refreshAiCreditBalance,
                 onRefreshProjectAiConsent = ::refreshProjectAiConsent,
                 onGrantProjectAiConsent = ::grantProjectAiConsent,
                 onRevokeProjectAiConsent = ::revokeProjectAiConsent,
                 onRequestProjectAi = { projectId, brief, question, fields, revision, projectDataConsent ->
-                    draft.templateSnapshot?.let { template ->
+                    draft.templateSnapshot
+                        ?.takeIf { it.publication == dev.nextgen.mobile.domain.project.ProjectTemplatePublication.PUBLISHED }
+                        ?.let { template ->
                         requestProjectAiScaffold(
                             template,
                             brief,
@@ -3088,6 +4067,17 @@ internal fun EvidriloApp(
                 onApplyProjectAi = ::applyProjectAiScaffold,
                 onDiscardProjectAiPreview = ::discardProjectAiPreview,
                 onRetryProjectAiSettlement = ::retryProjectAiSettlement,
+                projectAiStageAssistState = projectAiStageAssistState,
+                projectAiAccountAvailable = projectAiStageAssistAccountAvailable,
+                projectAiAccountMessage = projectAiStageAssistAccountMessage,
+                onRequestProjectAiStageAssist = ::requestProjectAiStageAssist,
+                onApplyProjectAiStageAssist = ::applyProjectAiStageAssist,
+                onDismissProjectAiStageAssist = ::dismissProjectAiStageAssist,
+                onRetryProjectAiStageAssistSettlement = ::retryProjectAiStageAssistSettlement,
+                projectAiActivityHistoryState = projectAiActivityHistoryState,
+                onRefreshProjectAiActivity = ::refreshProjectAiActivity,
+                onLoadMoreProjectAiActivity = ::loadMoreProjectAiActivity,
+                onRetryUnknownProjectAiStageAssist = ::retryProjectAiStageAssistRequest,
                 onRequestClose = {
                     if (studentProjectEditorIsDirty) {
                         studentProjectExitConfirmation = true
@@ -3399,14 +4389,7 @@ internal fun EvidriloApp(
                 else -> "Home"
             },
             onBack = { navigationState = navigationState.back() },
-            onOpenPractice = {
-                if (requireDestinationAccess(EvidriloDestination.PRACTICE)) {
-                    if (state is ConclusionState.Intro) {
-                        dispatch(ConclusionEvent.Begin)
-                    }
-                    navigationState = navigationState.open(EvidriloDestination.PRACTICE)
-                }
-            },
+            onOpenPractice = startTargetPractice,
             onReplayOnboarding = ::requestGetStartedTour,
             audioState = audioState,
             onListen = { playNarration(AudioNarrationId.GUIDE, AudioNarrationCopy.guide()) },
@@ -3507,6 +4490,28 @@ internal fun EvidriloApp(
             onBack = { navigationState = navigationState.back() },
             backLabel = "Settings",
         )
+    } else if (navigationState.current == EvidriloDestination.PRACTICE) {
+        EvidriloPracticeCourseScreen(
+            onLessonVisibilityChanged = { practiceLessonOpen = it },
+            tabletState = state,
+            onTabletEvent = { event -> dispatch(event) },
+            tabletCase = baseCase,
+            onExit = returnToHome,
+            onOpenProjects = {
+                releaseActiveProjectAiPreview()
+                navigationState = navigationState.open(EvidriloDestination.PROJECTS)
+            },
+            onTabletContextChanged = { practiceTabletContext = it },
+            onOpenTabletHistory = {
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
+            },
+            onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
+            tabletAudioControls = {
+                EvidriloAudioListenControl(audioState, {
+                    playNarration(AudioNarrationId.CASE_FACT, AudioNarrationCopy.case(case))
+                }, pauseOrResumeAudio, stopAudio)
+            },
+        )
     } else if (navigationState.current == EvidriloDestination.HOME) {
         EvidriloTargetHomeScreen(
             storageNotice = storageNotice,
@@ -3529,168 +4534,65 @@ internal fun EvidriloApp(
             onCreateProject = ::beginManualProjectFromHome,
             onResumeProject = { project -> resumeStudentProject(project.id) },
             onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
+            onOpenPractice = startTargetPractice,
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
             onDismissRecommendation = ::dismissRecommendation,
             onRetryRecommendation = ::retryRecommendation,
         )
     } else {
-        when (val current = state) {
-            ConclusionState.Intro -> EvidriloTargetHomeScreen(
-                storageNotice = storageNotice,
-                onNavigate = openTargetSection,
-                onOpenProjectCatalog = {
-                    navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
-                },
-                onSelectProjectFamily = { family ->
-                    selectedProjectTemplateFamily = family
-                    navigationState = navigationState.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
-                },
-                projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
-                projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
-                projectsLoadError = studentProjectListState.toHomeErrorMessage(),
-                activeProjectLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
-                    projectProEntitlementActive.value,
-                ),
-                onRetryProjects = { studentProjectListReload += 1 },
-                onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
-                onCreateProject = ::beginManualProjectFromHome,
-                onResumeProject = { project -> resumeStudentProject(project.id) },
-                onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
-                recommendation = recommendationState,
-                onAcceptRecommendation = ::acceptRecommendation,
-                onDismissRecommendation = ::dismissRecommendation,
-                onRetryRecommendation = ::retryRecommendation,
-            )
-
-            is ConclusionState.Drafting -> EvidriloDraftScreen(
-                case = case,
-                title = "Build a bounded conclusion",
-                draft = current.draft,
-                validationMessage = current.validationMessage,
-                onDraftChange = { dispatch(ConclusionEvent.UpdateDraft(it)) },
-                onSubmit = { dispatch(ConclusionEvent.Submit) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.CASE_FACT, AudioNarrationCopy.case(case)) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-                onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
-            )
-
-            is ConclusionState.Incomplete -> EvidriloDraftScreen(
-                case = case,
-                title = "Complete the conclusion",
-                draft = current.draft,
-                validationMessage = current.feedback.message,
-                onDraftChange = { dispatch(ConclusionEvent.UpdateDraft(it)) },
-                onSubmit = { dispatch(ConclusionEvent.Submit) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                initialStep = current.feedback.field.toDraftStep(),
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.CASE_FACT, AudioNarrationCopy.case(case)) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-                onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
-            )
-
-            is ConclusionState.Feedback -> EvidriloFeedbackScreen(
-                case = case,
-                draft = current.draft,
-                evaluation = current.evaluation,
-                onRevise = { dispatch(ConclusionEvent.BeginRevision) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.FEEDBACK, AudioNarrationCopy.feedback()) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-            )
-
-            is ConclusionState.Revision -> EvidriloDraftScreen(
-                case = case,
-                title = "Revise once with the feedback",
-                draft = current.draft,
-                validationMessage = current.validationMessage,
-                onDraftChange = { dispatch(ConclusionEvent.UpdateDraft(it)) },
-                onSubmit = { dispatch(ConclusionEvent.Submit) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                initialStep = initialDraftStepFor(current),
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.REVISION, AudioNarrationCopy.revision()) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-                onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
-            )
-
-            is ConclusionState.Summary -> EvidriloTargetEvidenceDeltaScreen(
-                case = case,
-                before = current.initialDraft,
-                after = current.revisedDraft,
-                evaluation = current.finalEvaluation,
-                onNavigate = openTargetSection,
-                onBack = returnToHome,
-                onOpenHistory = {
-                    dispatch(ConclusionEvent.Reset)
-                    navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
-                },
-                onStartChallenge = {
-                    dispatch(ConclusionEvent.BeginEvidenceChange)
-                    navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
-                },
-            )
-
-            is ConclusionState.EvidenceChangeDrafting -> EvidriloDraftScreen(
-                case = ConclusionCases.EVIDENCE_CHANGE,
-                title = "Rebuild the conclusion after the evidence change",
-                draft = current.draft,
-                validationMessage = current.validationMessage,
-                onDraftChange = { dispatch(ConclusionEvent.UpdateEvidenceChangeDraft(it)) },
-                onSubmit = { dispatch(ConclusionEvent.SubmitEvidenceChange) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                initialStep = initialDraftStepFor(current),
-                audioState = audioState,
-                onListen = {
-                    playNarration(
-                        AudioNarrationId.CHALLENGE,
-                        AudioNarrationCopy.case(ConclusionCases.EVIDENCE_CHANGE),
-                    )
-                },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-                onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
-            )
-
-            is ConclusionState.EvidenceChangeFeedback -> EvidriloEvidenceChangeFeedbackScreen(
-                baseDraft = current.baseDraft,
-                draft = current.draft,
-                evaluation = current.evaluation,
-                onFinish = { dispatch(ConclusionEvent.FinishEvidenceChange) },
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.CHALLENGE, AudioNarrationCopy.challenge()) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-            )
-
-            is ConclusionState.EvidenceChangeSummary -> EvidriloEvidenceChangeSummaryScreen(
-                baseDraft = current.baseDraft,
-                challengeDraft = current.challengeDraft,
-                challengeEvaluation = current.challengeEvaluation,
-                onReset = { dispatch(ConclusionEvent.Reset) },
-                onBack = returnToHome,
-                audioState = audioState,
-                onListen = { playNarration(AudioNarrationId.CHALLENGE, AudioNarrationCopy.challenge()) },
-                onPauseOrResumeAudio = pauseOrResumeAudio,
-                onStopAudio = stopAudio,
-            )
-        }
+        EvidriloLegacyPracticeSurface(
+            state = state,
+            case = case,
+            onEvent = { dispatch(it) },
+            onBack = returnToHome,
+            audioState = audioState,
+            onNarration = playNarration,
+            onPauseOrResumeAudio = pauseOrResumeAudio,
+            onStopAudio = stopAudio,
+            onSelectionSound = { playEffect(AudioEffectId.SELECTION) },
+            onNavigate = openTargetSection,
+            onOpenHistory = {
+                dispatch(ConclusionEvent.Reset)
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.HISTORY)
+            },
+            onStartChallenge = {
+                dispatch(ConclusionEvent.BeginEvidenceChange)
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PRACTICE)
+            },
+            introContent = {
+                EvidriloTargetHomeScreen(
+                    storageNotice = storageNotice,
+                    onNavigate = openTargetSection,
+                    onOpenProjectCatalog = {
+                        navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
+                    },
+                    onSelectProjectFamily = { family ->
+                        selectedProjectTemplateFamily = family
+                        navigationState = navigationState.open(EvidriloDestination.PROJECT_FAMILY_DETAIL)
+                    },
+                    projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
+                    projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
+                    projectsLoadError = studentProjectListState.toHomeErrorMessage(),
+                    activeProjectLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
+                        projectProEntitlementActive.value,
+                    ),
+                    onRetryProjects = { studentProjectListReload += 1 },
+                    onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
+                    onCreateProject = ::beginManualProjectFromHome,
+                    onResumeProject = { project -> resumeStudentProject(project.id) },
+                    onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
+            onOpenPractice = startTargetPractice,
+                    recommendation = recommendationState,
+                    onAcceptRecommendation = ::acceptRecommendation,
+                    onDismissRecommendation = ::dismissRecommendation,
+                    onRetryRecommendation = ::retryRecommendation,
+                )
+            },
+        )
     }
+
+    } // Workspace shell; overlays retain their original full-screen host.
 
     EvidriloFloatingAssistant(
         visible = assistantVisible,
@@ -3713,6 +4615,181 @@ internal fun EvidriloApp(
         onOpenVerify = { navigationState = navigationState.open(EvidriloDestination.VERIFY_CLAIM) },
     )
 
+    EvidriloGeneralAiChat(
+        visible = generalChatVisible,
+        accountKey = currentBillingAccountId(),
+        projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty()
+            .mapNotNull { project ->
+                projectAiEntryProjectOption(
+                    projectId = project.id,
+                    title = project.title,
+                    isActive = project.status == StudentProjectStatus.DRAFT || project.status == StudentProjectStatus.ACTIVE,
+                    templatePublished = project.templateSnapshot?.publication ==
+                        dev.nextgen.mobile.domain.project.ProjectTemplatePublication.PUBLISHED,
+                    hasDeclaredAiOperation = project.templateSnapshot?.steps?.any { it.aiOperations.isNotEmpty() } == true,
+                )
+            },
+        projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
+        accessMessage = generalChatAccessMessage,
+        apiConfigured = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl).isConfigured,
+        aiCreditBalance = aiCreditBalancePresentation,
+        consentState = projectAiConsentState,
+        canOpenAccount = generalChatCanOpenAccount,
+        onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
+        onRefreshConsent = ::refreshProjectAiConsent,
+        onRefreshAiCreditBalance = ::refreshAiCreditBalance,
+        onGrantConsent = ::grantProjectAiConsent,
+        onRevokeConsent = ::revokeProjectAiConsent,
+        onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
+        onOpenProject = ::resumeStudentProject,
+        activityHistoryState = projectAiActivityHistoryState,
+        onRefreshActivityHistory = ::refreshProjectAiActivity,
+        onLoadMoreActivityHistory = ::loadMoreProjectAiActivity,
+        onSendMessage = ::requestGeneralChatMessage,
+    )
+
+    }
+}
+
+@Composable
+private fun EvidriloLegacyPracticeSurface(
+    state: ConclusionState,
+    case: ConclusionCase,
+    onEvent: (ConclusionEvent) -> Unit,
+    onBack: () -> Unit,
+    audioState: AudioPlaybackState,
+    onNarration: (AudioNarrationId, String) -> Unit,
+    onPauseOrResumeAudio: () -> Unit,
+    onStopAudio: () -> Unit,
+    onSelectionSound: () -> Unit,
+    onNavigate: (EvidriloTargetSection) -> Unit,
+    onOpenHistory: () -> Unit,
+    onStartChallenge: () -> Unit,
+    introContent: @Composable () -> Unit,
+) {
+    when (val current = state) {
+        ConclusionState.Intro -> introContent()
+
+        is ConclusionState.Drafting -> EvidriloDraftScreen(
+            case = case,
+            title = "Build a bounded conclusion",
+            draft = current.draft,
+            validationMessage = current.validationMessage,
+            onDraftChange = { onEvent(ConclusionEvent.UpdateDraft(it)) },
+            onSubmit = { onEvent(ConclusionEvent.Submit) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.CASE_FACT, AudioNarrationCopy.case(case)) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+            onSelectionSound = onSelectionSound,
+        )
+
+        is ConclusionState.Incomplete -> EvidriloDraftScreen(
+            case = case,
+            title = "Complete the conclusion",
+            draft = current.draft,
+            validationMessage = current.feedback.message,
+            onDraftChange = { onEvent(ConclusionEvent.UpdateDraft(it)) },
+            onSubmit = { onEvent(ConclusionEvent.Submit) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            initialStep = current.feedback.field.toDraftStep(),
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.CASE_FACT, AudioNarrationCopy.case(case)) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+            onSelectionSound = onSelectionSound,
+        )
+
+        is ConclusionState.Feedback -> EvidriloFeedbackScreen(
+            case = case,
+            draft = current.draft,
+            evaluation = current.evaluation,
+            onRevise = { onEvent(ConclusionEvent.BeginRevision) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.FEEDBACK, AudioNarrationCopy.feedback()) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+        )
+
+        is ConclusionState.Revision -> EvidriloDraftScreen(
+            case = case,
+            title = "Revise once with the feedback",
+            draft = current.draft,
+            validationMessage = current.validationMessage,
+            onDraftChange = { onEvent(ConclusionEvent.UpdateDraft(it)) },
+            onSubmit = { onEvent(ConclusionEvent.Submit) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            initialStep = initialDraftStepFor(current),
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.REVISION, AudioNarrationCopy.revision()) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+            onSelectionSound = onSelectionSound,
+        )
+
+        is ConclusionState.Summary -> EvidriloTargetEvidenceDeltaScreen(
+            case = case,
+            before = current.initialDraft,
+            after = current.revisedDraft,
+            evaluation = current.finalEvaluation,
+            onNavigate = onNavigate,
+            onBack = onBack,
+            onOpenHistory = onOpenHistory,
+            onStartChallenge = onStartChallenge,
+        )
+
+        is ConclusionState.EvidenceChangeDrafting -> EvidriloDraftScreen(
+            case = ConclusionCases.EVIDENCE_CHANGE,
+            title = "Rebuild the conclusion after the evidence change",
+            draft = current.draft,
+            validationMessage = current.validationMessage,
+            onDraftChange = { onEvent(ConclusionEvent.UpdateEvidenceChangeDraft(it)) },
+            onSubmit = { onEvent(ConclusionEvent.SubmitEvidenceChange) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            initialStep = initialDraftStepFor(current),
+            audioState = audioState,
+            onListen = {
+                onNarration(
+                    AudioNarrationId.CHALLENGE,
+                    AudioNarrationCopy.case(ConclusionCases.EVIDENCE_CHANGE),
+                )
+            },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+            onSelectionSound = onSelectionSound,
+        )
+
+        is ConclusionState.EvidenceChangeFeedback -> EvidriloEvidenceChangeFeedbackScreen(
+            baseDraft = current.baseDraft,
+            draft = current.draft,
+            evaluation = current.evaluation,
+            onFinish = { onEvent(ConclusionEvent.FinishEvidenceChange) },
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.CHALLENGE, AudioNarrationCopy.challenge()) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+        )
+
+        is ConclusionState.EvidenceChangeSummary -> EvidriloEvidenceChangeSummaryScreen(
+            baseDraft = current.baseDraft,
+            challengeDraft = current.challengeDraft,
+            challengeEvaluation = current.challengeEvaluation,
+            onReset = { onEvent(ConclusionEvent.Reset) },
+            onBack = onBack,
+            audioState = audioState,
+            onListen = { onNarration(AudioNarrationId.CHALLENGE, AudioNarrationCopy.challenge()) },
+            onPauseOrResumeAudio = onPauseOrResumeAudio,
+            onStopAudio = onStopAudio,
+        )
     }
 }
 
@@ -3949,7 +5026,7 @@ private fun EvidriloPremiumCatalogScreen(
     backLabel: String,
 ) {
     EvidriloContentColumn {
-        EvidriloBackButton(label = backLabel, onClick = onBack)
+        EvidriloBackGesture(label = backLabel, onClick = onBack)
         Text("Choose a focused case", style = MaterialTheme.typography.displayLarge)
         Text(
             "Each case keeps the same bounded conclusion method: supplied facts, limitations, one revision, and learner-authored text.",
@@ -3967,7 +5044,7 @@ private fun EvidriloPremiumCatalogScreen(
             onClick = onBeginCase,
             enabled = state.selectedCase != null,
         )
-        EvidriloSecondaryButton(label = "Return to free workflow", onClick = onBack)
+        EvidriloBackGesture("Free workflow", onBack)
     }
 }
 
@@ -3983,7 +5060,7 @@ private fun EvidriloPremiumSummaryScreen(
     onStopAudio: () -> Unit = {},
 ) {
     EvidriloContentColumn {
-        EvidriloBackButton(label = "Packs", onClick = onBack)
+        EvidriloBackGesture(label = "Packs", onClick = onBack)
         Text("Compare the premium evidence case", style = MaterialTheme.typography.displayLarge)
         Text(
             "The initial draft and one revision remain learner-authored. This premium session is not added to free-core local comparison history.",
@@ -4005,7 +5082,7 @@ private fun EvidriloPremiumSummaryScreen(
             title = "The premium conclusion passes the bounded checks",
             body = "The selected evidence, scope, limitations, and next action remain connected.",
         )
-        EvidriloPrimaryButton(label = "Return to premium cases", onClick = onBack)
+        EvidriloPrimaryButton(label = "Explore cases", onClick = onBack)
     }
 }
 
@@ -4026,229 +5103,21 @@ private fun EvidriloDraftScreen(
     onStopAudio: () -> Unit = {},
     onSelectionSound: () -> Unit = {},
 ) {
-    var step by remember(case.id, initialStep) { mutableStateOf(initialStep) }
-    var confirmReset by remember(case.id, initialStep) { mutableStateOf(false) }
-    var showCaseDetails by remember(case.id, initialStep) { mutableStateOf(false) }
-
-    EvidriloContentColumn {
-        onBack?.let { back ->
-            EvidriloBackButton(label = "Home", onClick = back)
-        }
-        Text(
-            when (step) {
-                EvidriloDraftStep.EVIDENCE -> title
-                EvidriloDraftStep.CLAIM -> "Write a bounded claim"
-                EvidriloDraftStep.LIMITS -> "Name the limits and next action"
-            },
-            style = MaterialTheme.typography.displayLarge,
-        )
-        Text(
-            when (step) {
-                EvidriloDraftStep.EVIDENCE -> "Compare the case prediction with the observations, then choose the facts that support your conclusion."
-                EvidriloDraftStep.CLAIM -> "Write what your selected evidence supports, then choose how far the claim can go."
-                EvidriloDraftStep.LIMITS -> "Name the limitations that still matter and one practical next action."
-            },
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        EvidriloDraftStepIndicator(current = step)
-        evidenceChangeContextNote(case)?.let { note -> EvidriloContextCard(note) }
-        if (validationMessage != null) {
-            EvidriloNotice(
-                status = ConclusionStatus.INCOMPLETE,
-                title = "Finish the required input",
-                body = validationMessage,
-            )
-        }
-        EvidriloAudioListenControl(
-            state = audioState,
-            onListen = onListen,
-            onPauseOrResume = onPauseOrResumeAudio,
-            onStopAudio = onStopAudio,
-        )
-
-        when (step) {
-            EvidriloDraftStep.EVIDENCE -> {
-                EvidriloCaseQuestionCard(case)
-                EvidriloSectionTitle("1. What relationship are you making?")
-                ConclusionRelation.entries
-                    .filter { it != ConclusionRelation.UNSUPPORTED }
-                    .forEach { relation ->
-                        EvidriloChoiceButton(
-                            label = relation.displayLabel(),
-                            selected = draft.relation == relation,
-                            onClick = {
-                                onSelectionSound()
-                                onDraftChange(draft.copy(relation = relation))
-                            },
-                        )
-                    }
-
-                EvidriloSectionTitle("2. Which observations support it?")
-                Text(
-                    "Choose the supplied observation facts. Their IDs become anchors in feedback.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                case.factsOfType(ConclusionFactType.OBSERVATION).forEach { fact ->
-                    EvidriloFactChoice(
-                        fact = fact,
-                        selected = fact.id in draft.evidenceRefs,
-                        onClick = {
-                            onSelectionSound()
-                            onDraftChange(
-                                draft.copy(evidenceRefs = draft.evidenceRefs.toggle(fact.id)),
-                            )
-                        },
-                    )
-                }
-                EvidriloSecondaryButton(
-                    label = if (showCaseDetails) "Hide case details" else "Read all case facts and trace",
-                    onClick = { showCaseDetails = !showCaseDetails },
-                )
-                if (showCaseDetails) {
-                    EvidriloWorkspaceTraceCard(case = case, draft = draft)
-                    EvidriloCaseFactsCard(case)
-                }
-                EvidriloPrimaryButton(
-                    label = "Continue to claim",
-                    onClick = { step = EvidriloDraftStep.CLAIM },
-                )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
-            }
-
-            EvidriloDraftStep.CLAIM -> {
-                EvidriloTintPanel {
-                    Text("Selected evidence", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        draft.evidenceRefs.ifEmpty { listOf("No observation selected yet") }.joinToString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                EvidriloSectionTitle("3. Write the conclusion")
-                OutlinedTextField(
-                    value = draft.claimText,
-                    onValueChange = { onDraftChange(draft.copy(claimText = it.take(400))) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Your claim") },
-                    supportingText = {
-                        Text(draft.claimText.length.toString() + "/320 characters · minimum 20")
-                    },
-                    minLines = 4,
-                )
-                EvidriloSectionTitle("4. How far does the claim go?")
-                ConclusionScope.entries
-                    .filter { it != ConclusionScope.UNSUPPORTED }
-                    .forEach { scope ->
-                        EvidriloChoiceButton(
-                            label = scope.displayLabel(),
-                            selected = draft.scope == scope,
-                            onClick = {
-                                onSelectionSound()
-                                onDraftChange(draft.copy(scope = scope))
-                            },
-                        )
-                    }
-                EvidriloSecondaryButton(
-                    label = "Back to evidence",
-                    onClick = { step = EvidriloDraftStep.EVIDENCE },
-                )
-                EvidriloPrimaryButton(
-                    label = "Continue to limits",
-                    onClick = { step = EvidriloDraftStep.LIMITS },
-                )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
-            }
-
-            EvidriloDraftStep.LIMITS -> {
-                EvidriloSectionTitle("5. Which limitations matter?")
-                Text(
-                    "Choose the supplied limitations that constrain your claim.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                case.factsOfType(ConclusionFactType.LIMITATION).forEach { fact ->
-                    EvidriloFactChoice(
-                        fact = fact,
-                        selected = fact.id in draft.limitationRefs,
-                        onClick = {
-                            onSelectionSound()
-                            onDraftChange(
-                                draft.copy(limitationRefs = draft.limitationRefs.toggle(fact.id)),
-                            )
-                        },
-                    )
-                }
-                OutlinedTextField(
-                    value = draft.limitationNote,
-                    onValueChange = { onDraftChange(draft.copy(limitationNote = it.take(300))) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Explain the limitation") },
-                    supportingText = {
-                        Text(draft.limitationNote.length.toString() + "/240 characters · minimum 10")
-                    },
-                    minLines = 3,
-                )
-
-                EvidriloSectionTitle("6. What is the next action?")
-                ConclusionImplication.entries
-                    .filter { it != ConclusionImplication.UNSUPPORTED }
-                    .forEach { implication ->
-                        EvidriloChoiceButton(
-                            label = implication.displayLabel(),
-                            selected = draft.implication == implication,
-                            onClick = {
-                                onSelectionSound()
-                                onDraftChange(draft.copy(implication = implication))
-                            },
-                        )
-                    }
-                OutlinedTextField(
-                    value = draft.implicationReason,
-                    onValueChange = { onDraftChange(draft.copy(implicationReason = it.take(300))) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Why this action?") },
-                    supportingText = {
-                        Text(draft.implicationReason.length.toString() + "/240 characters · minimum 10")
-                    },
-                    minLines = 3,
-                )
-
-                EvidriloSecondaryButton(
-                    label = "Back to claim",
-                    onClick = { step = EvidriloDraftStep.CLAIM },
-                )
-                EvidriloPrimaryButton(
-                    label = "Review my conclusion",
-                    onClick = onSubmit,
-                )
-                EvidriloSecondaryButton(label = "Reset this workflow", onClick = { confirmReset = true })
-            }
-        }
-    }
-    if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text("Reset this workflow?") },
-            text = {
-                Text(
-                    "Your current local draft will be discarded and the bundled case will return to its starting state.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReset = false
-                        onReset()
-                    },
-                ) {
-                    Text("Reset workflow")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) {
-                    Text("Keep editing")
-                }
-            },
-        )
-    }
+    EvidriloPracticeDraftScreen(
+        case = case,
+        title = title,
+        draft = draft,
+        validationMessage = validationMessage,
+        onDraftChange = onDraftChange,
+        onSubmit = onSubmit,
+        onReset = onReset,
+        onBack = onBack,
+        initialStep = initialStep,
+        onSelectionSound = onSelectionSound,
+        audioControls = {
+            EvidriloAudioListenControl(audioState, onListen, onPauseOrResumeAudio, onStopAudio)
+        },
+    )
 }
 
 @Composable
@@ -4343,38 +5212,17 @@ private fun EvidriloFeedbackScreen(
     onPauseOrResumeAudio: () -> Unit = {},
     onStopAudio: () -> Unit = {},
 ) {
-    EvidriloContentColumn {
-        onBack?.let { back ->
-            EvidriloBackButton(label = "Home", onClick = back)
-        }
-        Text("See what the case supports", style = MaterialTheme.typography.displayLarge)
-        Text(
-            "These checks are bounded to the supplied facts. They are not a grade or a claim that the real-world experiment is scientifically complete.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        EvidriloAudioListenControl(
-            state = audioState,
-            onListen = onListen,
-            onPauseOrResume = onPauseOrResumeAudio,
-            onStopAudio = onStopAudio,
-        )
-        EvidriloClaimBoundaryCard(case = case, draft = draft, evaluation = evaluation)
-        EvidriloVerificationDetailCard(evaluation = evaluation)
-        evaluation.primaryFeedback?.let { feedback ->
-            EvidriloFeedbackCard(feedback, prominent = true)
-        } ?: EvidriloNotice(
-            status = ConclusionStatus.PASS,
-            title = "All four bounded checks pass",
-            body = "Your conclusion is connected to the selected facts, limits its scope, and names a supported next action.",
-        )
-        if (evaluation.checks.isNotEmpty()) {
-            EvidriloSectionTitle("Check details")
-            evaluation.checks.forEach { check -> EvidriloCheckCard(check) }
-        }
-        EvidriloDraftSnapshot("Current conclusion", draft)
-        EvidriloPrimaryButton(label = "Revise once", onClick = onRevise)
-        EvidriloSecondaryButton(label = "Finish and reset", onClick = onReset)
-    }
+    EvidriloPracticeFeedbackScreen(
+        case = case,
+        draft = draft,
+        evaluation = evaluation,
+        onRevise = onRevise,
+        onReset = onReset,
+        onBack = onBack,
+        audioControls = {
+            EvidriloAudioListenControl(audioState, onListen, onPauseOrResumeAudio, onStopAudio)
+        },
+    )
 }
 
 @Composable
@@ -4393,7 +5241,7 @@ private fun EvidriloSummaryScreen(
 ) {
     EvidriloContentColumn {
         onBack?.let { back ->
-            EvidriloBackButton(label = "Home", onClick = back)
+            EvidriloBackGesture(label = "Home", onClick = back)
         }
         Text("Compare your reasoning", style = MaterialTheme.typography.displayLarge)
         Text(
@@ -4442,44 +5290,17 @@ private fun EvidriloEvidenceChangeFeedbackScreen(
     onPauseOrResumeAudio: () -> Unit = {},
     onStopAudio: () -> Unit = {},
 ) {
-    EvidriloContentColumn {
-        onBack?.let { back ->
-            EvidriloBackButton(label = "Home", onClick = back)
-        }
-        Text("Re-evaluate the changed case", style = MaterialTheme.typography.displayLarge)
-        Text(
-            "This feedback uses only the observations still supplied in the challenge. There is no second revision in this round.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        evidenceChangeContextNote(ConclusionCases.EVIDENCE_CHANGE)?.let { note -> EvidriloContextCard(note) }
-        EvidriloAudioListenControl(
-            state = audioState,
-            onListen = onListen,
-            onPauseOrResume = onPauseOrResumeAudio,
-            onStopAudio = onStopAudio,
-        )
-        EvidriloClaimBoundaryCard(
-            case = ConclusionCases.EVIDENCE_CHANGE,
-            draft = draft,
-            evaluation = evaluation,
-        )
-        EvidriloVerificationDetailCard(evaluation = evaluation)
-        evaluation.primaryFeedback?.let { feedback ->
-            EvidriloFeedbackCard(feedback, prominent = true)
-        } ?: EvidriloNotice(
-            status = ConclusionStatus.PASS,
-            title = "The changed-evidence checks pass",
-            body = "Your new conclusion stays within the observations and limitations available in this round.",
-        )
-        if (evaluation.checks.isNotEmpty()) {
-            EvidriloSectionTitle("Challenge check details")
-            evaluation.checks.forEach { check -> EvidriloCheckCard(check) }
-        }
-        EvidriloDraftSnapshot("Base revision remains unchanged", baseDraft)
-        EvidriloDraftSnapshot("Challenge conclusion", draft)
-        EvidriloPrimaryButton(label = "See the comparison", onClick = onFinish)
-        EvidriloSecondaryButton(label = "Leave challenge", onClick = onReset)
-    }
+    EvidriloPracticeChangedFeedbackScreen(
+        baseDraft = baseDraft,
+        draft = draft,
+        evaluation = evaluation,
+        onFinish = onFinish,
+        onReset = onReset,
+        onBack = onBack,
+        audioControls = {
+            EvidriloAudioListenControl(audioState, onListen, onPauseOrResumeAudio, onStopAudio)
+        },
+    )
 }
 
 @Composable
@@ -4494,47 +5315,16 @@ private fun EvidriloEvidenceChangeSummaryScreen(
     onPauseOrResumeAudio: () -> Unit = {},
     onStopAudio: () -> Unit = {},
 ) {
-    EvidriloContentColumn {
-        onBack?.let { back ->
-            EvidriloBackButton(label = "Home", onClick = back)
-        }
-        Text("See what changed with the evidence", style = MaterialTheme.typography.displayLarge)
-        Text(
-            "The base revision is kept beside the fresh challenge conclusion. The comparison is stored locally as the latest entry and can be cleared from the start screen.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        evidenceChangeContextNote(ConclusionCases.EVIDENCE_CHANGE)?.let { note -> EvidriloContextCard(note) }
-        EvidriloAudioListenControl(
-            state = audioState,
-            onListen = onListen,
-            onPauseOrResume = onPauseOrResumeAudio,
-            onStopAudio = onStopAudio,
-        )
-        EvidriloDraftSnapshot("Base revision", baseDraft)
-        HorizontalDivider()
-        EvidriloDraftSnapshot("Changed-evidence conclusion", challengeDraft)
-        EvidriloEvidenceDeltaCard(
-            before = baseDraft,
-            after = challengeDraft,
-            title = "Changed-evidence comparison",
-            case = ConclusionCases.EVIDENCE_CHANGE,
-            beforeCase = ConclusionCases.M0_T2,
-        )
-        EvidriloClaimBoundaryCard(
-            case = ConclusionCases.EVIDENCE_CHANGE,
-            draft = challengeDraft,
-            evaluation = challengeEvaluation,
-        )
-        EvidriloVerificationDetailCard(evaluation = challengeEvaluation)
-        challengeEvaluation.primaryFeedback?.let { feedback ->
-            EvidriloFeedbackCard(feedback, prominent = true)
-        } ?: EvidriloNotice(
-            status = ConclusionStatus.PASS,
-            title = "The challenge conclusion passes the bounded checks",
-            body = "The latest comparison preserves the learner-authored conclusions and active fact anchors.",
-        )
-        EvidriloPrimaryButton(label = "Return to workflow", onClick = onReset)
-    }
+    EvidriloPracticeChangedSummaryScreen(
+        baseDraft = baseDraft,
+        challengeDraft = challengeDraft,
+        challengeEvaluation = challengeEvaluation,
+        onReset = onReset,
+        onBack = onBack,
+        audioControls = {
+            EvidriloAudioListenControl(audioState, onListen, onPauseOrResumeAudio, onStopAudio)
+        },
+    )
 }
 
 @Composable

@@ -14,6 +14,30 @@ import kotlin.test.assertTrue
 
 class EvidriloProjectAiScaffoldPanelTest {
     @Test
+    fun `project AI explains sign in requirement when guest mode is disabled`() {
+        val aiMessage = projectAiAccountRequirementMessage(
+            guestModeEnabled = false,
+            consentManagement = false,
+        )
+        val consentMessage = projectAiAccountRequirementMessage(
+            guestModeEnabled = false,
+            consentManagement = true,
+        )
+        val guestMessage = projectAiAccountRequirementMessage(
+            guestModeEnabled = true,
+            consentManagement = false,
+        )
+
+        assertTrue(aiMessage.contains("verified account"))
+        assertTrue(aiMessage.contains("no context was sent", ignoreCase = true))
+        assertFalse(aiMessage.contains("guest mode", ignoreCase = true))
+        assertTrue(consentMessage.contains("sign in", ignoreCase = true))
+        assertTrue(consentMessage.contains("consent"))
+        assertFalse(consentMessage.contains("guest mode", ignoreCase = true))
+        assertTrue(guestMessage.contains("guest mode", ignoreCase = true))
+    }
+
+    @Test
     fun `project AI transient state is isolated between projects and accounts`() {
         val projectA = projectAiScaffoldPanelStateKey(
             templateId = "reviewed-template",
@@ -49,9 +73,10 @@ class EvidriloProjectAiScaffoldPanelTest {
         val disclosure = projectAiCreditDisclosure(creating = true)
 
         assertTrue(disclosure.contains("verified provider token usage"))
-        assertTrue(disclosure.contains("up to 200 credits for one request"))
-        assertTrue(disclosure.contains("even if you dismiss"))
-        assertTrue(disclosure.contains("release the reservation"))
+        assertTrue(disclosure.contains("up to 200 credits per request"))
+        assertTrue(disclosure.contains("Only a valid preview"))
+        assertTrue(disclosure.contains("rejected, failed, or stale requests release the reservation"))
+        assertTrue(disclosure.contains("Dismissing a valid preview does not refund it"))
     }
 
     @Test
@@ -59,9 +84,10 @@ class EvidriloProjectAiScaffoldPanelTest {
         val disclosure = projectAiCreditDisclosure(creating = false)
 
         assertTrue(disclosure.contains("verified provider token usage"))
-        assertTrue(disclosure.contains("up to 200 credits for one request"))
-        assertTrue(disclosure.contains("even if you dismiss"))
-        assertTrue(disclosure.contains("release the reservation"))
+        assertTrue(disclosure.contains("up to 200 credits per request"))
+        assertTrue(disclosure.contains("Only a valid preview"))
+        assertTrue(disclosure.contains("rejected, failed, or stale requests release the reservation"))
+        assertTrue(disclosure.contains("Dismissing a valid preview does not refund it"))
     }
 
     @Test
@@ -89,6 +115,14 @@ class EvidriloProjectAiScaffoldPanelTest {
         assertFalse(canRequestProjectAi(dataConsent = false, assignmentBrief = "A real brief"))
         assertFalse(canRequestProjectAi(dataConsent = true, assignmentBrief = " \n "))
         assertTrue(canRequestProjectAi(dataConsent = true, assignmentBrief = "A real brief"))
+    }
+
+    @Test
+    fun `project preview cannot apply while editor is dirty or its revision identity is stale`() {
+        assertFalse(canApplyProjectAiPreview(true, "project-1", "project-1", 4, 5))
+        assertFalse(canApplyProjectAiPreview(false, "project-1", "project-1", 4, 4))
+        assertFalse(canApplyProjectAiPreview(true, "project-other", "project-1", 4, 4))
+        assertTrue(canApplyProjectAiPreview(true, "project-1", "project-1", 4, 4))
     }
 
     @Test

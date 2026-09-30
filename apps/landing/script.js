@@ -1,230 +1,289 @@
-const factInputs = Array.from(document.querySelectorAll('[data-fact]'));
+'use strict';
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const compactLayout = window.matchMedia('(max-width:767px), (max-width:959px) and (max-height:560px) and (orientation:landscape)');
+const clamp = function (value, min, max) { return Math.min(max, Math.max(min, value)); };
+const controls = function (selector) { return Array.from(document.querySelectorAll(selector)); };
+const enable = function (items) { items.forEach(function (item) { item.disabled = false; }); };
+const softSwap = function (element) {
+  if (reducedMotion.matches || !element.animate) return;
+  element.getAnimations().forEach(function (animation) { animation.cancel(); });
+  element.animate(
+    [{ opacity: 0.5, transform: 'translateY(7px)' }, { opacity: 1, transform: 'translateY(0)' }],
+    { duration: 350, easing: 'cubic-bezier(.22,1,.36,1)' }
+  );
+};
+
+// The phone explains three stages. It is an illustration, not a remote app.
+const heroVisual = document.querySelector('[data-phone-stage]');
+const heroPhone = document.querySelector('.hero-phone');
+const phoneDeck = document.querySelector('[data-phone-deck]');
+const phoneControls = controls('[data-phone-control]');
+const phoneNav = controls('.phone-nav > span');
+const phoneTags = controls('.source-tag');
+const phoneAnnotations = [
+  [
+    { label: 'Your starting point', title: 'The assignment brief', icon: '#i-doc' },
+    { label: 'Keep it yours', title: 'A local project', icon: '#i-folder' }
+  ],
+  [
+    { label: 'Your chosen material', title: 'Sources you can revisit', icon: '#i-doc' },
+    { label: 'Follow the connection', title: 'Source → note → claim', icon: '#i-link' }
+  ],
+  [
+    { label: 'A useful next step', title: 'Review and revise', icon: '#i-reset' },
+    { label: 'Your academic judgment', title: 'Keep the limits visible', icon: '#i-check' }
+  ]
+];
+let phoneIndex = -1;
+function setPhone(index) {
+  if (index === phoneIndex) return;
+  const firstScreen = phoneIndex === -1;
+  phoneIndex = index;
+  heroVisual.dataset.screen = String(index);
+  phoneTags.forEach(function (tag, tagIndex) {
+    const annotation = phoneAnnotations[index][tagIndex];
+    tag.querySelector('small').textContent = annotation.label;
+    tag.querySelector('strong').textContent = annotation.title;
+    tag.querySelector('use').setAttribute('href', annotation.icon);
+    if (!firstScreen) softSwap(tag.querySelector('div'));
+  });
+  phoneDeck.style.setProperty('--phone-index', String(index));
+  phoneControls.forEach(function (button, buttonIndex) {
+    button.setAttribute('aria-pressed', String(buttonIndex === index));
+    button.dataset.past = String(buttonIndex < index);
+  });
+  phoneNav.forEach(function (item, itemIndex) {
+    item.classList.toggle('is-active', itemIndex === index);
+  });
+}
+enable(phoneControls);
+phoneControls.forEach(function (button) {
+  button.addEventListener('click', function () { setPhone(Number(button.dataset.phoneControl)); });
+});
+setPhone(0);
+
+// A sticky project preview follows the narrative on wide screens.
+// Compact screens present the same stages as touch controls beside one caption.
+const journeyStage = document.querySelector('.journey-stage');
+const storySteps = controls('[data-story-step]');
+const journeyScenes = controls('[data-journey-scene]');
+const journeyControls = controls('[data-journey-control]');
+const journeyLabel = document.querySelector('[data-journey-label]');
+const journeyMarkers = controls('.journey-stage-footer i');
+const journeyLabels = ['Create a local project', 'Connect the material behind a claim', 'Review and keep the next step visible'];
+let journeyIndex = -1;
+function setJourney(index, animate) {
+  if (index === journeyIndex) return;
+  journeyIndex = index;
+  journeyStage.dataset.step = String(index);
+  journeyScenes.forEach(function (scene, sceneIndex) { scene.hidden = sceneIndex !== index; });
+  journeyControls.forEach(function (button, buttonIndex) {
+    button.setAttribute('aria-pressed', String(buttonIndex === index));
+  });
+  storySteps.forEach(function (step, stepIndex) { step.classList.toggle('is-active', stepIndex === index); });
+  journeyMarkers.forEach(function (marker, markerIndex) { marker.classList.toggle('is-active', markerIndex === index); });
+  journeyLabel.textContent = journeyLabels[index];
+  if (animate) softSwap(journeyScenes[index]);
+}
+enable(journeyControls);
+journeyControls.forEach(function (button) {
+  button.addEventListener('click', function () {
+    setJourney(Number(button.dataset.journeyControl), true);
+    queueResize();
+  });
+});
+setJourney(0, false);
+
+// These controls explain the proposed workflow; they never call an AI service.
+const aiControls = controls('[data-ai-control]');
+const aiPanels = controls('[data-ai-panel]');
+let aiIndex = 0;
+enable(aiControls);
+aiControls.forEach(function (button) {
+  button.addEventListener('click', function () {
+    const index = Number(button.dataset.aiControl);
+    if (index === aiIndex) return;
+    aiIndex = index;
+    aiControls.forEach(function (control, controlIndex) {
+      control.setAttribute('aria-pressed', String(controlIndex === index));
+    });
+    aiPanels.forEach(function (panel, panelIndex) { panel.hidden = panelIndex !== index; });
+    softSwap(aiPanels[index]);
+    queueResize();
+  });
+});
+
+// The supplied practice data stay bounded to one fictional trial per condition.
+const factInputs = controls('[data-fact]');
+const resetFacts = document.getElementById('reset-facts');
 const availability = document.getElementById('availability');
 const boundedDescription = document.getElementById('bounded-description');
 const scopeNote = document.getElementById('scope-note');
-const resetFacts = document.getElementById('reset-facts');
-const demoAnswer = document.querySelector('.demo-answer');
+const labResult = document.querySelector('.lab-result');
 const demoOutput = document.querySelector('.demo-output');
-const traceNodes = Array.from(document.querySelectorAll('[data-trace-fact]'));
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-let feedbackAnimation;
+const factTrace = controls('[data-trace-fact]');
+const suppliedFacts = [
+  { id: 'warm', name: 'warm water', location: 'in warm water', time: 32 },
+  { id: 'room', name: 'room temperature', location: 'at room temperature', time: 58 },
+  { id: 'cold', name: 'cold water', location: 'in cold water', time: 92 }
+];
+function updateDemo(animate) {
+  const active = suppliedFacts.filter(function (fact) {
+    return factInputs.some(function (input) { return input.dataset.fact === fact.id && input.checked; });
+  });
+  const activeIds = new Set(active.map(function (fact) { return fact.id; }));
+  const missing = suppliedFacts.filter(function (fact) { return !activeIds.has(fact.id); });
+  availability.textContent = active.length + ' of 3 available';
+  labResult.dataset.availability = String(active.length);
+  resetFacts.disabled = active.length === suppliedFacts.length;
+  factTrace.forEach(function (node) { node.classList.toggle('is-missing', !activeIds.has(node.dataset.traceFact)); });
 
-const facts = {
-  warm: { name: 'warm water', time: 32 },
-  room: { name: 'room-temperature water', time: 58 },
-  cold: { name: 'cold water', time: 92 },
-};
-
-function updateEvidenceExample(animateFeedback = false) {
-  const selected = factInputs.filter((input) => input.checked).map((input) => facts[input.dataset.fact]);
-  const selectedIds = new Set(factInputs.filter((input) => input.checked).map((input) => input.dataset.fact));
-  availability.textContent = `${selected.length} of 3 available`;
-  demoAnswer.dataset.availability = selected.length;
-  resetFacts.disabled = selected.length === factInputs.length;
-  traceNodes.forEach((node) => node.classList.toggle('is-missing', !selectedIds.has(node.dataset.traceFact)));
-
-  if (selected.length === 3) {
+  if (active.length === 3) {
     boundedDescription.textContent = 'In this supplied case, dissolution took 32 seconds in warm water, 58 seconds at room temperature, and 92 seconds in cold water.';
-    scopeNote.textContent = 'All three supplied conditions are available for comparison. The description stays inside this case.';
-  } else if (selected.length === 2) {
-    boundedDescription.textContent = `The available observations show ${selected[0].time} seconds in ${selected[0].name} and ${selected[1].time} seconds in ${selected[1].name}.`;
-    scopeNote.textContent = 'One observation is missing. A claim about all three temperatures would now go beyond the available facts.';
-  } else if (selected.length === 1) {
-    boundedDescription.textContent = `The only available observation is ${selected[0].time} seconds in ${selected[0].name}.`;
-    scopeNote.textContent = 'A single observation cannot support a comparison across temperatures.';
+    scopeNote.textContent = 'All three supplied conditions are available for comparison. This description stays within one trial per condition.';
+  } else if (active.length === 2) {
+    boundedDescription.textContent = 'In this supplied case, dissolution took ' + active[0].time + ' seconds ' + active[0].location + ' and ' + active[1].time + ' seconds ' + active[1].location + '.';
+    scopeNote.textContent = 'The ' + missing[0].name + ' observation is unavailable, so the three-condition comparison is incomplete. Each remaining condition has one trial.';
+  } else if (active.length === 1) {
+    boundedDescription.textContent = 'Only the ' + active[0].name + ' observation remains: ' + active[0].time + ' seconds in this supplied trial.';
+    scopeNote.textContent = 'One observation cannot support a comparison across temperatures. Restore another supplied fact to compare conditions.';
   } else {
-    boundedDescription.textContent = 'No observations are available to describe.';
-    scopeNote.textContent = 'Review the supplied facts before writing a comparison.';
+    boundedDescription.textContent = 'No supplied observations are available to describe.';
+    scopeNote.textContent = 'Restore at least one observation to inspect this case. A comparison needs more than one condition.';
   }
-
-  if (animateFeedback && !reducedMotion.matches && demoOutput.animate) {
-    feedbackAnimation?.cancel();
-    feedbackAnimation = demoOutput.animate(
-      [{ opacity: 0.55, clipPath: 'inset(0 0 5% 0)' }, { opacity: 1, clipPath: 'inset(0 0 0 0)' }],
-      { duration: 260, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
-    );
-  }
+  if (animate) softSwap(demoOutput);
 }
-
-for (const input of factInputs) {
-  input.disabled = false;
-  input.addEventListener('change', () => updateEvidenceExample(true));
-}
-
-resetFacts.addEventListener('click', () => {
-  for (const input of factInputs) input.checked = true;
-  updateEvidenceExample(true);
+enable(factInputs);
+factInputs.forEach(function (input) { input.addEventListener('change', function () { updateDemo(true); }); });
+resetFacts.addEventListener('click', function () {
+  factInputs.forEach(function (input) { input.checked = true; });
+  updateDemo(true);
 });
+updateDemo(false);
 
-updateEvidenceExample();
-
-const mobileNav = document.querySelector('.mobile-nav');
-for (const link of mobileNav.querySelectorAll('a[href^="#"]')) {
-  link.addEventListener('click', () => { mobileNav.open = false; });
-}
-
-const reasoningLine = document.querySelector('.reasoning-line');
-const reasoningSteps = Array.from(reasoningLine.querySelectorAll('li'));
-const storyStage = document.querySelector('[data-story-stage]');
-const storySteps = Array.from(document.querySelectorAll('[data-story-step]'));
-const storyShots = Array.from(document.querySelectorAll('[data-story-shot]'));
-const pageProgress = document.querySelector('.page-progress');
-const boundaryScene = document.querySelector('[data-boundary-scene]');
-const revisionDesk = document.querySelector('[data-revision-desk]');
-let activeStoryIndex = -1;
-let scrollQueued = false;
-let revealObserver;
-let revisionObserver;
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function setActiveStory(index) {
-  if (index === activeStoryIndex) return;
-  activeStoryIndex = index;
-  storyStage.dataset.active = String(index);
-  storyStage.setAttribute(
-    'aria-label',
-    `Case practice screen ${index + 1} of ${storyShots.length}: ${storyShots[index].alt}`
-  );
-
-  storySteps.forEach((step, stepIndex) => step.classList.toggle('is-current', stepIndex === index));
-  storyShots.forEach((shot, shotIndex) => {
-    shot.classList.toggle('is-current', shotIndex === index);
-    shot.setAttribute('aria-hidden', String(shotIndex !== index));
+// Native horizontal scrolling remains available with touch and keyboard.
+const gallery = document.querySelector('.screen-gallery');
+const galleryButtons = controls('[data-gallery-direction]');
+function updateGallery() {
+  const remaining = Math.max(0, gallery.scrollWidth - gallery.clientWidth);
+  galleryButtons.forEach(function (button) {
+    button.disabled = Number(button.dataset.galleryDirection) < 0
+      ? gallery.scrollLeft <= 2
+      : gallery.scrollLeft >= remaining - 2;
   });
 }
-
-function updateScrollMotion() {
-  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
-  const pageFill = scrollableHeight > 0 ? clamp(window.scrollY / scrollableHeight, 0, 1) : 0;
-  pageProgress.style.setProperty('--page-progress', pageFill.toFixed(4));
-
-  const boundaryTop = boundaryScene.getBoundingClientRect().top;
-  const boundaryProgress = clamp((window.innerHeight * 0.85 - boundaryTop) / (window.innerHeight * 0.7), 0, 1);
-  const boundaryOffset = reducedMotion.matches ? 0 : 28 * (1 - boundaryProgress);
-  boundaryScene.style.setProperty('--boundary-offset', `${boundaryOffset.toFixed(1)}px`);
-  boundaryScene.style.setProperty('--boundary-fill', boundaryProgress.toFixed(3));
-
-  const lineTop = reasoningLine.getBoundingClientRect().top;
-  const progress = clamp((window.innerHeight * 0.85 - lineTop) / (window.innerHeight * 0.6), 0, 1);
-  reasoningSteps.forEach((step, index) => {
-    const fill = reducedMotion.matches ? 1 : clamp(progress * reasoningSteps.length - index, 0, 1);
-    step.style.setProperty('--segment-fill', fill.toFixed(3));
-    step.classList.toggle('is-passed', fill > 0.05);
-  });
-
-  const focusLine = window.innerHeight * 0.48;
-  let visibleStep = 0;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const [index, step] of storySteps.entries()) {
-    const rect = step.getBoundingClientRect();
-    const distance = focusLine < rect.top
-      ? rect.top - focusLine
-      : focusLine > rect.bottom
-        ? focusLine - rect.bottom
-        : 0;
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      visibleStep = index;
-    }
-  }
-  setActiveStory(visibleStep);
-}
-
-function queueScrollMotion() {
-  if (scrollQueued) return;
-  scrollQueued = true;
-  window.requestAnimationFrame(() => {
-    scrollQueued = false;
-    updateScrollMotion();
-  });
-}
-
-function setupEntranceMotion() {
-  if (reducedMotion.matches || !('IntersectionObserver' in window)) return;
-
-  const groups = [
-    { selector: '.assurance-grid p', motion: 'rise', stagger: 85 },
-    { selector: '.thinking-grid > div:first-child', motion: 'from-left' },
-    { selector: '.thinking-copy', motion: 'from-right' },
-    { selector: '.demo-heading > *', motion: 'rise', stagger: 90 },
-    { selector: '.demo-grid', motion: 'scale' },
-    { selector: '.boundary-heading > *', motion: 'rise', stagger: 90 },
-    { selector: '.boundary-endnote', motion: 'soft' },
-    { selector: '.inside-heading > *', motion: 'rise', stagger: 90 },
-    { selector: '.story-step h3, .story-step p', motion: 'rise', stagger: 55 },
-    { selector: '.story-step-image', motion: 'uncover' },
-    { selector: '.revision-intro > *', motion: 'rise', stagger: 90 },
-    { selector: '.revision-sheet', motion: 'scale', stagger: 135 },
-    { selector: '.revision-outro', motion: 'soft' },
-    { selector: '.principles-lead', motion: 'from-left' },
-    { selector: '.principles-list', motion: 'from-right' },
-    { selector: '.faq-intro', motion: 'from-left' },
-    { selector: '.faq-list', motion: 'soft' },
-    { selector: '.final-inner', motion: 'rise' },
-  ];
-
-  revealObserver = new IntersectionObserver((entries, observer) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      entry.target.classList.add('is-revealed');
-      observer.unobserve(entry.target);
-    }
-  }, { threshold: 0.12, rootMargin: '0px 0px -7% 0px' });
-
-  for (const group of groups) {
-    document.querySelectorAll(group.selector).forEach((element, index) => {
-      if (!element.getClientRects().length) return;
-      element.dataset.reveal = group.motion;
-      element.style.setProperty('--reveal-delay', `${Math.min(index * (group.stagger || 0), 240)}ms`);
-      const rect = element.getBoundingClientRect();
-      if (rect.bottom <= 0 || rect.top < window.innerHeight * 0.88) {
-        element.classList.add('is-revealed');
-        return;
-      }
-      element.classList.add('reveal-prep');
-      revealObserver.observe(element);
+galleryButtons.forEach(function (button) {
+  button.addEventListener('click', function () {
+    const screen = gallery.querySelector('.screen-panel');
+    const distance = screen.getBoundingClientRect().width + (parseFloat(window.getComputedStyle(gallery).columnGap) || 0);
+    gallery.scrollBy({
+      left: distance * Number(button.dataset.galleryDirection),
+      behavior: reducedMotion.matches ? 'auto' : 'smooth'
     });
+  });
+});
+gallery.addEventListener('scroll', updateGallery, { passive: true });
+
+// No animation loop runs while idle. Geometry is cached on resize, not read
+// repeatedly during scroll. One frame coalesces each burst of scroll events.
+const progressBar = document.querySelector('.page-progress');
+let geometry;
+let frame = 0;
+let resizePending = false;
+let motionObserver;
+function measure() {
+  const position = window.scrollY;
+  const phoneTop = heroVisual.getBoundingClientRect().top + position;
+  const start = Math.max(0, phoneTop - window.innerHeight * 0.6);
+  geometry = {
+    total: Math.max(1, document.documentElement.scrollHeight - window.innerHeight),
+    heroEnd: phoneTop + heroVisual.offsetHeight,
+    phoneStart: start,
+    phoneRange: Math.max(360, phoneTop + heroPhone.offsetHeight - window.innerHeight * 0.25 - start),
+    steps: storySteps.map(function (step) { return step.querySelector('h3').getBoundingClientRect().top + position; }),
+    journeyEnd: document.querySelector('.journey-layout').getBoundingClientRect().bottom + position
+  };
+}
+function renderScroll(fromScroll) {
+  if (!geometry) measure();
+  const position = window.scrollY;
+  progressBar.style.setProperty('--page-progress', clamp(position / geometry.total, 0, 1).toFixed(4));
+
+  if (position < geometry.heroEnd && !reducedMotion.matches) {
+    const progress = clamp((position - geometry.phoneStart) / geometry.phoneRange, 0, 1);
+    heroVisual.style.setProperty('--hero-travel', progress.toFixed(3));
+    heroVisual.style.setProperty('--folio-shift', (progress * -14).toFixed(1) + 'px');
+    const wide = !compactLayout.matches;
+    heroPhone.style.setProperty('--phone-y', wide ? (-8 + progress * 9).toFixed(2) + 'deg' : '0deg');
+    heroPhone.style.setProperty('--phone-z', wide ? (2 - progress * 3).toFixed(2) + 'deg' : '0deg');
+    if (fromScroll) setPhone(Math.min(2, Math.floor(progress * 3)));
   }
 
-  document.documentElement.classList.add('motion-ready');
-  revisionObserver = new IntersectionObserver((entries, observer) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      revisionDesk.classList.add('is-entered');
-      observer.unobserve(entry.target);
-    }
-  }, { threshold: 0.16, rootMargin: '0px 0px -8% 0px' });
-  if (revisionDesk.getBoundingClientRect().top < window.innerHeight * 0.88) {
-    revisionDesk.classList.add('is-entered');
-  } else {
-    revisionObserver.observe(revisionDesk);
+  if (fromScroll && !compactLayout.matches && position < geometry.journeyEnd) {
+    const readingLine = position + window.innerHeight * 0.5;
+    let index = 0;
+    geometry.steps.forEach(function (top, stepIndex) { if (top <= readingLine) index = stepIndex; });
+    setJourney(index, true);
   }
-
-  document.addEventListener('focusin', (event) => {
-    const target = event.target.closest('.reveal-prep');
-    if (!target) return;
-    target.classList.add('is-revealed');
-    revealObserver?.unobserve(target);
+}
+function queueScroll() {
+  if (frame) return;
+  frame = window.requestAnimationFrame(function () {
+    frame = 0;
+    renderScroll(true);
   });
 }
-
-setupEntranceMotion();
-
-window.addEventListener('scroll', queueScrollMotion, { passive: true });
-window.addEventListener('resize', queueScrollMotion);
-window.addEventListener('load', queueScrollMotion);
-reducedMotion.addEventListener('change', () => {
-  if (reducedMotion.matches) {
-    revealObserver?.disconnect();
-    revisionObserver?.disconnect();
-    document.querySelectorAll('.reveal-prep').forEach((element) => element.classList.add('is-revealed'));
-    revisionDesk.classList.add('is-entered');
-    document.documentElement.classList.remove('motion-ready');
+function queueResize() {
+  if (resizePending) return;
+  resizePending = true;
+  window.requestAnimationFrame(function () {
+    resizePending = false;
+    measure();
+    renderScroll(false);
+    updateGallery();
+  });
+}
+window.addEventListener('scroll', queueScroll, { passive: true });
+window.addEventListener('resize', queueResize, { passive: true });
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden && frame) {
+    window.cancelAnimationFrame(frame);
+    frame = 0;
   }
-  queueScrollMotion();
 });
-queueScrollMotion();
-document.documentElement.classList.add('story-scroll-ready');
+function observeArtwork() {
+  const artwork = controls('[data-in-view]');
+  if (motionObserver) motionObserver.disconnect();
+  if (reducedMotion.matches || !('IntersectionObserver' in window)) {
+    artwork.forEach(function (item) { item.classList.add('is-in-view'); });
+    return;
+  }
+  motionObserver = new IntersectionObserver(function (entries, observer) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('is-in-view');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.25 });
+  artwork.forEach(function (item) {
+    if (!item.classList.contains('is-in-view')) motionObserver.observe(item);
+  });
+}
+reducedMotion.addEventListener('change', function () {
+  if (reducedMotion.matches) {
+    document.getAnimations().forEach(function (animation) { animation.cancel(); });
+  }
+  observeArtwork();
+  queueResize();
+});
+document.querySelectorAll('.faq-list details').forEach(function (item) {
+  item.addEventListener('toggle', queueResize);
+});
+document.documentElement.classList.add('has-interactions');
+measure();
+renderScroll(false);
+updateGallery();
+observeArtwork();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueResize);
+window.addEventListener('load', queueResize, { once: true });

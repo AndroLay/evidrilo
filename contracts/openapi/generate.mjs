@@ -149,7 +149,7 @@ for (const route of manifest.routes) {
   if (!operationsByPath.has(routePath)) operationsByPath.set(routePath, {});
 
   const responseContent = {
-    'application/json': { schema: { $ref: schemaReference(route.responseSchema) } },
+    [route.responseMediaType ?? 'application/json']: { schema: { $ref: schemaReference(route.responseSchema) } },
   };
   for (const variant of route.responseVariants ?? []) {
     responseContent[variant.mediaType] = { schema: { $ref: schemaReference(variant.responseSchema) } };
@@ -160,7 +160,7 @@ for (const route of manifest.routes) {
     tags: [routeTag(route.path)],
     security: operationSecurity(route.authentication),
     responses: {
-      '2XX': {
+      [String(route.successStatusCode ?? '2XX')]: {
         description: 'Successful response.',
         content: responseContent,
       },

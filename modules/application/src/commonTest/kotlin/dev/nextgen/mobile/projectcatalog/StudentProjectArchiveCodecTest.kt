@@ -6,6 +6,7 @@ import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
 import dev.nextgen.mobile.domain.project.StudentProjectAttachmentRef
 import dev.nextgen.mobile.domain.project.ProjectTemplateAiOperationCapability
 import dev.nextgen.mobile.domain.project.ProjectTemplateDefinition
+import dev.nextgen.mobile.domain.project.ProjectStarterTemplateCatalog
 import dev.nextgen.mobile.domain.project.ProjectTemplateExample
 import dev.nextgen.mobile.domain.project.ProjectTemplateExampleKind
 import dev.nextgen.mobile.domain.project.ProjectTemplateFamily
@@ -157,12 +158,12 @@ class StudentProjectArchiveCodecTest {
         val projectJson = Json.parseToJsonElement(entries.getValue("project.json").decodeToString()).jsonObject
 
         assertEquals("evidrilo.project-archive-manifest", manifest.getValue("schema").jsonPrimitive.content)
-        assertEquals("5", manifest.getValue("version").jsonPrimitive.content)
+        assertEquals("7", manifest.getValue("version").jsonPrimitive.content)
         assertEquals(project.id, manifest.getValue("projectId").jsonPrimitive.content)
         assertTrue(manifest.getValue("createdAtUtc").jsonPrimitive.content.endsWith("Z"))
         assertTrue(manifest.getValue("updatedAtUtc").jsonPrimitive.content.endsWith("Z"))
         assertEquals("evidrilo.student-project", projectJson.getValue("schema").jsonPrimitive.content)
-        assertEquals("5", projectJson.getValue("version").jsonPrimitive.content)
+        assertEquals("7", projectJson.getValue("version").jsonPrimitive.content)
         assertTrue("createdAtUtc" in projectJson.getValue("project").jsonObject)
         assertTrue("updatedAtUtc" in projectJson.getValue("project").jsonObject)
         val manifestEntries = manifest.getValue("entries").jsonArray
@@ -188,6 +189,24 @@ class StudentProjectArchiveCodecTest {
     }
 
     @Test
+    fun `archive round trips a local starter without relabeling it as reviewed`() {
+        val template = ProjectStarterTemplateCatalog.forFamily(ProjectTemplateFamily.QUALITATIVE_INTERVIEW_FIELD_STUDY)
+        val project = assertIs<StudentProjectDraftCreateResult.Created>(
+            StudentProjectDraftRules.create("11111111-1111-4111-8111-111111111111", template, template.title, 200),
+        ).draft
+
+        val encoded = assertIs<StudentProjectArchiveEncodingResult.Encoded>(
+            StudentProjectArchiveCodec.encode(project, appVersion = "1.0.0-dev"),
+        )
+        val restored = assertIs<StudentProjectArchiveReadResult.Preview>(
+            StudentProjectArchiveCodec.preview(encoded.bytes),
+        ).project
+
+        assertEquals(project, restored)
+        assertEquals(ProjectTemplatePublication.BUILT_IN_STARTER, restored.templateSnapshot?.publication)
+    }
+
+    @Test
     fun `archive roundtrips claims and review status in project and revision payloads`() {
         val claims = listOf(
             StudentProjectClaimRecord(
@@ -203,7 +222,10 @@ class StudentProjectArchiveCodecTest {
                 reviewStatus = StudentProjectClaimReviewStatus.NEEDS_REVISION,
             ),
         )
-        val project = StudentProjectDraftRules.initializeRevisionHistory(manualProject().copy(claims = claims))
+        val project = StudentProjectDraftRules.initializeRevisionHistory(manualProject().copy(
+            claims = claims,
+            deadlineDate = "2026-10-15",
+        ))
         val encoded = assertIs<StudentProjectArchiveEncodingResult.Encoded>(
             StudentProjectArchiveCodec.encode(project, appVersion = "1.0.0-dev"),
         )
@@ -214,6 +236,8 @@ class StudentProjectArchiveCodecTest {
             .jsonObject
 
         assertEquals(2, projectPayload.getValue("claims").jsonArray.size)
+        assertEquals("2026-10-15", projectPayload.getValue("deadlineDate").jsonPrimitive.content)
+        assertEquals("2026-10-15", revisionPayload.getValue("deadlineDate").jsonPrimitive.content)
         assertEquals(
             "ready_for_review",
             projectPayload.getValue("claims").jsonArray.first().jsonObject.getValue("reviewStatus").jsonPrimitive.content,
@@ -226,6 +250,18 @@ class StudentProjectArchiveCodecTest {
             project,
             assertIs<StudentProjectArchiveReadResult.Preview>(StudentProjectArchiveCodec.preview(encoded.bytes)).project,
         )
+    }
+
+    @Test
+    fun `archive version five remains readable after current archive advances`() {
+        val project = StudentProjectDraftRules.initializeRevisionHistory(manualProject())
+        val legacy = legacyArchive(project, "5")
+
+        val restored = assertIs<StudentProjectArchiveReadResult.Preview>(
+            StudentProjectArchiveCodec.preview(legacy),
+        ).project
+
+        assertEquals(project, restored)
     }
 
     @Test
@@ -795,14 +831,16 @@ class StudentProjectArchiveCodecTest {
         val projectDocument = Json.parseToJsonElement(entries.getValue("project.json").decodeToString()).jsonObject
         val archivedProject = projectDocument.getValue("project").jsonObject.toMutableMap().apply {
             if (version == "1" || version == "2") remove("claims")
-            remove("limitationActions")
+            if (version in setOf("1", "2", "3")) remove("limitationActions")
             if (version == "1") remove("attachments")
+            remove("deadlineDate")
             val revisions = getValue("revisionSnapshots").jsonArray
             put("revisionSnapshots", JsonArray(revisions.map { revision ->
                 JsonObject(revision.jsonObject.toMutableMap().apply {
                     if (version == "1" || version == "2") remove("claims")
-                    remove("limitationActions")
+                    if (version in setOf("1", "2", "3")) remove("limitationActions")
                     if (version == "1") remove("attachments")
+                    remove("deadlineDate")
                 })
             }))
         }
@@ -814,8 +852,9 @@ class StudentProjectArchiveCodecTest {
         entries.keys.filter { it.startsWith("revisions/") }.forEach { path ->
             val revision = Json.parseToJsonElement(entries.getValue(path).decodeToString()).jsonObject.toMutableMap()
             if (version == "1" || version == "2") revision.remove("claims")
-            revision.remove("limitationActions")
+            if (version in setOf("1", "2", "3")) revision.remove("limitationActions")
             if (version == "1") revision.remove("attachments")
+            revision.remove("deadlineDate")
             entries[path] = JsonObject(revision).toString().encodeToByteArray()
         }
 

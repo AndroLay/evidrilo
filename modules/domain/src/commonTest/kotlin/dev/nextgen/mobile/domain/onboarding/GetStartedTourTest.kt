@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class GetStartedTourTest {
     @Test
-    fun walkthrough_moves_from_student_work_to_organization_to_review_in_three_steps() {
+    fun introduction_moves_through_all_six_product_sections() {
         var state = GetStartedTourState()
 
         assertEquals("WELCOME", state.step.name)
@@ -18,6 +18,12 @@ class GetStartedTourTest {
         state = state.reduce(GetStartedTourEvent.Next)
         assertEquals("REVIEW", state.step.name)
         assertTrue(state.canContinue)
+        state = state.reduce(GetStartedTourEvent.Next)
+        assertEquals(GetStartedTourStep.ASSISTANCE, state.step)
+        state = state.reduce(GetStartedTourEvent.Next)
+        assertEquals(GetStartedTourStep.PORTABILITY, state.step)
+        state = state.reduce(GetStartedTourEvent.Next)
+        assertEquals(GetStartedTourStep.READY, state.step)
         state = state.reduce(GetStartedTourEvent.Next)
 
         assertTrue(state.isComplete)
@@ -33,7 +39,7 @@ class GetStartedTourTest {
     }
 
     @Test
-    fun walkthrough_is_field_neutral_and_completes_after_three_sections() {
+    fun introduction_is_field_neutral_and_completes_after_six_sections() {
         var state = GetStartedTourState()
         assertEquals(GetStartedTourStep.WELCOME, state.step)
         assertTrue(state.canContinue)
@@ -43,10 +49,12 @@ class GetStartedTourTest {
         state = state.reduce(GetStartedTourEvent.Next)
         assertEquals(GetStartedTourStep.REVIEW, state.step)
         assertTrue(state.canContinue)
+        repeat(3) { state = state.reduce(GetStartedTourEvent.Next) }
+        assertEquals(GetStartedTourStep.READY, state.step)
         state = state.reduce(GetStartedTourEvent.Next)
 
         assertTrue(state.isComplete)
-        assertEquals(GetStartedTourStep.REVIEW, state.step)
+        assertEquals(GetStartedTourStep.READY, state.step)
         assertEquals(state, state.reduce(GetStartedTourEvent.Next))
         assertFalse(GetStartedTourState().isComplete)
     }

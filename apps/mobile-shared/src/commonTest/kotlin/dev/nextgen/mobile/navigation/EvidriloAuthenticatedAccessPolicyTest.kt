@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class EvidriloAuthenticatedAccessPolicyTest {
     @Test
-    fun localProjectAndReadOnlyCatalogRoutesRemainAvailableWithoutAnAccount() {
+    fun localProjectAndReadOnlyCatalogRoutesRemainAvailableWithoutAnAccountAfterGuestModeIsRetired() {
         val localProjectRoutes = listOf(
             EvidriloDestination.HOME,
             EvidriloDestination.PROJECT_CATALOG,
@@ -34,7 +34,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
     }
 
     @Test
-    fun local_case_workflow_and_history_are_available_to_guest_but_premium_stays_protected() {
+    fun case_workflow_and_history_require_an_account_after_guest_mode_is_retired() {
         val localCaseRoutes = listOf(
             EvidriloDestination.SOURCES,
             EvidriloDestination.WORKSPACE,
@@ -50,7 +50,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
         )
 
         localCaseRoutes.forEach { destination ->
-            assertFalse(destination.requiresAuthenticatedFreeAccess(), "$destination is local and must work in guest mode")
+            assertTrue(destination.requiresAuthenticatedFreeAccess(), "$destination must require a signed-in account")
         }
         assertTrue(EvidriloDestination.PREMIUM.requiresAuthenticatedFreeAccess())
     }
@@ -72,7 +72,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
     }
 
     @Test
-    fun all_unlisted_destinations_fail_closed_and_demo_does_not_unlock_product_routes() {
+    fun all_unlisted_destinations_fail_closed_after_guest_mode_is_retired() {
         val public = setOf(
             EvidriloDestination.ACCOUNT,
             EvidriloDestination.GUIDE,
@@ -84,17 +84,6 @@ class EvidriloAuthenticatedAccessPolicyTest {
             EvidriloDestination.PROJECT_TEMPLATE_DETAIL,
             EvidriloDestination.PROJECTS,
             EvidriloDestination.PROJECT_EDITOR,
-            EvidriloDestination.SOURCES,
-            EvidriloDestination.WORKSPACE,
-            EvidriloDestination.EVIDENCE,
-            EvidriloDestination.EVIDENCE_LENS,
-            EvidriloDestination.CLAIM_TRACE,
-            EvidriloDestination.CLAIM_BOUNDARY,
-            EvidriloDestination.VERIFY_CLAIM,
-            EvidriloDestination.ACTION,
-            EvidriloDestination.EVIDENCE_DELTA,
-            EvidriloDestination.PRACTICE,
-            EvidriloDestination.HISTORY,
             EvidriloDestination.PROFILE,
             EvidriloDestination.SETTINGS,
             EvidriloDestination.WORKSPACE_PREFERENCES,
@@ -103,7 +92,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
         )
 
         EvidriloDestination.entries.filterNot(public::contains).forEach { destination ->
-            assertTrue(destination.requiresAuthenticatedFreeAccess(), "$destination must remain gated while demo is active")
+            assertTrue(destination.requiresAuthenticatedFreeAccess(), "$destination must remain gated without an account")
         }
     }
 
