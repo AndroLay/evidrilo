@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ProjectAiStageAssistGatewayTest {
     @Test
@@ -40,6 +41,44 @@ class ProjectAiStageAssistGatewayTest {
         assertEquals(true, transport.body?.contains("\"selectedEvidenceIds\":[\"evidence_01\"]") == true)
         assertEquals(true, transport.body?.contains("\"selectedEvidence\":[{\"id\":\"evidence_01\",\"kind\":\"DATA\",\"label\":\"Collected data\",\"summary\":\"Only the selected observation\",\"origin\":\"Student project\"}]") == true)
         assertEquals(false, transport.body?.contains("Unselected private note") == true)
+    }
+
+    @Test
+    fun `preview serializes selected fields deterministically across map insertion orders`() {
+        val reverseOrderTransport = QueueStageAssistTransport(AccountHttpResponse(200, previewJson()))
+        val sortedOrderTransport = QueueStageAssistTransport(AccountHttpResponse(200, previewJson()))
+        val reverseOrderRequest = validRequest().copy(
+            selectedFieldValues = linkedMapOf(
+                "research_question" to "old question",
+                "hypothesis" to "expected result",
+            ),
+        )
+        val sortedOrderRequest = validRequest().copy(
+            selectedFieldValues = linkedMapOf(
+                "hypothesis" to "expected result",
+                "research_question" to "old question",
+            ),
+        )
+
+        runSuspendTest {
+            gateway(reverseOrderTransport).generatePreview(
+                reverseOrderRequest,
+                "stage_ai_req_0001",
+                explicitlyConfirmedForRequest = true,
+            )
+            gateway(sortedOrderTransport).generatePreview(
+                sortedOrderRequest,
+                "stage_ai_req_0001",
+                explicitlyConfirmedForRequest = true,
+            )
+        }
+
+        assertEquals(sortedOrderTransport.body, reverseOrderTransport.body)
+        assertTrue(
+            reverseOrderTransport.body?.contains(
+                "\"selectedFields\":[{\"id\":\"hypothesis\",\"value\":\"expected result\"},{\"id\":\"research_question\",\"value\":\"old question\"}]",
+            ) == true,
+        )
     }
 
     @Test

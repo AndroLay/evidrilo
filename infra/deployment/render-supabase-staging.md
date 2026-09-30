@@ -178,8 +178,12 @@ use.
   failed because that job lacked `rg`.
 - The separate iOS Simulator workflow for `e114571` failed because
   `PracticeCourseStore.kt` called `toSortedMap()`, which is unavailable in
-  common Kotlin. A focused follow-up change fixes both CI issues and adds
-  regression coverage; its hosted workflow result is pending.
+-  common Kotlin. Commit `0961fff` fixed that call and the missing Linux `rg`
+  dependency. Its hosted Android/JVM, API/worker, contract/migration, and public
+  package jobs passed, while iOS found a second `toSortedMap()` call in
+  `ProjectAiStageAssistGateway.kt`. The next focused change replaces it with
+  common Kotlin sorting and adds regression coverage; its hosted result is
+  pending.
 - A full `scripts/ci/verify-local.sh` run passed earlier on 2026-10-01:
   Kotlin/JVM and Android tests/build, 168 Node tests, 453 API tests, 30 worker
   tests, Docker Compose, architecture, audio assets, and deployment checks

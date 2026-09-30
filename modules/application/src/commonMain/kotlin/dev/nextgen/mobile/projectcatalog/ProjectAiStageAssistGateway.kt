@@ -469,7 +469,7 @@ class ProjectAiStageAssistGateway(
             request.selectedFieldValues.keys.sorted().forEach { add(JsonPrimitive(it)) }
         })
         put("selectedFields", buildJsonArray {
-            request.selectedFieldValues.toSortedMap().forEach { (id, value) ->
+            request.selectedFieldValues.entries.sortedBy { it.key }.forEach { (id, value) ->
                 add(buildJsonObject {
                     put("id", id)
                     put("value", value)
