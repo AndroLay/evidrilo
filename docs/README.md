@@ -8,6 +8,7 @@ review the application.
 
 | Task | Start with |
 | --- | --- |
+| Latest observed runtime and remaining release work | [`development/current-status.md`](development/current-status.md) |
 | Understand current product scope | [`product/m0-product-contract.md`](product/m0-product-contract.md), then [`decisions.md`](decisions.md) |
 | Follow student, account, project, AI, and billing journeys | [`product/workflows.md`](product/workflows.md) — includes the detailed Mermaid diagrams and marks gated/target paths |
 | Trace runtime calls between mobile, API, providers, and storage | [`architecture/system-execution-flows.md`](architecture/system-execution-flows.md) — sequence, context, data-boundary, and local-topology diagrams |

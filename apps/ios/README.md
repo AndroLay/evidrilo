@@ -1,5 +1,9 @@
 # Evidrilo iOS host
 
+Current observed runtime: [1 October Staging / judging acceptance](../../docs/development/current-status.md).
+Android uses hosted Render; Test Store is Debug-only. Production and native
+iOS account/billing acceptance must not be inferred from Android evidence.
+
 This folder contains the thin Xcode host for the shared Kotlin/Compose app.
 The product UI, reducer, feedback engine, and RevenueCat adapter remain in
 `apps/mobile-shared`; the Swift layer only presents the shared `App()` composable.

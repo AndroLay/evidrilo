@@ -1,5 +1,9 @@
 # Evidrilo Platform
 
+Current observed runtime: [1 October Staging / judging acceptance](../docs/development/current-status.md).
+Android uses hosted Render; Test Store is Debug-only. Production and native
+iOS account/billing acceptance must not be inferred from Android evidence.
+
 The platform is an optional online foundation for account-backed and
 server-owned capabilities. The bundled learning workflow remains local-first
 and must work without the API, database, or worker.
@@ -187,13 +191,12 @@ request spend at USD 0.01 and shared monthly spend at USD 2. Ordinary mobile
 account calls retain their short timeout; calls waiting for AI allow 75 seconds.
 The outer gateway and provider-spend lease respect the configured provider time.
 
-On 1 October a synthetic request through the actual Evidrilo adapter reached
-Experiential and was rejected as rate-limited (HTTP 429). No successful live
-adapter completion, persisted provider settlement or authenticated device AI
-acceptance is established. The isolated probe used a recording budget, not a
-user-credit ledger. Local fixture tests and disposable database checks remain
-separate evidence. Hosted activation stays off until the full account → consent
-→ provider → authoritative credit settlement path is accepted.
+An early 1 October probe received HTTP 429 with the exhausted owner key.
+A dedicated key later enabled live Android general chat through Render Staging.
+The hosted candidate uses 2,048 output tokens, the existing request/monthly
+spend limits, verified sign-in, consent and server credit accounting. Default
+activation flags in source remain off. Device acceptance for every project
+operation and native iOS remains separate from this general chat observation.
 
 Project scaffold, stage-assist, and General chat adapters share that stateless Responses
 transport, token accounting, and provider-spend ledger. They remain off unless
@@ -227,9 +230,9 @@ is semantically entailed by the cited material. The API does not independently
 re-run the on-device KMP evaluator. The adapter sets Responses `store:false`,
 but that does not guarantee zero retention at the gateway or upstream provider.
 Review the Experiential organization capture setting and provider route before
-using real student content. Provider terms, retention controls, privacy
-approval, and live runtime evidence remain open; keep the adapter disabled until
-those gates are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
+using real student content. The owner-approved Staging runtime has live general-chat evidence. Production
+privacy/retention and operational review remain separate; keep other environments
+disabled until their gates are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
 
 Deployment preparation and ownership boundaries are described in
 [infra/README.md](../infra/README.md).

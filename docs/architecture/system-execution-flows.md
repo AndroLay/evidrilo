@@ -1,5 +1,9 @@
 # System Architecture and Execution Flows
 
+Observed deployment/device status: [1 October acceptance snapshot](../development/current-status.md).
+Default-off and reviewed-template gates below describe source/configuration
+boundaries; hosted general chat is enabled in the approved Staging runtime.
+
 This guide shows how Evidrilo components exchange data at runtime. It
 complements the student-facing journeys in
 [`../product/workflows.md`](../product/workflows.md), which describe choices and
@@ -54,7 +58,7 @@ flowchart LR
         Worker[.NET worker] --> Pg
         Auth[Supabase JWT validation] -->|verified principal| Api
         Api --> Credits[Consent and AI-credit ledger]
-        Api -. provider disabled .-> AiProvider[AI provider]
+        Api -. gated provider dispatch .-> AiProvider[AI provider]
     end
 
     App -. optional configured requests .-> Api
@@ -316,9 +320,10 @@ project-reducer application. The five bundled structure-only family starters
 do not enable method-specific AI. Home's AI entry first offers General Chat or
 one eligible Draft/Active project; the project picker includes only a Published
 template with a declared AI operation and sends no project list to the provider.
-General Chat remains a separate, unlinked mode; each request requires its own
-consent and sends only the current message, not prior transcript or project
-data. Server activity history is metadata-only. Project history supports
+General Chat supports bounded recent conversation (eight turns, 16,000
+characters) and an explicitly selected local project snapshot when requested.
+Sending requires current account consent. Without a selected project it remains
+unlinked; local snapshots are untrusted context, not proof of server ownership. Server activity history is metadata-only. Project history supports
 cursor-based older pages; General Chat opens an account activity view that
 labels unlinked General entries separately from project-bound metadata.
 
@@ -332,7 +337,7 @@ usage; invalid, stale, rejected, or failed requests release the reservation.
 With the current default-off configuration the route returns
 `PROJECT_AI_NOT_READY` and does not dispatch to a provider.
 
-#### Current request: provider disabled
+#### Default-off request: provider disabled
 
 ```mermaid
 sequenceDiagram

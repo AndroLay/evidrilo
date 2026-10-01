@@ -1,5 +1,9 @@
 # Evidrilo Android release
 
+Current observed runtime: [1 October Staging / judging acceptance](../../docs/development/current-status.md).
+Android uses hosted Render; Test Store is Debug-only. Production and native
+iOS account/billing acceptance must not be inferred from Android evidence.
+
 The Android app uses `dev.nextgen.mobile` as its current application ID,
 `minSdk 26`, `targetSdk 35`, and version defaults `1` / the canonical release
 version in the repository root `version.props`. Only the platform build number

@@ -1,5 +1,9 @@
 # Product Workflows
 
+Observed deployment/device status: [1 October acceptance snapshot](../development/current-status.md).
+Default-off and reviewed-template gates below describe source/configuration
+boundaries; hosted general chat is enabled in the approved Staging runtime.
+
 This guide collects Evidrilo's student, account, project, and purchase
 workflows. It separates behavior present in the current source from product
 targets that remain gated. A Mermaid diagram describes a path; it does not by
@@ -186,6 +190,11 @@ source records, evidence notes, findings, themes, claims, limitations, next
 actions, and revision checkpoints. Structural checks surface missing fields or
 links; they do not grade academic quality or decide whether a claim is true.
 
+Current UI: Projects → catalog selection → local editor → review/export. Active
+and completed projects share one list and count toward the total cap; permanent
+deletion requires confirmation. Archive/Trash in the diagram below describe
+legacy compatibility records, not current navigation or a way to free quota.
+
 ~~~mermaid
 flowchart TD
     Home[Home] --> List[My Projects]
@@ -272,13 +281,13 @@ action of recording a note from it.
 The guided M0 case remains a separate learning path. Opening or finishing a
 synthetic case does not populate the project with its facts or conclusions.
 
-Local active-project capacity is five on the Free path and up to fifty only
+Local total-project capacity is five on the Free path and up to fifty only
 when a signed-in account has a verified active `evidrilo_pro` entitlement. If
 entitlement state is unknown, the app uses the Free limit; it must not delete,
 hide, or rewrite existing projects. These are per-installation limits, not
 account-wide quota or cloud sync. The temporary guest-mode switch controls
 whether RevenueCat is initialized for a guest installation; it is currently
-disabled in the client. Trash retention is thirty days in the local project
+disabled in the client. Legacy Trash retention is thirty days in the compatibility project
 rules; a full active quota does not expire or purge an item early.
 
 The five bundled offline family starters are selectable and create local
@@ -596,7 +605,9 @@ only Draft/Active projects whose saved template is Published and declares an AI
 operation. Choosing a project opens it through the normal resume flow; other
 projects remain available through My Projects for manual work. The project list
 is not sent to the provider. General Chat has no project ID or case context and
-sends only the current message. Before sending, the app refreshes the signed-in
+sends the message and bounded recent conversation. An explicitly selected local
+project snapshot can provide contextual help, with proposed edits reviewed
+before application. Before sending, the app refreshes the signed-in
 account's revocable AI data-use consent from the platform; granting it sends no
 message by itself, and each message still requires separate `general-chat.v1`
 confirmation. The server stores metadata rather than the transcript. No

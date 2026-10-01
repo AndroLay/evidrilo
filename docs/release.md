@@ -1,5 +1,10 @@
 # Next Gen Submission Readiness
 
+Latest dated evidence: [Staging / Android judging acceptance](development/current-status.md).
+The checklist below is the complete release contract; unchecked items are not
+a statement that no implementation exists. Hosted Android acceptance does not
+complete the submission package or public-store release.
+
 This checklist is for the Shipaton Next Gen submission, not an App Store or
 Google Play release. Next Gen does not require a store listing or a paid Apple
 or Google developer account. It does require a working-app demonstration and a
@@ -33,8 +38,8 @@ frozen build and the evidence actually collected for it.
 
 - [ ] The app launches from a reproducible build and demonstrates the exact
       interaction described in the story and video.
-- [ ] Get Started offers an optional, clearly synthetic preview with distinct
-      `not started`, `skipped`, and `completed` states. The preview does not
+- [ ] Get Started offers an optional, language-first introduction to app capabilities with distinct
+      `not started`, `skipped`, and `completed` states. The introduction does not
       create a project, save answers, or write learning history.
 - [ ] Skipping Get Started returns to Home and does not block accountless local
       project work or anonymous read-only catalog browsing. Verified sign-in is

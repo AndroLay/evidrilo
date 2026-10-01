@@ -1,7 +1,12 @@
 # Render + Supabase staging handoff
 
-API staging status: `SCHEMA AND RUNTIME ROLES PROVISIONED / RENDER CREATION BLOCKED HTTP 402 / NOT DEPLOYED`.
-Full API-and-worker staging status: `NOT READY — Render payment setup, Google callback/sign-in, hosted AI, RevenueCat transactions and final native UI acceptance remain`.
+API staging status: `LIVE — hosted Staging on 5a40b748; final readiness 200`.
+Full API-and-worker staging status: `READY WITH RISKS for Android judging / Test Store; iOS and Production release gates remain`.
+
+Current snapshot: [acceptance status](../../docs/development/current-status.md).
+Dated checks below are historical when superseded by the final hosted snapshot.
+Local API/worker/PostgreSQL are stopped. API pooling is disabled to avoid retained
+idle connections across independent stores; verified TLS and role grants remain.
 
 The landing page has a separate Cloudflare Pages setup in
 [`cloudflare-pages-landing.md`](cloudflare-pages-landing.md). The default API
@@ -415,5 +420,7 @@ provider-default effort, USD 0.01/request and USD 2/month limits. Billing is
 Test Store only, with server-verified sandbox subscription reconciliation;
 production webhook ingestion is not enabled alongside that mode.
 The mobile Debug build points to hosted Staging. This is a judging/test build,
-not evidence of real App Store/Play billing readiness. Hosted health, verified
-account/device calls, and final deploy SHA must be recorded after deployment.
+not evidence of real App Store/Play billing readiness. Final deployment uses `5a40b748`; readiness and signed-in account endpoints
+returned 200, and Android general AI received a live reply through Render.
+Verify CI passed; the latest native iOS CI result remains pending. See the
+current acceptance snapshot for limits.

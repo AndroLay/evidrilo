@@ -193,7 +193,7 @@ Duplicate callbacks, restore, and repeated balance reads must not duplicate a
 period grant. Active subscriptions retain Restore and Manage actions, and loading
 offers must preserve verified active access.
 
-For a local-only Staging Test Store run, the default-off server reconciliation
+For a Staging Test Store run (local or hosted), the default-off server reconciliation
 mode reads RevenueCat directly and validates sandbox/store/product/period data.
 It recovers verified purchase periods when no hosted webhook is available.
 Production continues to require its authenticated provider-event integration;

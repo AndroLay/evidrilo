@@ -1,4 +1,7 @@
-# Evidrilo
+<p align="center">
+  <img src="apps/landing/assets/evidrilo-mark.png" width="112" alt="Evidrilo logo">
+</p>
+<h1 align="center">Evidrilo</h1>
 
 **From a research task to a claim whose evidence and limits stay in view.**
 
@@ -6,15 +9,23 @@ Evidrilo is a student research workspace. It connects a project brief, sources,
 evidence notes, findings, claims, limitations, and next steps so students can
 inspect the reasoning behind their work.
 
-Students can organize their own local project or practice separately with a
-bundled synthetic case. The case is not a project template and does not fill in
-a student's research.
+Students can organize their own local project or follow three separate
+bundled practice cases (the first Free, two additional cases with verified Pro).
+These cases are not project templates and do not fill in a student's research.
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.12.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
-[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![RevenueCat](https://img.shields.io/badge/RevenueCat-KMP%203.10.1-00AEEF)](https://www.revenuecat.com/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Mobile-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Compose](https://img.shields.io/badge/Compose-UI-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
+[![.NET](https://img.shields.io/badge/.NET-API_%26_worker-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth_%26_Postgres-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Render](https://img.shields.io/badge/Render-Staging-000000?logo=render&logoColor=white)](https://render.com/)
+[![RevenueCat](https://img.shields.io/badge/RevenueCat-Subscriptions-F2545B?logo=revenuecat&logoColor=white)](https://www.revenuecat.com/)
+![Experiential Labs](https://img.shields.io/badge/Experiential_Labs-Luna_6_AI-245AFF)
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-Landing-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/)
+[![Google](https://img.shields.io/badge/Google-OAuth-4285F4?logo=google&logoColor=white)](https://developers.google.com/identity)
 [![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
+
+**Status:** Android judging build uses hosted Staging; billing is RevenueCat
+Test Store only. [Current acceptance and remaining work →](docs/development/current-status.md)
 
 [Features](#features) · [Landing page](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md) · [Quick start](#quick-start) ·
 [Architecture](docs/architecture/repository-structure.md) · [System flows](docs/architecture/system-execution-flows.md) ·
@@ -45,7 +56,7 @@ local; signing in does not upload or merge project data.
 
 ### Guided Case Practice
 
-These Android screenshots show the separate, guest-accessible M0 tablet-dissolution
+Earlier Android screenshots illustrate the separate M0 tablet-dissolution
 case. Its supplied observations are synthetic, not student projects or research
 submissions. Feedback is deterministic and bounded to the case.
 
@@ -125,40 +136,33 @@ reviewed student-selectable template.
 
 ### Bounded AI Assistance
 
-The mobile/API source includes project scaffolding from a reviewed template,
-stage assistance for templates that explicitly declare supported operations,
-and a separate unlinked General Chat. Home's AI entry asks the student to
-choose General Chat or one eligible project; only active projects with a
-published template and declared AI operation appear. Project requests show
-selected context and return proposals for review before reducer-mediated
-application; General Chat sends only the current message and never receives
-project context. The server stores activity metadata rather than chat
-transcripts; the app can inspect account AI activity without retrieving
-transcripts, with General Chat explicitly labeled unlinked. These source paths
-are not proof of a live provider flow:
-provider/privacy flags are default-off, and method-specific help still
-requires a genuinely reviewed, published template. Manual local project work
-remains available, and the deterministic evaluator—not AI—retains authority
-over case feedback.
+Signed-in students can chat with AI or select a local project for contextual
+help. Messages may include recent conversation and the chosen project snapshot;
+chat history stays local and server activity is metadata-only. Proposed edits
+show a preview and require confirmation before being applied. General Chat was
+verified on Android through hosted Staging using Experiential Luna 6. Reviewed
+method-specific scaffolding still requires an approved, published template;
+AI does not replace deterministic case feedback or scientific review.
 
 [AI assistance boundary →](docs/decisions.md#d-106-use-an-evidence-grounded-ai-loop-for-project-assistance)
 
 ### Accounts and Evidrilo Pro
 
 Local project work does not require sign-in and is not uploaded when a user
-signs in. Account and entitlement handling are in source; identity-provider
-runtime and RevenueCat purchase, cancellation, restore, revoke, and expiry need
-provider/device verification.
+signs in. Google sign-in and Android session restoration have been observed. RevenueCat
+Test Store monthly/annual purchase, checkout cancellation/failure recovery,
+restore, relaunch, and sandbox expiry have evidence; real-store billing and
+iOS transaction acceptance remain open.
 
 [RevenueCat architecture →](docs/architecture/revenuecat.md)
 
 ### API and Background Worker
 
 The ASP.NET Core API, PostgreSQL migrations, and bounded .NET worker provide a
-local platform foundation for versioned contracts and account-bound services.
-RevenueCat billing events use idempotent webhook projections; these local
-contracts do not establish a live provider transaction or managed deployment.
-Local integration is separate from a hosted production deployment.
+hosted Staging foundation on Render with Supabase Auth/PostgreSQL. Authenticated
+credits, entitlements, progress, notifications, and sync returned successful
+responses; AI chat was verified from Android. Staging uses server-verified
+Test Store reconciliation; Production webhook billing is a separate release gate.
 
 [Platform architecture →](docs/architecture/repository-structure.md) · [API docs →](docs/api/README.md)
 
