@@ -1,14 +1,18 @@
 # Current acceptance status
 
-Observed on 1 October 2026 for application commit `5a40b748`.
+Observed on 1 October 2026 for application candidate `cfa22860`, version 1.0.0 / build 2.
+The v1.0.0 tag also includes landing-page and documentation changes; these do
+not change the verified native application inputs.
 This is a dated snapshot, not continuous monitoring or a production guarantee.
 
-**Decision: READY WITH RISKS for the Android judging build / Staging / Test Store.**
-Public store release and full iOS acceptance remain unproven.
+**Decision: READY WITH RISKS for Android and iOS Simulator judging builds / Staging / Test Store.**
+Public store distribution and full native iOS online acceptance remain unproven.
+Download scope and limits: [Release 1.0.0](https://github.com/AndroLay/evidrilo/releases/tag/v1.0.0).
 
 ## Observed
 
-- Render API and worker are live from the same commit, with separate Supabase
+- Render API and worker are live from `87d2c06d` (server inputs unchanged in
+  the application candidate), with separate Supabase
   Staging runtime roles and verified TLS. Production was not changed.
 - API readiness returned 200 with Auth/database/config ready; unauthenticated
   AI credits returned 401. Signed-in credits, entitlements, progress,
@@ -22,10 +26,18 @@ Public store release and full iOS acceptance remain unproven.
   are fixture evidence, not elapsed live months. No real payment was made.
 - The Profile identity card shows name/email/Free or Pro. Google connection is
   shown separately inside account details, not on the Profile main page.
-- [Verify passed](https://github.com/AndroLay/evidrilo/actions/runs/36865870445).
-  [iOS Simulator](https://github.com/AndroLay/evidrilo/actions/runs/36865870424)
-  completed the unsigned Release host build; its guest-project UI test was
-  still running when this snapshot was written.
+- [Verify passed](https://github.com/AndroLay/evidrilo/actions/runs/36876562081)
+  on `cfa22860`, including backend, contracts/migrations, mobile/JVM, and public
+  package checks.
+- [iOS Simulator passed](https://github.com/AndroLay/evidrilo/actions/runs/36876561915):
+  unsigned Debug judging host, install/launch, guest Home → Projects → catalog →
+  blank project → Project basics / Project name, and package validation.
+  Build: Apple Silicon / arm64, Xcode 26.0.1, version 1.0.0 / build 2.
+  Google/email and Test Store are configured; native provider transactions have
+  not been demonstrated. No Apple signing or installable iPhone IPA is available.
+- The landing page now uses Android 1.0.0 captures and current project, Practice,
+  AI and Free/Pro information. Captures use synthetic demo data and Test Store.
+
 
 The former local API, local worker/PostgreSQL containers, and idle build
 daemons were stopped; Android uses the HTTPS Render endpoint. These operational
@@ -34,7 +46,8 @@ retaining connections in independent store pools on the small Staging pooler.
 
 ## Remaining work
 
-1. Record the final iOS build/simulator result and native sign-in/billing evidence.
+1. Verify native iOS Google/email sign-in and billing transactions separately.
+   iOS project attachment picking/storage and DOCX text extraction remain unavailable.
 2. Record end-to-end project AI preview/apply and file export/import/reopen on
    named devices; current source/fixtures are not complete device acceptance.
 3. Validate student usability, accessibility, and educational usefulness. Human

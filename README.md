@@ -24,8 +24,8 @@ These cases are not project templates and do not fill in a student's research.
 [![Google](https://img.shields.io/badge/Google-OAuth-4285F4?logo=google&logoColor=white)](https://developers.google.com/identity)
 [![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
 
-**Status:** Android judging build uses hosted Staging; billing is RevenueCat
-Test Store only. [Current acceptance and remaining work →](docs/development/current-status.md)
+**Version 1.0.0:** [Android APK and iOS Simulator build](https://github.com/AndroLay/evidrilo/releases/tag/v1.0.0)
+use hosted Staging and RevenueCat Test Store. The simulator package is not an iPhone IPA. [Current acceptance and remaining work →](docs/development/current-status.md)
 
 [Features](#features) · [Landing page](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md) · [Quick start](#quick-start) ·
 [Architecture](docs/architecture/repository-structure.md) · [System flows](docs/architecture/system-execution-flows.md) ·

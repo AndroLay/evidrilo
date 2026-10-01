@@ -22,18 +22,9 @@ const phoneControls = controls('[data-phone-control]');
 const phoneNav = controls('.phone-nav > span');
 const phoneTags = controls('.source-tag');
 const phoneAnnotations = [
-  [
-    { label: 'Your starting point', title: 'The assignment brief', icon: '#i-doc' },
-    { label: 'Keep it yours', title: 'A local project', icon: '#i-folder' }
-  ],
-  [
-    { label: 'Your chosen material', title: 'Sources you can revisit', icon: '#i-doc' },
-    { label: 'Follow the connection', title: 'Source → note → claim', icon: '#i-link' }
-  ],
-  [
-    { label: 'A useful next step', title: 'Review and revise', icon: '#i-reset' },
-    { label: 'Your academic judgment', title: 'Keep the limits visible', icon: '#i-check' }
-  ]
+  [{ label: 'Keep the next step visible', title: 'Your project, in progress', icon: '#i-folder' }, { label: 'On your device', title: 'Your work stays yours', icon: '#i-shield' }],
+  [{ label: 'Start with your assignment', title: 'Five project families', icon: '#i-doc' }, { label: 'Make it your own', title: 'A guided local starter', icon: '#i-folder' }],
+  [{ label: 'Learn through decisions', title: 'Three Practice cases', icon: '#i-graph' }, { label: 'Take it into your project', title: 'Evidence before claims', icon: '#i-link' }]
 ];
 let phoneIndex = -1;
 function setPhone(index) {

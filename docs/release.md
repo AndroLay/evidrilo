@@ -1,6 +1,6 @@
 # Next Gen Submission Readiness
 
-Latest dated evidence: [Staging / Android judging acceptance](development/current-status.md).
+Latest dated evidence: [1.0.0 Staging / Android and iOS Simulator acceptance](development/current-status.md).
 The checklist below is the complete release contract; unchecked items are not
 a statement that no implementation exists. Hosted Android acceptance does not
 complete the submission package or public-store release.

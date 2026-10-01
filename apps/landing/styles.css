@@ -751,3 +751,50 @@ h2{color:var(--navy)}
   .source-tag{transform:none}
   .phone-pane{transform:translateX(calc((var(--pane) - var(--phone-index,0))*100%))}
 }
+
+/* Current native captures retain the scroll-driven, bezel-free phone. */
+.hero-phone-capture{height:auto;aspect-ratio:540/884}
+.hero-phone-capture .phone-deck{height:auto;aspect-ratio:540/884}
+.hero-phone-capture .phone-pane-capture{padding:0;background:#fff}
+.phone-pane-capture img{display:block;width:100%;height:100%;object-fit:cover}
+.practice-showcase{padding:110px 0;background:#f5f8ff;overflow:hidden}
+.practice-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:100px;align-items:center}
+.practice-art{position:relative;width:min(100%,330px);justify-self:center;transform:rotate(-3deg);transition:transform .8s var(--ease)}
+.practice-art.is-visible{transform:rotate(0deg)}
+.practice-art>img{display:block;width:100%;height:auto;border-radius:24px;box-shadow:0 28px 55px -30px #12265370}
+.practice-art-caption{display:block;margin-top:20px;font-size:12px;text-align:center;color:var(--muted)}
+.practice-copy h2,.plans-layout h2{margin:0;font-size:clamp(36px,4.8vw,64px);line-height:1.04;letter-spacing:-.025em;text-wrap:balance}
+.practice-copy h2 span,.plans-layout h2 span{color:var(--cobalt)}
+.practice-copy>.section-lead{margin:22px 0 0;color:var(--slate);max-width:40ch}
+.practice-lessons{margin:28px 0;padding:0;list-style:none}
+.practice-lessons li{display:flex;gap:17px;padding:20px 0;border-bottom:1px solid var(--line)}
+.practice-lessons li>.icon{margin-top:4px;color:var(--cobalt)}
+.practice-lessons h3{margin:0;font-size:23px;line-height:1.2}
+.practice-lessons p{margin:8px 0;max-width:44ch;font-size:16px;color:var(--slate)}
+.practice-lessons span{color:var(--cobalt);font-size:13px;font-weight:600}
+.plans-section{padding:95px 0;background:#edf2ff}
+.plans-layout{display:grid;grid-template-columns:1fr 1.15fr;gap:85px;align-items:start}
+.plans-layout>div>p{max-width:40ch;color:var(--slate)}
+.plans-layout .plan-boundary{margin-top:26px;font-size:14px;color:var(--navy)}
+.plan-comparison table{width:100%;border-collapse:collapse;font-size:17px;text-align:left;font-variant-numeric:tabular-nums}
+.plan-comparison th,.plan-comparison td{padding:18px 12px;border-bottom:1px solid #c8d5ee;vertical-align:top}
+.plan-comparison thead th{padding-top:0;font-size:21px;color:var(--navy)}
+.plan-comparison th:first-child{padding-left:0;width:43%}
+.plan-comparison tbody th{font-weight:600}
+.plan-comparison td:last-child{color:var(--cobalt);font-weight:600}
+.plan-comparison>p{margin:18px 0 0;font-size:13px;color:var(--slate);max-width:65ch}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:800px){
+ .practice-showcase,.plans-section{padding:64px 0}
+ .practice-grid,.plans-layout{grid-template-columns:1fr;gap:36px}
+ .practice-copy{grid-row:1}
+ .practice-art{width:min(75%,300px);transform:none}
+ .practice-copy h2,.plans-layout h2{font-size:42px}
+ .practice-lessons p{font-size:16px}
+ .plan-comparison th,.plan-comparison td{padding:16px 8px;font-size:15px}
+ .plan-comparison thead th{font-size:18px}
+ .plan-comparison th:first-child{width:39%}
+}
+@media(prefers-reduced-motion:reduce){.practice-art{transform:none;transition:none}}
+.preview-label{font-size:11px}
+.result-trace small{color:#536b94;font-size:12px}
