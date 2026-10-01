@@ -173,7 +173,7 @@ jobs:
           printf '%s\n' 'iOS Simulator application; not an iPhone IPA. Debug judging builds use Staging and RevenueCat Test Store only.' > "$RUNNER_TEMP/evidrilo-ios-package/BUILD-NOTES.txt"
 
       - name: Upload verified iOS simulator application
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-simulator-app
           path: ${{ runner.temp }}/evidrilo-ios-package
@@ -191,7 +191,7 @@ jobs:
 
       - name: Upload iOS simulator evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-simulator-evidence
           path: |

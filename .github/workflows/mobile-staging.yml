@@ -46,7 +46,7 @@ jobs:
       - name: Build sandbox Android APK
         run: ./gradlew --no-daemon --no-configuration-cache --max-workers=1 :androidApp:assembleDebug :androidApp:verifyComposeResourcePackaging --quiet
       - name: Save Staging APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidrilo-staging-android-${{ github.sha }}
           path: apps/android/build/outputs/apk/debug/androidApp-debug.apk
