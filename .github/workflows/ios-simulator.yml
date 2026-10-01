@@ -201,6 +201,12 @@ jobs:
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
+          if [[ -d "$RUNNER_TEMP/evidrilo-ios-build/ios-ui-tests.xcresult" ]]; then
+            xcrun xcresulttool export attachments \
+              --path "$RUNNER_TEMP/evidrilo-ios-build/ios-ui-tests.xcresult" \
+              --output-path "$RUNNER_TEMP/evidrilo-ios-build/ui-attachments" \
+              > "$RUNNER_TEMP/evidrilo-ios-build/attachment-export.log" 2>&1
+          fi
           xcrun simctl list devices > "$RUNNER_TEMP/evidrilo-ios-simulator-evidence/devices-final-ci.txt" 2>&1
           xcodebuild -version > "$RUNNER_TEMP/evidrilo-ios-simulator-evidence/xcode-final.txt" 2>&1
           exit 0

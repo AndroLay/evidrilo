@@ -48,7 +48,28 @@ final class EvidriloUITests: XCTestCase {
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<6 {
-            if element.exists && element.isHittable { return }
+            if element.exists && element.isHittable {
+                // Compose scroll deceleration is not tracked by XCTest's idle
+                // detection. A tap during it can stop scrolling instead of
+                // activating the button. Wait for its actual frame to settle.
+                var lastFrame = element.frame
+                var stationarySince = Date()
+                let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    guard element.exists && element.isHittable else {
+                        stationarySince = Date()
+                        return false
+                    }
+                    let frame = element.frame
+                    if frame != lastFrame {
+                        lastFrame = frame
+                        stationarySince = Date()
+                    }
+                    return Date().timeIntervalSince(stationarySince) >= 0.75
+                }, object: nil)
+                XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 8), .completed,
+                               "Button must stop scrolling before tapping")
+                return
+            }
             app.swipeUp()
         }
     }
