@@ -50,7 +50,7 @@ jobs:
       IOS_BUILD_CONFIGURATION: ${{ github.event_name != 'pull_request' && vars.EVIDRILO_JUDGING_STAGING_ENABLED == 'true' && 'Debug' || 'Release' }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Java 21
         uses: actions/setup-java@v4

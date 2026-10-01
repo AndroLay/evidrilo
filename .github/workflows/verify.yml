@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes ripgrep
@@ -75,7 +75,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -110,7 +110,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
@@ -129,7 +129,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes ripgrep
