@@ -47,56 +47,41 @@ checker, academic grader, or scientific-truth oracle.
 
 ### Student Project Workspace
 
-Start with a blank project and your brief. Add sources, evidence notes, and
-findings; connect them to synthesis themes and claims, then record limits and
-next steps. This first path focuses on directed literature synthesis and stays
-local; signing in does not upload or merge project data.
+Choose a project family from the catalog, then use an editable offline starter
+or begin blank. Work through focused sections for your brief, question, sources,
+evidence notes, findings, claims, limits, and next steps. Project data stays
+local; signing in does not upload or merge it.
 
 [Project workflow and lifecycle →](docs/product/workflows.md)
 
 ### Guided Case Practice
 
-Earlier Android screenshots illustrate the separate M0 tablet-dissolution
-case. Its supplied observations are synthetic, not student projects or research
-submissions. Feedback is deterministic and bounded to the case.
+Three bundled cases explore observations, source comparison, and reconsidering
+data. The first is Free; verified Pro opens the other two. Their synthetic
+material and deterministic feedback support practice separately from your own
+projects. They do not grade academic work or automatically populate a project.
+
+### Inside the Current App
+
+Android 1.0.0 / build 2, captured 1 October 2026. These nine screens use synthetic
+demo data and Test Store plans; they illustrate the interface, not real payments
+or a completed research study. Select a screen to view the full image.
 
 <table>
   <tr>
-    <td align="center" valign="top" width="33%">
-      <strong>Evidence Lens</strong><br>
-      <a href="apps/landing/assets/evidence-lens.webp"><img src="apps/landing/assets/evidence-lens.webp" width="165" alt="Evidence Lens listing the supplied warm, room-temperature, and cold-water observations"></a>
-      <p>Inspect the three supplied observations and select which ones support the comparison you want to make.</p>
-      <a href="docs/product/workflows.md">Case workflow →</a>
-    </td>
-    <td align="center" valign="top" width="33%">
-      <strong>Requirement Trace</strong><br>
-      <a href="apps/landing/assets/requirement-trace.webp"><img src="apps/landing/assets/requirement-trace.webp" width="165" alt="Requirement Trace connecting the synthetic case requirement to supplied evidence"></a>
-      <p>Follow the task from its requirement to the observations that can support it.</p>
-      <a href="docs/product/workflows.md">Case workflow →</a>
-    </td>
-    <td align="center" valign="top" width="33%">
-      <strong>Claim Boundary</strong><br>
-      <a href="apps/landing/assets/claim-boundary.webp"><img src="apps/landing/assets/claim-boundary.webp" width="165" alt="Claim Boundary before assessment, showing the claim, scope, and limitations to review"></a>
-      <p>Keep a learner-written claim, its scope, and its limitations visible before verification.</p>
-      <a href="docs/product/workflows.md">Case workflow →</a>
-    </td>
+    <td align="center" valign="top" width="33%"><strong>Your next step</strong><br><a href="docs/screenshots/v1.0.0/home.webp"><img src="docs/screenshots/v1.0.0/home.webp" width="210" alt="Evidrilo 1.0.0: Your next step"></a><p>Home keeps your projects and learning routes within reach.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Choose a starting point</strong><br><a href="docs/screenshots/v1.0.0/catalog.webp"><img src="docs/screenshots/v1.0.0/catalog.webp" width="210" alt="Evidrilo 1.0.0: Choose a starting point"></a><p>Five illustrated families offer editable offline structures.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Keep work organized</strong><br><a href="docs/screenshots/v1.0.0/projects.webp"><img src="docs/screenshots/v1.0.0/projects.webp" width="210" alt="Evidrilo 1.0.0: Keep work organized"></a><p>A focused list brings active and completed projects together.</p></td>
   </tr>
-</table>
-
-<table>
   <tr>
-    <td align="center" valign="top" width="50%">
-      <strong>Evidence Map</strong><br>
-      <a href="apps/landing/assets/evidence-map.webp"><img src="apps/landing/assets/evidence-map.webp" width="165" alt="Evidence Map connecting the case requirement to three observations and flagging missing evidence"></a>
-      <p>See how supplied facts connect to a requirement and where support is still missing.</p>
-      <a href="docs/product/workflows.md">Evidence mapping →</a>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <strong>Evidence Delta · What Changed?</strong><br>
-      <a href="apps/landing/assets/what-changed.webp"><img src="apps/landing/assets/what-changed.webp" width="165" alt="What Changed screen comparing supplied evidence and a learner-authored revision"></a>
-      <p>Compare the original with one learner-authored revision and inspect what changed.</p>
-      <a href="docs/product/workflows.md">Revision workflow →</a>
-    </td>
+    <td align="center" valign="top" width="33%"><strong>Move through your project</strong><br><a href="docs/screenshots/v1.0.0/sections.webp"><img src="docs/screenshots/v1.0.0/sections.webp" width="210" alt="Evidrilo 1.0.0: Move through your project"></a><p>A section drawer makes the research path easier to navigate.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Record your sources</strong><br><a href="docs/screenshots/v1.0.0/editor.webp"><img src="docs/screenshots/v1.0.0/editor.webp" width="210" alt="Evidrilo 1.0.0: Record your sources"></a><p>Keep source details and evidence notes alongside your own work.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Follow the Practice trail</strong><br><a href="docs/screenshots/v1.0.0/practice.webp"><img src="docs/screenshots/v1.0.0/practice.webp" width="210" alt="Evidrilo 1.0.0: Follow the Practice trail"></a><p>Three separate cases make evidence reasoning concrete.</p></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="33%"><strong>Start an investigation</strong><br><a href="docs/screenshots/v1.0.0/mission.webp"><img src="docs/screenshots/v1.0.0/mission.webp" width="210" alt="Evidrilo 1.0.0: Start an investigation"></a><p>Short missions introduce the task before case-bounded feedback.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Ask for assistance</strong><br><a href="docs/screenshots/v1.0.0/chat.webp"><img src="docs/screenshots/v1.0.0/chat.webp" width="210" alt="Evidrilo 1.0.0: Ask for assistance"></a><p>Optional signed-in AI chat keeps the conversation focused.</p></td>
+    <td align="center" valign="top" width="33%"><strong>Explore Evidrilo Pro</strong><br><a href="docs/screenshots/v1.0.0/pro.webp"><img src="docs/screenshots/v1.0.0/pro.webp" width="210" alt="Evidrilo 1.0.0: Explore Evidrilo Pro"></a><p>Clear plan comparisons and RevenueCat Test Store checkout.</p></td>
   </tr>
 </table>
 
@@ -171,7 +156,7 @@ Test Store reconciliation; Production webhook billing is a separate release gate
 Responsive vanilla HTML/CSS/JavaScript site with an animated project-workspace phone preview, a clearly gated Project AI story, an interactive synthetic-case walkthrough, and a capability FAQ. [Open the live landing page →](https://evidrilo.pages.dev) · [Landing guide](apps/landing/README.md)
 
 The production site is hosted on Cloudflare Pages and connected to this GitHub repository. Changes under `apps/landing/` on `main` are configured to trigger a deployment.
-Preview with `python3 -m http.server 8000 --directory apps/landing`; replace the README screenshot gallery with a WebM walkthrough when the demo is recorded.
+Preview with `python3 -m http.server 8000 --directory apps/landing`.
 
 ## Quick start
 
