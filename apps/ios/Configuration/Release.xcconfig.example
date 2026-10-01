@@ -8,7 +8,7 @@ CODE_SIGN_STYLE = Automatic
 CODE_SIGN_IDENTITY = Apple Distribution
 
 // Keep the version synchronized with the release candidate.
-MARKETING_VERSION = 0.1.0
+MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
 
 // Optional local-only provider settings. Leave empty for the free-core build.

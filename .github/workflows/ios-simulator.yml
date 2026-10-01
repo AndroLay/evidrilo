@@ -2,6 +2,7 @@ name: iOS Simulator
 
 on:
   push:
+    branches: [main]
     paths:
       - '.github/workflows/ios-simulator.yml'
       - 'apps/ios/**'
@@ -45,6 +46,8 @@ jobs:
     name: Build and smoke-test iOS Simulator
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      IOS_BUILD_CONFIGURATION: ${{ github.event_name != 'pull_request' && vars.EVIDRILO_JUDGING_STAGING_ENABLED == 'true' && 'Debug' || 'Release' }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -82,14 +85,46 @@ jobs:
             xcrun simctl list devices available
           } 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/toolchain.txt"
 
-      - name: Build unsigned iOS Release host
+      - name: Configure Staging judging build (Debug only)
+        if: env.IOS_BUILD_CONFIGURATION == 'Debug'
+        env:
+          STAGING_SUPABASE_PUBLIC_KEY: ${{ secrets.EVIDRILO_STAGING_SUPABASE_PUBLIC_KEY }}
+          STAGING_REVENUECAT_TEST_KEY: ${{ secrets.EVIDRILO_REVENUECAT_TEST_PUBLIC_KEY }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PYCONFIG'
+          import os
+          from pathlib import Path
+          public_key = os.environ['STAGING_SUPABASE_PUBLIC_KEY']
+          test_key = os.environ['STAGING_REVENUECAT_TEST_KEY']
+          if not public_key.startswith('sb_publishable_') or not test_key.startswith('test_'):
+              raise SystemExit('Judging build public SDK inputs are missing or invalid')
+          if any(c in public_key + test_key for c in '\r\n'):
+              raise SystemExit('Invalid multiline build input')
+          values = {
+              'SUPABASE_URL': 'https:/$()/cdgzbrrrvlrrgpzbgqog.supabase.co',
+              'SUPABASE_PUBLISHABLE_KEY': public_key,
+              'SUPABASE_AUTH_REDIRECT_URL': 'evidrilo:/$()/auth/callback',
+              'SUPABASE_GOOGLE_AUTH_ENABLED': 'true',
+              'SUPABASE_APPLE_AUTH_ENABLED': 'false',
+              'EVIDRILO_API_BASE_URL': 'https:/$()/evidrilo-staging-api.onrender.com',
+              'REVENUECAT_PUBLIC_SDK_KEY': test_key,
+              'REVENUECAT_ENTITLEMENT_ID': 'evidrilo_pro',
+              'REVENUECAT_PRODUCT_IDS': 'monthly,yearly',
+          }
+          Path('apps/ios/Configuration/Config.local.xcconfig').write_text(
+              ''.join(f'{key}[config=Debug] = {value}\n' for key, value in values.items()))
+          print('Staging public SDK inputs configured for Debug only')
+          PYCONFIG
+
+      - name: Build unsigned iOS host
         run: |
           set -Eeuo pipefail
           set -o pipefail
           xcodebuild \
             -project apps/ios/iosApp.xcodeproj \
             -scheme Evidrilo \
-            -configuration Release \
+            -configuration "$IOS_BUILD_CONFIGURATION" \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
@@ -101,7 +136,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           bash scripts/ios/smoke-simulator.sh \
-            "$RUNNER_TEMP/evidrilo-derived-data/Build/Products/Release-iphonesimulator/Evidrilo.app" \
+            "$RUNNER_TEMP/evidrilo-derived-data/Build/Products/$IOS_BUILD_CONFIGURATION-iphonesimulator/Evidrilo.app" \
             dev.nextgen.mobile.ios \
             "$RUNNER_TEMP/evidrilo-ios-simulator-evidence"
 
@@ -118,7 +153,7 @@ jobs:
           xcodebuild \
             -project apps/ios/iosApp.xcodeproj \
             -scheme Evidrilo \
-            -configuration Release \
+            -configuration "$IOS_BUILD_CONFIGURATION" \
             -destination "platform=iOS Simulator,id=$simulator_udid" \
             -derivedDataPath "$RUNNER_TEMP/evidrilo-derived-data" \
             -resultBundlePath "$RUNNER_TEMP/evidrilo-ios-build/ios-ui-tests.xcresult" \
@@ -127,6 +162,23 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             test 2>&1 | tee "$RUNNER_TEMP/evidrilo-ios-build/xcodebuild-ui-tests.log" | \
             awk '/(^|[[:space:]])error:|warning:|Test Suite|Test Case|Executed [0-9]+ tests?|TEST (SUCCEEDED|FAILED)|Testing (failed|cancelled)/ { print; fflush() }'
+
+      - name: Package verified iOS simulator application
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$RUNNER_TEMP/evidrilo-ios-package"
+          app_path="$RUNNER_TEMP/evidrilo-derived-data/Build/Products/$IOS_BUILD_CONFIGURATION-iphonesimulator/Evidrilo.app"
+          app_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Info.plist")
+          ditto -c -k --keepParent "$app_path" "$RUNNER_TEMP/evidrilo-ios-package/Evidrilo-$app_version-ios-simulator.zip"
+          printf '%s\n' 'iOS Simulator application; not an iPhone IPA. Debug judging builds use Staging and RevenueCat Test Store only.' > "$RUNNER_TEMP/evidrilo-ios-package/BUILD-NOTES.txt"
+
+      - name: Upload verified iOS simulator application
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: ${{ runner.temp }}/evidrilo-ios-package
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Collect final simulator diagnostics
         if: always()

@@ -3,7 +3,28 @@
 All notable repository changes are recorded here. The current marketing
 version is defined in [`version.props`](version.props).
 
-## [0.1.0] - Unreleased
+## [1.0.0] - 2026-10-01
+
+### Added and improved
+
+- Student project workspace, catalog-first creation, evidence/claim mapping,
+  review, portability, and three bundled Practice cases (one Free, two Pro).
+- Language-first introduction, English/Indonesian UI, concise account profile,
+  and Google connection inside account details.
+- Hosted Render Staging API/worker with Supabase Auth/PostgreSQL and bounded,
+  consent-based Experiential Luna 6 chat. Project edits remain reviewable proposals.
+- RevenueCat Test Store monthly/annual access, restore, and repeat-safe
+  200-credit subscription periods; Free receives a one-time 20-credit allowance.
+- Downloadable Android judging APK and a CI-built iOS simulator package.
+
+### Release boundary
+
+This is the 1.0.0 judging / Staging release, not Production store distribution.
+Payments are Test Store only. iOS simulator packages require macOS/Xcode and
+are not installable iPhone IPAs; Apple signing is not available. Device/provider
+acceptance and remaining risks are recorded in the release notes.
+
+## [0.1.0] - Historical development baseline
 
 ### Changed
 
