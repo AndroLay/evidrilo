@@ -1754,3 +1754,176 @@ a prerequisite for any actionable family choice. It does not waive review for
 remote method guidance, evaluation, or AI, and it does not authorize provider
 activation, participant-data collection, or a claim that the five methods have
 been validated with students or domain reviewers.
+
+## D-134 — Keep the first Practice case Free and open the complete trail with Pro
+
+Owner-directed decision, 1 October 2026: the Tablet investigation is the single
+Free Practice case. Studies and Survey require a current verified
+`evidrilo_pro` entitlement. Keep all three stations visible in the 2.5D trail,
+with clear Pro locks and access to a public comparison without sign-in.
+Preserve saved attempts when Pro ends; access controls must also cover restored
+sessions, restarts, and next-case navigation.
+
+The public comparison includes D-126/D-130's existing credit policy: 20 credits
+once for a verified Free account after explicit AI consent, plus 200 for each
+earned active Pro entitlement month (including yearly subscriptions). Earned
+credits accumulate without expiry. This decision does not grant credits on the
+client, activate AI, alter provider or purchase authority, or remove account
+requirements for account-bound actions. Separate premium evidence cases stay
+separate from the three-case Practice course.
+
+## D-135 — Show both Pro subscription periods in the public comparison
+
+Owner-directed UI addition, 1 October 2026: expose Monthly and Annually plan
+buttons without requiring sign-in to read the comparison. Label D-100's USD
+1.99/month and USD 19.99/year as reference prices. These references are public
+product information, not provider offers or checkout authorization.
+
+Choosing a period passes the approved `monthly` or `yearly` product through
+the existing sign-in gate. Checkout displays the provider-localized offer and
+requires a separate explicit purchase action. If the chosen period is missing,
+fail without substituting another product. Show renewal/cancellation terms
+and clarify that both periods earn 200 credits per active entitlement month.
+No catalog setting, actual transaction, or entitlement is changed by this UI.
+
+## D-136 — Keep local learning accessible and show recorded work concisely
+
+Owner-directed interaction refinement, 1 October 2026: login serves AI and
+other account-backed online actions. Local projects, the first Free Practice
+case, local M0 work and local histories do not require an account, independently
+of the temporary guest-mode flag. Pro cases still require current verified
+provider access; online services retain their configuration, identity, consent
+and cost gates. No API policy or provider activation changes follow from this
+navigation decision.
+
+Use native phone Back without visible Back controls. Project sections keep a
+local navigation bookmark separate from project content, revision history and
+archive formats. Review offers direct links to missing structural work, not a
+research-quality verdict. Practice handoff selects a project and an appropriate
+section without copying synthetic answers into student records.
+
+Keep sign-in focused on its configured methods and form. Profile shows real
+local project, nonempty note and saved-course counts, with loading, read-error
+and recovery states instead of invented grades or streaks. Optional explanation
+belongs in accessible disclosures or dialogs; consequential consent, failures
+and store prices remain visible. Monthly/Annually selection uses one continuation
+action and preserves D-135's exact product choice and separate purchase step.
+
+## D-137 — Give Cases and project relationships their own workspace surfaces
+
+Owner-directed UI refinement, 1 October 2026: Cases has a separate root entry
+from the three-case Practice course. The local worked case uses the existing
+conclusion session; premium cases retain the current account and freshly
+verified entitlement gates. Browsing a card does not create a student project
+or grant access. Pending entitlement checks remain visibly pending.
+
+Place the project section drawer in the editor header. Allow a content swipe,
+button, outside tap and native Back to open or dismiss it. Moving to a different
+section keeps the existing save boundary and does not close on save failure.
+Project card actions use a top-right menu and a final primary action.
+
+The project map derives only recorded sources, evidence notes, findings,
+comparisons, claims, boundary actions and their explicit links from the current
+draft. It labels support, contradiction and context as student-selected
+relationships, not research verdicts. Missing references are reported; legacy
+source-level claim links are not invented as note-to-claim edges. Canvas and
+list views provide access to the same records and link rationales. The map
+does not upload material or mutate the project.
+
+AI chat and proposal review may expand to fullscreen. Presentation changes
+retain account, identity, project revision, consent, cost, selection, editing
+and explicit application checks. No provider activation, new AI capability,
+backend schema, archive format or credit policy follows from these surfaces.
+Use original method-specific catalog artwork and the official untinted Google
+sign-in mark within Evidrilo's established visual system.
+
+## D-138 — Simplify project spaces and add local interface language selection
+
+Owner-directed refinement, 1 October 2026: use one Projects list with visible
+Active/Completed status, a header import action, per-project export, and a
+catalog-first creation action. Free has five total stored project spaces and
+verified Pro has fifty; the owner explicitly confirmed both totals. Completed
+projects consume a space. New/imported archived records cannot bypass capacity.
+Existing records remain available after a downgrade or above-limit legacy
+state; moving an existing record between statuses does not create another slot.
+Keep legacy archive/status formats readable. Do not bulk-delete old records as
+a side effect of changing the UI. User-initiated deletion uses the existing
+permanent metadata/attachment cleanup path and an explicit confirmation.
+
+Show Pro near the top of Profile, use its gear to open the Settings hub, and
+make recorded Practice progress interactive without bypassing Pro access or
+restart confirmation. English and Indonesian interface selection is local and
+persisted. Student-entered research, source quotations, template material and
+bundled learning content keep their original language; UI translation is a
+separate presentation concern and can expand independently.
+
+Project Review reports inspectable local structure checks with direct next
+actions, not a numerical grade, method evaluator or scientific verdict. An AI
+opinion is an optional bounded excerpt of a saved revision, reviewed in the
+ordinary General Chat composer. Preparing it sends nothing. Sending retains
+verified-account, configuration, stored consent, per-message consent and
+server-authoritative credit checks. Reject sending a prepared opinion if its
+local project revision is no longer current. The message contains the selected
+excerpt only; no original attachment or server project-context binding is
+implied. AI suggestions are not automatically applied to the project.
+
+
+## D-139 — Complete interface languages and orient first-time users to the current workflow
+
+Owner-directed frontend refinement, 1 October 2026: the welcome flow begins
+with a local English/Indonesian choice, using labeled native flag illustrations.
+Preferences exposes the same choice through a dedicated Language sheet. Selection
+persists through the existing device settings adapter; save failure is shown.
+
+This supersedes D-138's allowance to leave bundled learning text and local starter
+instructions in English. App-owned interface, bundled Practice facts/feedback,
+local starter guidance and Get Started copy follow the selected interface language.
+Localization happens in presentation only: record IDs, rules, answer choices,
+project snapshots and archive bytes remain unchanged. Learner-authored project
+content, source quotations, names, chat inputs and provider replies are displayed
+verbatim. Arbitrary remote content is not machine translated. No language switch
+rewrites a project or changes an evaluator rule.
+
+Get Started presents nine skippable chapters after language selection: orientation,
+structure selection, workspace sections, evidence relationships, project map,
+Practice, optional AI, review/portability and the first project. Allow about two
+to three minutes for careful reading and interaction; do not force a timed wait.
+Examples remain temporary. The final project action opens the catalog explicitly;
+a separate Free-practice action follows existing access checks. Native Back is
+retained without adding visible back buttons.
+
+Home reuses original method-specific catalog illustration backgrounds. Pro uses
+the established crown icon; remove Premium cases from plan comparison copy.
+Project maps derive only explicitly recorded relationships and show unlinked
+records, available connections and missing references. Provide graph/list views,
+lane navigation and record-to-record inspection. Use lazy project/chat lists and
+visible-row graph rendering; illustrations remain bundled and shared. No new
+provider, payment operation, project limit, backend capability or evaluation claim
+is authorized by this frontend refinement.
+
+## D-140 — Prepare isolated Staging alignment and use Luna 6 provider defaults
+
+Owner direction, 1 October 2026: align mobile workflows, account/API boundaries,
+server integrations and current notes in an isolated candidate based on GitHub
+main, preserving accepted local UI and unrelated owner changes. The existing
+Free/Pro limits and server-owned credits remain authoritative. Publishing a
+candidate, provisioning hosted credentials and deploying services are separate
+operator actions requiring the exact reviewed candidate and approval.
+
+Use Experiential Labs `gpt-6-luna` with provider-default reasoning. The owner
+explicitly accepted this after live model metadata reported that reasoning
+controls were unsupported. Omit `AI_REASONING_EFFORT` in this profile; the
+adapter may serialize it only when a future supported route is deliberately
+configured. Retain the existing USD 0.01/request and USD 2/month shared provider
+limits. The bounded Staging profile uses 1,024 output tokens and a 60-second
+provider timeout, with compatible reservation leases and mobile AI timeouts.
+No account data or research is sent merely by signing in or opening a chat.
+
+API readiness must require migration 055: 054 supplies local Project AI context
+bindings, and 055 supplies an API-only boolean account-lock function. It preserves
+delete-versus-billing/credit/conversation fencing without direct Auth table grants. Provision distinct table/operation-limited API and worker roles with
+NOBYPASSRLS, no owner rights or memberships, and server-only RLS policies. Prove
+both denied privileges and allowed runtime flows before hosted activation.
+A synthetic adapter request rejected with HTTP 429 is evidence of a provider
+availability failure, not live AI acceptance. Keep checked-in activation flags
+off until hosted identity, consent, entitlement/credits and delivery pass.

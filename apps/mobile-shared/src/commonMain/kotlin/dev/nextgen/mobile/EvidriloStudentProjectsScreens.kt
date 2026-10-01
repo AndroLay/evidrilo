@@ -1,10 +1,18 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -23,7 +33,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +91,9 @@ import dev.nextgen.mobile.projectcatalog.StudentProjectImportReceipt
 import dev.nextgen.mobile.projectcatalog.ProjectAiStageAssistSelectedEvidence
 import dev.nextgen.mobile.projectcatalog.readStudentProjectAttachmentForPreview
 import dev.nextgen.mobile.storage.StudentProjectAttachmentStore
+import dev.nextgen.mobile.storage.createProjectSectionBookmarkStore
+import dev.nextgen.mobile.storage.LocalStorageReadResult
+import dev.nextgen.mobile.storage.LocalStorageWriteResult
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -103,6 +116,7 @@ internal sealed interface StudentProjectListUiState {
 internal enum class StudentProjectCardAction(val label: String) {
     CONTINUE("Continue project"),
     OPEN("Open project"),
+    EXPORT("Export project"),
     MARK_COMPLETE("Mark complete"),
     ARCHIVE("Archive project"),
     MOVE_TO_TRASH("Move to Trash"),
@@ -121,25 +135,10 @@ internal fun studentProjectPrimaryAction(status: StudentProjectStatus): StudentP
     StudentProjectStatus.TRASHED -> StudentProjectCardAction.RESTORE_ACTIVE
 }
 
-internal fun studentProjectSecondaryActions(status: StudentProjectStatus): List<StudentProjectCardAction> = when (status) {
-    StudentProjectStatus.DRAFT,
-    StudentProjectStatus.ACTIVE,
-    -> listOf(
-        StudentProjectCardAction.MARK_COMPLETE,
-        StudentProjectCardAction.ARCHIVE,
-        StudentProjectCardAction.MOVE_TO_TRASH,
-    )
-    StudentProjectStatus.COMPLETED,
-    StudentProjectStatus.ARCHIVED,
-    -> listOf(
-        StudentProjectCardAction.RESTORE_ACTIVE,
-        StudentProjectCardAction.MOVE_TO_TRASH,
-    )
-    StudentProjectStatus.TRASHED -> listOf(
-        StudentProjectCardAction.RESTORE_ARCHIVED,
-        StudentProjectCardAction.DELETE_PERMANENTLY,
-    )
-}
+internal fun studentProjectSecondaryActions(status: StudentProjectStatus): List<StudentProjectCardAction> =
+    listOf(if (status == StudentProjectStatus.DRAFT || status == StudentProjectStatus.ACTIVE)
+        StudentProjectCardAction.MARK_COMPLETE else StudentProjectCardAction.RESTORE_ACTIVE,
+        StudentProjectCardAction.EXPORT, StudentProjectCardAction.DELETE_PERMANENTLY)
 
 private sealed interface StudentProjectAttachmentPreviewLoad {
     data class Ready(val result: StudentProjectDocumentTextResult) : StudentProjectAttachmentPreviewLoad
@@ -175,7 +174,7 @@ internal fun StudentProjectListUiState.toHomeErrorMessage(): String? = when (thi
 internal fun studentProjectDraftFlowMessage(result: StudentProjectDraftFlowResult<*>): String? = when (result) {
     is StudentProjectDraftFlowResult.Value -> null
     is StudentProjectDraftFlowResult.Rejected -> when (result.code) {
-        "PROJECT_ACTIVE_LIMIT_REACHED" -> "This installation has reached its active project limit. Archive a project to make room; existing work remains available."
+        "PROJECT_ACTIVE_LIMIT_REACHED" -> "Your project spaces are full. Export and permanently remove a project to make room. Completed projects also use a space."
         "TEMPLATE_NOT_READY" -> "This template is not ready to start. Only a published, reviewed template can create a project."
         "PROJECT_AI_TEMPLATE_REQUIRED" -> "Project assistance is unavailable until a compatible reviewed template is selected. You can continue manually."
         "PROJECT_TRASH_RETENTION_EXPIRED" -> "This project is past its 30-day recovery period. Refresh the project list to remove expired Trash items."
@@ -395,7 +394,11 @@ internal data class StudentProjectEditorSection(
     val title: String,
     val kind: StudentProjectEditorSectionKind,
     val fieldIds: List<String> = emptyList(),
-)
+    val templateStepId: String? = null,
+) {
+    // Navigation metadata has its own namespace; backend/template step IDs stay unchanged.
+    val navigationId: String get() = if (templateStepId != null) "template-step:$templateStepId" else id
+}
 
 internal data class StudentProjectReviewField(
     val id: String,
@@ -418,13 +421,18 @@ internal fun studentProjectEditorSections(draft: StudentProjectDraft): List<Stud
             id = "project-basics",
             title = "Project basics",
             kind = StudentProjectEditorSectionKind.PROJECT_BASICS,
-            fieldIds = if (template == null) {
-                ManualLiteratureSynthesisFields.all.take(6).map(StudentProjectFieldDefinition::id)
-            } else {
-                emptyList()
-            },
+            fieldIds = emptyList(),
         ),
     )
+
+    if (template == null) {
+        add(StudentProjectEditorSection("manual-question", "Frame your question", StudentProjectEditorSectionKind.TEMPLATE_STEP,
+            listOf(ManualLiteratureSynthesisFields.ASSIGNMENT_BRIEF, ManualLiteratureSynthesisFields.RESEARCH_QUESTION)))
+        add(StudentProjectEditorSection("manual-boundaries", "Set your boundaries", StudentProjectEditorSectionKind.TEMPLATE_STEP,
+            listOf(ManualLiteratureSynthesisFields.AIM, ManualLiteratureSynthesisFields.SCOPE)))
+        add(StudentProjectEditorSection("manual-material", "Plan your material", StudentProjectEditorSectionKind.TEMPLATE_STEP,
+            listOf(ManualLiteratureSynthesisFields.SELECTION_METHOD, ManualLiteratureSynthesisFields.SEARCH_SCOPE)))
+    }
 
     if (template != null) {
         val knownFieldIds = template.inputFields.mapTo(mutableSetOf(), ProjectTemplateInputField::id)
@@ -432,13 +440,14 @@ internal fun studentProjectEditorSections(draft: StudentProjectDraft): List<Stud
         template.steps.forEach { step ->
             val fieldIds = step.inputFieldIds.filter { it in knownFieldIds }
             assignedFieldIds += fieldIds
-            if (fieldIds.isNotEmpty()) {
+            if (fieldIds.isNotEmpty() || step.aiOperations.isNotEmpty()) {
                 add(
                     StudentProjectEditorSection(
                         id = step.id,
                         title = step.title,
                         kind = StudentProjectEditorSectionKind.TEMPLATE_STEP,
                         fieldIds = fieldIds,
+                        templateStepId = step.id,
                     ),
                 )
             }
@@ -459,7 +468,8 @@ internal fun studentProjectEditorSections(draft: StudentProjectDraft): List<Stud
 
     add(StudentProjectEditorSection("sources-and-files", "Sources and files", StudentProjectEditorSectionKind.SOURCES_AND_FILES))
     add(StudentProjectEditorSection("evidence-notes", "Evidence notes", StudentProjectEditorSectionKind.EVIDENCE_NOTES))
-    add(StudentProjectEditorSection("findings-and-synthesis", "Findings and comparison", StudentProjectEditorSectionKind.FINDINGS_AND_SYNTHESIS))
+    add(StudentProjectEditorSection("findings-and-synthesis", "Findings and comparison", StudentProjectEditorSectionKind.FINDINGS_AND_SYNTHESIS,
+        if (template == null) listOf(ManualLiteratureSynthesisFields.SYNTHESIS) else emptyList()))
     add(
         StudentProjectEditorSection(
             id = "claims-and-evidence-links",
@@ -570,6 +580,7 @@ internal fun EvidriloStudentProjectsScreen(
     onOpenCatalog: () -> Unit,
     onResume: (StudentProjectDraft) -> Unit,
     onCreateManualProject: () -> Unit,
+    onExportProject: (StudentProjectDraft) -> Unit = onResume,
     onMarkCompleted: (StudentProjectDraft) -> Boolean,
     onArchive: (StudentProjectDraft) -> Boolean,
     onMoveToTrash: (StudentProjectDraft) -> Boolean,
@@ -587,7 +598,6 @@ internal fun EvidriloStudentProjectsScreen(
     onBack: () -> Unit,
     onNavigate: (EvidriloTargetSection) -> Unit,
 ) {
-    var libraryFilter by remember { mutableStateOf(0) }
     var confirmTarget by remember { mutableStateOf<Pair<StudentProjectDraft, Boolean>?>(null) }
     var archiveImportDialog by remember { mutableStateOf<StudentProjectArchiveImportDialogState>(StudentProjectArchiveImportDialogState.Hidden) }
     val archiveImportScope = rememberCoroutineScope()
@@ -679,128 +689,58 @@ internal fun EvidriloStudentProjectsScreen(
     }
 
     EvidriloTargetSurface(selected = EvidriloTargetSection.HOME, onNavigate = onNavigate) {
-        EvidriloContentColumn(includeBottomSafeArea = false) {
-            EvidriloBackGesture(label = "Home", onClick = onBack)
-            EvidriloPageHeading("Your projects", "All your work. On this device.")
-            notice?.let {
-                EvidriloTargetCard {
-                    Text(it, style = MaterialTheme.typography.bodyMedium)
-                }
+        Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) {
+        EvidriloBackGesture(label="Home",onClick=onBack)
+        LazyColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)),
+            contentPadding=PaddingValues(horizontal=20.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            item(key="heading") {
+                EvidriloPageHeading(uiText("Your projects"),uiText("Make room for your ideas."),action={
+                    if(isStudentProjectFileImportAvailable) EvidriloIconButton(EvidriloIconName.UPLOAD,uiText("Import project"),selectProjectArchive.select)
+                })
             }
-            when (state) {
-                StudentProjectListUiState.Loading -> EvidriloTargetCard {
-                    Text("Loading local projects…", style = MaterialTheme.typography.bodyMedium)
-                }
+            notice?.let { item(key="notice") {EvidriloTargetCard {Text(uiText(it),style=MaterialTheme.typography.bodyMedium)}} }
+            when(state) {
+                StudentProjectListUiState.Loading -> item {EvidriloTargetCard {Text("Loading local projects…")}}
                 is StudentProjectListUiState.Loaded -> {
-                    if (isStudentProjectFileImportAvailable) {
-                        TextButton(onClick = selectProjectArchive.select) { Text("Import a backup (.evproj)", color = EvidriloColors.Cobalt) }
+                    val projects=state.projects.sortedByDescending {it.updatedAtEpochMillis}
+                    item(key="capacity") {Text(uiText("${projects.size} of $activeLimit projects","${projects.size} dari $activeLimit proyek"),style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)}
+                    if(projects.isEmpty()) item(key="empty") {
+                        Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                            Box(Modifier.fillMaxWidth().height(190.dp)) {EvidriloProjectIllustration(null,Modifier.matchParentSize())}
+                            Text("A place for your next question",style=MaterialTheme.typography.titleLarge)
+                            Text("Choose a project structure. Bring your own ideas and evidence.",style=MaterialTheme.typography.bodyMedium,color=EvidriloColors.Slate)
+                        }
                     }
-                    if (state.projects.isEmpty()) {
-                        EvidriloTargetCard {
-                            Text("No projects yet", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                "Start with your assignment and research question. You can add sources and build the synthesis yourself; nothing is prefilled.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EvidriloColors.Slate,
-                            )
-                            EvidriloPrimaryButton(label = "Create a project", onClick = onCreateManualProject)
-                            TextButton(onClick = onOpenCatalog) { Text("Choose a project structure", color = EvidriloColors.Cobalt) }
-                        }
-                    } else {
-                        val active = state.projects.filter {
-                            it.status == StudentProjectStatus.DRAFT || it.status == StudentProjectStatus.ACTIVE
-                        }
-                        val archived = state.projects.filter { it.status == StudentProjectStatus.ARCHIVED || it.status == StudentProjectStatus.COMPLETED }
-                        val trash = state.projects.filter { it.status == StudentProjectStatus.TRASHED }
-                        Text("${active.size} of $activeLimit active", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
-                        if (libraryFilter == 1 && archived.isEmpty()) Text("Completed and archived projects appear here.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
-                        if (libraryFilter == 2 && trash.isEmpty()) Text("Trash is empty.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
-                        if (active.size >= activeLimit) {
-                            EvidriloTargetCard {
-                                Text("Active project limit reached", style = MaterialTheme.typography.titleMedium)
-                                Text("Archive a project to make room, or check Pro access for a higher local limit.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
-                                EvidriloSecondaryButton(label = "View Pro access", onClick = onOpenPremium)
-                            }
-                        } else {
-                            EvidriloPrimaryButton(label = "Create a project", onClick = onCreateManualProject)
-                        }
-                        TextButton(onClick = onOpenCatalog) { Text("Choose a project structure", color = EvidriloColors.Cobalt) }
-                        GetStartedChoices(listOf("In progress", "Saved", "Trash"), libraryFilter, { libraryFilter = it }, "Filter local projects")
-                        if (libraryFilter == 0 && active.isEmpty()) Text("No projects in progress. Start a new idea or open saved work.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
-                        if (libraryFilter == 0 && active.isNotEmpty()) {
-                            Text("In progress", style = MaterialTheme.typography.titleLarge)
-                        }
-                        if (libraryFilter == 0) active.forEach { project ->
-                            StudentProjectCard(
-                                project = project,
-                                onResume = { onResume(project) },
-                                onMarkCompleted = { onMarkCompleted(project) },
-                                onArchive = { onArchive(project) },
-                                onMoveToTrash = { confirmTarget = project to false },
-                                onRestore = {},
-                                onRestoreArchived = {},
-                                onPermanentlyDelete = {},
-                            )
-                        }
-                        if (libraryFilter == 1 && archived.isNotEmpty()) {
-                            Text("Archived and completed", style = MaterialTheme.typography.titleLarge)
-                            archived.forEach { project ->
-                                StudentProjectCard(
-                                    project = project,
-                                    onResume = { onResume(project) },
-                                    onMarkCompleted = {},
-                                    onArchive = {},
-                                    onMoveToTrash = { confirmTarget = project to false },
-                                    onRestore = { onRestore(project, false) },
-                                    onRestoreArchived = {},
-                                    onPermanentlyDelete = {},
-                                )
-                            }
-                        }
-                        if (libraryFilter == 2 && trash.isNotEmpty()) {
-                            Text("Trash · recoverable for 30 days", style = MaterialTheme.typography.titleLarge)
-                            trash.forEach { project ->
-                                StudentProjectCard(
-                                    project = project,
-                                    onResume = {},
-                                    onMarkCompleted = {},
-                                    onArchive = {},
-                                    onMoveToTrash = {},
-                                    onRestore = { onRestore(project, false) },
-                                    onRestoreArchived = { onRestore(project, true) },
-                                    onPermanentlyDelete = { confirmTarget = project to true },
-                                )
-                            }
-                        }
+                    if(projects.size>=activeLimit) item(key="full") {Text("Your project spaces are full. Export and remove a project you no longer need.",style=MaterialTheme.typography.bodyMedium,color=EvidriloColors.Slate)}
+                    items(projects,key={"project:"+it.id}) {project ->
+                        StudentProjectCard(project=project,onResume={onResume(project)},onMarkCompleted={onMarkCompleted(project)},
+                            onArchive={},onMoveToTrash={},onRestore={onRestore(project,false)},onRestoreArchived={},
+                            onPermanentlyDelete={confirmTarget=project to true},onExport={onExportProject(project)})
                     }
                 }
-                StudentProjectListUiState.StorageUnavailable -> ProjectStorageState(
-                    title = "Local project storage is unavailable",
-                    message = "This platform build cannot save project drafts. Your existing project-type guidance remains available.",
-                    onRetry = onRetry,
-                )
-                StudentProjectListUiState.StorageCorrupt -> ProjectStorageState(
-                    title = "Saved project data could not be read",
-                    message = "The app did not overwrite the unreadable data. Retry, or keep browsing the catalog without creating a draft.",
-                    onRetry = onRetry,
-                )
-                StudentProjectListUiState.StorageFailed -> ProjectStorageState(
-                    title = "Projects could not be loaded",
-                    message = "No project state was assumed. Check local storage and retry.",
-                    onRetry = onRetry,
-                )
+                StudentProjectListUiState.StorageUnavailable -> item {ProjectStorageState("Local project storage is unavailable","This platform build cannot save project drafts. Your existing project-type guidance remains available.",onRetry)}
+                StudentProjectListUiState.StorageCorrupt -> item {ProjectStorageState("Saved project data could not be read","The app did not overwrite the unreadable data. Retry, or keep browsing the catalog without creating a draft.",onRetry)}
+                StudentProjectListUiState.StorageFailed -> item {ProjectStorageState("Projects could not be loaded","No project state was assumed. Check local storage and retry.",onRetry)}
             }
-            Spacer(Modifier.height(8.dp))
+        }
+        }
+        if(state is StudentProjectListUiState.Loaded) {
+            Box(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp)) {
+                EvidriloPrimaryButton(uiText("Create a project","Buat proyek"),onOpenCatalog,
+                    enabled=state.projects.size<activeLimit,trailingIcon=EvidriloIconName.PLUS)
+            }
+        }
         }
     }
 
     confirmTarget?.let { (project, permanent) ->
         AlertDialog(
             onDismissRequest = { confirmTarget = null },
-            title = { Text(if (permanent) "Delete permanently?" else "Move project to Trash?") },
+            title = { Text(uiText(if (permanent) "Delete permanently?" else "Move project to Trash?")) },
             text = {
                 Text(if (permanent) {
-                    "${project.title} will be permanently removed from this device. This cannot be undone."
+                    uiText("${project.title} will be permanently removed from this device. This cannot be undone.", "${project.title} akan dihapus permanen dari perangkat ini. Tindakan ini tidak dapat dibatalkan.")
                 } else {
                     "${project.title} will stay recoverable in Trash for 30 days."
                 })
@@ -809,10 +749,10 @@ internal fun EvidriloStudentProjectsScreen(
                 TextButton(onClick = {
                     val done = if (permanent) onPermanentlyDelete(project) else onMoveToTrash(project)
                     if (done) confirmTarget = null
-                }) { Text(if (permanent) "Delete permanently" else "Move to Trash") }
+                }) { Text(uiText(if (permanent) "Delete permanently" else "Move to Trash")) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmTarget = null }) { Text("Cancel") }
+                TextButton(onClick = { confirmTarget = null }) { Text(uiText("Cancel")) }
             },
         )
     }
@@ -875,7 +815,7 @@ internal fun EvidriloStudentProjectsScreen(
             text = {
                 Column {
                     val project = importState.payload.preview.project
-                    Text(project.title, style = MaterialTheme.typography.titleMedium)
+                    RawText(project.title, style = MaterialTheme.typography.titleMedium)
                     Text("Revision ${project.revision} · ${project.sources.size} sources · ${project.findings.size} findings · ${importState.payload.preview.manifest.attachments.size} attachments")
                     Text("This is student-entered project data. Import does not verify sources, methods, or claims. Attachments are restored only to private storage on this device.")
                     Text("Existing projects will never be overwritten.")
@@ -883,11 +823,11 @@ internal fun EvidriloStudentProjectsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { commitArchiveImport(importState.payload, asCopy = false, archiveAtCapacity = false) }) {
-                    Text("Import project")
+                    Text(uiText("Import project"))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text("Cancel") }
+                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text(uiText("Cancel")) }
             },
         )
         is StudentProjectArchiveImportDialogState.AlreadyPresent -> AlertDialog(
@@ -898,10 +838,10 @@ internal fun EvidriloStudentProjectsScreen(
                 TextButton(onClick = {
                     archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden
                     onResume(importState.project)
-                }) { Text("Open project") }
+                }) { Text(uiText("Open project")) }
             },
             dismissButton = {
-                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text("Close") }
+                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text(uiText("Close")) }
             },
         )
         is StudentProjectArchiveImportDialogState.Duplicate -> AlertDialog(
@@ -933,20 +873,16 @@ internal fun EvidriloStudentProjectsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text("Cancel") }
+                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text(uiText("Cancel")) }
             },
         )
         is StudentProjectArchiveImportDialogState.AtCapacity -> AlertDialog(
             onDismissRequest = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden },
-            title = { Text("Active project limit reached") },
-            text = { Text("Import this project as archived? It will not use an active project slot. You can keep or archive existing work separately.") },
+            title = { Text(uiText("Project spaces are full", "Ruang proyek penuh")) },
+            text = { Text(uiText("This installation can hold $activeLimit projects, including completed projects. Export and delete a project you no longer need before importing another.",
+                "Instalasi ini dapat menyimpan $activeLimit proyek, termasuk yang selesai. Ekspor lalu hapus proyek yang tidak lagi diperlukan sebelum mengimpor proyek baru.")) },
             confirmButton = {
-                TextButton(onClick = {
-                    commitArchiveImport(importState.payload, asCopy = importState.importAsCopy, archiveAtCapacity = true)
-                }) { Text("Import as archived") }
-            },
-            dismissButton = {
-                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text("Cancel") }
+                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text(uiText("Close")) }
             },
         )
         is StudentProjectArchiveImportDialogState.Error -> AlertDialog(
@@ -954,7 +890,7 @@ internal fun EvidriloStudentProjectsScreen(
             title = { Text("Project was not imported") },
             text = { Text(importState.message) },
             confirmButton = {
-                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text("Close") }
+                TextButton(onClick = { archiveImportDialog = StudentProjectArchiveImportDialogState.Hidden }) { Text(uiText("Close")) }
             },
         )
     }
@@ -988,64 +924,54 @@ private fun studentProjectArchiveImportFailure(code: String): String = when (cod
 
 @Composable
 private fun StudentProjectCard(
-    project: StudentProjectDraft,
-    onResume: () -> Unit,
-    onMarkCompleted: () -> Unit,
-    onArchive: () -> Unit,
-    onMoveToTrash: () -> Unit,
-    onRestore: () -> Unit,
-    onRestoreArchived: () -> Unit,
-    onPermanentlyDelete: () -> Unit,
+    project: StudentProjectDraft, onResume: () -> Unit, onMarkCompleted: () -> Unit,
+    onArchive: () -> Unit, onMoveToTrash: () -> Unit, onRestore: () -> Unit,
+    onRestoreArchived: () -> Unit, onPermanentlyDelete: () -> Unit, onExport: () -> Unit,
 ) {
     var actionsExpanded by remember(project.id) { mutableStateOf(false) }
-    val progress = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.requiredFieldProgress(project)
-    val templateSnapshot = project.templateSnapshot
-    EvidriloTargetCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            EvidriloIcon(EvidriloIconName.FOLDER, tint = EvidriloColors.Cobalt, modifier = Modifier.size(30.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(project.title, style = MaterialTheme.typography.titleLarge)
-                Text(if (templateSnapshot?.publication == ProjectTemplatePublication.BUILT_IN_STARTER) "Local starter" else if (templateSnapshot == null) "Blank project" else "Published template", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
-            }
-        }
-        Text("${progress.filledRequired}/${progress.totalRequired} required fields · structure only", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Cobalt)
-        project.deadlineDate?.let { Text("Due $it", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
-        val primaryAction = studentProjectPrimaryAction(project.status)
-        EvidriloPrimaryButton(
-            label = primaryAction.label,
-            onClick = when (primaryAction) {
-                StudentProjectCardAction.CONTINUE,
-                StudentProjectCardAction.OPEN,
-                -> onResume
-                StudentProjectCardAction.RESTORE_ACTIVE -> onRestore
-                else -> onResume
-            },
-        )
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            TextButton(onClick = { actionsExpanded = true }) { Text("More actions") }
-            DropdownMenu(
-                expanded = actionsExpanded,
-                onDismissRequest = { actionsExpanded = false },
-            ) {
-                studentProjectSecondaryActions(project.status).forEach { action ->
-                    DropdownMenuItem(
-                        text = { Text(action.label) },
-                        onClick = {
-                            actionsExpanded = false
-                            when (action) {
-                                StudentProjectCardAction.MARK_COMPLETE -> onMarkCompleted()
-                                StudentProjectCardAction.ARCHIVE -> onArchive()
-                                StudentProjectCardAction.MOVE_TO_TRASH -> onMoveToTrash()
-                                StudentProjectCardAction.RESTORE_ACTIVE -> onRestore()
-                                StudentProjectCardAction.RESTORE_ARCHIVED -> onRestoreArchived()
-                                StudentProjectCardAction.DELETE_PERMANENTLY -> onPermanentlyDelete()
-                                StudentProjectCardAction.CONTINUE,
-                                StudentProjectCardAction.OPEN,
-                                -> Unit
+    val progress=StudentProjectDraftRules.requiredFieldProgress(project)
+    val completed=project.status==StudentProjectStatus.COMPLETED
+    val inactive=project.status==StudentProjectStatus.ARCHIVED
+    val legacyRemoved=project.status==StudentProjectStatus.TRASHED
+    androidx.compose.material3.Surface(shape=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),color=EvidriloColors.Atmosphere) {
+        Box(Modifier.fillMaxWidth()) {
+            EvidriloProjectIllustration(project.templateSnapshot?.family,Modifier.matchParentSize())
+            Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    EvidriloIcon(if(completed) EvidriloIconName.CHECK else if(legacyRemoved) EvidriloIconName.ALERT else EvidriloIconName.LAYERS,
+                        tint=EvidriloColors.Cobalt,modifier=Modifier.size(18.dp))
+                    Text(uiText(if(completed) "Completed" else if(inactive) "Inactive" else if(legacyRemoved) "Recovery needed" else "Active"),
+                        Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.labelSmall,color=EvidriloColors.Cobalt)
+                    Box {
+                        EvidriloIconButton(EvidriloIconName.MORE,"More actions for ${project.title}",{actionsExpanded=true})
+                        DropdownMenu(actionsExpanded,{actionsExpanded=false},containerColor=EvidriloColors.Card) {
+                            studentProjectSecondaryActions(project.status).forEach { action ->
+                                val label=when(action) { StudentProjectCardAction.MARK_COMPLETE -> uiText("Mark complete","Tandai selesai");
+                                    StudentProjectCardAction.EXPORT -> uiText("Export project","Ekspor proyek");
+                                    StudentProjectCardAction.DELETE_PERMANENTLY -> uiText("Delete project","Hapus proyek");
+                                    else -> uiText(if(legacyRemoved) "Recover project" else "Reopen project") }
+                                DropdownMenuItem(text={Text(label)},onClick={
+                                    actionsExpanded=false
+                                    when(action) { StudentProjectCardAction.MARK_COMPLETE -> onMarkCompleted(); StudentProjectCardAction.EXPORT -> onExport();
+                                        StudentProjectCardAction.DELETE_PERMANENTLY -> onPermanentlyDelete(); else -> onRestore() }
+                                })
                             }
-                        },
-                    )
+                        }
+                    }
                 }
+                RawText(project.title,Modifier.padding(end=88.dp),style=MaterialTheme.typography.titleLarge,maxLines=3,
+                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(uiText(project.templateSnapshot?.family?.let(::projectFamilyShortName) ?: "Independent project"),
+                    style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)
+                Text(uiText("${project.evidenceItems.size} notes · ${StudentProjectDraftRules.effectiveClaims(project).size} claims",
+                    "${project.evidenceItems.size} catatan · ${StudentProjectDraftRules.effectiveClaims(project).size} klaim"),
+                    style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)
+                LinearProgressIndicator(progress={if(progress.totalRequired==0) 0f else progress.filledRequired.toFloat()/progress.totalRequired},
+                    modifier=Modifier.fillMaxWidth().height(5.dp),color=EvidriloColors.Cobalt,trackColor=EvidriloColors.Tint)
+                Text(uiText("${progress.filledRequired}/${progress.totalRequired} required responses", "${progress.filledRequired}/${progress.totalRequired} isian wajib"),
+                    style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)
+                EvidriloPrimaryButton(uiText(if(legacyRemoved) "Recover project" else if(completed || inactive) "Open project" else "Continue project"),
+                    if(legacyRemoved) onRestore else onResume,trailingIcon=EvidriloIconName.ARROW_FORWARD)
             }
         }
     }
@@ -1129,6 +1055,9 @@ internal fun EvidriloStudentProjectEditorScreen(
     onSaveAndLeave: () -> Unit,
     onDiscardAndLeave: () -> Unit,
     onCancelExit: () -> Unit,
+    exportRequested: Boolean = false,
+    onConsumeExportRequest: () -> Unit = {},
+    onAskAiOpinion: (StudentProjectDraft) -> Unit = {},
 ) {
     var savedTitle by remember(draft.id, draft.revision) { mutableStateOf(draft.title) }
     var savedValues by remember(draft.id, draft.revision) { mutableStateOf(draft.fieldValues.toMap()) }
@@ -1164,6 +1093,9 @@ internal fun EvidriloStudentProjectEditorScreen(
     var limitationActionSequence by remember(draft.id) { mutableStateOf(draft.limitationActions.size + 1) }
     var localError by remember(draft.id) { mutableStateOf<String?>(null) }
     var autosaveStatus by remember(draft.id) { mutableStateOf("Saved on this device.") }
+    var showExportChoices by remember(draft.id) { mutableStateOf(false) }
+    var showReviewMap by remember(draft.id) { mutableStateOf(false) }
+    LaunchedEffect(exportRequested,draft.id) { if(exportRequested) { showExportChoices=true; onConsumeExportRequest() } }
     var exportNotice by remember(draft.id) { mutableStateOf<String?>(null) }
     var exportReviewState by remember(draft.id) { mutableStateOf<StudentProjectExportReviewState>(StudentProjectExportReviewState.Hidden) }
     var removalReviewNotice by remember(draft.id) { mutableStateOf<String?>(null) }
@@ -1196,8 +1128,21 @@ internal fun EvidriloStudentProjectEditorScreen(
     )
     val structure = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.structureReport(manualDraft)
     val editorSections = remember(draft.id, draft.templateSnapshot) { studentProjectEditorSections(draft) }
-    var editorSectionIndex by remember(draft.id) { mutableStateOf(0) }
-    var showProjectSections by remember(draft.id) { mutableStateOf(false) }
+    val bookmarkStore = remember { createProjectSectionBookmarkStore() }
+    val bookmarkKey = projectSectionBookmarkKey(draft)
+    val bookmarkLoad = remember(bookmarkKey) { bookmarkStore.read(bookmarkKey) }
+    var bookmarkNotice by remember(bookmarkKey) { mutableStateOf(
+        if (bookmarkLoad !is LocalStorageReadResult.Success) "Your last section could not be restored. Your project is still available." else null
+    ) }
+    var editorSectionIndex by remember(bookmarkKey) { mutableStateOf(
+        editorSections.indexOfFirst { it.navigationId == bookmarkLoad.value }.takeIf { it >= 0 } ?: 0
+    ) }
+    LaunchedEffect(bookmarkKey) {
+        if (editorSections.none { it.navigationId == bookmarkLoad.value }) {
+            bookmarkNotice = if (bookmarkStore.write(bookmarkKey, editorSections[editorSectionIndex].navigationId) == LocalStorageWriteResult.SAVED) null
+                else "Your section position could not be remembered. Your project is still available."
+        }
+    }
     val activeEditorSectionIndex = editorSectionIndex.coerceIn(0, editorSections.lastIndex)
     val activeEditorSection = editorSections[activeEditorSectionIndex]
     val editorProgress = studentProjectEditorProgress(activeEditorSectionIndex, editorSections.size)
@@ -1366,6 +1311,8 @@ internal fun EvidriloStudentProjectEditorScreen(
         val nextIndex = targetIndex.coerceIn(0, editorSections.lastIndex)
         if (nextIndex == activeEditorSectionIndex || !saveBeforeSectionNavigation()) return
         editorSectionIndex = nextIndex
+        bookmarkNotice = if (bookmarkStore.write(bookmarkKey, editorSections[nextIndex].navigationId) == LocalStorageWriteResult.SAVED) null
+            else "Your work is saved, but this section position could not be remembered."
     }
 
     val launchAttachmentPicker = rememberStudentProjectAttachmentPicker { result ->
@@ -1635,13 +1582,17 @@ internal fun EvidriloStudentProjectEditorScreen(
     EvidriloProjectEditorScaffold(
         projectTitle = title, sectionTitle = activeEditorSection.title, sectionKey = activeEditorSectionIndex,
         progress = editorProgress, progressDescription = editorProgressDescription,
-        saveStatus = autosaveStatus, onChooseSection = { showProjectSections = true },
+        saveStatus = autosaveStatus, sections = editorSections, sectionIssue = localError ?: saveError,
+        draft = manualDraft,
+        onSelectSection = { index -> navigateToEditorSection(index); editorSectionIndex == index },
         nextLabel = if (activeEditorSectionIndex < editorSections.lastIndex) {
             if (editorSections[activeEditorSectionIndex + 1].kind == StudentProjectEditorSectionKind.REVIEW) "Review" else "Continue"
         } else null,
         onNext = { navigateToEditorSection(activeEditorSectionIndex + 1) },
     ) {
         key(activeEditorSectionIndex) {
+            bookmarkNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
+            EvidriloProjectSectionCoach(activeEditorSection, manualDraft)
             notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
             removalReviewNotice?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Cobalt)
@@ -1656,8 +1607,8 @@ internal fun EvidriloStudentProjectEditorScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Project name") },
-                supportingText = { Text("A short name to find this draft later.") },
+                label = { Text(uiText("Project name")) },
+                supportingText = { Text(uiText("A short name to find this draft later.")) },
                 singleLine = true,
                 isError = title.isBlank() || title.length > 160,
                 )
@@ -1670,8 +1621,8 @@ internal fun EvidriloStudentProjectEditorScreen(
                 )
             }
 
-            if (manual && activeEditorSection.kind == StudentProjectEditorSectionKind.PROJECT_BASICS) {
-                    ManualLiteratureSynthesisFields.all.take(6).forEach { field ->
+            if (manual && activeEditorSection.kind == StudentProjectEditorSectionKind.TEMPLATE_STEP) {
+                    ManualLiteratureSynthesisFields.all.filter { it.id in activeEditorSection.fieldIds }.forEach { field ->
                     ProjectDraftField(
                         label = field.label,
                         prompt = field.prompt,
@@ -1976,15 +1927,11 @@ internal fun EvidriloStudentProjectEditorScreen(
                 ) {
                     val step = template.steps.singleOrNull { it.id == activeEditorSection.id }
                     step?.let { currentStep ->
-                        Text(
-                            "Work through the fields for this part of your project. You can move between sections without completing them first.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = EvidriloColors.Slate,
-                        )
                         template.inputFields.filter { it.id in activeEditorSection.fieldIds }.forEach { field ->
                             ProjectDraftField(
                                 label = field.label,
-                                prompt = field.kind.editorPrompt(),
+                                prompt = field.label.takeIf { it.length <= 72 && it.isNotBlank() } ?: field.kind.editorPrompt(),
+                                writingHint = field.label.takeIf { it.length > 72 } ?: field.kind.editorPrompt(),
                                 placeholder = field.kind.editorHint(),
                                 required = field.required,
                                 value = values[field.id].orEmpty(),
@@ -2124,7 +2071,7 @@ internal fun EvidriloStudentProjectEditorScreen(
                                         reportDirty(nextClaimLinks = nextLinks)
                                     },
                                 )
-                                Text(source.title.ifBlank { "Untitled source" }, style = MaterialTheme.typography.bodyMedium)
+                                RawText(source.title.ifBlank { uiText("Untitled source") }, style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
@@ -2195,6 +2142,10 @@ internal fun EvidriloStudentProjectEditorScreen(
             }
 
             if (activeEditorSection.kind == StudentProjectEditorSectionKind.REVIEW) {
+                EvidriloProjectReview(manualDraft,isDirty,
+                    onSection={sectionId -> val index=editorSections.indexOfFirst { it.navigationId==sectionId }; if(index>=0) navigateToEditorSection(index)},
+                    onMap={showReviewMap=true},onExport={showExportChoices=true},
+                    onAiOpinion={projectSnapshotForExport()?.let(onAskAiOpinion)})
                 EvidriloProjectRecordCard("Review your material", "${manualDraft.sources.size} sources · ${manualDraft.evidenceItems.size} evidence notes · ${manualDraft.claims.size} claims") {
                 StudentProjectReviewContent(
                     draft = manualDraft,
@@ -2237,30 +2188,6 @@ internal fun EvidriloStudentProjectEditorScreen(
                     structure = structure,
                 )
                 }
-                Text(
-                    "Review the project details above before choosing an export. Exports contain your recorded material; Evidrilo does not verify the sources, methods, or conclusions.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EvidriloColors.Slate,
-                )
-                if (isStudentProjectFileExportAvailable) {
-                EvidriloExportChooser(listOf(
-                    "Markdown report" to { exportSnapshot(StudentProjectExportFormatter::markdown) },
-                    "PDF report" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toPdfReportInput() } },
-                    "Word document" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toDocxReportInput() } },
-                    "Project backup (.evproj)" to { exportArchiveSnapshot() },
-                    "Source matrix (CSV)" to { exportSnapshot(StudentProjectExportFormatter::sourceMatrixCsv) },
-                    "Synthesis themes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::synthesisThemesCsv) },
-                    "Evidence notes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceItemsCsv) },
-                    "Findings (CSV)" to { exportSnapshot(StudentProjectExportFormatter::findingsCsv) },
-                    "Evidence relationships (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceRelationsCsv) },
-                ))
-                } else {
-                Text(
-                    "File export is not available in this build. Your project remains saved locally.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EvidriloColors.Slate,
-                )
-                }
                 exportNotice?.let { message ->
                     EvidriloTargetCard {
                         Text(message, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
@@ -2277,13 +2204,26 @@ internal fun EvidriloStudentProjectEditorScreen(
             }
         }
     }
-    if (showProjectSections) {
-        EvidriloProjectSectionsDialog(editorSections, activeEditorSectionIndex, localError ?: saveError,
-            onSelect = { index ->
-                navigateToEditorSection(index)
-                if (editorSectionIndex == index) showProjectSections = false
-            }, onDismiss = { showProjectSections = false })
-    }
+
+    if(showReviewMap) EvidriloProjectMapDialog(manualDraft) {showReviewMap=false}
+    if(showExportChoices) AlertDialog(onDismissRequest={showExportChoices=false},containerColor=EvidriloColors.Card,
+        title={Text(uiText("Export project","Ekspor proyek"))},
+        text={Column(Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(uiText("Choose a format. Review the file before saving or sharing.","Pilih format. Tinjau berkas sebelum menyimpan atau membagikan."))
+            if(isStudentProjectFileExportAvailable) {
+                EvidriloExportChooser(listOf(
+                    "Markdown report" to { exportSnapshot(StudentProjectExportFormatter::markdown) },
+                    "PDF report" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toPdfReportInput() } },
+                    "Word document" to { exportSnapshot { project -> StudentProjectExportFormatter.markdown(project).toDocxReportInput() } },
+                    "Project backup (.evproj)" to { exportArchiveSnapshot() },
+                    "Source matrix (CSV)" to { exportSnapshot(StudentProjectExportFormatter::sourceMatrixCsv) },
+                    "Synthesis themes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::synthesisThemesCsv) },
+                    "Evidence notes (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceItemsCsv) },
+                    "Findings (CSV)" to { exportSnapshot(StudentProjectExportFormatter::findingsCsv) },
+                    "Evidence relationships (CSV)" to { exportSnapshot(StudentProjectExportFormatter::evidenceRelationsCsv) },
+                ))
+            } else Text(uiText("File export is not available in this build.","Ekspor berkas tidak tersedia pada build ini."))
+        }},confirmButton={TextButton({showExportChoices=false}) {Text(uiText("Close","Tutup"))}})
 
     if (attachmentTextReadInProgress != null) {
         AlertDialog(
@@ -2292,7 +2232,7 @@ internal fun EvidriloStudentProjectEditorScreen(
             text = { Text("Checking the saved file size and checksum, then preparing a local preview. Nothing is sent online.") },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { attachmentTextReadJob?.cancel() }) { Text("Cancel") }
+                TextButton(onClick = { attachmentTextReadJob?.cancel() }) { Text(uiText("Cancel")) }
             },
         )
     }
@@ -2300,7 +2240,7 @@ internal fun EvidriloStudentProjectEditorScreen(
     attachmentTextPreview?.let { preview ->
         AlertDialog(
             onDismissRequest = { attachmentTextPreview = null },
-            title = { Text(preview.fileName) },
+            title = { RawText(preview.fileName) },
             text = {
                 Column(
                     modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
@@ -2312,7 +2252,7 @@ internal fun EvidriloStudentProjectEditorScreen(
                         color = EvidriloColors.Slate,
                     )
                     SelectionContainer {
-                        Text(preview.text, style = MaterialTheme.typography.bodyMedium)
+                        RawText(preview.text, style = MaterialTheme.typography.bodyMedium)
                     }
                     if (preview.isTruncated) {
                         Text(
@@ -2468,29 +2408,26 @@ private fun ProjectDraftField(
     label: String,
     prompt: String,
     placeholder: String = "Add your own notes.",
+    writingHint: String? = null,
     required: Boolean,
     value: String,
     onValueChange: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            "$label${if (required) " · required for structure check" else " · optional"}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Text(prompt, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(prompt) },
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = if (label == prompt) prompt else "$label. $prompt" },
             placeholder = { Text(placeholder) },
             supportingText = {
-                Text(if (required) "Required" else "Optional")
+                Text(if (required) "Required response" else "Optional response")
             },
-            minLines = 3,
+            minLines = 2,
             maxLines = 7,
             isError = value.length > 8_000,
         )
+        writingHint?.takeIf { it != prompt }?.let { EvidriloExplanation("Writing hint", it) }
     }
 }
 
@@ -2586,7 +2523,7 @@ private fun ProjectEvidenceItemEditor(
     var showRemoveConfirmation by remember(evidence.id) { mutableStateOf(false) }
     var removalError by remember(evidence.id) { mutableStateOf(false) }
     EvidriloProjectRecordCard(title = evidence.excerpt.ifBlank { "New evidence note" }.take(100), detail = sourceLabel, initiallyExpanded = evidence.excerpt.isBlank()) {
-        Text("Evidence from: $sourceLabel", style = MaterialTheme.typography.titleSmall)
+        RawText(uiText("Evidence from: ","Bukti dari: ")+sourceLabel, style = MaterialTheme.typography.titleSmall)
         SourceTextInput("Your excerpt or paraphrase", evidence.excerpt, multiline = true) {
             onChange(evidence.copy(excerpt = it))
         }
@@ -2768,7 +2705,7 @@ private fun ProjectLimitationActionEditor(
                         },
                     )
                     Column {
-                        Text(finding.statement.ifBlank { "Untitled finding" }, style = MaterialTheme.typography.bodyMedium)
+                        RawText(finding.statement.ifBlank { uiText("Untitled finding") }, style = MaterialTheme.typography.bodyMedium)
                         Text("ID: ${finding.id}", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                     }
                 }
@@ -2788,7 +2725,7 @@ private fun ProjectLimitationActionEditor(
                         },
                     )
                     Column {
-                        Text(claim.statement.ifBlank { "Untitled claim" }, style = MaterialTheme.typography.bodyMedium)
+                        RawText(claim.statement.ifBlank { uiText("Untitled claim") }, style = MaterialTheme.typography.bodyMedium)
                         Text("ID: ${claim.id}", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                     }
                 }
@@ -2821,7 +2758,7 @@ private fun ProjectEvidenceRelationsEditor(
             it.targetType == targetType && it.targetId == targetId && it.evidenceId == evidence.id
         }
         Column {
-            Text(evidence.excerpt.ifBlank { "Evidence note · ${evidence.id}" }, style = MaterialTheme.typography.bodySmall)
+            RawText(evidence.excerpt.ifBlank { "Evidence note · ${evidence.id}" }, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StudentProjectEvidenceRelationType.entries.forEach { relation ->
                     FilterChip(
@@ -2851,7 +2788,7 @@ private fun ProjectRevisionSnapshotCard(
 ) {
     EvidriloTargetCard {
         Text("Revision ${snapshot.revision}", style = MaterialTheme.typography.titleMedium)
-        Text(snapshot.changeSummary, style = MaterialTheme.typography.bodyMedium)
+        RawText(snapshot.changeSummary, style = MaterialTheme.typography.bodyMedium)
         Text(
             "Saved ${snapshot.savedAtEpochMillis} · ${snapshot.actor.name.lowercase().replace('_', ' ')}",
             style = MaterialTheme.typography.bodySmall,
@@ -2898,7 +2835,7 @@ private fun ProjectSynthesisThemeEditor(
                         onChange(theme.copy(sourceIds = next))
                     },
                 )
-                Text(source.title.ifBlank { "Untitled source · ${source.id}" }, style = MaterialTheme.typography.bodyMedium)
+                RawText(source.title.ifBlank { "Untitled source · ${source.id}" }, style = MaterialTheme.typography.bodyMedium)
             }
         }
         SourceTextInput(
@@ -2923,7 +2860,7 @@ private fun SourceTextInput(
         value = value,
         onValueChange = { next -> if (next.length <= 8_000) onValueChange(next) },
         modifier = modifier.fillMaxWidth(),
-        label = { Text(label) },
+        label = { Text(uiText(label)) },
         singleLine = !multiline,
         minLines = if (multiline) 2 else 1,
         maxLines = if (multiline) 6 else 1,
@@ -2933,8 +2870,8 @@ private fun SourceTextInput(
 @Composable
 private fun ProjectReviewValue(label: String, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
-        Text(value.ifBlank { "Not added yet." }, style = MaterialTheme.typography.bodyMedium)
+        Text(uiText(label), style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
+        RawText(value.ifBlank { uiText("Not added yet.") }, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -2968,8 +2905,8 @@ private fun StudentProjectReviewContent(
                 else -> templateSnapshot?.title ?: "Your own task"
             },
         )
-        ProjectReviewValue("Project status", draft.status.name.lowercase().replace('_', ' '))
-        ProjectReviewValue("Optional deadline", draft.deadlineDate ?: "Not set")
+        ProjectReviewValue("Project status", uiText(draft.status.name.lowercase().replace('_', ' ').replaceFirstChar {it.uppercase()}))
+        ProjectReviewValue("Optional deadline", draft.deadlineDate ?: uiText("Not set"))
         ProjectReviewValue("Saved revision", draft.revision.toString())
         Text(
             "This review records what is in the local draft. It is not an academic grade or a verification of research quality.",
@@ -2984,21 +2921,21 @@ private fun StudentProjectReviewContent(
     }
 
     EvidriloTargetCard {
-        Text("Sources", style = MaterialTheme.typography.titleLarge)
+        Text(uiText("Sources"), style = MaterialTheme.typography.titleLarge)
         if (draft.sources.isEmpty()) {
             Text("No sources have been recorded.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
         }
     }
     draft.sources.forEach { source ->
         EvidriloTargetCard {
-            Text(source.title.ifBlank { "Untitled source" }, style = MaterialTheme.typography.titleMedium)
+            RawText(source.title.ifBlank { uiText("Untitled source") }, style = MaterialTheme.typography.titleMedium)
             ProjectReviewValue("Author or organization", source.authors)
             ProjectReviewValue("Year", source.year)
             ProjectReviewValue("Source type", source.sourceType)
             ProjectReviewValue("DOI or URL", source.doiOrUrl)
             ProjectReviewValue("Access date", source.accessedOn)
             ProjectReviewValue("Citation text", source.citationText)
-            ProjectReviewValue("Your selection", source.selectionStatus.label())
+            ProjectReviewValue("Your selection", uiText(source.selectionStatus.label()))
             if (source.selectionStatus == SourceSelectionStatus.EXCLUDED) {
                 ProjectReviewValue("Exclusion reason", source.exclusionReason)
             } else {
@@ -3009,7 +2946,7 @@ private fun StudentProjectReviewContent(
                 ProjectReviewValue("Reported limitations", source.reportedLimitations)
                 ProjectReviewValue("Your notes", source.studentNotes)
             }
-            ProjectReviewValue("Checked by you", if (source.studentChecked) "Yes" else "No")
+            ProjectReviewValue("Checked by you", uiText(if (source.studentChecked) "Yes" else "No"))
         }
     }
 
@@ -3025,7 +2962,7 @@ private fun StudentProjectReviewContent(
     }
 
     EvidriloTargetCard {
-        Text("Evidence notes", style = MaterialTheme.typography.titleLarge)
+        Text(uiText("Evidence notes"), style = MaterialTheme.typography.titleLarge)
         Text(
             "These excerpts or notes were entered by you. Their presence does not mean Evidrilo has verified the source or interpretation.",
             style = MaterialTheme.typography.bodySmall,
@@ -3038,7 +2975,7 @@ private fun StudentProjectReviewContent(
             ProjectReviewValue("Source", sourcesById[evidence.sourceId]?.title ?: "Source no longer in this project")
             ProjectReviewValue("Excerpt or paraphrase", evidence.excerpt)
             ProjectReviewValue("Location", evidence.locator)
-            ProjectReviewValue("Checked by you", if (evidence.studentChecked) "Yes" else "No")
+            ProjectReviewValue("Checked by you", uiText(if (evidence.studentChecked) "Yes" else "No"))
         }
     }
 
@@ -3080,7 +3017,7 @@ private fun StudentProjectReviewContent(
     }
 
     EvidriloTargetCard {
-        Text("Claims and evidence links", style = MaterialTheme.typography.titleLarge)
+        Text(uiText("Claims and evidence links"), style = MaterialTheme.typography.titleLarge)
         Text(
             "The relationships below are choices recorded by you. Evidrilo has not determined whether a claim is true or supported.",
             style = MaterialTheme.typography.bodySmall,
@@ -3115,7 +3052,7 @@ private fun StudentProjectReviewContent(
     }
 
     EvidriloTargetCard {
-        Text("Limitations and next steps", style = MaterialTheme.typography.titleLarge)
+        Text(uiText("Limitations and next steps"), style = MaterialTheme.typography.titleLarge)
         if (draft.limitationActions.isEmpty()) {
             Text("No structured limitation or next action has been recorded.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
         }

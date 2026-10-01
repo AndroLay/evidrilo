@@ -23,7 +23,7 @@ fun AccountSession.toPresentation(): AccountPresentation {
     return when (this) {
         AccountSession.SignedOut -> AccountPresentation(
             title = "Sign in or create an account",
-            body = "Local projects stay on this device. Account sign-in is optional and does not upload projects. Pro requires a signed-in account and a confirmed entitlement; server AI and cloud sync remain paused in this build.",
+            body = "Local projects stay on this device. Account sign-in is optional and does not upload projects. Pro requires a signed-in account and a confirmed entitlement. AI also needs internet, a verified account, consent, credits and an available service.",
             actionLabel = null,
             action = AccountPresentationAction.NONE,
             isBusy = false,
@@ -51,7 +51,7 @@ fun AccountSession.toPresentation(): AccountPresentation {
                 title = pendingOperation?.let { unavailableTitle(AccountUnavailableReason.OPERATION_OUTCOME_UNKNOWN) }
                     ?: "Account connected",
                 body = pendingOperation?.let(::unknownMutationBody)
-                    ?: "You are signed in on this device. Local projects stay here; cloud sync remains paused in local mode.",
+                    ?: "You are signed in on this device. Online AI and Pro have their own service and access checks. Local projects stay here; signing in does not upload them.",
                 actionLabel = "Sign out",
                 action = AccountPresentationAction.SIGN_OUT,
                 isBusy = false,

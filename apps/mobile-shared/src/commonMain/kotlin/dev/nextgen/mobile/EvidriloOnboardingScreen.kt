@@ -27,10 +27,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +61,18 @@ public fun EvidriloOnboardingScreen(
     onSkip: () -> Unit,
     onStartProject: () -> Unit,
     storageNotice: LocalStorageNotice? = null,
+    language:EvidriloLanguage=LocalEvidriloLanguage.current,
+    languageSaveFailed:Boolean=false,
+    onSetLanguage:(EvidriloLanguage)->Unit={},
+    onConfirmLanguage:()->Boolean={true},
+    onStartPractice:(()->Unit)?=null,
 ) {
+    var languageConfirmed by rememberSaveable {mutableStateOf(false)}
+    if(!languageConfirmed) {
+        EvidriloSystemBackHandler(enabled=true) {onSkip()}
+        EvidriloWelcomeLanguage(language,languageSaveFailed,onSetLanguage,{if(onConfirmLanguage()) languageConfirmed=true},onSkip)
+        return
+    }
     val step = tourState.step
     val scene = getStartedScene(step)
     val preview = rememberGetStartedSceneSelections()
@@ -94,7 +108,8 @@ public fun EvidriloOnboardingScreen(
                 label = "Product tour shared axis",
             ) { visibleStep ->
                 val visibleScene = getStartedScene(visibleStep)
-                BoxWithConstraints(Modifier.fillMaxSize().semantics { paneTitle = visibleScene.section }) {
+                val paneLabel=uiText(visibleScene.section)
+                BoxWithConstraints(Modifier.fillMaxSize().semantics { paneTitle = paneLabel }) {
                     val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
                     val artHeight = (maxHeight - 190.dp).coerceIn(270.dp, 350.dp) * fontScale
                     val compact = maxHeight < 440.dp || fontScale > 1.15f
@@ -122,8 +137,9 @@ public fun EvidriloOnboardingScreen(
                     enabled = tourState.canContinue,
                     trailingIcon = if (step == GetStartedTourStep.READY) EvidriloIconName.FOLDER else EvidriloIconName.ARROW_FORWARD,
                 )
+                if(step==GetStartedTourStep.READY && onStartPractice!=null) TextButton(onStartPractice) {Text(uiText("Try the Free practice first"))}
                 Text(
-                    if (step == GetStartedTourStep.WELCOME) "About 1–2 minutes · at your pace"
+                    if (step == GetStartedTourStep.WELCOME) "About 2–3 minutes · at your pace"
                     else "Preview only · your work stays untouched",
                     style = MaterialTheme.typography.bodySmall,
                     color = EvidriloColors.Slate,
@@ -138,12 +154,14 @@ public fun EvidriloOnboardingScreen(
 private fun GetStartedProgress(step: GetStartedTourStep) {
     val total = GetStartedTourStep.entries.size
     val current = step.ordinal + 1
+    val spokenProgress=uiText("Get Started progress")
+    val spokenState=uiText("Section $current of $total: ","Bagian $current dari $total: ")+uiText(getStartedScene(step).section)
     val progress by animateFloatAsState(current / total.toFloat(), tween(420), label = "Tour progress fill")
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
             .semantics {
-                contentDescription = "Get Started progress"
-                stateDescription = "Section $current of $total: ${getStartedScene(step).section}"
+                contentDescription = spokenProgress
+                stateDescription = spokenState
                 progressBarRangeInfo = ProgressBarRangeInfo(current.toFloat(), 0f..total.toFloat(), total - 1)
             }.height(9.dp).clip(RoundedCornerShape(50)).background(EvidriloColors.Separator),
     ) {
@@ -170,7 +188,10 @@ private fun GetStartedSceneArtwork(step: GetStartedTourStep, preview: GetStarted
     when (step) {
         GetStartedTourStep.WELCOME -> GetStartedWelcomeScene(preview, height)
         GetStartedTourStep.ORGANIZE -> GetStartedProjectsScene(preview, height)
+        GetStartedTourStep.WORKSPACE -> GetStartedWorkspaceScene(height)
         GetStartedTourStep.REVIEW -> GetStartedEvidenceScene(preview, height)
+        GetStartedTourStep.GRAPH -> GetStartedMapScene(height)
+        GetStartedTourStep.PRACTICE -> GetStartedPracticeScene(height)
         GetStartedTourStep.ASSISTANCE -> GetStartedAiScene(preview, height)
         GetStartedTourStep.PORTABILITY -> GetStartedPortabilityScene(preview, height)
         GetStartedTourStep.READY -> GetStartedReadyScene(preview, height)

@@ -20,7 +20,10 @@ enum class GetStartedStatus(val storageValue: String) {
 enum class GetStartedTourStep {
     WELCOME,
     ORGANIZE,
+    WORKSPACE,
     REVIEW,
+    GRAPH,
+    PRACTICE,
     ASSISTANCE,
     PORTABILITY,
     READY,

@@ -37,7 +37,7 @@ public sealed class AiConversationGateway
         this.provider = provider;
         this.creditLedger = creditLedger;
         this.pricing = pricing ?? AiProviderOptions.DefaultPricing;
-        this.timeout = timeout ?? TimeSpan.FromSeconds(5);
+        this.timeout = timeout ?? this.pricing.Timeout;
     }
 
     public async Task<AiConversationGatewayResult> GenerateAsync(

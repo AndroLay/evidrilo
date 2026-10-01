@@ -1,6 +1,5 @@
 package dev.nextgen.mobile.navigation
 
-import dev.nextgen.mobile.account.TEMPORARY_GUEST_MODE_ENABLED
 
 internal enum class EvidriloDestination {
     HOME,
@@ -20,6 +19,7 @@ internal enum class EvidriloDestination {
     EVIDENCE_DELTA,
     PROFILE,
     PRACTICE,
+    CASES,
     PREMIUM,
     GUIDE,
     HISTORY,
@@ -34,7 +34,7 @@ internal enum class EvidriloDestination {
 
 /** Account-bound actions stay gated while local work, account entry, and settings remain guest-reachable. */
 internal fun EvidriloDestination.requiresAuthenticatedFreeAccess(): Boolean {
-    if (TEMPORARY_GUEST_MODE_ENABLED && this in localGuestDestinations) return false
+    if (this in localGuestDestinations) return false
     return when (this) {
         EvidriloDestination.ACCOUNT,
         EvidriloDestination.GUIDE,
@@ -46,6 +46,9 @@ internal fun EvidriloDestination.requiresAuthenticatedFreeAccess(): Boolean {
         EvidriloDestination.PROJECT_TEMPLATE_DETAIL,
         EvidriloDestination.PROJECTS,
         EvidriloDestination.PROJECT_EDITOR,
+        EvidriloDestination.PRACTICE,
+        EvidriloDestination.CASES,
+        EvidriloDestination.HISTORY,
         EvidriloDestination.PROFILE,
         EvidriloDestination.SETTINGS,
         EvidriloDestination.WORKSPACE_PREFERENCES,

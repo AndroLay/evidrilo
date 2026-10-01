@@ -34,7 +34,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
     }
 
     @Test
-    fun case_workflow_and_history_require_an_account_after_guest_mode_is_retired() {
+    fun local_case_workflow_and_history_remain_available_without_an_account() {
         val localCaseRoutes = listOf(
             EvidriloDestination.SOURCES,
             EvidriloDestination.WORKSPACE,
@@ -50,7 +50,7 @@ class EvidriloAuthenticatedAccessPolicyTest {
         )
 
         localCaseRoutes.forEach { destination ->
-            assertTrue(destination.requiresAuthenticatedFreeAccess(), "$destination must require a signed-in account")
+            assertFalse(destination.requiresAuthenticatedFreeAccess(), "$destination is local and must not require sign-in")
         }
         assertTrue(EvidriloDestination.PREMIUM.requiresAuthenticatedFreeAccess())
     }
@@ -89,6 +89,18 @@ class EvidriloAuthenticatedAccessPolicyTest {
             EvidriloDestination.WORKSPACE_PREFERENCES,
             EvidriloDestination.NOTIFICATIONS,
             EvidriloDestination.PRIVACY_DATA,
+            EvidriloDestination.SOURCES,
+            EvidriloDestination.WORKSPACE,
+            EvidriloDestination.EVIDENCE,
+            EvidriloDestination.EVIDENCE_LENS,
+            EvidriloDestination.CLAIM_TRACE,
+            EvidriloDestination.CLAIM_BOUNDARY,
+            EvidriloDestination.VERIFY_CLAIM,
+            EvidriloDestination.ACTION,
+            EvidriloDestination.EVIDENCE_DELTA,
+            EvidriloDestination.PRACTICE,
+            EvidriloDestination.CASES,
+            EvidriloDestination.HISTORY,
         )
 
         EvidriloDestination.entries.filterNot(public::contains).forEach { destination ->

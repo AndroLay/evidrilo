@@ -7,6 +7,25 @@ namespace Evidrilo.Api.Tests;
 public sealed class AiProviderOptionsTests
 {
     [Fact]
+    public void Bounded_reasoning_configuration_keeps_legacy_defaults_and_accepts_live_budget()
+    {
+        var options = AiProviderOptions.From(EnabledConfiguration(
+            ("AI_REASONING_EFFORT", "max"),
+            ("AI_MAX_OUTPUT_TOKENS", "1024"),
+            ("AI_PROVIDER_TIMEOUT_SECONDS", "60")));
+        Assert.Equal("max", options.ReasoningEffort);
+        Assert.Equal(1024, options.MaxOutputTokens);
+        Assert.Equal(60, options.Timeout.TotalSeconds);
+        Assert.Throws<PlatformConfigurationException>(() => AiProviderOptions.From(
+            EnabledConfiguration(("AI_REASONING_EFFORT", "unsupported"))));
+        Assert.Throws<PlatformConfigurationException>(() => AiProviderOptions.From(
+            EnabledConfiguration(("AI_MAX_OUTPUT_TOKENS", "8193"))));
+        Assert.Throws<PlatformConfigurationException>(() => AiProviderOptions.From(
+            EnabledConfiguration(("AI_PROVIDER_TIMEOUT_SECONDS", "91"))));
+        Assert.Null(AiProviderOptions.From(EnabledConfiguration()).ReasoningEffort);
+    }
+
+    [Fact]
     public void Provider_is_disabled_even_when_a_key_is_present_without_explicit_enablement()
     {
         var options = AiProviderOptions.From(BuildConfiguration(

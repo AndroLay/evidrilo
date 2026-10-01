@@ -12,7 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +52,7 @@ internal fun EvidriloAboutScreen(
             body = if (TEMPORARY_GUEST_MODE_ENABLED) {
                 "Projects, the catalog, case work, and history work in local guest mode. Sign-in is optional; Pro requires a signed-in account and confirmed entitlement. Cloud sync and server AI are disabled in this build. Project data stays on this device."
             } else {
-                "Local projects work without an account. Account-bound learning and project AI require sign-in; AI also needs separate consent and is disabled in this build. Project data stays on this device unless you separately enable cloud sync. Billing is not required for local work."
+                "Local projects, evidence work and Free practice do not need an account. Online AI needs internet, a verified account, consent, credits and an available service. Projects stay on this device; an AI request sends the context you separately confirm. Billing is not required for local work."
             },
         )
         EvidriloAboutPanel(

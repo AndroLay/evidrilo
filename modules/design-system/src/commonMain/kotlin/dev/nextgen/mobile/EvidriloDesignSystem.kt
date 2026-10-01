@@ -51,7 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -694,7 +694,7 @@ public fun EvidriloBackButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         EvidriloIcon(EvidriloIconName.ARROW_BACK, tint = EvidriloColors.Cobalt)
-        Text(label, color = EvidriloColors.Cobalt, style = MaterialTheme.typography.titleMedium)
+        Text(uiText(label), color = EvidriloColors.Cobalt, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -705,13 +705,14 @@ public fun EvidriloIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
+    val spokenDescription=uiText(contentDescription)
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = enabled, onClick = onClick)
             .semantics {
-                this.contentDescription = contentDescription
+                this.contentDescription = spokenDescription
                 role = Role.Button
             },
         contentAlignment = Alignment.Center,
@@ -732,6 +733,7 @@ public fun EvidriloPrimaryButton(
     enabled: Boolean = true,
     trailingIcon: EvidriloIconName? = null,
 ) {
+    val spokenLabel=uiText(label)
     val contentColor = evidriloPrimaryButtonContentColor(enabled)
     // Solid Cobalt face on a darker lip; a disabled button goes flat and grey so
     // it never looks tappable. The spoken label keeps its original casing.
@@ -740,7 +742,7 @@ public fun EvidriloPrimaryButton(
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = label },
+            .semantics { contentDescription = spokenLabel },
         faceColor = if (enabled) EvidriloColors.PrimaryAction else EvidriloColors.Separator,
         lipColor = if (enabled) EvidriloColors.CobaltPressed else EvidriloColors.Separator,
         borderColor = null,
@@ -756,12 +758,13 @@ public fun EvidriloSecondaryButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
+    val spokenLabel=uiText(label)
     EvidriloPressableSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = label },
+            .semantics { contentDescription = spokenLabel },
         faceColor = EvidriloColors.Card,
         lipColor = EvidriloColors.Separator,
         borderColor = EvidriloColors.Separator,
@@ -783,12 +786,13 @@ public fun EvidriloInverseButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val spokenLabel=uiText(label)
     EvidriloPressableSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .semantics { contentDescription = label },
+            .semantics { contentDescription = spokenLabel },
         faceColor = EvidriloColors.White,
         lipColor = EvidriloColors.PatternBlue,
         borderColor = null,
@@ -813,7 +817,7 @@ private fun EvidriloButtonContent(
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = label.uppercase(),
+            text = uiText(label).uppercase(),
             style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 0.8.sp),
             color = color,
             textAlign = TextAlign.Center,
@@ -862,7 +866,7 @@ public fun EvidriloEyebrow(
     color: Color = EvidriloColors.Cobalt,
 ) {
     Text(
-        text = text.uppercase(),
+        text = uiText(text).uppercase(),
         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
         color = color,
         modifier = modifier,
@@ -892,7 +896,7 @@ public fun EvidriloStatPill(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         EvidriloIcon(icon, tint = tint, modifier = Modifier.size(20.dp))
-        Text(label, style = MaterialTheme.typography.titleSmall, color = tint)
+        Text(uiText(label), style = MaterialTheme.typography.titleSmall, color = tint)
     }
 }
 
@@ -917,7 +921,7 @@ public fun EvidriloCalloutBubble(
                 .padding(horizontal = 14.dp, vertical = 7.dp),
         ) {
             Text(
-                text = text.uppercase(),
+                text = uiText(text).uppercase(),
                 style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 0.8.sp),
                 color = contentColor,
             )

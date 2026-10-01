@@ -66,7 +66,7 @@ flowchart TD
 - Keep Get Started optional, skippable, replayable, and targeted at about three
   minutes; that duration is a design target, not validated usability evidence.
   Use a visual progress bar and a plain-language current-section title instead
-  of visible “Step N of M” copy. Back, Next, and Skip remain available, and
+  of visible “Step N of M” copy. Native Back, Next, and Skip remain available, and
   assistive technology receives a meaningful progress description.
 - Start the guide nearly blank. Let a student use their own assignment or topic,
   or continue without one. Explain the general path from a task, to material,
@@ -101,7 +101,8 @@ flowchart TD
   remote template or treated as human approval.
 - Keep case practice separate from the student's project. A synthetic case is
   clearly labeled as practice, its facts never become project sources, and its
-  account gate does not block local project work. Remove visible narration
+  first Free case and local history require no account under D-136; Pro cases
+  retain D-134's verified entitlement gate. Remove visible narration
   **Listen** controls from the current product surfaces; this does not remove
   operating-system screen-reader support or decide separate selection feedback
   and device-local sound preferences. D-098's optional-audio capability remains
@@ -675,7 +676,7 @@ student can understand a method, keep their own work, or retrieve their data.
 | Capability | Free | Pro |
 | --- | --- | --- |
 | Catalog | Browse and use all five offline structure-only starters; preview every remote published version; start a reviewed baseline template whenever that family has one | May start optional reviewed specialist templates introduced later; no family is Pro-only |
-| Projects | Blank/manual projects, full core workflow, five active projects per installation | Fifty active projects per installation while entitlement is verified |
+| Projects | Blank/manual projects, full core workflow, five total projects per installation | Fifty total projects per installation while entitlement is verified |
 | Case practice | Complete Free learning loop | Two additional approved premium cases |
 | AI allowance | 20 one-time credits for an eligible verified account after consent | Adds 200 credits for each active entitlement month; monthly and yearly plans accumulate unused credits, including after Pro ends |
 | Reports and data | Essential report export and complete project-data portability | No paid-only lock on existing project data or recovery/export |

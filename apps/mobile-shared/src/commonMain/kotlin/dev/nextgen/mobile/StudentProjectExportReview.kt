@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
@@ -7,7 +8,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -126,7 +127,7 @@ internal fun StudentProjectExportReviewDialog(
         title = { Text("Review ${review.formatLabel.lowercase()}") },
         text = {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                Text(review.fileName, style = MaterialTheme.typography.titleSmall)
+                RawText(review.fileName, style = MaterialTheme.typography.titleSmall)
                 Text("${review.projectTitle} · revision ${review.projectRevision}", style = MaterialTheme.typography.titleSmall)
                 Text(review.privacyNotice, style = MaterialTheme.typography.bodySmall)
                 Text(review.cancelNotice, style = MaterialTheme.typography.bodySmall)
@@ -139,7 +140,7 @@ internal fun StudentProjectExportReviewDialog(
                     )
                 } else {
                     SelectionContainer {
-                        Text(review.contentPreview.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                        RawText(review.contentPreview.orEmpty(), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

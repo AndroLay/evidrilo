@@ -46,8 +46,8 @@ internal fun premiumPaywallModel(
         state = state,
         title = when (state) {
             PremiumPaywallState.LOADING -> "Checking premium access"
-            PremiumPaywallState.LOCKED -> "Unlock two evidence cases"
-            PremiumPaywallState.OFFERS_AVAILABLE -> "Choose monthly or yearly access"
+            PremiumPaywallState.LOCKED -> "Explore Evidrilo Pro"
+            PremiumPaywallState.OFFERS_AVAILABLE -> "Choose Monthly or Annually"
             PremiumPaywallState.EMPTY -> "Premium plans are unavailable"
             PremiumPaywallState.ERROR -> "Purchase needs attention"
             PremiumPaywallState.PENDING -> "Purchase is being reconciled"

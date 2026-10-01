@@ -1,11 +1,13 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.project.*
 import dev.nextgen.mobile.recommendation.RecommendationUiState
 import dev.nextgen.mobile.storage.LocalStorageNotice
+import dev.nextgen.mobile.storage.createProjectSectionBookmarkStore
+import androidx.compose.runtime.remember
 
 internal data class HomeProjectSummary(
     val totalCount: Int,
@@ -24,7 +28,7 @@ internal data class HomeProjectSummary(
     val archivedCount: Int,
     val activeLimit: Int,
 ) {
-    val remainingActiveSlots: Int get() = (activeLimit - activeCount).coerceAtLeast(0)
+    val remainingActiveSlots: Int get() = (activeLimit - totalCount).coerceAtLeast(0)
 }
 
 internal fun homeProjectSummary(
@@ -34,7 +38,7 @@ internal fun homeProjectSummary(
     val safeLimit = activeLimit.coerceAtLeast(1)
     val visibleProjects = projects.filter { it.status != StudentProjectStatus.TRASHED }
     return HomeProjectSummary(
-        totalCount = visibleProjects.size,
+        totalCount = projects.size,
         activeCount = visibleProjects.count { StudentProjectDraftRules.countsTowardActiveLimit(it.status) },
         completedCount = visibleProjects.count { it.status == StudentProjectStatus.COMPLETED },
         archivedCount = visibleProjects.count { it.status == StudentProjectStatus.ARCHIVED },
@@ -64,6 +68,7 @@ internal fun EvidriloTargetHomeScreen(
     onResumeProject: (StudentProjectDraft) -> Unit = {},
     onOpenSettings: () -> Unit,
     onOpenPractice: () -> Unit = {},
+    onOpenCases: () -> Unit = {},
     recommendation: RecommendationUiState = RecommendationUiState.Hidden,
     onAcceptRecommendation: () -> Unit = {},
     onDismissRecommendation: () -> Unit = {},
@@ -74,16 +79,16 @@ internal fun EvidriloTargetHomeScreen(
     EvidriloContentColumn(includeBottomSafeArea = false, verticalArrangement = Arrangement.spacedBy(22.dp)) {
         EvidriloBrandHeader(onSettings = onOpenSettings)
         storageNotice?.takeIf { it.isError }?.let { EvidriloRecoveryNotice(it) }
-        EvidriloPageHeading("One idea.\nA clear next step.", "Your questions, notes and reasoning—in one place.")
+        EvidriloPageHeading("Keep your ideas moving.")
         when {
             projectsLoading -> Surface(shape = RoundedCornerShape(22.dp), color = EvidriloColors.Atmosphere) {
                 Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Opening your workspace…", style = MaterialTheme.typography.titleMedium)
+                    Text(uiText("Opening your workspace…","Membuka ruang kerjamu…"), style = MaterialTheme.typography.titleMedium)
                     LinearProgressIndicator(Modifier.fillMaxWidth(), color = EvidriloColors.Cobalt, trackColor = EvidriloColors.Tint)
                 }
             }
             projectsLoadError != null -> EvidriloTargetCard {
-                Text("Let's recover your projects", style = MaterialTheme.typography.titleLarge)
+                Text(uiText("Let's recover your projects","Pulihkan proyekmu"), style = MaterialTheme.typography.titleLarge)
                 Text(projectsLoadError, color = EvidriloColors.Slate, style = MaterialTheme.typography.bodyMedium)
                 EvidriloPrimaryButton("Try again", onRetryProjects)
             }
@@ -91,8 +96,8 @@ internal fun EvidriloTargetHomeScreen(
             else -> Surface(shape = RoundedCornerShape(24.dp), color = EvidriloColors.Atmosphere) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     EvidriloLogoMark(size = 72.dp)
-                    Text("Your next chapter starts here.", style = MaterialTheme.typography.headlineSmall)
-                    Text("Bring a question. Build the rest as you go.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+                    Text(uiText("Your next chapter starts here.","Mulai langkah baru di sini."), style = MaterialTheme.typography.headlineSmall)
+                    Text(uiText("Bring a question. Build the rest as you go.","Mulai dengan pertanyaan. Kembangkan selangkah demi selangkah."), style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                     EvidriloPrimaryButton("Create a project", onCreateProject, trailingIcon = EvidriloIconName.PLUS)
                 }
             }
@@ -100,34 +105,28 @@ internal fun EvidriloTargetHomeScreen(
         if (!projectsLoading && projectsLoadError == null) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("${summary.totalCount} local ${if (summary.totalCount == 1) "project" else "projects"}", style = MaterialTheme.typography.titleMedium)
-                    Text("${summary.activeCount} of ${summary.activeLimit} active", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                    Text(uiText("${summary.totalCount} local ${if (summary.totalCount == 1) "project" else "projects"}", "${summary.totalCount} proyek lokal"), style = MaterialTheme.typography.titleMedium)
+                    Text(uiText("${summary.totalCount} of ${summary.activeLimit} project spaces", "${summary.totalCount} dari ${summary.activeLimit} ruang proyek"), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                 }
-                TextButton(onOpenProjects) { Text("View projects", color = EvidriloColors.Cobalt) }
+                TextButton(onOpenProjects) { Text(uiText("View projects","Lihat proyek"), color = EvidriloColors.Cobalt) }
             }
-            if (current != null) EvidriloWorkspaceRow(EvidriloIconName.PLUS, "New project", "Start with your own question", onCreateProject)
+            if (current != null) EvidriloWorkspaceRow(EvidriloIconName.PLUS, uiText("New project"), uiText("Start with your own question"), onCreateProject)
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Find your starting point", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                TextButton(onOpenProjectCatalog) { Text("Explore", color = EvidriloColors.Cobalt) }
+                Text(uiText("Find your starting point","Temukan titik awalmu"), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                TextButton(onOpenProjectCatalog) { Text(uiText("Explore"), color = EvidriloColors.Cobalt) }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(projectTemplateFamilyOverviews, key = { it.family.id }) { overview ->
                     val family = overview.family
                     val design = projectTemplateFamilyCardDesign(family)
-                    EvidriloPressableCard(onClick = { onSelectProjectFamily(family) }, modifier = Modifier.width(160.dp), faceColor = EvidriloColors.Atmosphere, borderColor = EvidriloColors.Atmosphere, lipColor = EvidriloColors.Tint) {
-                        Box(Modifier.fillMaxWidth().height(82.dp), contentAlignment = Alignment.Center) {
-                            EvidriloIcon(design.icon, tint = EvidriloColors.Cobalt, modifier = Modifier.size(40.dp))
-                        }
-                        Text(projectFamilyShortName(family), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 14.dp))
-                        Text("Explore a structure", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate, modifier = Modifier.padding(14.dp))
-                    }
+                    EvidriloHomeCatalogCover(family,design.cue) {onSelectProjectFamily(family)}
                 }
             }
         }
         EvidriloPracticeEntry(onOpenPractice)
-        EvidriloWorkspaceRow(EvidriloIconName.EVIDENCE_GRAPH, "Explore a worked case", "Sources, evidence, and a next move · separate from your projects", { onNavigate(EvidriloTargetSection.SOURCES) })
+        EvidriloCasesEntry(onOpenCases)
         if (recommendation !is RecommendationUiState.Hidden) EvidriloRecommendationCard(recommendation, onAcceptRecommendation, onDismissRecommendation, onRetryRecommendation)
         Spacer(Modifier.height(64.dp))
     }
@@ -136,18 +135,30 @@ internal fun EvidriloTargetHomeScreen(
 @Composable
 private fun HomeContinueProject(project: StudentProjectDraft, onContinue: () -> Unit) {
     val progress = StudentProjectDraftRules.requiredFieldProgress(project)
+    val bookmarkStore = remember { createProjectSectionBookmarkStore() }
+    val bookmarkLoad = remember(project.id, project.revision) { bookmarkStore.read(projectSectionBookmarkKey(project)) }
+    val sections = studentProjectEditorSections(project)
+    val resumeSection = sections.firstOrNull { it.navigationId == bookmarkLoad.value } ?: sections.first()
+    val nextTask = projectWorkSuggestions(project).firstOrNull()
     val enter = rememberGetStartedReveal(project.id, 650)
     Box(Modifier.fillMaxWidth()) {
         Surface(Modifier.matchParentSize().graphicsLayer { rotationZ = -2.5f; translationY = 5.dp.toPx() }, shape = RoundedCornerShape(24.dp), color = EvidriloColors.Tint) {}
         Surface(Modifier.fillMaxWidth().graphicsLayer { translationY = (1 - enter.value) * 10.dp.toPx() }, shape = RoundedCornerShape(24.dp), color = EvidriloColors.Card, shadowElevation = 3.dp) {
-            Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     EvidriloIcon(EvidriloIconName.FOLDER, tint = EvidriloColors.Cobalt, modifier = Modifier.size(27.dp))
-                    Text("Pick up where you left off", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate, modifier = Modifier.weight(1f))
+                    Text(uiText("Your current project","Proyek yang sedang dikerjakan"), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate, modifier = Modifier.weight(1f))
                     EvidriloLogoMark(size = 34.dp)
                 }
-                Text(project.title.ifBlank { "Untitled project" }, style = MaterialTheme.typography.headlineSmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Text("${progress.filledRequired}/${progress.totalRequired} required fields · structure only", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                RawText(project.title.ifBlank { "Untitled project" }, style = MaterialTheme.typography.headlineSmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(uiText(resumeSection.title), style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Cobalt)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LinearProgressIndicator(progress = { if (progress.totalRequired == 0) 0f else progress.filledRequired.toFloat()/progress.totalRequired }, modifier = Modifier.weight(1f).height(6.dp), color = EvidriloColors.Cobalt, trackColor = EvidriloColors.Tint)
+                    Text(uiText("${progress.filledRequired}/${progress.totalRequired} responses", "${progress.filledRequired}/${progress.totalRequired} isian"), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+                nextTask?.takeIf { it.sectionId != resumeSection.navigationId }?.let {
+                    Text(uiText("Next: ","Berikutnya: ")+uiText(it.title), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
                 EvidriloPrimaryButton("Continue project", onContinue, trailingIcon = EvidriloIconName.ARROW_FORWARD)
             }
         }

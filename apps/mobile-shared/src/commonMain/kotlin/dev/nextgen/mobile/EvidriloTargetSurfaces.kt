@@ -39,7 +39,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -1556,69 +1556,22 @@ internal fun EvidriloTargetProfileScreen(
     onOpenAccount: () -> Unit,
     onOpenLocalProjects: () -> Unit,
     onOpenSupport: () -> Unit,
+    projects: List<dev.nextgen.mobile.domain.project.StudentProjectDraft> = emptyList(),
+    projectsLoading: Boolean = false,
+    projectsError: String? = null,
+    profileName: String = if (signedIn) "Your account" else "Local student",
+    hasVerifiedPro: Boolean = false,
+    onRetryProjects: () -> Unit = {},
+    onResumeProject: (dev.nextgen.mobile.domain.project.StudentProjectDraft) -> Unit = {},
+    onOpenPractice: () -> Unit = {},
+    onOpenPracticeLesson: (dev.nextgen.mobile.domain.practice.PracticeLessonId) -> Unit = { onOpenPractice() },
 ) {
     EvidriloTargetSurface(EvidriloTargetSection.PROFILE, onNavigate) {
-        EvidriloContentColumn {
+        EvidriloContentColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             EvidriloBackGesture(label = "Home", onClick = onBack)
-            TargetPageIntro(
-                title = "Your space.",
-                body = if (TEMPORARY_GUEST_MODE_ENABLED) {
-                    "Projects, catalog, case work, and history stay on this device."
-                } else if (signedIn) {
-                    "Your work, preferences, and account."
-                } else {
-                    "Your projects stay on this device."
-                },
-            )
-            TargetProfileSummaryCard(
-                signedIn = signedIn,
-                profileSubtitle = profileSubtitle,
-                history = history,
-                onClick = onOpenAccount,
-            )
-            if (REVENUECAT_PRO_FEATURE_ENABLED) EvidriloProEntry(onOpenPremium)
-            TargetSettingsRow(
-                icon = EvidriloIconName.FOLDER,
-                title = "My projects",
-                subtitle = "Open projects stored on this device",
-                onClick = onOpenLocalProjects,
-            )
-            TargetSettingsRow(
-                icon = EvidriloIconName.SETTINGS,
-                title = "Workspace preferences",
-                subtitle = "Customize your workspace",
-                onClick = onOpenWorkspacePreferences,
-            )
-            TargetSettingsRow(
-                icon = EvidriloIconName.BELL,
-                title = "Notifications",
-                subtitle = "Off by default · local reminders",
-                onClick = onOpenNotifications,
-            )
-            if (!TEMPORARY_GUEST_MODE_ENABLED) TargetSettingsRow(
-                icon = EvidriloIconName.DATABASE,
-                title = "Export & backup",
-                subtitle = "Account export when signed in",
-                onClick = onOpenAccount,
-            )
-            TargetSettingsRow(
-                icon = EvidriloIconName.SHIELD,
-                title = "Privacy & data",
-                subtitle = "Your data, your control",
-                onClick = onOpenPrivacyData,
-            )
-            TargetSettingsRow(
-                icon = EvidriloIconName.HISTORY,
-                title = "Local history",
-                subtitle = "Review changes on this device",
-                onClick = onOpenHistory,
-            )
-            TargetSettingsRow(
-                icon = EvidriloIconName.QUESTION,
-                title = "Support",
-                subtitle = "Help and account options",
-                onClick = onOpenSupport,
-            )
+            EvidriloProfileProgress(signedIn, profileName, projects, projectsLoading, projectsError, hasVerifiedPro,
+                onOpenAccount, onOpenLocalProjects, onResumeProject, onOpenPractice, onOpenHistory, onOpenPremium,
+                onRetryProjects, onOpenWorkspacePreferences, onOpenNotifications, onOpenPrivacyData, onOpenSupport, onOpenPracticeLesson)
         }
     }
 }
@@ -2073,7 +2026,7 @@ private fun TargetActionHero(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 TargetIconTile(icon = EvidriloIconName.LIGHTNING, size = 42.dp)
-                Text("Next action", style = MaterialTheme.typography.titleLarge, color = EvidriloColors.Cobalt)
+                Text(uiText("Next action"), style = MaterialTheme.typography.titleLarge, color = EvidriloColors.Cobalt)
             }
             Text(title, style = MaterialTheme.typography.titleLarge)
             Text(reason, style = MaterialTheme.typography.bodyMedium)

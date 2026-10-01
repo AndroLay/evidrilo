@@ -1,0 +1,182 @@
+package dev.nextgen.mobile
+
+private data class UiCopyPattern(val prefix:String,val suffix:String,val regex:Regex,val translated:String)
+private val placeholderRegex=Regex("\\{([0-9]+)\\}")
+private val patterns=listOf(
+    UiCopyPattern(""," premium investigations",Regex("^([0-9]+) premium investigations$"),"{1} penyelidikan Pro"),
+    UiCopyPattern(""," published templates available to inspect.",Regex("^(.+?)\\ published\\ templates\\ available\\ to\\ inspect\\.\$"),"{1} template terbit tersedia untuk diperiksa."),
+    UiCopyPattern(""," accessible practice attempts completed. Not a mastery score.",Regex("^(.+?)\\ of\\ (.+?)\\ accessible\\ practice\\ attempts\\ completed\\.\\ Not\\ a\\ mastery\\ score\\.\$"),"{1} dari {2} percobaan tersedia selesai. Bukan skor penguasaan."),
+    UiCopyPattern(""," AI credits remaining",Regex("^(.+?)\\ AI\\ credits\\ remaining\$"),"{1} kredit AI tersisa"),
+    UiCopyPattern(""," shared AI credits",Regex("^(.+?)\\ shared\\ AI\\ credits\$"),"{1} kredit AI bersama"),
+    UiCopyPattern(""," shared AI credits · actual provider usage",Regex("^(.+?)\\ shared\\ AI\\ credits\\ ·\\ actual\\ provider\\ usage\$"),"{1} kredit AI bersama · penggunaan penyedia sebenarnya"),
+    UiCopyPattern(""," connections",Regex("^(.+?)\\ connections\$"),"{1} hubungan"),
+    UiCopyPattern(""," responses recorded",Regex("^(.+?)\\ responses\\ recorded\$"),"{1} jawaban tercatat"),
+    UiCopyPattern(""," claims have recorded boundaries",Regex("^(.+?)\\ claims\\ have\\ recorded\\ boundaries\$"),"{1} klaim memiliki batas tercatat"),
+    UiCopyPattern(""," selected",Regex("^(.+?)\\ selected\$"),"{1} dipilih"),
+    UiCopyPattern(""," not selected",Regex("^(.+?)\\ not\\ selected\$"),"{1} belum dipilih"),
+    UiCopyPattern("","% read",Regex("^(.+?)%\\ read\$"),"{1}% dibaca"),
+    UiCopyPattern(""," projects total",Regex("^(.+?)\\ projects\\ total\$"),"{1} proyek total"),
+    UiCopyPattern(""," claim evidence links",Regex("^(.+?)\\ claims\\ ·\\ (.+?)\\ claim\\ evidence\\ links\$"),"{1} klaim · {2} hubungan bukti klaim"),
+    UiCopyPattern(""," without note links",Regex("^(.+?)\\ claims\\ ·\\ (.+?)\\ without\\ note\\ links\$"),"{1} klaim · {2} tanpa hubungan catatan"),
+    UiCopyPattern(""," available",Regex("^(.+?)\\ available\$"),"{1} tersedia"),
+    UiCopyPattern(""," added",Regex("^(.+?)\\ added\$"),"{1} ditambahkan"),
+    UiCopyPattern(""," removed or unavailable",Regex("^(.+?)\\ removed\\ or\\ unavailable\$"),"{1} dihapus atau tidak tersedia"),
+    UiCopyPattern(""," notes recorded",Regex("^(.+?)\\ notes\\ recorded\$"),"{1} catatan tercatat"),
+    UiCopyPattern(""," empty",Regex("^(.+?)\\ recorded\\ ·\\ (.+?)\\ empty\$"),"{1} tercatat · {2} kosong"),
+    UiCopyPattern(""," findings and comparisons recorded",Regex("^(.+?)\\ findings\\ and\\ comparisons\\ recorded\$"),"{1} temuan dan perbandingan tercatat"),
+    UiCopyPattern(""," boundary and action records",Regex("^(.+?)\\ boundary\\ and\\ action\\ records\$"),"{1} catatan batasan dan langkah"),
+    UiCopyPattern(""," need details",Regex("^(.+?)\\ recorded\\ ·\\ (.+?)\\ need\\ details\$"),"{1} tercatat · {2} perlu rincian"),
+    UiCopyPattern(""," sources recorded",Regex("^(.+?)\\ sources\\ recorded\$"),"{1} sumber tercatat"),
+    UiCopyPattern(""," links recorded by you",Regex("^(.+?)\\ sources\\ ·\\ (.+?)\\ evidence\\ notes\\ ·\\ (.+?)\\ findings\\ ·\\ (.+?)\\ claims\\ ·\\ (.+?)\\ links\\ recorded\\ by\\ you\$"),"{1} sumber · {2} catatan bukti · {3} temuan · {4} klaim · {5} hubungan pilihan Anda"),
+    UiCopyPattern(""," claims",Regex("^(.+?)\\ sources\\ ·\\ (.+?)\\ evidence\\ notes\\ ·\\ (.+?)\\ claims\$"),"{1} sumber · {2} catatan bukti · {3} klaim"),
+    UiCopyPattern(""," characters",Regex("^(.+?)\\ characters\$"),"{1} karakter"),
+    UiCopyPattern("","",Regex("^(.+?)\\ characters\\ ·\\ at\\ least\\ (.+?)\$"),"{1} karakter · minimal {2}"),
+    UiCopyPattern(""," · proposed change",Regex("^(.+?)\\ ·\\ proposed\\ change\$"),"{1} · usulan perubahan"),
+    UiCopyPattern(""," supplied observations selected",Regex("^(.+?)\\ of\\ (.+?)\\ supplied\\ observations\\ selected\$"),"{1} dari {2} pengamatan dipilih"),
+    UiCopyPattern(""," selected reference is unavailable in this case version and cannot support the claim.",Regex("^(.+?)\\ selected\\ reference\\ is\\ unavailable\\ in\\ this\\ case\\ version\\ and\\ cannot\\ support\\ the\\ claim\\.\$"),"{1} rujukan terpilih tidak tersedia dalam versi kasus ini dan tidak dapat mendukung klaim."),
+    UiCopyPattern(""," missing references",Regex("^(.+?)\\ missing\\ references\$"),"{1} rujukan hilang"),
+    UiCopyPattern(""," open support gaps",Regex("^(.+?)\\ open\\ support\\ gaps\$"),"{1} celah dukungan terbuka"),
+    UiCopyPattern(""," required responses",Regex("^(.+?)\\ required\\ responses\$"),"{1} jawaban wajib"),
+    UiCopyPattern(""," required responses recorded",Regex("^(.+?)\\ required\\ responses\\ recorded\$"),"{1} jawaban wajib tercatat"),
+    UiCopyPattern(""," responses",Regex("^(.+?)\\ responses\$"),"{1} jawaban"),
+    UiCopyPattern(""," recorded",Regex("^(.+?)\\ recorded\$"),"{1} tercatat"),
+    UiCopyPattern(""," claims",Regex("^(.+?)\\ notes\\ ·\\ (.+?)\\ claims\$"),"{1} catatan · {2} klaim"),
+    UiCopyPattern(""," projects",Regex("^(.+?)\\ of\\ (.+?)\\ projects\$"),"{1} dari {2} proyek"),
+    UiCopyPattern(""," project spaces",Regex("^(.+?)\\ of\\ (.+?)\\ project\\ spaces\$"),"{1} dari {2} ruang proyek"),
+    UiCopyPattern(""," other sections",Regex("^(.+?)\\ other\\ sections\$"),"{1} bagian lainnya"),
+    UiCopyPattern(""," removed",Regex("^(.+?)\\ added\\ ·\\ (.+?)\\ removed\$"),"{1} ditambahkan · {2} dihapus"),
+    UiCopyPattern(""," · local structure-only guide",Regex("^(.+?)\\ ·\\ local\\ structure\\-only\\ guide\$"),"{1} · panduan struktur lokal"),
+    UiCopyPattern("All "," Practice cases",Regex("^All\\ (.+?)\\ Practice\\ cases\$"),"Semua {1} kasus latihan"),
+    UiCopyPattern("Account email · "," · verified",Regex("^Account\\ email\\ ·\\ (.+?)\\ ·\\ verified\$"),"Email akun · {1} · terverifikasi"),
+    UiCopyPattern("Account email · ","",Regex("^Account\\ email\\ ·\\ (.+?)\$"),"Email akun · {1}"),
+    UiCopyPattern("Current account email · ","",Regex("^Current\\ account\\ email\\ ·\\ (.+?)\$"),"Email akun saat ini · {1}"),
+    UiCopyPattern("Activity metadata is temporarily unavailable (",").",Regex("^Activity\\ metadata\\ is\\ temporarily\\ unavailable\\ \\((.+?)\\)\\.\$"),"Metadata aktivitas sementara tidak tersedia ({1})."),
+    UiCopyPattern("Anchored to ","",Regex("^Anchored\\ to\\ (.+?)\$"),"Merujuk {1}"),
+    UiCopyPattern("Anchors: ","",Regex("^Anchors:\\ (.+?)\$"),"Rujukan: {1}"),
+    UiCopyPattern("Attachments: ","",Regex("^Attachments:\\ (.+?)\$"),"Lampiran: {1}"),
+    UiCopyPattern("Bundled case · ","",Regex("^Bundled\\ case\\ ·\\ (.+?)\$"),"Kasus bawaan · {1}"),
+    UiCopyPattern("Cadence · ","",Regex("^Cadence\\ ·\\ (.+?)\$"),"Frekuensi · {1}"),
+    UiCopyPattern("Case boundary · ","",Regex("^Case\\ boundary\\ ·\\ (.+?)\$"),"Batas kasus · {1}"),
+    UiCopyPattern("Check: ","",Regex("^Check:\\ (.+?)\$"),"Periksa: {1}"),
+    UiCopyPattern("Claim Boundary: ","",Regex("^Claim\\ Boundary:\\ (.+?)\$"),"Batas Klaim: {1}"),
+    UiCopyPattern("Claim boundary · ","",Regex("^Claim\\ boundary\\ ·\\ (.+?)\$"),"Batas klaim · {1}"),
+    UiCopyPattern("Claim · ","",Regex("^Claim\\ ·\\ (.+?)\$"),"Klaim · {1}"),
+    UiCopyPattern("Claims: ","",Regex("^Claims:\\ (.+?)\$"),"Klaim: {1}"),
+    UiCopyPattern("Collapse ","",Regex("^Collapse\\ (.+?)\$"),"Tutup {1}"),
+    UiCopyPattern("Expand ","",Regex("^Expand\\ (.+?)\$"),"Buka {1}"),
+    UiCopyPattern("Continue ","",Regex("^Continue\\ (.+?)\$"),"Lanjutkan {1}"),
+    UiCopyPattern("Current case state · "," questions",Regex("^Current\\ case\\ state\\ ·\\ (.+?)\\ questions\$"),"Kasus saat ini · {1} pertanyaan"),
+    UiCopyPattern("Currently: ","",Regex("^Currently:\\ (.+?)\$"),"Saat ini: {1}"),
+    UiCopyPattern("Draft suggestion · ","",Regex("^Draft\\ suggestion\\ ·\\ (.+?)\$"),"Saran draf · {1}"),
+    UiCopyPattern("Edit suggested ","",Regex("^Edit\\ suggested\\ (.+?)\$"),"Edit saran {1}"),
+    UiCopyPattern("Evidence lens for ","",Regex("^Evidence\\ lens\\ for\\ (.+?)\$"),"Lensa bukti untuk {1}"),
+    UiCopyPattern("Evidence note · ","",Regex("^Evidence\\ note\\ ·\\ (.+?)\$"),"Catatan bukti · {1}"),
+    UiCopyPattern("Evidence notes: ","",Regex("^Evidence\\ notes:\\ (.+?)\$"),"Catatan bukti: {1}"),
+    UiCopyPattern("Findings: ","",Regex("^Findings:\\ (.+?)\$"),"Temuan: {1}"),
+    UiCopyPattern("Focus: ","",Regex("^Focus:\\ (.+?)\$"),"Fokus: {1}"),
+    UiCopyPattern("Grounded in: ","",Regex("^Grounded\\ in:\\ (.+?)\$"),"Berdasarkan: {1}"),
+    UiCopyPattern("Limit: ","",Regex("^Limit:\\ (.+?)\$"),"Batasan: {1}"),
+    UiCopyPattern("Limitations: ","",Regex("^Limitations:\\ (.+?)\$"),"Batasan: {1}"),
+    UiCopyPattern("Local guide · ","",Regex("^Local\\ guide\\ ·\\ (.+?)\$"),"Panduan lokal · {1}"),
+    UiCopyPattern("Local revision ","",Regex("^Local\\ revision\\ (.+?)\\ ·\\ archive\\ revision\\ (.+?)\$"),"Revisi lokal {1} · revisi cadangan {2}"),
+    UiCopyPattern("Next schedule: ","",Regex("^Next\\ schedule:\\ (.+?)\$"),"Jadwal berikutnya: {1}"),
+    UiCopyPattern("Next: ","",Regex("^Next:\\ (.+?)\$"),"Berikutnya: {1}"),
+    UiCopyPattern("Observation ","",Regex("^Observation\\ (.+?)\$"),"Pengamatan {1}"),
+    UiCopyPattern("Older activity could not be loaded (",").",Regex("^Older\\ activity\\ could\\ not\\ be\\ loaded\\ \\((.+?)\\)\\.\$"),"Aktivitas sebelumnya gagal dimuat ({1})."),
+    UiCopyPattern("On · ","",Regex("^On\\ ·\\ (.+?)\$"),"Aktif · {1}"),
+    UiCopyPattern("Origin: ","",Regex("^Origin:\\ (.+?)\$"),"Asal: {1}"),
+    UiCopyPattern("Practice progress: ","",Regex("^Practice\\ progress:\\ (.+?)\$"),"Progres latihan: {1}"),
+    UiCopyPattern("Preview ","",Regex("^Preview\\ (.+?)\$"),"Pratinjau {1}"),
+    UiCopyPattern("Pro · all "," cases available",Regex("^Pro\\ ·\\ all\\ (.+?)\\ cases\\ available\$"),"Pro · semua {1} kasus tersedia"),
+    UiCopyPattern("Progress sync could not advance safely (",").",Regex("^Progress\\ sync\\ could\\ not\\ advance\\ safely\\ \\((.+?)\\)\\.\$"),"Sinkronisasi progres gagal dilanjutkan aman ({1})."),
+    UiCopyPattern("Progress sync could not be saved safely (",").",Regex("^Progress\\ sync\\ could\\ not\\ be\\ saved\\ safely\\ \\((.+?)\\)\\.\$"),"Sinkronisasi progres gagal disimpan aman ({1})."),
+    UiCopyPattern("Project AI consent could not be verified (","). No project context was sent.",Regex("^Project\\ AI\\ consent\\ could\\ not\\ be\\ verified\\ \\((.+?)\\)\\.\\ No\\ project\\ context\\ was\\ sent\\.\$"),"Persetujuan AI proyek gagal diverifikasi ({1}). Konteks belum dikirim."),
+    UiCopyPattern("Project AI is unavailable (","). Your saved project is unchanged; continue manually or retry later.",Regex("^Project\\ AI\\ is\\ unavailable\\ \\((.+?)\\)\\.\\ Your\\ saved\\ project\\ is\\ unchanged;\\ continue\\ manually\\ or\\ retry\\ later\\.\$"),"AI proyek tidak tersedia ({1}). Proyek tersimpan tidak berubah; lanjutkan manual atau coba nanti."),
+    UiCopyPattern("Project AI rejected this request (","). Your saved project is unchanged.",Regex("^Project\\ AI\\ rejected\\ this\\ request\\ \\((.+?)\\)\\.\\ Your\\ saved\\ project\\ is\\ unchanged\\.\$"),"AI proyek menolak permintaan ({1}). Proyek tersimpan tidak berubah."),
+    UiCopyPattern("Published case connected · ","…",Regex("^Published\\ case\\ connected\\ ·\\ (.+?)…\$"),"Kasus terbit terhubung · {1}…"),
+    UiCopyPattern("Published template · version ","",Regex("^Published\\ template\\ ·\\ version\\ (.+?)\$"),"Template terbit · versi {1}"),
+    UiCopyPattern("Reading archive: ","",Regex("^Reading\\ archive:\\ (.+?)\$"),"Membaca cadangan: {1}"),
+    UiCopyPattern("Recording your apply choice. The ","-credit preview charge is already settled…",Regex("^Recording\\ your\\ apply\\ choice\\.\\ The\\ (.+?)\\-credit\\ preview\\ charge\\ is\\ already\\ settled…\$"),"Mencatat pilihan penerapan. Biaya pratinjau {1} kredit sudah ditagihkan…"),
+    UiCopyPattern("Recording your dismissal. The ","-credit preview charge is already settled…",Regex("^Recording\\ your\\ dismissal\\.\\ The\\ (.+?)\\-credit\\ preview\\ charge\\ is\\ already\\ settled…\$"),"Mencatat penolakan. Biaya pratinjau {1} kredit sudah ditagihkan…"),
+    UiCopyPattern("Relation: ","",Regex("^Relation:\\ (.+?)\$"),"Hubungan: {1}"),
+    UiCopyPattern("Remove ","",Regex("^Remove\\ (.+?)\$"),"Hapus {1}"),
+    UiCopyPattern("Required information: "," fields filled. This is not a grade.",Regex("^Required\\ information:\\ (.+?)\\ of\\ (.+?)\\ fields\\ filled\\.\\ This\\ is\\ not\\ a\\ grade\\.\$"),"Informasi wajib: {1} dari {2} isian terisi. Ini bukan nilai."),
+    UiCopyPattern("Requirement · ","",Regex("^Requirement\\ ·\\ (.+?)\$"),"Persyaratan · {1}"),
+    UiCopyPattern("Review ","",Regex("^Review\\ (.+?)\$"),"Tinjau {1}"),
+    UiCopyPattern("Review the "," field and submit again.",Regex("^Review\\ the\\ (.+?)\\ field\\ and\\ submit\\ again\\.\$"),"Tinjau isian {1} dan kirim kembali."),
+    UiCopyPattern("Reviewing selected context for ","…",Regex("^Reviewing\\ selected\\ context\\ for\\ (.+?)…\$"),"Meninjau konteks terpilih untuk {1}…"),
+    UiCopyPattern("Revision "," could not be restored. Your current project was left unchanged.",Regex("^Revision\\ (.+?)\\ could\\ not\\ be\\ restored\\.\\ Your\\ current\\ project\\ was\\ left\\ unchanged\\.\$"),"Revisi {1} gagal dipulihkan. Proyek saat ini tidak berubah."),
+    UiCopyPattern("Revision "," attachments",Regex("^Revision\\ (.+?)\\ ·\\ (.+?)\\ sources\\ ·\\ (.+?)\\ findings\\ ·\\ (.+?)\\ attachments\$"),"Revisi {1} · {2} sumber · {3} temuan · {4} lampiran"),
+    UiCopyPattern("Revision "," restored as a new revision.",Regex("^Revision\\ (.+?)\\ restored\\ as\\ a\\ new\\ revision\\.\$"),"Revisi {1} dipulihkan sebagai revisi baru."),
+    UiCopyPattern("Revision ","",Regex("^Revision\\ (.+?)\$"),"Revisi {1}"),
+    UiCopyPattern("Revision checkpoints: ","",Regex("^Revision\\ checkpoints:\\ (.+?)\$"),"Titik simpan revisi: {1}"),
+    UiCopyPattern("Saved revision ",". A bounded excerpt, not a complete project evaluation.",Regex("^Saved\\ revision\\ (.+?)\\.\\ A\\ bounded\\ excerpt,\\ not\\ a\\ complete\\ project\\ evaluation\\.\$"),"Revisi tersimpan {1}. Cuplikan terbatas, bukan evaluasi seluruh proyek."),
+    UiCopyPattern("Saved revision: ","",Regex("^Saved\\ revision:\\ (.+?)\$"),"Revisi tersimpan: {1}"),
+    UiCopyPattern("Selected references: ","",Regex("^Selected\\ references:\\ (.+?)\$"),"Rujukan terpilih: {1}"),
+    UiCopyPattern("Source · ","",Regex("^Source\\ ·\\ (.+?)\$"),"Sumber · {1}"),
+    UiCopyPattern("Sources: ","",Regex("^Sources:\\ (.+?)\$"),"Sumber: {1}"),
+    UiCopyPattern("Summary: ","",Regex("^Summary:\\ (.+?)\$"),"Ringkasan: {1}"),
+    UiCopyPattern("Swipe to discover · "," / 5",Regex("^Swipe\\ to\\ discover\\ ·\\ (.+?)\\ /\\ 5\$"),"Geser untuk menjelajahi · {1} / 5"),
+    UiCopyPattern("Synthesis · "," sources",Regex("^Synthesis\\ ·\\ (.+?)\\ sources\$"),"Sintesis · {1} sumber"),
+    UiCopyPattern("Text preview for the ","; final page layout may differ.",Regex("^Text\\ preview\\ for\\ the\\ (.+?);\\ final\\ page\\ layout\\ may\\ differ\\.\$"),"Pratinjau teks {1}; tata letak halaman akhir mungkin berbeda."),
+    UiCopyPattern("The AI activity could not be recorded (","). The preview charge is already settled.",Regex("^The\\ AI\\ activity\\ could\\ not\\ be\\ recorded\\ \\((.+?)\\)\\.\\ The\\ preview\\ charge\\ is\\ already\\ settled\\.\$"),"Aktivitas AI gagal dicatat ({1}). Biaya pratinjau sudah ditagihkan."),
+    UiCopyPattern("The AI activity outcome is uncertain (","); its preview charge is already settled.",Regex("^The\\ AI\\ activity\\ outcome\\ is\\ uncertain\\ \\((.+?)\\);\\ its\\ preview\\ charge\\ is\\ already\\ settled\\.\$"),"Hasil aktivitas AI belum pasti ({1}); biaya pratinjau sudah ditagihkan."),
+    UiCopyPattern("The activity request was rejected (",").",Regex("^The\\ activity\\ request\\ was\\ rejected\\ \\((.+?)\\)\\.\$"),"Permintaan aktivitas ditolak ({1})."),
+    UiCopyPattern("The project archive could not be prepared (","). No file was exported.",Regex("^The\\ project\\ archive\\ could\\ not\\ be\\ prepared\\ \\((.+?)\\)\\.\\ No\\ file\\ was\\ exported\\.\$"),"Cadangan gagal disiapkan ({1}). Berkas belum diekspor."),
+    UiCopyPattern("The request could not be completed (","). Your saved project is unchanged.",Regex("^The\\ request\\ could\\ not\\ be\\ completed\\ \\((.+?)\\)\\.\\ Your\\ saved\\ project\\ is\\ unchanged\\.\$"),"Permintaan gagal diselesaikan ({1}). Proyek tersimpan tidak berubah."),
+    UiCopyPattern("The request was not accepted (","). Your project was not changed.",Regex("^The\\ request\\ was\\ not\\ accepted\\ \\((.+?)\\)\\.\\ Your\\ project\\ was\\ not\\ changed\\.\$"),"Permintaan ditolak ({1}). Proyek tidak berubah."),
+    UiCopyPattern("The server rejected this project context (","). Save or review the project and retry.",Regex("^The\\ server\\ rejected\\ this\\ project\\ context\\ \\((.+?)\\)\\.\\ Save\\ or\\ review\\ the\\ project\\ and\\ retry\\.\$"),"Server menolak konteks proyek ({1}). Simpan atau tinjau proyek lalu coba lagi."),
+    UiCopyPattern("This draft references ",", but it is not present in the active case version; no substitute is used.",Regex("^This\\ draft\\ references\\ (.+?),\\ but\\ it\\ is\\ not\\ present\\ in\\ the\\ active\\ case\\ version;\\ no\\ substitute\\ is\\ used\\.\$"),"Draf merujuk {1}, tetapi tidak ada dalam kasus aktif; pengganti tidak dipakai."),
+    UiCopyPattern("This installation can hold "," projects, including completed projects. Export and delete a project you no longer need before importing another.",Regex("^This\\ installation\\ can\\ hold\\ (.+?)\\ projects,\\ including\\ completed\\ projects\\.\\ Export\\ and\\ delete\\ a\\ project\\ you\\ no\\ longer\\ need\\ before\\ importing\\ another\\.\$"),"Instalasi ini menyimpan {1} proyek termasuk yang selesai. Ekspor dan hapus proyek tidak diperlukan sebelum mengimpor yang lain."),
+    UiCopyPattern("Verification note · ","",Regex("^Verification\\ note\\ ·\\ (.+?)\$"),"Catatan pemeriksaan · {1}"),
+    UiCopyPattern("Version ","",Regex("^Version\\ (.+?)\\ ·\\ (.+?)\$"),"Versi {1} · {2}"),
+    UiCopyPattern("Why: ","",Regex("^Why:\\ (.+?)\$"),"Alasan: {1}"),
+    UiCopyPattern("Workspace trace for ","",Regex("^Workspace\\ trace\\ for\\ (.+?)\$"),"Jejak ruang kerja {1}"),
+    UiCopyPattern("[","] Linked in verification",Regex("^\\[(.+?)\\]\\ Linked\\ in\\ verification\$"),"[{1}] Terhubung dalam pemeriksaan"),
+    UiCopyPattern("• Missing section: ","",Regex("^•\\ Missing\\ section:\\ (.+?)\$"),"• Bagian belum terisi: {1}"),
+    UiCopyPattern("Section ","",Regex("^Section\\ (.+?)\\ of\\ (.+?):\\ (.+?)\$"),"Bagian {1} dari {2}: {3}"),
+    UiCopyPattern(""," will be permanently removed from this device. This cannot be undone.",Regex("^(.+?)\\ will\\ be\\ permanently\\ removed\\ from\\ this\\ device\\.\\ This\\ cannot\\ be\\ undone\\.\$"),"{1} dihapus permanen dari perangkat ini. Tindakan tidak dapat dibatalkan."),
+    UiCopyPattern("More actions for ","",Regex("^More\\ actions\\ for\\ (.+?)\$"),"Tindakan lain untuk {1}"),
+    UiCopyPattern("Evidence from: ","",Regex("^Evidence\\ from:\\ (.+?)\$"),"Bukti dari: {1}"),
+    UiCopyPattern(""," opposing relationships recorded. Inspect their rationale before sharing.",Regex("^(.+?)\\ opposing\\ relationships\\ recorded\\.\\ Inspect\\ their\\ rationale\\ before\\ sharing\\.\$"),"{1} hubungan bertentangan tercatat. Tinjau alasannya sebelum membagikan."),
+    UiCopyPattern(""," observation",Regex("^(.+?)\\ observation\$"),"{1} pengamatan"),
+    UiCopyPattern(""," observations",Regex("^(.+?)\\ observations\$"),"{1} pengamatan"),
+    UiCopyPattern(""," AI credits used",Regex("^(.+?)\\ AI\\ credits\\ used\$"),"{1} kredit AI terpakai"),
+    UiCopyPattern(""," AI credit used",Regex("^(.+?)\\ AI\\ credit\\ used\$"),"{1} kredit AI terpakai"),
+    UiCopyPattern(""," AI credits",Regex("^(.+?)\\ AI\\ credits\$"),"{1} kredit AI"),
+    UiCopyPattern(""," AI credit",Regex("^(.+?)\\ AI\\ credit\$"),"{1} kredit AI"),
+    UiCopyPattern(""," local projects",Regex("^(.+?)\\ local\\ projects\$"),"{1} proyek lokal"),
+    UiCopyPattern(""," local project",Regex("^(.+?)\\ local\\ project\$"),"{1} proyek lokal"),
+    UiCopyPattern(""," required responses missing",Regex("^(.+?)\\ required\\ responses\\ missing\$"),"{1} jawaban wajib belum terisi"),
+    UiCopyPattern(""," required response missing",Regex("^(.+?)\\ required\\ response\\ missing\$"),"{1} jawaban wajib belum terisi"),
+    UiCopyPattern("","",Regex("^(.+?)\\ ·\\ revision\\ (.+?)\$"),"{1} · revisi {2}"),
+)
+
+/** Anchored, app-owned templates. Captures remain verbatim; user records bypass this boundary. */
+internal fun translateIndonesianUi(english:String):String {
+    CompleteIndonesianUiCopy[english]?.let {return it}
+    if(english.length>8192) return english
+    for(pattern in patterns) {
+        if(!english.startsWith(pattern.prefix) || !english.endsWith(pattern.suffix)) continue
+        val match=pattern.regex.matchEntire(english) ?: continue
+        return placeholderRegex.replace(pattern.translated) { part ->
+            match.groupValues.getOrNull(part.groupValues[1].toInt()) ?: part.value
+        }
+    }
+    // Translate app-provided multiline feedback and compact statistic labels separately.
+    for(separator in listOf("\n", " · ")) {
+        if(separator in english) {
+            val pieces=english.split(separator)
+            return pieces.joinToString(separator) {CompleteIndonesianUiCopy[it] ?: translateIndonesianSegment(it)}
+        }
+    }
+    return english
+}
+private fun translateIndonesianSegment(text:String):String {
+    for(pattern in patterns) {
+        if(!text.startsWith(pattern.prefix) || !text.endsWith(pattern.suffix)) continue
+        val match=pattern.regex.matchEntire(text) ?: continue
+        return placeholderRegex.replace(pattern.translated) { part -> match.groupValues.getOrNull(part.groupValues[1].toInt()) ?: part.value }
+    }
+    return text
+}

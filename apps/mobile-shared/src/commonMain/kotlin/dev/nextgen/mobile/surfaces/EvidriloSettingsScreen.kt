@@ -1,5 +1,7 @@
 package dev.nextgen.mobile
 
+import dev.nextgen.mobile.uiText
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +17,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -100,7 +102,12 @@ internal fun EvidriloSettingsScreen(
     onOpenNotifications: () -> Unit = {},
     onOpenWorkspacePreferences: () -> Unit = {},
     onOpenPrivacyData: () -> Unit = {},
+    language: dev.nextgen.mobile.EvidriloLanguage = dev.nextgen.mobile.LocalEvidriloLanguage.current,
+    languageSaveFailed: Boolean = false,
+    onSetLanguage: (dev.nextgen.mobile.EvidriloLanguage) -> Unit = {},
 ) {
+    var showLanguages by remember { mutableStateOf(false) }
+    if(showLanguages) dev.nextgen.mobile.EvidriloLanguageSheet(language,languageSaveFailed,onSetLanguage,{showLanguages=false})
     var pendingAction by remember { mutableStateOf<SettingsDestructiveAction?>(null) }
     var readingExpanded by remember { mutableStateOf(false) }
     var localDataExpanded by remember { mutableStateOf(false) }
@@ -135,7 +142,7 @@ internal fun EvidriloSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingAction = null }) {
-                    Text("Keep data")
+                    Text(uiText("Keep data"))
                 }
             },
         )
@@ -145,32 +152,35 @@ internal fun EvidriloSettingsScreen(
         EvidriloBackGesture(label = backLabel, onClick = onBack)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                when (section) {
+                uiText(when (section) {
                     EvidriloSettingsSection.HUB -> "Settings"
                     EvidriloSettingsSection.NOTIFICATIONS -> "Notifications"
                     EvidriloSettingsSection.WORKSPACE_PREFERENCES -> "Workspace preferences"
                     EvidriloSettingsSection.PRIVACY_DATA -> "Privacy & data"
-                },
+                }),
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                when (section) {
+                uiText(when (section) {
                     EvidriloSettingsSection.HUB -> "Choose what you want to manage."
                     EvidriloSettingsSection.NOTIFICATIONS -> "Manage reminders on this device."
                     EvidriloSettingsSection.WORKSPACE_PREFERENCES -> "Adjust how your workspace looks and sounds."
                     EvidriloSettingsSection.PRIVACY_DATA -> "Review what stays local and control optional data use."
-                },
+                }),
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
 
-        storageNotice?.let { notice ->
+        storageNotice?.takeIf { it.isError }?.let { notice ->
             EvidriloRecoveryNotice(notice = notice)
         }
 
         if (section == EvidriloSettingsSection.HUB) {
             EvidriloSectionHeading("Preferences")
             EvidriloSettingsGroup {
+                EvidriloSettingsRow(icon=EvidriloIconName.GLOBE,title="Language",subtitle=language.nativeName,
+                    onClick={showLanguages=true})
+                EvidriloDivider()
                 EvidriloSettingsRow(
                     icon = EvidriloIconName.CHECKLIST,
                     title = "Workspace preferences",

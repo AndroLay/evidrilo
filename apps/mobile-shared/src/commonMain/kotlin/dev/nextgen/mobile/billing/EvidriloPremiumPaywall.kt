@@ -17,7 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +50,7 @@ internal fun EvidriloPremiumPaywall(
     onSelectOffer: (String) -> Unit,
     onBack: () -> Unit,
     backLabel: String,
+    onChooseAnotherPlan: (() -> Unit)? = null,
 ) {
     val model = premiumPaywallModel(billing.copy(isBusy = isBusy))
 
@@ -93,10 +94,15 @@ internal fun EvidriloPremiumPaywall(
 
             if (model.canPurchase) {
                 EvidriloPrimaryButton(
-                    label = if (model.isBusy) "Processing purchase…" else "Continue with Pro",
+                    label = if (model.isBusy) "Processing purchase…"
+                        else "Subscribe ${EvidriloProPlan.forProduct(model.selectedProductId)?.label ?: "to Pro"}",
                     onClick = onPurchase,
                     enabled = !model.isBusy,
                 )
+            }
+            if (model.offers.isNotEmpty() && model.state != PremiumPaywallState.UNLOCKED) {
+                Text("Your store confirms the price before purchase. Subscriptions renew automatically each month or year unless cancelled through your store. Both plans add 200 AI credits per active month.",
+                    style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
             }
             if (model.canRestore) {
                 EvidriloSecondaryButton(
@@ -111,6 +117,9 @@ internal fun EvidriloPremiumPaywall(
                     onClick = onRetry,
                     enabled = !model.isBusy,
                 )
+                onChooseAnotherPlan?.let { choose ->
+                    EvidriloSecondaryButton("Choose another plan", choose, enabled = !model.isBusy)
+                }
             }
             if (managedPaywallAvailable && model.state != PremiumPaywallState.UNLOCKED) {
                 EvidriloSecondaryButton(
@@ -122,7 +131,7 @@ internal fun EvidriloPremiumPaywall(
             EvidriloSecondaryButton(label = "Continue with Free", onClick = onBack)
             Spacer(modifier = Modifier.size(4.dp))
             Text(
-                "Three synthetic Practice cases are included with Free. Additional Practice for Pro is planned. Purchases and access follow your account's subscription status.",
+                "The first synthetic Practice case is Free. Pro opens all three. Purchases and access follow your account's subscription status.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -137,6 +146,7 @@ private fun PremiumOfferChoice(
     onClick: () -> Unit,
 ) {
     val choiceColors = evidriloChoiceColors(selected)
+    val plan = EvidriloProPlan.forProduct(offer.productId)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,7 +158,7 @@ private fun PremiumOfferChoice(
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) {
-                contentDescription = "${offer.title}, ${offer.price}"
+                contentDescription = "${plan?.label ?: offer.title}, ${offer.price} ${plan?.period.orEmpty()}"
                 role = Role.RadioButton
                 this.selected = selected
                 stateDescription = if (selected) "Selected" else "Not selected"
@@ -169,13 +179,16 @@ private fun PremiumOfferChoice(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(offer.title, style = MaterialTheme.typography.titleMedium)
+                Text(plan?.label ?: offer.title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     if (selected) "Selected subscription" else "Select this subscription",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Text(offer.price, style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Cobalt)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(offer.price, style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Cobalt)
+                plan?.let { Text(it.period, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
+            }
         }
     }
 }

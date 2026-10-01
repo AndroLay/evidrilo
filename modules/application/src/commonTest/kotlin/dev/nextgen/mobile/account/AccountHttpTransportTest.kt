@@ -14,6 +14,17 @@ import kotlin.test.assertNull
 
 class AccountHttpTransportTest {
     @Test
+    fun provider_waits_are_bounded_without_extending_auth_or_credit_requests() {
+        listOf("/v1/ai/assist", "/v1/ai/conversations", "/v1/ai/conversations/session/turns", "/v1/project-ai/scaffold", "/v1/project-ai/stage-assist").forEach {
+            assertEquals(75_000, accountHttpReadTimeoutMillis("POST", "https://example.test$it"))
+            assertEquals(15_000, accountHttpReadTimeoutMillis("GET", "https://example.test$it"))
+        }
+        listOf("/auth/v1/token", "/v1/ai/credits", "/v1/project-ai/consent", "/v1/project-ai/stage-assist/settlement").forEach {
+            assertEquals(15_000, accountHttpReadTimeoutMillis("POST", "https://example.test$it"))
+        }
+    }
+
+    @Test
     fun request_validation_rejects_remote_cleartext() {
         assertFailsWith<IllegalArgumentException> {
             validateAccountHttpRequest("http://example.test/auth", "{}")

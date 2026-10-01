@@ -10,7 +10,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
+import androidx.compose.material3.Text as RawText
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -540,6 +541,7 @@ private fun ProjectAiScaffoldPreview(
     var applyMessage by remember(requestId) { mutableStateOf<String?>(null) }
     val fieldsById = template.inputFields.associateBy { it.id }
 
+    EvidriloReviewFocus("Review your AI draft") {
     EvidriloTargetCard {
         Text("AI draft · review before using", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -547,7 +549,7 @@ private fun ProjectAiScaffoldPreview(
             style = MaterialTheme.typography.bodySmall,
             color = EvidriloColors.Slate,
         )
-        Text(proposal.guidanceText, style = MaterialTheme.typography.bodyMedium)
+        RawText(proposal.guidanceText, style = MaterialTheme.typography.bodyMedium)
         Text(
             "This is a suggestion, not verified academic guidance. Check it against your assignment and instructor's requirements.",
             style = MaterialTheme.typography.bodySmall,
@@ -635,5 +637,6 @@ private fun ProjectAiScaffoldPreview(
                 },
             )
         }
+    }
     }
 }

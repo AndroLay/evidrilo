@@ -567,6 +567,10 @@ object StudentProjectDraftRules {
     fun countsTowardActiveLimit(status: StudentProjectStatus): Boolean =
         status == StudentProjectStatus.DRAFT || status == StudentProjectStatus.ACTIVE
 
+    /** Capacity applies to every stored record, including completed and legacy records. */
+    fun projectLimit(hasVerifiedProEntitlement: Boolean): Int =
+        if (hasVerifiedProEntitlement) PRO_ACTIVE_PROJECT_LIMIT else FREE_ACTIVE_PROJECT_LIMIT
+
     fun activeProjectLimit(hasVerifiedProEntitlement: Boolean): Int =
         if (hasVerifiedProEntitlement) PRO_ACTIVE_PROJECT_LIMIT else FREE_ACTIVE_PROJECT_LIMIT
 

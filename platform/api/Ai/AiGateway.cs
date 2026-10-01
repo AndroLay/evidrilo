@@ -204,7 +204,7 @@ public sealed class AiGateway
         this.provider = provider;
         this.creditLedger = creditLedger;
         this.pricing = pricing ?? AiProviderOptions.DefaultPricing;
-        this.timeout = timeout ?? TimeSpan.FromSeconds(5);
+        this.timeout = timeout ?? this.pricing.Timeout;
     }
 
     public Task<AiGatewayResult> GenerateAsync(

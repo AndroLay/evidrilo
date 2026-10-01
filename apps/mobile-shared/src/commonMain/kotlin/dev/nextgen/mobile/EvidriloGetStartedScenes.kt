@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,14 +70,16 @@ import kotlin.math.sin
 internal fun GetStartedWelcomeScene(preview: GetStartedSceneSelections, height: Dp) {
     val entry = rememberGetStartedReveal(preview.welcomePulse.value, 1100)
     val drift = rememberGetStartedReveal(preview.welcomePulse.value, 2800)
-    val labelWidth = 132.dp + 70.dp * (LocalDensity.current.fontScale - 1f).coerceIn(0f, .5f)
+    val spokenWelcome=uiText("Your question, notes, claim and next step, connected in Evidrilo")
+    val spokenReplay=uiText("Replay the introduction artwork")
+    val labelWidth = 152.dp + 90.dp * (LocalDensity.current.fontScale - 1f).coerceIn(0f, .5f)
     val line = EvidriloColors.PatternBlue
     val cobalt = EvidriloColors.Cobalt
     GetStartedAtmosphere(
         Modifier.fillMaxWidth().height(height).clickable(
-            role = Role.Button, onClickLabel = "Replay the introduction artwork",
+            role = Role.Button, onClickLabel = spokenReplay,
             onClick = { preview.welcomePulse.value++ },
-        ).semantics(mergeDescendants = true) { contentDescription = "Your question, notes, claim and next step, connected in Evidrilo" },
+        ).semantics(mergeDescendants = true) { contentDescription = spokenWelcome },
     ) {
         Canvas(Modifier.matchParentSize().clearAndSetSemantics {}) {
             val radius = size.minDimension * .36f
@@ -148,13 +150,15 @@ internal fun GetStartedProjectsScene(preview: GetStartedSceneSelections, height:
                     },
                     shape = RoundedCornerShape(24.dp), color = EvidriloColors.Card, shadowElevation = 5.dp,
                 ) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxSize()) {
+                    val tile=when(family){GetStartedProjectFamily.LAB->0;GetStartedProjectFamily.SURVEY->1;GetStartedProjectFamily.LITERATURE->2;GetStartedProjectFamily.QUALITATIVE->3;GetStartedProjectFamily.DESIGN->4}
+                    EvidriloProjectIllustration(dev.nextgen.mobile.domain.project.ProjectTemplateFamily.entries[tile],Modifier.matchParentSize())
+                    Column(Modifier.padding(20.dp).padding(end=50.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(EvidriloColors.Tint), contentAlignment = Alignment.Center) {
                                 EvidriloIcon(family.icon, tint = EvidriloColors.Cobalt, modifier = Modifier.size(25.dp))
                             }
                             Column(Modifier.weight(1f)) {
-                                Text("PROJECT STRUCTURE", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Slate)
                                 Text(family.label, style = MaterialTheme.typography.titleLarge, color = EvidriloColors.Ink)
                             }
                         }
@@ -166,13 +170,15 @@ internal fun GetStartedProjectsScene(preview: GetStartedSceneSelections, height:
                         }
                         Text("Empty structure. Your own content.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                     }
+                    }
                 }
             }
             Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.Center) {
                 GetStartedProjectFamily.entries.forEachIndexed { index, family ->
                     val selected = index == pager.currentPage
+                    val spokenPreview=uiText("Preview ","Pratinjau ")+uiText(family.displayName)
                     Box(
-                        Modifier.size(48.dp).semantics { contentDescription = "Preview ${family.displayName}" }
+                        Modifier.size(48.dp).semantics { contentDescription = spokenPreview }
                             .selectable(selected, onClick = { scope.launch { pager.animateScrollToPage(index) } }, role = Role.RadioButton),
                         contentAlignment = Alignment.Center,
                     ) {

@@ -532,31 +532,26 @@ class StudentProjectDraftFlowTest {
     }
 
     @Test
-    fun `archived projects do not consume active quota and reactivation is guarded`() {
+    fun `completed and archived projects consume total quota while existing work can reactivate`() {
         val store = InMemoryDraftStore()
-        val ids = ArrayDeque((1..7).map { "archive-project-$it" })
+        val ids = ArrayDeque((1..6).map { "archive-project-$it" })
         val flow = StudentProjectDraftFlow(store, { ids.removeFirst() }, { 100 })
         val projects = (1..5).map { index ->
             assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
                 flow.startManual("Project $index"),
             ).value
         }
-
         assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.archive(projects.first().id))
-        val sixth = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
-            flow.startManual("Project 6"),
-        ).value
-        assertEquals(StudentProjectStatus.ARCHIVED, store.drafts.first { it.id == projects.first().id }.status)
-        assertEquals(StudentProjectStatus.DRAFT, sixth.status)
-        assertEquals(
-            StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"),
-            flow.reactivate(projects.first().id),
-        )
-        assertEquals(6, store.drafts.size)
+        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.markCompleted(projects.last().id))
+        assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"), flow.startManual("Project 6"))
+        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.reactivate(projects.first().id))
+        assertEquals(StudentProjectStatus.ACTIVE, store.drafts.single { it.id == projects.first().id }.status)
+        assertEquals(StudentProjectStatus.COMPLETED, store.drafts.single { it.id == projects.last().id }.status)
+        assertEquals(5, store.drafts.size)
     }
 
     @Test
-    fun `trash preserves a project and can restore it as archived when free quota is full`() {
+    fun `legacy trash occupies a total slot and restoration does not add a project`() {
         val store = InMemoryDraftStore()
         val ids = ArrayDeque((1..6).map { "trash-project-$it" })
         val flow = StudentProjectDraftFlow(store, { ids.removeFirst() }, { 100 })
@@ -565,19 +560,15 @@ class StudentProjectDraftFlowTest {
                 flow.startManual("Project $index"),
             ).value
         }
-        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.delete(projects.first().id))
+        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.moveToTrash(projects.first().id))
+        assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"), flow.startManual("Project 6"))
+        assertEquals(StudentProjectStatus.TRASHED, store.drafts.single { it.id == projects.first().id }.status)
+        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.restoreFromTrash(projects.first().id))
+        assertEquals(StudentProjectStatus.DRAFT, store.drafts.single { it.id == projects.first().id }.status)
+        assertEquals(5, store.drafts.size)
+        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(flow.permanentlyDelete(projects.first().id))
         assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(flow.startManual("Project 6"))
-
-        assertEquals(StudentProjectStatus.TRASHED, store.drafts.first { it.id == projects.first().id }.status)
-        assertEquals(6, store.drafts.size)
-        assertEquals(
-            StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"),
-            flow.restoreFromTrash(projects.first().id),
-        )
-        assertIs<StudentProjectDraftFlowResult.Value<Unit>>(
-            flow.restoreFromTrash(projects.first().id, asArchivedWhenAtLimit = true),
-        )
-        assertEquals(StudentProjectStatus.ARCHIVED, store.drafts.first { it.id == projects.first().id }.status)
+        assertEquals(5, store.drafts.size)
     }
 
     @Test
@@ -1524,7 +1515,7 @@ class StudentProjectDraftFlowTest {
     }
 
     @Test
-    fun `archive import at free capacity requires explicit archive choice`() {
+    fun `archive import cannot bypass the free total project cap`() {
         val store = InMemoryDraftStore()
         val generated = ArrayDeque((1..5).map { "existing-$it" })
         val flow = StudentProjectDraftFlow(store, { generated.removeFirst() }, { 100 })
@@ -1539,13 +1530,12 @@ class StudentProjectDraftFlowTest {
         assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"), blocked)
         assertEquals(5, store.drafts.size)
 
-        val archived = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectImportReceipt>>(
+        assertEquals(
+            StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED"),
             flow.importValidatedProject(incoming, archiveWhenAtCapacity = true),
-        ).value
-        assertEquals(StudentProjectStatus.ARCHIVED, archived.project.status)
-        assertEquals(true, archived.archivedToRespectCapacity)
-        assertEquals(6, store.drafts.size)
-        assertEquals(5, store.drafts.count { StudentProjectDraftRules.countsTowardActiveLimit(it.status) })
+        )
+        assertEquals(5, store.drafts.size)
+        assertTrue(store.drafts.none { it.id == incoming.id })
     }
 
     @Test

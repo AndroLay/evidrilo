@@ -10,6 +10,21 @@ namespace Evidrilo.Api.Tests;
 public sealed class OpenAiResponsesProviderTests
 {
     [Fact]
+    public async Task Explicit_reasoning_effort_is_forwarded_without_sampling_controls()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(CompletedResponse(
+            """{"kind":"explanation","text":"Use the recorded observation.","referencedAnchorIds":["OBS-01"],"proposal":null}""",
+            inputTokens: 40, outputTokens: 20)));
+        using var client = new HttpClient(handler);
+        var provider = CreateProvider(client, new RecordingSpendBudget(), reasoningEffort: "max");
+        await provider.CompleteAsync(Request(), CancellationToken.None);
+        using var body = JsonDocument.Parse(handler.Body!);
+        Assert.Equal("max", body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString());
+        Assert.False(body.RootElement.TryGetProperty("temperature", out _));
+        Assert.False(body.RootElement.TryGetProperty("top_p", out _));
+    }
+
+    [Fact]
     public async Task Custom_strict_schema_returns_raw_structured_output_with_shared_usage_settlement()
     {
         const string structuredOutput = "{\"guidanceText\":\"Use the selected observations.\"}";
@@ -78,6 +93,7 @@ public sealed class OpenAiResponsesProviderTests
         Assert.Equal("gpt-test-snapshot", root.GetProperty("model").GetString());
         Assert.False(root.GetProperty("store").GetBoolean());
         Assert.Equal(512, root.GetProperty("max_output_tokens").GetInt32());
+        Assert.False(root.TryGetProperty("reasoning", out _));
         Assert.Equal("json_schema", root.GetProperty("text").GetProperty("format").GetProperty("type").GetString());
         Assert.True(root.GetProperty("text").GetProperty("format").GetProperty("strict").GetBoolean());
         Assert.False(root.TryGetProperty("conversation", out _));
@@ -359,7 +375,8 @@ public sealed class OpenAiResponsesProviderTests
         decimal outputRate = 2m,
         decimal cachedInputRate = 0.01m,
         decimal cacheWriteInputRate = 1.25m,
-        string baseUrl = "https://api.openai.com/v1")
+        string baseUrl = "https://api.openai.com/v1",
+        string? reasoningEffort = null)
     {
         var values = new Dictionary<string, string?>
         {
@@ -374,6 +391,7 @@ public sealed class OpenAiResponsesProviderTests
             ["AI_OPENAI_OUTPUT_USD_PER_MILLION_TOKENS"] = outputRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["AI_MAX_REQUEST_COST_USD"] = maxRequestCostUsd.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["AI_MONTHLY_SPEND_LIMIT_USD"] = "2",
+            ["AI_REASONING_EFFORT"] = reasoningEffort,
         };
         return new OpenAiResponsesProvider(
             AiProviderOptions.From(new ConfigurationBuilder().AddInMemoryCollection(values).Build()),

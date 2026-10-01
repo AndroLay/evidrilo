@@ -98,7 +98,7 @@ public sealed class OpenAiResponsesProvider : IAiProvider
             options.Model,
             maximumCost,
             options.MonthlySpendLimitUsd.Value,
-            TimeSpan.FromSeconds(30));
+            options.Timeout + TimeSpan.FromSeconds(15));
         var reserveStatus = await spendBudgetStore.TryReserveAsync(reservation, cancellationToken);
         if (reserveStatus != AiProviderBudgetReservationStatus.Reserved)
         {
@@ -358,7 +358,10 @@ public sealed class OpenAiResponsesProvider : IAiProvider
                 },
             },
         };
-        return JsonSerializer.Serialize(payload);
+        var body = JsonSerializer.SerializeToNode(payload)!.AsObject();
+        if (options.ReasoningEffort is not null)
+            body["reasoning"] = JsonSerializer.SerializeToNode(new { effort = options.ReasoningEffort });
+        return body.ToJsonString();
     }
 
     private async Task SettleUnknownSpendAsync(AiProviderRequest request, decimal reservedCostUsd) =>

@@ -56,6 +56,9 @@ internal fun getStartedPreviewFor(
         title = "History and exports",
         detail = "Keep local revisions, export a report, or move a project using an Evidrilo archive.",
     )
+    GetStartedTourStep.WORKSPACE -> GetStartedPreviewContent("Your workspace","Move between sections. Your work is saved before switching.")
+    GetStartedTourStep.GRAPH -> GetStartedPreviewContent("The project map","Tap each record to follow the reasoning.")
+    GetStartedTourStep.PRACTICE -> GetStartedPreviewContent("Your practice","Trace a claim back to the supplied observations.")
     GetStartedTourStep.READY -> GetStartedPreviewContent(
         title = "Your next question",
         detail = "Open My Projects to create your own project explicitly.",

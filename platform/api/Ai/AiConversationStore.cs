@@ -600,9 +600,9 @@ public sealed class NpgsqlAiConversationStore : IAiConversationStore, IDisposabl
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "select id from auth.users where id = @account_id for update;";
+        command.CommandText = "select public.lock_runtime_account(@account_id);";
         command.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, accountId);
-        if (await command.ExecuteScalarAsync(cancellationToken) is null)
+        if (await command.ExecuteScalarAsync(cancellationToken) is not true)
             throw new ApiException(StatusCodes.Status404NotFound, "ACCOUNT_NOT_FOUND", "The account could not be found.");
     }
 

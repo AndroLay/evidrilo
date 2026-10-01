@@ -47,7 +47,7 @@ public sealed class DatabaseReadinessTests
                 migrationLedgerExists: true,
                 currentMigrationApplied: true));
         Assert.Equal(
-            "052_project_ai_general_completed_outcome",
+            "055_runtime_account_lock",
             DatabaseSchemaReadiness.CurrentMigrationVersion);
     }
 }

@@ -1,7 +1,7 @@
 package dev.nextgen.mobile.account
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.Composable
 import dev.nextgen.mobile.EvidriloContentColumn
 import dev.nextgen.mobile.EvidriloPrimaryButton
@@ -45,7 +45,7 @@ internal fun EvidriloAccountRequiredGate(
                 if (TEMPORARY_GUEST_MODE_ENABLED) {
                     "Pro requires an account and a confirmed RevenueCat entitlement. Your free projects and case work remain available locally without signing in."
                 } else {
-                    "This feature needs an account. Your local projects remain available without signing in."
+                    "Online AI and account-linked Pro need an account. Local projects, evidence work and Free practice remain available without signing in."
                 }
             } else {
                 "Account access is not available in this build. You can keep working with local projects or contact support."

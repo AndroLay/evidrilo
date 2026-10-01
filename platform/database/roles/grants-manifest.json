@@ -1,0 +1,275 @@
+{
+  "api": {
+    "account_deletion_requests": [
+      "select"
+    ],
+    "account_deletion_tombstones": [
+      "select"
+    ],
+    "account_export_jobs": [
+      "delete",
+      "insert",
+      "select",
+      "update"
+    ],
+    "account_profiles": [
+      "select"
+    ],
+    "ai_audit_events": [
+      "insert",
+      "select"
+    ],
+    "ai_conversation_sessions": [
+      "delete",
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_conversation_turn_requests": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_credit_consents": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_credit_grants": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_credit_reservation_allocations": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_credit_reservations": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_provider_monthly_spend": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "ai_provider_spend_reservations": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "analytics_events": [
+      "insert",
+      "select"
+    ],
+    "attempt_commands": [
+      "insert",
+      "select"
+    ],
+    "case_lifecycle_audit_events": [
+      "select"
+    ],
+    "case_review_decisions": [
+      "insert",
+      "select"
+    ],
+    "case_versions": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "entitlement_events": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "entitlements": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "evidrilo_schema_migrations": [
+      "select"
+    ],
+    "membership_audit_events": [
+      "insert",
+      "select"
+    ],
+    "notification_preferences": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "organization_memberships": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "organizations": [
+      "select"
+    ],
+    "progress_daily_projections": [
+      "select"
+    ],
+    "progress_projections": [
+      "select"
+    ],
+    "project_ai_activity": [
+      "delete",
+      "insert",
+      "select",
+      "update"
+    ],
+    "project_ai_consent_events": [
+      "insert",
+      "select"
+    ],
+    "project_ai_consents": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "project_ai_local_contexts": [
+      "delete",
+      "insert",
+      "select",
+      "update"
+    ],
+    "project_template_review_decisions": [
+      "insert",
+      "select"
+    ],
+    "project_template_versions": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "recommendation_events": [
+      "insert",
+      "select"
+    ],
+    "student_project_cloud_consent_events": [
+      "insert",
+      "select"
+    ],
+    "student_project_cloud_consents": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "student_project_commands": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "student_project_revisions": [
+      "insert",
+      "select"
+    ],
+    "student_projects": [
+      "delete",
+      "insert",
+      "select",
+      "update"
+    ],
+    "sync_changes": [
+      "select"
+    ]
+  },
+  "worker": {
+    "account_auth_deletion_outbox": [
+      "select",
+      "update"
+    ],
+    "account_deletion_requests": [
+      "select"
+    ],
+    "account_deletion_tombstones": [
+      "select"
+    ],
+    "account_export_jobs": [
+      "delete",
+      "select",
+      "update"
+    ],
+    "account_profiles": [
+      "select"
+    ],
+    "ai_audit_events": [
+      "select"
+    ],
+    "ai_conversation_sessions": [
+      "select"
+    ],
+    "ai_conversation_turn_requests": [
+      "select"
+    ],
+    "ai_credit_consents": [
+      "select"
+    ],
+    "ai_credit_grants": [
+      "select"
+    ],
+    "ai_credit_reservations": [
+      "select"
+    ],
+    "analytics_events": [
+      "select"
+    ],
+    "attempt_commands": [
+      "select"
+    ],
+    "entitlement_events": [
+      "select"
+    ],
+    "entitlements": [
+      "select"
+    ],
+    "notification_preferences": [
+      "select"
+    ],
+    "progress_daily_projections": [
+      "delete",
+      "insert",
+      "select"
+    ],
+    "progress_projections": [
+      "insert",
+      "select",
+      "update"
+    ],
+    "project_ai_activity": [
+      "select"
+    ],
+    "project_ai_consent_events": [
+      "select"
+    ],
+    "project_ai_consents": [
+      "select"
+    ],
+    "recommendation_events": [
+      "select"
+    ],
+    "student_project_cloud_consent_events": [
+      "select"
+    ],
+    "student_project_cloud_consents": [
+      "select"
+    ],
+    "student_project_revisions": [
+      "select"
+    ],
+    "student_projects": [
+      "select"
+    ],
+    "sync_changes": [
+      "select"
+    ],
+    "worker_jobs": [
+      "select",
+      "update"
+    ]
+  }
+}

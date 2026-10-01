@@ -14,6 +14,7 @@ import dev.nextgen.mobile.storage.AndroidConclusionStorage
 import dev.nextgen.mobile.storage.AndroidConclusionHistoryStorage
 import dev.nextgen.mobile.storage.AndroidOnboardingStorage
 import dev.nextgen.mobile.storage.AndroidStudentProjectDraftStorage
+import dev.nextgen.mobile.storage.AndroidProjectSectionBookmarkStorage
 import dev.nextgen.mobile.storage.AndroidStudentProjectAttachmentStorage
 import dev.nextgen.mobile.sync.AndroidSyncQueueStorage
 import dev.nextgen.mobile.sync.AndroidSyncConsentStorage
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
         AndroidConclusionHistoryStorage.initialize(applicationContext)
         AndroidOnboardingStorage.initialize(applicationContext)
         AndroidStudentProjectDraftStorage.initialize(applicationContext)
+        AndroidProjectSectionBookmarkStorage.initialize(applicationContext)
         AndroidStudentProjectAttachmentStorage.initialize(applicationContext)
         AndroidSyncQueueStorage.initialize(applicationContext)
         AndroidSyncConsentStorage.initialize(applicationContext)

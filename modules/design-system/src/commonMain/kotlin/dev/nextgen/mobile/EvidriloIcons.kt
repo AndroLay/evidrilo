@@ -57,6 +57,7 @@ public enum class EvidriloIconName {
     ACCOUNT_FILLED,
     FOLDER_FILLED,
     TROPHY,
+    GLOBE,
 }
 
 @Composable
@@ -80,6 +81,12 @@ public fun EvidriloIcon(
         )
         scale(scaleX, scaleY, pivot = Offset.Zero) {
             when (name) {
+                EvidriloIconName.GLOBE -> {
+                    drawCircle(tint,9f,Offset(12f,12f),style=stroke)
+                    drawLine(tint,Offset(3f,12f),Offset(21f,12f),strokeWidth=stroke.width)
+                    val meridians=Path().apply {moveTo(12f,3f);cubicTo(5f,7f,5f,17f,12f,21f);cubicTo(19f,17f,19f,7f,12f,3f)}
+                    drawPath(meridians,tint,style=stroke)
+                }
                 EvidriloIconName.ARROW_BACK -> drawArrowBack(tint, stroke)
                 EvidriloIconName.ARROW_FORWARD -> drawArrowForward(tint, stroke)
                 EvidriloIconName.CHEVRON_RIGHT -> drawChevronRight(tint, stroke)

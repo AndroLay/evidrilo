@@ -40,7 +40,7 @@ class EvidriloHomeProjectSummaryTest {
     }
 
     @Test
-    fun summary_counts_active_slots_separately_from_completed_archived_and_trashed_projects() {
+    fun summary_counts_every_stored_project_toward_capacity_and_visible_statuses_separately() {
         val summary = homeProjectSummary(
             projects = listOf(
                 project("draft", StudentProjectStatus.DRAFT),
@@ -52,23 +52,23 @@ class EvidriloHomeProjectSummaryTest {
             activeLimit = 5,
         )
 
-        assertEquals(4, summary.totalCount)
+        assertEquals(5, summary.totalCount)
         assertEquals(2, summary.activeCount)
         assertEquals(1, summary.completedCount)
         assertEquals(1, summary.archivedCount)
-        assertEquals(3, summary.remainingActiveSlots)
+        assertEquals(0, summary.remainingActiveSlots)
     }
 
     @Test
-    fun summary_uses_the_current_installation_limit_without_counting_trash() {
+    fun summary_keeps_legacy_trash_in_the_total_until_it_is_permanently_removed() {
         val summary = homeProjectSummary(
             projects = listOf(project("trashed", StudentProjectStatus.TRASHED)),
             activeLimit = 50,
         )
 
-        assertEquals(0, summary.totalCount)
+        assertEquals(1, summary.totalCount)
         assertEquals(0, summary.activeCount)
-        assertEquals(50, summary.remainingActiveSlots)
+        assertEquals(49, summary.remainingActiveSlots)
     }
 
     private fun project(id: String, status: StudentProjectStatus) = StudentProjectDraft(

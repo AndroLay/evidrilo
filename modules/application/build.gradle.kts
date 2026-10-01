@@ -41,7 +41,7 @@ val androidBuildConfigFields = linkedMapOf(
     "SUPABASE_AUTH_REDIRECT_URL" to localOrGradleProperty("supabaseAuthRedirectUrl").asKotlinStringLiteral(),
     "EVIDRILO_API_BASE_URL" to localOrGradleProperty("evidriloApiBaseUrl").asKotlinStringLiteral(),
     "SUPABASE_GOOGLE_AUTH_ENABLED" to localOrGradleProperty("supabaseGoogleAuthEnabled")
-        .ifBlank { "true" }
+        .ifBlank { "false" }
         .asBuildConfigBoolean(),
     "SUPABASE_APPLE_AUTH_ENABLED" to localOrGradleProperty("supabaseAppleAuthEnabled")
         .ifBlank { "false" }

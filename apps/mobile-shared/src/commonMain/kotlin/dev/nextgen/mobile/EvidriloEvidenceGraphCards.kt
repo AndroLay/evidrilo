@@ -10,7 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
+import androidx.compose.material3.Text as RawText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -225,8 +226,8 @@ internal fun EvidriloVerificationDetailCard(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(detail.message, style = MaterialTheme.typography.bodyMedium)
-                        Text("Why: ${detail.why}", style = MaterialTheme.typography.bodySmall)
-                        Text("Next: ${detail.nextAction}", style = MaterialTheme.typography.bodySmall)
+                        Text(uiText("Why: ","Alasan: ")+uiText(detail.why), style = MaterialTheme.typography.bodySmall)
+                        Text(uiText("Next: ","Berikutnya: ")+uiText(detail.nextAction), style = MaterialTheme.typography.bodySmall)
                         if (detail.anchorIds.isNotEmpty()) {
                             Text(
                                 "Anchors: ${detail.anchorIds.joinToString()}",
@@ -306,7 +307,8 @@ private fun TraceFactRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+        if(label=="Student claim") RawText(text,style=MaterialTheme.typography.bodyMedium)
+        else Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,24 +17,16 @@ import dev.nextgen.mobile.billing.BillingPresentation
 import dev.nextgen.mobile.billing.BillingUiState
 import dev.nextgen.mobile.billing.EvidriloPremiumPaywall
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
+import dev.nextgen.mobile.domain.practice.PracticeCourseAccessRules
 import dev.nextgen.mobile.domain.project.StudentProjectDraftRules
 
 /** The same blue paper-prism emblem is used at every Pro entry. */
 @Composable
 internal fun EvidriloProEmblem(size: Dp = 56.dp) {
-    val light = EvidriloColors.CobaltBright
-    val face = EvidriloColors.PrimaryAction
-    val edge = EvidriloColors.CobaltPressed
-    Surface(Modifier.size(size).clearAndSetSemantics {}, shape = RoundedCornerShape(size * .28f), color = EvidriloColors.Tint) {
-        Canvas(Modifier.fillMaxSize().padding(size * .16f)) {
-            val width = this.size.width
-            val height = this.size.height
-            fun facet(vararg points: Pair<Float, Float>) = Path().apply {
-                points.forEachIndexed { i, (x,y) -> if (i == 0) moveTo(x * width, y * height) else lineTo(x * width, y * height) }; close()
-            }
-            drawPath(facet(.5f to .04f, .94f to .27f, .5f to .51f, .06f to .27f), light)
-            drawPath(facet(.06f to .27f, .5f to .51f, .5f to .97f, .06f to .72f), face)
-            drawPath(facet(.5f to .51f, .94f to .27f, .94f to .72f, .5f to .97f), edge)
+    Surface(Modifier.size(size).clearAndSetSemantics {}, shape = androidx.compose.foundation.shape.CircleShape,
+        color=EvidriloColors.Tint) {
+        Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
+            EvidriloIcon(EvidriloIconName.CROWN,tint=EvidriloColors.Cobalt,modifier=Modifier.size(size*.58f))
         }
     }
 }
@@ -48,7 +40,7 @@ internal fun EvidriloProEntry(onClick: () -> Unit) {
             EvidriloProEmblem()
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Evidrilo Pro", style = MaterialTheme.typography.titleLarge, color = EvidriloColors.Ink)
-                Text("More project space. Deeper evidence cases.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                Text("More projects. The full Practice trail.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
             }
             EvidriloIcon(EvidriloIconName.ARROW_FORWARD, tint = EvidriloColors.Cobalt)
         }
@@ -59,37 +51,32 @@ internal fun EvidriloProEntry(onClick: () -> Unit) {
 internal fun EvidriloProHeader() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Surface(shape = RoundedCornerShape(24.dp), color = EvidriloColors.Atmosphere) {
-            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     EvidriloProEmblem(64.dp)
                     Column(Modifier.weight(1f)) {
-                        Text("Evidrilo Pro", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
-                        Text("Make room for more.", style = MaterialTheme.typography.bodyLarge, color = EvidriloColors.Slate)
+                        Text("Evidrilo Pro", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+                        Text("Make room for more.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
                     }
                 }
-                Text("Follow bigger questions. Keep the evidence in view.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Ink)
             }
         }
-        ProBenefit(EvidriloIconName.FOLDER, "More room for projects",
-            "Up to ${StudentProjectDraftRules.PRO_ACTIVE_PROJECT_LIMIT} active projects with verified Pro access.")
-        ProBenefit(EvidriloIconName.EVIDENCE_GRAPH, "Explore deeper cases",
-            "${ConclusionCases.premium.size} additional evidence-linked cases, separate from your projects.")
-        Text("Your three Free practice cases stay available. More Pro investigations are planned.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+        ProBenefit(EvidriloIconName.FOLDER, uiText("${StudentProjectDraftRules.PRO_ACTIVE_PROJECT_LIMIT} projects total","${StudentProjectDraftRules.PRO_ACTIVE_PROJECT_LIMIT} proyek total"))
+        ProBenefit(EvidriloIconName.BOOK, "All ${PracticeCourseAccessRules.proCaseCount} Practice cases")
+        ProBenefit(EvidriloIconName.LIGHTNING, "200 AI credits each active month")
+        EvidriloExplanation("Credits & access", "Pro needs verified subscription access. Free receives 20 AI credits once after account verification and AI consent; active Pro adds 200 each month, including annual plans. Earned credits accumulate and do not expire. AI needs internet, consent and an available service. Your first Practice case stays Free.")
     }
 }
 
 @Composable
-private fun ProBenefit(icon: EvidriloIconName, title: String, body: String) {
+private fun ProBenefit(icon: EvidriloIconName, title: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Surface(shape = RoundedCornerShape(14.dp), color = EvidriloColors.Tint) {
             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 EvidriloIcon(icon, tint = EvidriloColors.Cobalt)
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
-        }
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
     }
 }
 

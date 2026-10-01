@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.spring
@@ -27,13 +28,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.text.KeyboardActions
@@ -276,11 +280,11 @@ private fun EvidriloLocalChatSheet(
     val selectedSession = sessions.firstOrNull { it.id == selectedId }
     val readOnly = selectedSession != null && selectedSession.contextKey != contextKey
     val messages = selectedSession?.messages.orEmpty()
-    val scroll = rememberScrollState()
+    val scroll = rememberLazyListState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(messages.size, selectedId, showHistory, composerFocused) {
-        if (!showHistory) scroll.animateScrollTo(scroll.maxValue)
+        if (!showHistory && messages.isNotEmpty()) scroll.animateScrollToItem(messages.lastIndex)
     }
     DisposableEffect(Unit) {
         onDispose { pendingFiles.forEach { store.deleteAttachment(it.id) } }
@@ -388,12 +392,12 @@ private fun EvidriloLocalChatSheet(
             }
 
             if (showHistory) {
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Saved on this device", style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Ink)
+                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {Text("Saved on this device", style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Ink)}
                     if (sessions.isEmpty()) {
-                        Text("No chats yet. Start a conversation about this case and it will appear here.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+                        item {Text("No chats yet. Start a conversation about this case and it will appear here.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)}
                     }
-                    sessions.forEach { session ->
+                    items(sessions,key={it.id}) { session ->
                         Surface(
                             modifier = Modifier.fillMaxWidth().clickable {
                                 pendingFiles.forEach { store.deleteAttachment(it.id) }
@@ -407,7 +411,7 @@ private fun EvidriloLocalChatSheet(
                         ) {
                             Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(session.title, style = MaterialTheme.typography.titleSmall, color = EvidriloColors.Ink, maxLines = 1)
+                                    RawText(session.title, style = MaterialTheme.typography.titleSmall, color = EvidriloColors.Ink, maxLines = 1)
                                     Text(
                                         if (session.contextKey == contextKey) "Current case state · ${session.messages.size / 2} questions"
                                         else "Earlier case state · read only",
@@ -424,12 +428,14 @@ private fun EvidriloLocalChatSheet(
                 if (readOnly) {
                     Text("This chat is from an earlier case state. You can read it here; start a new chat for the current facts.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                 }
-                Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(Modifier.weight(1f),state=scroll, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (messages.isEmpty() && !composerFocused) {
+                        item {Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         Text("What would you like to understand?", style = MaterialTheme.typography.headlineSmall, color = EvidriloColors.Ink)
                         Text("Ask about the supplied observations, your hypothesis, or the next step. Answers stay within this case.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
+                        }}
                     } else {
-                        messages.forEach { message ->
+                        items(messages) { message ->
                             if (message.fromLearner) GuideLearnerBubble(message.text, message.attachments)
                             else GuideAssistantBubble(message.text)
                         }
@@ -458,7 +464,7 @@ private fun EvidriloLocalChatSheet(
                         pendingFiles.forEach { file ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 EvidriloIcon(EvidriloIconName.FILE, tint = EvidriloColors.Cobalt, modifier = Modifier.size(18.dp))
-                                Text("${file.name} · ${formatChatFileSize(file.sizeBytes)}", modifier = Modifier.weight(1f).padding(start = 7.dp), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Ink, maxLines = 1)
+                                RawText("${file.name} · ${formatChatFileSize(file.sizeBytes)}", modifier = Modifier.weight(1f).padding(start = 7.dp), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Ink, maxLines = 1)
                                 TextButton(onClick = { pendingFiles.remove(file); store.deleteAttachment(file.id) }) { Text("Remove") }
                             }
                         }
@@ -592,6 +598,16 @@ private fun formatChatFileSize(bytes: Long): String = when {
 
 @Composable
 private fun GuideAssistantBubble(text: String) {
+    val localizedLines=mutableListOf<String>()
+    for(line in text.lines()) {
+        localizedLines += when {
+            line.startsWith("[") && "] " in line -> line.substringBefore("] ")+"] "+uiText(line.substringAfter("] "))
+            line.startsWith("Why: ") -> uiText("Why: ","Alasan: ")+uiText(line.removePrefix("Why: "))
+            line.startsWith("Next action: ") -> uiText("Next action: ","Langkah berikutnya: ")+uiText(line.removePrefix("Next action: "))
+            ": " in line -> uiText(line.substringBefore(": "))+": "+uiText(line.substringAfter(": "))
+            else -> uiText(line)
+        }
+    }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.Top) {
         Surface(
             modifier = Modifier.widthIn(max = 300.dp),
@@ -600,7 +616,7 @@ private fun GuideAssistantBubble(text: String) {
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Evidrilo · local guide", style = MaterialTheme.typography.labelSmall, color = EvidriloColors.Cobalt)
-                Text(text, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Ink)
+                Text(localizedLines.joinToString("\n"), style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Ink)
             }
         }
     }
@@ -615,11 +631,11 @@ private fun GuideLearnerBubble(text: String, attachments: List<ChatAttachment>) 
             color = EvidriloColors.PrimaryAction,
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.White)
+                if (text.isNotBlank()) RawText(text, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.White)
                 attachments.forEach { file ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         EvidriloIcon(EvidriloIconName.FILE, tint = EvidriloColors.White, modifier = Modifier.size(17.dp))
-                        Text("${file.name} · ${formatChatFileSize(file.sizeBytes)}", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.White, maxLines = 2)
+                        RawText("${file.name} · ${formatChatFileSize(file.sizeBytes)}", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.White, maxLines = 2)
                     }
                 }
             }

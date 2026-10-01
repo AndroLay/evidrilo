@@ -1,5 +1,7 @@
 package dev.nextgen.mobile
 
+import androidx.lifecycle.compose.LifecycleEventEffect
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +19,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
+import androidx.compose.material3.Text as RawText
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -103,6 +106,7 @@ import dev.nextgen.mobile.billing.PremiumPracticeState
 import dev.nextgen.mobile.billing.RevenueCatCustomerCenter
 import dev.nextgen.mobile.billing.RevenueCatManagedPaywall
 import dev.nextgen.mobile.billing.createRevenueCatUiAvailability
+import dev.nextgen.mobile.billing.withRequestedProPlan
 import dev.nextgen.mobile.domain.conclusion.ConclusionCase
 import dev.nextgen.mobile.domain.conclusion.ConclusionCases
 import dev.nextgen.mobile.domain.conclusion.ConclusionCheckResult
@@ -239,14 +243,19 @@ internal fun EvidriloApp(
     billingGateway: BillingGateway,
     themeController: EvidriloThemeController = remember { EvidriloThemeController() },
 ) {
-    dev.nextgen.mobile.navigation.EvidriloBackGestureHost {
-        EvidriloAppContent(billingGateway, themeController)
+    val languageStore = rememberLanguageSettingsStore()
+    val languageController = remember(languageStore) { EvidriloLanguageController(languageStore) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalEvidriloLanguage provides languageController.language) {
+        dev.nextgen.mobile.navigation.EvidriloBackGestureHost {
+            EvidriloAppContent(billingGateway, languageController, themeController)
+        }
     }
 }
 
 @Composable
 private fun EvidriloAppContent(
     billingGateway: BillingGateway,
+    languageController: EvidriloLanguageController,
     themeController: EvidriloThemeController = remember { EvidriloThemeController() },
 ) {
     val bundledBaseCase = ConclusionCases.M0_T2
@@ -829,8 +838,16 @@ private fun EvidriloAppContent(
     }
     var studentProjectListReload by remember { mutableStateOf(0) }
     var studentProjectNotice by remember { mutableStateOf<String?>(null) }
+    var pendingProjectDeletionNotice by remember { mutableStateOf<String?>(null) }
     var studentProjectSaveError by remember { mutableStateOf<String?>(null) }
     var activeStudentProjectDraft by remember { mutableStateOf<StudentProjectDraft?>(null) }
+    var projectExportIntentId by remember { mutableStateOf<String?>(null) }
+    var projectOpinionComposeIntent by remember { mutableStateOf<ProjectOpinionIntent?>(null) }
+    var profilePracticeLesson by remember { mutableStateOf<dev.nextgen.mobile.domain.practice.PracticeLessonId?>(null) }
+    var practiceProjectSectionIntent by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(navigationState.current) {
+        if (navigationState.current != EvidriloDestination.PROJECTS) practiceProjectSectionIntent = null
+    }
     var studentProjectEditorIsDirty by remember { mutableStateOf(false) }
     var studentProjectExitConfirmation by remember { mutableStateOf(false) }
     val projectTemplateCatalogListState = rememberLazyListState()
@@ -849,6 +866,11 @@ private fun EvidriloAppContent(
         mutableStateOf<PremiumPracticeState>(PremiumPracticeState.Hidden)
     }
     var premiumBusy by remember { mutableStateOf(false) }
+    var practiceAccessChecking by remember { mutableStateOf(false) }
+    var practiceAccessReload by remember { mutableStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { practiceAccessReload += 1 }
+    var proComparisonVisible by remember { mutableStateOf(false) }
+    var preferredProProductId by remember { mutableStateOf<String?>(null) }
     var premiumRequestId by remember { mutableStateOf(0) }
     var premiumOpenRequestStarted by remember { mutableStateOf(false) }
     var premiumWaitingForIdentity by remember { mutableStateOf(false) }
@@ -1181,16 +1203,14 @@ private fun EvidriloAppContent(
             navigationState = navigationState.open(EvidriloDestination.PROJECTS)
             return
         }
-        val activeCount = loaded.projects.count {
-            it.status == StudentProjectStatus.DRAFT || it.status == StudentProjectStatus.ACTIVE
-        }
+        val activeCount = loaded.projects.size
         val activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(
             projectProEntitlementActive.value,
         )
         if (activeCount >= activeLimit) {
             navigationState = navigationState.open(EvidriloDestination.PROJECTS)
         } else {
-            startManualStudentProject()
+            navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG)
         }
     }
 
@@ -2201,7 +2221,7 @@ private fun EvidriloAppContent(
         }
     }
 
-    fun resumeStudentProject(projectId: String) {
+    fun resumeStudentProject(projectId: String, sectionId: String? = null) {
         if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) return
         releaseActiveProjectAiPreview()
         when (val result = studentProjectDraftFlow.resume(projectId)) {
@@ -2210,9 +2230,21 @@ private fun EvidriloAppContent(
                 studentProjectSaveError = null
                 studentProjectEditorIsDirty = false
                 studentProjectExitConfirmation = false
+                val targetSection = studentProjectEditorSections(result.value).firstOrNull { it.navigationId == sectionId }
+                if (targetSection != null) {
+                    val positionSaved = dev.nextgen.mobile.storage.createProjectSectionBookmarkStore().write(
+                        projectSectionBookmarkKey(result.value), targetSection.navigationId,
+                    ) == dev.nextgen.mobile.storage.LocalStorageWriteResult.SAVED
+                    studentProjectNotice = if (positionSaved) null
+                        else "Your project opened, but its section position could not be saved. Choose ${targetSection.title} from Sections."
+                }
+                practiceProjectSectionIntent = null
                 navigationState = navigationState.open(EvidriloDestination.PROJECT_EDITOR)
             }
-            else -> studentProjectNotice = studentProjectDraftFlowMessage(result)
+            else -> {
+                if (projectExportIntentId == projectId) projectExportIntentId = null
+                studentProjectNotice = studentProjectDraftFlowMessage(result)
+            }
         }
     }
 
@@ -2411,9 +2443,20 @@ private fun EvidriloAppContent(
             },
         )
 
-    fun permanentlyDeleteStudentProject(project: StudentProjectDraft): Boolean =
-        requireDestinationAccess(EvidriloDestination.PROJECTS) &&
-            handleStudentProjectAction(studentProjectDraftFlow.permanentlyDelete(project.id))
+    fun permanentlyDeleteStudentProject(project: StudentProjectDraft): Boolean {
+        if (!requireDestinationAccess(EvidriloDestination.PROJECTS)) return false
+        val result = studentProjectDraftFlow.permanentlyDelete(project.id)
+        val deleted = result is StudentProjectDraftFlowResult.Value ||
+            studentProjectDraftFlow.resume(project.id) == StudentProjectDraftFlowResult.NotFound
+        if (deleted) {
+            dev.nextgen.mobile.storage.createProjectSectionBookmarkStore().remove(projectSectionBookmarkKey(project))
+            pendingProjectDeletionNotice = if (result is StudentProjectDraftFlowResult.Value) null else
+                "The project was removed. Attachment cleanup is pending; Evidrilo will retry it when the project list opens."
+            studentProjectNotice = pendingProjectDeletionNotice
+            studentProjectListReload += 1
+        } else studentProjectNotice = studentProjectDraftFlowMessage(result)
+        return deleted
+    }
 
     LaunchedEffect(
         navigationState.current,
@@ -2423,21 +2466,23 @@ private fun EvidriloAppContent(
         revenueCatIdentityAccountId,
     ) {
         if (navigationState.current == EvidriloDestination.PROJECTS ||
-            navigationState.current == EvidriloDestination.HOME
+            (navigationState.current == EvidriloDestination.HOME || navigationState.current == EvidriloDestination.PROFILE)
         ) {
             studentProjectListState = StudentProjectListUiState.Loading
             val result = studentProjectDraftFlow.list()
             studentProjectListState = result.toStudentProjectListUiState()
             studentProjectNotice = when (result) {
-                is StudentProjectDraftFlowResult.Value -> null
+                is StudentProjectDraftFlowResult.Value -> if (practiceProjectSectionIntent != null)
+                    "Choose a project to use this move with your own material. Practice answers remain separate." else pendingProjectDeletionNotice
                 else -> studentProjectDraftFlowMessage(result)
             }
+            pendingProjectDeletionNotice = null
             projectProEntitlementActive.value = false
             if (canUseRevenueCatForCurrentAccount()) {
                 val entitlementToken = billingRequestGate.begin(currentBillingAccountId())
                 billingGateway.refreshAccess { outcome ->
                     if (billingRequestGate.isCurrent(entitlementToken, currentBillingAccountId()) &&
-                        (navigationState.current == EvidriloDestination.PROJECTS || navigationState.current == EvidriloDestination.HOME)
+                        (navigationState.current == EvidriloDestination.PROJECTS || (navigationState.current == EvidriloDestination.HOME || navigationState.current == EvidriloDestination.PROFILE))
                     ) {
                         projectProEntitlementActive.value = outcome is BillingOutcome.Access && outcome.value == PremiumAccess.UNLOCKED
                     }
@@ -2449,6 +2494,24 @@ private fun EvidriloAppContent(
         if (navigationState.current == EvidriloDestination.PROJECT_CATALOG) {
             projectTemplateFamiliesState = ProjectTemplateRemoteUiState.Loading
             projectTemplateFamiliesState = projectTemplateCatalogGateway.listFamilies().toRemoteUiState()
+        }
+    }
+    // The local Practice host receives only a fresh entitlement bound to this signed-in account.
+    LaunchedEffect(navigationState.current, accountSession, accountRestoreComplete, revenueCatIdentityAccountId, practiceAccessReload) {
+        if (navigationState.current in setOf(EvidriloDestination.PRACTICE, EvidriloDestination.CASES)) {
+            practiceAccessChecking = canUseRevenueCatForCurrentAccount()
+            projectProEntitlementActive.value = false
+            if (canUseRevenueCatForCurrentAccount()) {
+                val entitlementToken = billingRequestGate.begin(currentBillingAccountId())
+                billingGateway.refreshAccess { outcome ->
+                    if (billingRequestGate.isCurrent(entitlementToken, currentBillingAccountId()) &&
+                        navigationState.current in setOf(EvidriloDestination.PRACTICE, EvidriloDestination.CASES)
+                    ) {
+                        projectProEntitlementActive.value = outcome is BillingOutcome.Access && outcome.value == PremiumAccess.UNLOCKED
+                        practiceAccessChecking = false
+                    }
+                }
+            }
         }
     }
     LaunchedEffect(navigationState.current, selectedProjectTemplateFamily, projectTemplateFamilyReload) {
@@ -2826,8 +2889,14 @@ private fun EvidriloAppContent(
         notificationStorageStatus,
     )
     fun emitAnalytics(event: AnalyticsEvent) {
-        if (analyticsTransmissionAllowed(analyticsConsent, TEMPORARY_GUEST_MODE_ENABLED)) {
-            accountScope.launch {
+        val signedIn = accountSession as? AccountSession.SignedIn ?: return
+        if (!accountRestoreComplete || !accountBoundFeaturesEnabled || !signedIn.account.emailVerified ||
+            !analyticsTransmissionAllowed(analyticsConsent, TEMPORARY_GUEST_MODE_ENABLED)) return
+        val boundAccount = currentBillingAccountId()
+        accountScope.launch {
+            val current = accountSession as? AccountSession.SignedIn
+            if (current?.account?.emailVerified == true && currentBillingAccountId() == boundAccount &&
+                analyticsTransmissionAllowed(analyticsConsent, TEMPORARY_GUEST_MODE_ENABLED)) {
                 analyticsGateway.sendWithRetry(event, analyticsConsent)
             }
         }
@@ -3446,6 +3515,9 @@ private fun EvidriloAppContent(
                 audioCoordinator.stop()
         }
         premiumState = premiumReducer.reduce(premiumState, event)
+        if (event is PremiumPracticeEvent.BillingResult && preferredProProductId != null) {
+            premiumState = premiumReducer.reduce(premiumState, PremiumPracticeEvent.SelectOffer(preferredProProductId!!))
+        }
     }
     fun refreshBillingAccessAfterManagedUi() {
         if (!canUseRevenueCatForCurrentAccount()) return
@@ -3586,6 +3658,7 @@ private fun EvidriloAppContent(
         }
     }
     val closePremium: () -> Unit = {
+        preferredProProductId = null
         premiumRequestId += 1
         premiumOpenRequestStarted = false
         premiumWaitingForIdentity = false
@@ -3600,6 +3673,10 @@ private fun EvidriloAppContent(
     }
     val returnToPremiumCatalog: () -> Unit = {
         dispatchPremium(PremiumPracticeEvent.Back)
+    }
+    val openProComparison: () -> Unit = {
+        preferredProProductId = null
+        proComparisonVisible = true
     }
     val openPremium: () -> Unit = premiumAction@{
         if (!REVENUECAT_PRO_FEATURE_ENABLED) return@premiumAction
@@ -3641,7 +3718,7 @@ private fun EvidriloAppContent(
                         billingRequestGate.isCurrent(requestToken, currentBillingAccountId())
                     ) {
                         emitBillingAnalytics(BillingOperation.LOAD_OFFER, offerOutcome)
-                        dispatchPremium(PremiumPracticeEvent.BillingResult(offerOutcome))
+                        dispatchPremium(PremiumPracticeEvent.BillingResult(offerOutcome.withRequestedProPlan(preferredProProductId)))
                         premiumBillingRequestActive = false
                         premiumOpenRequestStarted = false
                         premiumBusy = false
@@ -3739,6 +3816,7 @@ private fun EvidriloAppContent(
         accountSession !is AccountSession.SignedIn &&
         navigationState.current.requiresAuthenticatedFreeAccess()
     val assistantVisible = !TEMPORARY_GUEST_MODE_ENABLED &&
+        !proComparisonVisible &&
         (navigationState.current != EvidriloDestination.PRACTICE || practiceTabletContext) &&
         accountRestoreComplete &&
         accountSession is AccountSession.SignedIn &&
@@ -3790,6 +3868,7 @@ private fun EvidriloAppContent(
         accountRestoreComplete &&
         (generalChatAccount == null || !generalChatAccount.account.emailVerified)
     val generalChatVisible = navigationState.current == EvidriloDestination.HOME &&
+        !proComparisonVisible &&
         !onboardingPresentation.isVisible &&
         !accountGateVisible &&
         !revenueCatPaywallVisible &&
@@ -3810,7 +3889,7 @@ private fun EvidriloAppContent(
     Box(modifier = Modifier.fillMaxSize()) {
     EvidriloWorkspaceShell(
         destination = navigationState.current,
-        showNavigation = accountRestoreComplete && !onboardingPresentation.isVisible && !accountGateVisible && !practiceLessonOpen,
+        showNavigation = accountRestoreComplete && !onboardingPresentation.isVisible && !accountGateVisible && !practiceLessonOpen && !proComparisonVisible,
         onSelect = { destination ->
             if (requireDestinationAccess(destination)) {
                 releaseActiveProjectAiPreview()
@@ -3823,14 +3902,30 @@ private fun EvidriloAppContent(
     } else if (onboardingPresentation.isVisible) {
         EvidriloOnboardingScreen(
             tourState = onboardingTour,
+            language=languageController.language,
+            languageSaveFailed=languageController.saveFailed,
+            onSetLanguage=languageController::select,
+            onConfirmLanguage={languageController.select(languageController.language);!languageController.saveFailed},
+            onStartPractice={advanceGetStartedTour();navigationState=navigationState.resetToHome().open(EvidriloDestination.PRACTICE)},
             onNext = ::advanceGetStartedTour,
             onBack = { dispatchGetStartedTourEvent(GetStartedTourEvent.Back) },
             onSkip = ::skipGetStartedTour,
             onStartProject = {
                 advanceGetStartedTour()
-                navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECTS)
+                navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECT_CATALOG)
             },
             storageNotice = onboardingStorageStatus.notice(),
+        )
+    } else if (proComparisonVisible) {
+        EvidriloProComparisonScreen(
+            signedIn = accountSession is AccountSession.SignedIn,
+            plansAvailable = REVENUECAT_PRO_FEATURE_ENABLED,
+            onChoosePlan = { productId ->
+                preferredProProductId = productId
+                proComparisonVisible = false
+                openPremium()
+            },
+            onClose = { proComparisonVisible = false },
         )
     } else if (accountGateVisible) {
         EvidriloAccountRequiredGate(
@@ -3893,7 +3988,14 @@ private fun EvidriloAppContent(
                 }
             },
             onRetry = openPremium,
-            onSelectOffer = { dispatchPremium(PremiumPracticeEvent.SelectOffer(it)) },
+            onChooseAnotherPlan = {
+                leavePremium()
+                openProComparison()
+            },
+            onSelectOffer = {
+                preferredProProductId = it
+                dispatchPremium(PremiumPracticeEvent.SelectOffer(it))
+            },
             onSelectCase = { dispatchPremium(PremiumPracticeEvent.SelectCase(it)) },
             onBeginCase = { dispatchPremium(PremiumPracticeEvent.BeginSelectedCase) },
             onPracticeEvent = { dispatchPremium(PremiumPracticeEvent.PracticeEvent(it)) },
@@ -3930,7 +4032,7 @@ private fun EvidriloAppContent(
                 studentProjectNotice = null
                 navigationState = navigationState.open(EvidriloDestination.PROJECTS)
             },
-            onStartBlankProject = ::beginManualProjectFromHome,
+            onStartBlankProject = ::startManualStudentProject,
             onNavigate = openTargetSection,
             onSelectFamily = { family ->
                 selectedProjectTemplateFamily = family
@@ -3949,7 +4051,7 @@ private fun EvidriloAppContent(
                 navigationState = navigationState.open(EvidriloDestination.PROJECT_TEMPLATE_DETAIL)
             },
             onStartStarterProject = ::startStarterStudentProject,
-            onStartBlankProject = ::beginManualProjectFromHome,
+            onStartBlankProject = ::startManualStudentProject,
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
         )
@@ -3968,7 +4070,7 @@ private fun EvidriloAppContent(
             onGrantProjectAiConsent = ::grantProjectAiConsent,
             onRevokeProjectAiConsent = ::revokeProjectAiConsent,
             onStartProject = ::startStudentProject,
-            onStartBlankProject = ::beginManualProjectFromHome,
+            onStartBlankProject = ::startManualStudentProject,
             onRequestProjectAi = { template, projectId, brief, question, fields, revision, consent ->
                 requestProjectAiScaffold(template, brief, question, fields, projectId, revision, consent)
             },
@@ -3987,8 +4089,9 @@ private fun EvidriloAppContent(
             notice = studentProjectNotice,
             onRetry = { studentProjectListReload += 1 },
             onOpenCatalog = { navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG) },
-            onResume = { project -> resumeStudentProject(project.id) },
-            onCreateManualProject = ::startManualStudentProject,
+            onResume = { project -> resumeStudentProject(project.id, practiceProjectSectionIntent) },
+            onExportProject = { project -> projectExportIntentId=project.id; resumeStudentProject(project.id,studentProjectEditorSections(project).last().navigationId) },
+            onCreateManualProject = { navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG) },
             onMarkCompleted = ::completeStudentProject,
             onArchive = ::archiveStudentProject,
             onMoveToTrash = ::trashStudentProject,
@@ -3997,7 +4100,7 @@ private fun EvidriloAppContent(
             onImportProject = ::importStudentProject,
             onRestoreArchiveRevision = ::restoreStudentProjectFromArchive,
             activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(projectProEntitlementActive.value),
-            onOpenPremium = openPremium,
+            onOpenPremium = openProComparison,
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
         )
@@ -4009,8 +4112,9 @@ private fun EvidriloAppContent(
                 notice = "The selected project is no longer available.",
                 onRetry = { studentProjectListReload += 1 },
                 onOpenCatalog = { navigationState = navigationState.resetToHome().open(EvidriloDestination.PROJECT_CATALOG) },
-                onResume = { project -> resumeStudentProject(project.id) },
-                onCreateManualProject = ::startManualStudentProject,
+                onResume = { project -> resumeStudentProject(project.id, practiceProjectSectionIntent) },
+            onExportProject = { project -> projectExportIntentId=project.id; resumeStudentProject(project.id,studentProjectEditorSections(project).last().navigationId) },
+                onCreateManualProject = { navigationState = navigationState.open(EvidriloDestination.PROJECT_CATALOG) },
                 onMarkCompleted = ::completeStudentProject,
                 onArchive = ::archiveStudentProject,
                 onMoveToTrash = ::trashStudentProject,
@@ -4019,7 +4123,7 @@ private fun EvidriloAppContent(
                 onImportProject = ::importStudentProject,
                 onRestoreArchiveRevision = ::restoreStudentProjectFromArchive,
                 activeLimit = dev.nextgen.mobile.domain.project.StudentProjectDraftRules.activeProjectLimit(projectProEntitlementActive.value),
-                onOpenPremium = openPremium,
+                onOpenPremium = openProComparison,
                 onBack = { navigationState = navigationState.back() },
                 onNavigate = openTargetSection,
             )
@@ -4099,6 +4203,12 @@ private fun EvidriloAppContent(
                     navigationState = navigationState.back()
                 },
                 onCancelExit = { studentProjectExitConfirmation = false },
+                exportRequested = projectExportIntentId == draft.id,
+                onConsumeExportRequest = { projectExportIntentId=null },
+                onAskAiOpinion = { saved ->
+                    val excerpt=projectOpinionIntent(saved)
+                    projectOpinionComposeIntent=excerpt.copy(prompt=excerpt.prompt.take(3920)+"\nReply in ${languageController.language.nativeName}.")
+                },
             )
         }
     } else if (navigationState.current == EvidriloDestination.SOURCES) {
@@ -4247,6 +4357,15 @@ private fun EvidriloAppContent(
         )
         EvidriloTargetProfileScreen(
             signedIn = profileSignedIn,
+            profileName = if (profileSignedIn) (accountSession as? AccountSession.SignedIn)?.account?.email?.takeIf { it.isNotBlank() } ?: uiText("Your account") else uiText("Local student"),
+            projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
+            projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
+            projectsError = studentProjectListState.toHomeErrorMessage(),
+            hasVerifiedPro = canUseRevenueCatForCurrentAccount() && projectProEntitlementActive.value,
+            onRetryProjects = { studentProjectListReload += 1 },
+            onResumeProject = { project -> resumeStudentProject(project.id) },
+            onOpenPractice = { profilePracticeLesson = null; startTargetPractice() },
+            onOpenPracticeLesson = { lesson -> profilePracticeLesson = lesson; startTargetPractice() },
             profileSubtitle = if (!accountAuthRestoreComplete) {
                 "Checking account…"
             } else {
@@ -4255,14 +4374,14 @@ private fun EvidriloAppContent(
             history = historySnapshot,
             onBack = { navigationState = navigationState.back() },
             onNavigate = openTargetSection,
-            onOpenPremium = openPremium,
+            onOpenPremium = openProComparison,
             onOpenHistory = {
                 if (requireDestinationAccess(EvidriloDestination.HISTORY)) {
                     navigationState = navigationState.open(EvidriloDestination.HISTORY)
                 }
             },
             onOpenWorkspacePreferences = {
-                navigationState = navigationState.open(EvidriloDestination.WORKSPACE_PREFERENCES)
+                navigationState = navigationState.open(EvidriloDestination.SETTINGS)
             },
             onOpenNotifications = {
                 navigationState = navigationState.open(EvidriloDestination.NOTIFICATIONS)
@@ -4427,7 +4546,7 @@ private fun EvidriloAppContent(
             syncStatusMessage = syncStatusMessage,
             onSetSyncConsent = setSyncConsent,
             onSyncNow = ::syncNow,
-            onOpenPremium = openPremium,
+            onOpenPremium = openProComparison,
             onOpenGuide = { navigationState = navigationState.open(EvidriloDestination.GUIDE) },
             onOpenGuidedCase = startTargetPractice,
             onOpenHistory = { navigationState = navigationState.open(EvidriloDestination.HISTORY) },
@@ -4446,6 +4565,9 @@ private fun EvidriloAppContent(
             audioSettings = audioSettings,
             audioStorageStatus = audioStorageStatus,
             onSetAudioSettings = setAudioSettings,
+            language = languageController.language,
+            languageSaveFailed = languageController.saveFailed,
+            onSetLanguage = languageController::select,
             themeMode = themeController.mode,
             onSetThemeMode = themeController::select,
             notificationPreferences = notificationPreferences,
@@ -4471,7 +4593,7 @@ private fun EvidriloAppContent(
         val previousDestination = navigationState.stack.dropLast(1).lastOrNull()
         EvidriloSupportScreen(
             onBack = { navigationState = navigationState.back() },
-            onOpenPremium = openPremium,
+            onOpenPremium = openProComparison,
             onOpenAccount = { navigationState = navigationState.open(EvidriloDestination.ACCOUNT) },
             customerCenterAvailable = revenueCatUiAvailability.canPresent,
             onOpenCustomerCenter = openCustomerCenter,
@@ -4492,6 +4614,11 @@ private fun EvidriloAppContent(
         )
     } else if (navigationState.current == EvidriloDestination.PRACTICE) {
         EvidriloPracticeCourseScreen(
+            initialSelectedLesson = profilePracticeLesson,
+            onConsumeInitialLesson = { profilePracticeLesson = null },
+            hasVerifiedProAccess = canUseRevenueCatForCurrentAccount() && projectProEntitlementActive.value,
+            proAccessChecking = practiceAccessChecking && canUseRevenueCatForCurrentAccount(),
+            onOpenPro = openProComparison,
             onLessonVisibilityChanged = { practiceLessonOpen = it },
             tabletState = state,
             onTabletEvent = { event -> dispatch(event) },
@@ -4499,6 +4626,16 @@ private fun EvidriloAppContent(
             onExit = returnToHome,
             onOpenProjects = {
                 releaseActiveProjectAiPreview()
+                navigationState = navigationState.open(EvidriloDestination.PROJECTS)
+            },
+            onCarrySkillToProjects = { lesson ->
+                releaseActiveProjectAiPreview()
+                practiceProjectSectionIntent = when (lesson) {
+                    dev.nextgen.mobile.domain.practice.PracticeLessonId.TABLET -> "claims-and-evidence-links"
+                    dev.nextgen.mobile.domain.practice.PracticeLessonId.STUDIES -> "findings-and-synthesis"
+                    dev.nextgen.mobile.domain.practice.PracticeLessonId.SURVEY -> "limitations-and-next-steps"
+                }
+                studentProjectNotice = "Choose a project to use this move with your own material. Practice answers remain separate."
                 navigationState = navigationState.open(EvidriloDestination.PROJECTS)
             },
             onTabletContextChanged = { practiceTabletContext = it },
@@ -4512,6 +4649,11 @@ private fun EvidriloAppContent(
                 }, pauseOrResumeAudio, stopAudio)
             },
         )
+    } else if (navigationState.current == EvidriloDestination.CASES) {
+        EvidriloCasesScreen(case = case, hasPro = canUseRevenueCatForCurrentAccount() && projectProEntitlementActive.value,
+            accessChecking = practiceAccessChecking,
+            onOpenCase = { releaseActiveProjectAiPreview(); navigationState = navigationState.open(EvidriloDestination.SOURCES) }, onOpenProCases = openPremium,
+            onBack = { navigationState = navigationState.back() })
     } else if (navigationState.current == EvidriloDestination.HOME) {
         EvidriloTargetHomeScreen(
             storageNotice = storageNotice,
@@ -4535,6 +4677,7 @@ private fun EvidriloAppContent(
             onResumeProject = { project -> resumeStudentProject(project.id) },
             onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
             onOpenPractice = startTargetPractice,
+            onOpenCases = { navigationState = navigationState.open(EvidriloDestination.CASES) },
             recommendation = recommendationState,
             onAcceptRecommendation = ::acceptRecommendation,
             onDismissRecommendation = ::dismissRecommendation,
@@ -4583,6 +4726,7 @@ private fun EvidriloAppContent(
                     onResumeProject = { project -> resumeStudentProject(project.id) },
                     onOpenSettings = { openTargetSection(EvidriloTargetSection.PROFILE) },
             onOpenPractice = startTargetPractice,
+                    onOpenCases = { navigationState = navigationState.open(EvidriloDestination.CASES) },
                     recommendation = recommendationState,
                     onAcceptRecommendation = ::acceptRecommendation,
                     onDismissRecommendation = ::dismissRecommendation,
@@ -4616,6 +4760,13 @@ private fun EvidriloAppContent(
     )
 
     EvidriloGeneralAiChat(
+        opinionIntent = projectOpinionComposeIntent,
+        onConsumeOpinionIntent = { projectOpinionComposeIntent=null },
+        isOpinionCurrent = { id,revision ->
+            val result=studentProjectDraftFlow.resume(id)
+            result is StudentProjectDraftFlowResult.Value && result.value.revision==revision
+        },
+        editorMode = navigationState.current == EvidriloDestination.PROJECT_EDITOR,
         visible = generalChatVisible,
         accountKey = currentBillingAccountId(),
         projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty()
@@ -4641,7 +4792,11 @@ private fun EvidriloAppContent(
         onGrantConsent = ::grantProjectAiConsent,
         onRevokeConsent = ::revokeProjectAiConsent,
         onOpenProjects = { navigationState = navigationState.open(EvidriloDestination.PROJECTS) },
-        onOpenProject = ::resumeStudentProject,
+        onOpenProject = { projectId ->
+            val project = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects?.firstOrNull { it.id == projectId }
+            val section = project?.templateSnapshot?.steps?.firstOrNull { it.aiOperations.isNotEmpty() }?.id?.let { "template-step:$it" }
+            resumeStudentProject(projectId, section)
+        },
         activityHistoryState = projectAiActivityHistoryState,
         onRefreshActivityHistory = ::refreshProjectAiActivity,
         onLoadMoreActivityHistory = ::loadMoreProjectAiActivity,
@@ -4802,6 +4957,7 @@ private fun EvidriloPremiumSurface(
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
     onRetry: () -> Unit,
+    onChooseAnotherPlan: () -> Unit,
     onSelectOffer: (String) -> Unit,
     onSelectCase: (String) -> Unit,
     onBeginCase: () -> Unit,
@@ -4837,6 +4993,7 @@ private fun EvidriloPremiumSurface(
                         onPurchase = onPurchase,
                         onRestore = onRestore,
                         onRetry = onRetry,
+                        onChooseAnotherPlan = onChooseAnotherPlan,
                         onSelectOffer = onSelectOffer,
                         onBack = onBack,
                         backLabel = backLabel,
@@ -4999,6 +5156,7 @@ private fun EvidriloPremiumLockedScreen(
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
     onRetry: () -> Unit,
+    onChooseAnotherPlan: () -> Unit,
     onSelectOffer: (String) -> Unit,
     onBack: () -> Unit,
     backLabel: String,
@@ -5011,6 +5169,7 @@ private fun EvidriloPremiumLockedScreen(
         onPurchase = onPurchase,
         onRestore = onRestore,
         onRetry = onRetry,
+        onChooseAnotherPlan = onChooseAnotherPlan,
         onSelectOffer = onSelectOffer,
         onBack = onBack,
         backLabel = backLabel,
@@ -5534,7 +5693,8 @@ internal fun EvidriloDraftSnapshot(
 internal fun EvidriloSnapshotRow(label: String, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        if(label in setOf("Claim","Limitation note","Action reason")) RawText(value,style=MaterialTheme.typography.bodyMedium)
+        else Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

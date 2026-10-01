@@ -19,6 +19,7 @@ val localBuildProperties = Properties().apply {
 
 fun localOrGradleProperty(name: String): String =
     providers.gradleProperty(name).orNull
+        ?: providers.environmentVariable("ORG_GRADLE_PROJECT_" + name).orNull
         ?: localBuildProperties.getProperty(name).orEmpty()
 
 fun String.asKotlinStringLiteral(): String {

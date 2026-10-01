@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -246,7 +247,7 @@ internal fun EvidriloProjectAiStageAssistPanel(
                                 selectedEvidenceIds = emptySet()
                                 requestConsent = false
                             },
-                            label = { Text(candidate.id.replace('_', ' ')) },
+                            label = { RawText(candidate.id.replace('_', ' ')) },
                             enabled = !busy && !blockedByUnresolvedRequest,
                         )
                     }
@@ -357,7 +358,8 @@ internal fun EvidriloProjectAiStageAssistPanel(
                         onClick = { onRetryUnknownRequest(current) },
                     ) { Text("Retry same request") }
                 }
-                is ProjectAiStageAssistUiState.Preview -> ProjectAiStageAssistPreviewCard(
+                is ProjectAiStageAssistUiState.Preview -> EvidriloReviewFocus("Review AI suggestions") {
+                ProjectAiStageAssistPreviewCard(
                     session = current.session,
                     selectedProposalIds = selectedProposalIds,
                     editedValues = editedValues,
@@ -379,6 +381,7 @@ internal fun EvidriloProjectAiStageAssistPanel(
                     stale = current.session.projectRevision != draft.revision || isDirty,
                     canDismiss = canDismissProjectAiStageAssistPreview(current.session.contextIdentity, currentContext),
                 )
+                }
                 is ProjectAiStageAssistUiState.Settling -> Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -437,7 +440,7 @@ private fun ProjectAiStageAssistPreviewCard(
             )
         }
         preview.items.filter { it.kind.name != "PROPOSAL" }.forEach { item ->
-            Text(item.text.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+            RawText(item.text.orEmpty(), style = MaterialTheme.typography.bodyMedium)
         }
         proposals.forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -456,13 +459,13 @@ private fun ProjectAiStageAssistPreviewCard(
                 label = { Text("Review or edit") },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canReview,
-                supportingText = { Text("Current: ${item.beforeValue.orEmpty().take(160)}") },
+                supportingText = { RawText(uiText("Current: ","Saat ini: ")+item.beforeValue.orEmpty().take(160)) },
             )
             if (item.referenceIds.isNotEmpty()) {
                 Text("Selected references: ${item.referenceIds.joinToString()}", style = MaterialTheme.typography.bodySmall)
             }
             (item.uncertainties + item.knownLimits).distinct().forEach { limit ->
-                Text("Limit: $limit", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                RawText(uiText("Limit: ","Batasan: ")+limit, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
             }
         }
         if (proposals.isEmpty()) {

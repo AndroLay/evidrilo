@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
@@ -23,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,7 +36,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -166,6 +171,7 @@ internal fun reduceProjectAiEntrySurface(
 @Composable
 internal fun EvidriloGeneralAiChat(
     visible: Boolean,
+    editorMode: Boolean = false,
     accountKey: String?,
     projects: List<ProjectAiEntryProject>,
     projectsLoading: Boolean,
@@ -185,18 +191,37 @@ internal fun EvidriloGeneralAiChat(
     onRefreshActivityHistory: (String?) -> Unit,
     onLoadMoreActivityHistory: (String?, String) -> Unit,
     onSendMessage: (message: String, locale: String, onResult: (ProjectAiGeneralChatResult) -> Unit) -> Unit,
+    opinionIntent: ProjectOpinionIntent? = null,
+    onConsumeOpinionIntent: () -> Unit = {},
+    isOpinionCurrent: (String,Int) -> Boolean = { _,_ -> true },
 ) {
     var entrySurface by remember { mutableStateOf(ProjectAiEntrySurface.CLOSED) }
     var input by remember(accountKey) { mutableStateOf("") }
     var consentConfirmed by remember(accountKey) { mutableStateOf(false) }
     var sending by remember(accountKey) { mutableStateOf(false) }
-    var aiShortcutPosition by remember { mutableStateOf<AiShortcutPosition?>(null) }
+    var aiShortcutPosition by remember(editorMode) { mutableStateOf<AiShortcutPosition?>(null) }
     val entries = remember(accountKey) { mutableStateListOf<GeneralChatEntry>() }
     val listState = rememberLazyListState()
-    val locale = Locale.current.toLanguageTag().take(32).ifBlank { "en" }
+    val locale = LocalEvidriloLanguage.current.tag
+    var opinionContext by remember(accountKey) { mutableStateOf<ProjectOpinionIntent?>(null) }
+    var showOpinionExcerpt by remember(accountKey) { mutableStateOf(false) }
+    var opinionChanged by remember(accountKey) { mutableStateOf(false) }
+    LaunchedEffect(opinionIntent,sending,accountKey) {
+        if(opinionIntent!=null && !sending) {
+            opinionContext=opinionIntent; opinionChanged=false
+            entrySurface=ProjectAiEntrySurface.GENERAL_CHAT
+            input=opinionIntent.prompt
+            consentConfirmed=false
+            onConsumeOpinionIntent()
+        }
+    }
 
     fun send(rawMessage: String) {
         val message = rawMessage.trim()
+        val opinion=opinionContext
+        if(opinion!=null && !isOpinionCurrent(opinion.projectId,opinion.revision)) {
+            opinionChanged=true; consentConfirmed=false; return
+        }
         if (!canSendGeneralAiMessage(message, consentConfirmed, consentState, accessMessage, apiConfigured, sending)) return
         input = ""
         consentConfirmed = false
@@ -280,9 +305,9 @@ internal fun EvidriloGeneralAiChat(
         val density = LocalDensity.current
         val viewportWidthPx = with(density) { maxWidth.toPx() }
         val viewportHeightPx = with(density) { maxHeight.toPx() }
-        val shortcutSizePx = with(density) { 54.dp.toPx() }
+        val shortcutSizePx = with(density) { 48.dp.toPx() }
         val edgeInsetPx = with(density) { 16.dp.toPx() }
-        val endInsetPx = with(density) { 20.dp.toPx() }
+        val endInsetPx = with(density) { (if (editorMode) 16.dp else 80.dp).toPx() }
         val bottomInsetPx = with(density) { 100.dp.toPx() }
         val bounds = AiShortcutBounds(
             minXPx = edgeInsetPx,
@@ -295,7 +320,9 @@ internal fun EvidriloGeneralAiChat(
             viewportHeightPx = viewportHeightPx,
             shortcutSizePx = shortcutSizePx,
             endInsetPx = endInsetPx,
-            bottomInsetPx = bottomInsetPx,
+            // Start beside the Home header, away from the main continuation action.
+            bottomInsetPx = if (editorMode) with(density) { 160.dp.toPx() }
+                else viewportHeightPx - shortcutSizePx - with(density) { 52.dp.toPx() },
             bounds = bounds,
         )
         val displayedPosition = clampAiShortcutPosition(aiShortcutPosition ?: initialPosition, bounds)
@@ -349,13 +376,21 @@ internal fun EvidriloGeneralAiChat(
                         )
                     },
                 shape = androidx.compose.foundation.shape.CircleShape,
-                containerColor = EvidriloColors.PrimaryAction,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = EvidriloColors.Tint,
+                contentColor = EvidriloColors.Cobalt,
             ) {
-                EvidriloIcon(EvidriloIconName.CHAT_BUBBLE, tint = EvidriloColors.White, modifier = Modifier.size(24.dp))
+                EvidriloIcon(EvidriloIconName.CHAT_BUBBLE, tint = EvidriloColors.Cobalt, modifier = Modifier.size(23.dp))
             }
         }
     }
+
+    if(showOpinionExcerpt) AlertDialog(onDismissRequest={showOpinionExcerpt=false},containerColor=EvidriloColors.Card,
+        title={Text(uiText("Selected project excerpt","Cuplikan proyek pilihan"))},
+        text={Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(uiText("Only this message will be sent after your explicit approval. No original files. AI usage consumes credits.",
+                "Hanya pesan ini yang dikirim setelah persetujuan Anda. Tanpa berkas asli. Penggunaan AI memakai kredit."))
+            androidx.compose.foundation.text.selection.SelectionContainer {RawText(input)}
+        }},confirmButton={TextButton({showOpinionExcerpt=false}) {Text(uiText("Close","Tutup"))}})
 
     if (entrySurface != ProjectAiEntrySurface.CLOSED) {
         Dialog(
@@ -384,23 +419,36 @@ internal fun EvidriloGeneralAiChat(
                     )
 
                     if (entrySurface == ProjectAiEntrySurface.MODE_PICKER) {
-                        Text(
-                            "Choose how you want AI to help",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            "General Chat is unlinked. Project AI works only with an eligible project and selected context.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Surface(color = EvidriloColors.Atmosphere, shape = RoundedCornerShape(18.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(when {
+                                    !apiConfigured -> "AI is not connected in this build"
+                                    accessMessage != null -> "Your account needs attention"
+                                    consentState == ProjectAiConsentUiState.NotGranted -> "Review AI data use before asking"
+                                    consentState != ProjectAiConsentUiState.Granted -> "Check AI consent before sending"
+                                    else -> "Choose the help you need"
+                                }, style = MaterialTheme.typography.titleMedium)
+                                Text(when {
+                                    !apiConfigured -> "Keep working locally. Questions and project material are not sent from this build."
+                                    accessMessage != null -> accessMessage
+                                    consentState == ProjectAiConsentUiState.NotGranted -> "You choose what to share. Each request keeps its own context and confirmation."
+                                    consentState is ProjectAiConsentUiState.Unavailable -> consentState.message
+                                    consentState != ProjectAiConsentUiState.Granted -> "Consent status needs to be checked. Open a chat to check it before sending."
+                                    else -> "Your account and connection are configured. Service availability is checked when you send a request."
+                                }, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                            }
+                        }
                         EvidriloAiCreditBalancePanel(
                             presentation = aiCreditBalance,
                             onRefresh = onRefreshAiCreditBalance,
                         )
                         EvidriloWorkspaceRow(EvidriloIconName.CHAT_BUBBLE, "General Chat", "Ask a study question. No project is connected.",
                             { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_GENERAL) })
-                        EvidriloWorkspaceRow(EvidriloIconName.FOLDER, "Project AI", "Choose a supported project stage and its material.",
+                        EvidriloWorkspaceRow(EvidriloIconName.FOLDER, "Project AI", when {
+                            projectsLoading -> "Reading your supported project stages…"
+                            projects.isEmpty() -> "No supported project yet. Local starters remain available for manual work."
+                            else -> "${projects.size} supported ${if (projects.size == 1) "project" else "projects"}. Choose the stage and material to share."
+                        },
                             { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_PROJECT) })
                     } else {
                         if (entrySurface == ProjectAiEntrySurface.GENERAL_CHAT || entrySurface == ProjectAiEntrySurface.PROJECT_PICKER) {
@@ -460,7 +508,7 @@ internal fun EvidriloGeneralAiChat(
                                                 },
                                                 modifier = Modifier.fillMaxWidth(),
                                             ) {
-                                                Text(project.title.ifBlank { "Untitled project" }, modifier = Modifier.fillMaxWidth())
+                                                RawText(project.title.ifBlank { "Untitled project" }, modifier = Modifier.fillMaxWidth())
                                             }
                                         }
                                     }
@@ -489,7 +537,7 @@ internal fun EvidriloGeneralAiChat(
                                         color = MaterialTheme.colorScheme.secondaryContainer,
                                     ) {
                                         Text(
-                                            "Not linked to a project",
+                                            if(opinionContext!=null) uiText("Project excerpt · AI opinion","Cuplikan proyek · pendapat AI") else uiText("General Chat","Chat umum"),
                                             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -500,17 +548,25 @@ internal fun EvidriloGeneralAiChat(
                                             entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_ACTIVITY)
                                             onRefreshActivityHistory(null)
                                         },
-                                    ) { Text("Activity") }
+                                    ) { Text(uiText("Activity")) }
                                     if (entries.isNotEmpty()) {
                                         TextButton(
                                             onClick = {
-                                                entries.clear()
+                                                opinionContext=null; opinionChanged=false
+                                            entries.clear()
                                                 input = ""
                                                 consentConfirmed = false
                                             },
-                                        ) { Text("Clear") }
+                                        ) { Text(uiText("Clear")) }
                                     }
                                 }
+                                if(opinionContext!=null) TextButton({showOpinionExcerpt=true}) {
+                                    Text(uiText("Review selected excerpt","Tinjau cuplikan pilihan"))
+                                }
+                                if(opinionContext!=null) Text(uiText("Saved revision ${opinionContext?.revision}. A bounded excerpt, not a complete project evaluation.",
+                                    "Revisi tersimpan ${opinionContext?.revision}. Cuplikan terbatas, bukan evaluasi seluruh proyek."),style=MaterialTheme.typography.bodySmall)
+                                if(opinionChanged) Text(uiText("This project changed. Close chat and prepare a fresh excerpt from Review before sending.",
+                                    "Proyek berubah. Tutup chat dan siapkan cuplikan baru dari Tinjauan sebelum mengirim."),color=EvidriloColors.Error)
                                 EvidriloExplanation("What this chat sends", "Each request sends only its current message. Earlier turns are not sent or saved to account history.")
                                 EvidriloAiCreditBalancePanel(
                                     presentation = aiCreditBalance,
@@ -520,7 +576,7 @@ internal fun EvidriloGeneralAiChat(
                                 if (accessMessage == null && apiConfigured) {
                                     when (val savedConsent = consentState) {
                                         ProjectAiConsentUiState.Unknown -> TextButton(onClick = onRefreshConsent) {
-                                            Text("Check saved AI data-use consent")
+                                            Text(uiText("Check saved AI data-use consent"))
                                         }
                                         ProjectAiConsentUiState.Checking -> Row(
                                             verticalAlignment = Alignment.CenterVertically,
@@ -531,20 +587,19 @@ internal fun EvidriloGeneralAiChat(
                                         }
                                         ProjectAiConsentUiState.NotGranted -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text(
-                                                "The platform requires account-level AI data-use consent. Granting it sends nothing; each message still needs separate approval and never includes a project.",
+                                                "The platform requires account-level AI data-use consent. Granting it sends nothing; each message still needs separate approval. Only the text you choose in the composer is sent.",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
-                                            TextButton(onClick = onGrantConsent) { Text("Allow AI data processing") }
+                                            TextButton(onClick = onGrantConsent) { Text(uiText("Allow AI data processing")) }
                                         }
                                         ProjectAiConsentUiState.Granted -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(
-                                                "Account-level AI consent is active. You approve each message separately.",
+                                            Text(uiText("Account-level AI consent is active. You approve each message separately."),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                             TextButton(onClick = onRevokeConsent, enabled = !sending) {
-                                                Text("Revoke saved AI consent")
+                                                Text(uiText("Revoke saved AI consent"))
                                             }
                                         }
                                         is ProjectAiConsentUiState.Unavailable -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -580,6 +635,8 @@ internal fun EvidriloGeneralAiChat(
                                             TextButton(
                                                 onClick = {
                                                     input = prompt
+                                                    opinionContext = null
+                                                    opinionChanged = false
                                                     consentConfirmed = false
                                                 },
                                                 modifier = Modifier.fillMaxWidth(),
@@ -597,6 +654,8 @@ internal fun EvidriloGeneralAiChat(
                                                 is GeneralChatEntry.User -> ChatMessageBubble(text = entry.text, fromUser = true)
                                                 is GeneralChatEntry.Answer -> GeneralChatAnswerBubble(entry.value) { prompt ->
                                                     input = prompt
+                                                    opinionContext = null
+                                                    opinionChanged = false
                                                     consentConfirmed = false
                                                 }
                                                 is GeneralChatEntry.Notice -> ChatNotice(entry.text)
@@ -623,7 +682,7 @@ internal fun EvidriloGeneralAiChat(
                                         onValueChange = { value -> if (value.length <= 4_000) input = value },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("Ask a general study question") },
-                                        supportingText = { Text("Up to 4,000 characters · no project context") },
+                                        supportingText = { Text(uiText("Up to 4,000 characters · composer text only; no original files")) },
                                         minLines = 1,
                                         maxLines = 3,
                                         enabled = !sending && apiConfigured,
@@ -718,7 +777,7 @@ private fun AiWorkspaceHeader(
                 )
             }
         }
-        TextButton(onClick = onClose) { Text("Close") }
+        TextButton(onClick = onClose) { Text(uiText("Close")) }
     }
 }
 
@@ -736,7 +795,7 @@ private fun AiWorkspaceModeSelector(
         FilterChip(
             selected = selected == AiWorkspaceMode.GENERAL,
             onClick = onChooseGeneral,
-            label = { Text("General Chat") },
+            label = { Text(uiText("General Chat")) },
         )
         FilterChip(
             selected = selected == AiWorkspaceMode.PROJECT,
@@ -758,7 +817,7 @@ private fun ChatMessageBubble(text: String, fromUser: Boolean) {
             color = if (fromUser) EvidriloColors.Cobalt else EvidriloColors.Tint,
             contentColor = if (fromUser) EvidriloColors.White else EvidriloColors.Ink,
         ) {
-            Text(text, modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp), style = MaterialTheme.typography.bodyMedium)
+            RawText(text, modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

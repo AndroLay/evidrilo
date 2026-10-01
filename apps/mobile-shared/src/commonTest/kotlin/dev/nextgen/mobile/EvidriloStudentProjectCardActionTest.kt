@@ -12,8 +12,8 @@ class EvidriloStudentProjectCardActionTest {
         assertEquals(
             listOf(
                 StudentProjectCardAction.MARK_COMPLETE,
-                StudentProjectCardAction.ARCHIVE,
-                StudentProjectCardAction.MOVE_TO_TRASH,
+                StudentProjectCardAction.EXPORT,
+                StudentProjectCardAction.DELETE_PERMANENTLY,
             ),
             studentProjectSecondaryActions(StudentProjectStatus.ACTIVE),
         )
@@ -24,12 +24,13 @@ class EvidriloStudentProjectCardActionTest {
     }
 
     @Test
-    fun archived_and_completed_projects_can_be_restored_or_trashed() {
+    fun legacy_archived_and_completed_projects_can_be_restored_exported_or_removed() {
         assertEquals(StudentProjectCardAction.OPEN, studentProjectPrimaryAction(StudentProjectStatus.ARCHIVED))
         assertEquals(StudentProjectCardAction.OPEN, studentProjectPrimaryAction(StudentProjectStatus.COMPLETED))
         val expected = listOf(
             StudentProjectCardAction.RESTORE_ACTIVE,
-            StudentProjectCardAction.MOVE_TO_TRASH,
+            StudentProjectCardAction.EXPORT,
+            StudentProjectCardAction.DELETE_PERMANENTLY,
         )
 
         assertEquals(expected, studentProjectSecondaryActions(StudentProjectStatus.ARCHIVED))
@@ -37,11 +38,12 @@ class EvidriloStudentProjectCardActionTest {
     }
 
     @Test
-    fun trashed_projects_keep_both_restore_choices_and_confirmed_permanent_delete() {
+    fun legacy_trashed_projects_can_restore_export_or_permanently_delete() {
         assertEquals(StudentProjectCardAction.RESTORE_ACTIVE, studentProjectPrimaryAction(StudentProjectStatus.TRASHED))
         assertEquals(
             listOf(
-                StudentProjectCardAction.RESTORE_ARCHIVED,
+                StudentProjectCardAction.RESTORE_ACTIVE,
+                StudentProjectCardAction.EXPORT,
                 StudentProjectCardAction.DELETE_PERMANENTLY,
             ),
             studentProjectSecondaryActions(StudentProjectStatus.TRASHED),

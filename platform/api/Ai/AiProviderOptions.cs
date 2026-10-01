@@ -21,7 +21,8 @@ public sealed class AiProviderOptions
         decimal? maxRequestCostUsd,
         decimal? monthlySpendLimitUsd,
         int maxOutputTokens,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        string? reasoningEffort = null)
     {
         Enabled = enabled;
         ActivationApproved = activationApproved;
@@ -36,6 +37,7 @@ public sealed class AiProviderOptions
         MonthlySpendLimitUsd = monthlySpendLimitUsd;
         MaxOutputTokens = maxOutputTokens;
         Timeout = timeout;
+        ReasoningEffort = reasoningEffort;
     }
 
     public bool Enabled { get; }
@@ -63,6 +65,8 @@ public sealed class AiProviderOptions
     public int MaxOutputTokens { get; }
 
     public TimeSpan Timeout { get; }
+
+    public string? ReasoningEffort { get; }
 
     public static AiProviderOptions DefaultPricing { get; } = new(
         false,
@@ -115,8 +119,12 @@ public sealed class AiProviderOptions
                 "AI_MAX_REQUEST_COST_USD cannot exceed the 200-credit per-request limit.");
         }
 
-        var maxOutputTokens = ReadInteger(configuration, "AI_MAX_OUTPUT_TOKENS", 512, 64, 512);
-        var timeoutSeconds = ReadInteger(configuration, "AI_PROVIDER_TIMEOUT_SECONDS", 5, 1, 5);
+        var effort = configuration["AI_REASONING_EFFORT"]?.Trim();
+        if (string.IsNullOrEmpty(effort)) effort = null;
+        if (effort is not null && effort is not ("none" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
+            throw new PlatformConfigurationException("AI_REASONING_EFFORT must be a supported exact effort or omitted.");
+        var maxOutputTokens = ReadInteger(configuration, "AI_MAX_OUTPUT_TOKENS", 512, 64, 8192);
+        var timeoutSeconds = ReadInteger(configuration, "AI_PROVIDER_TIMEOUT_SECONDS", 5, 1, 90);
         return new AiProviderOptions(
             true,
             true,
@@ -130,7 +138,8 @@ public sealed class AiProviderOptions
             requestCeiling,
             monthlyCeiling,
             maxOutputTokens,
-            TimeSpan.FromSeconds(timeoutSeconds));
+            TimeSpan.FromSeconds(timeoutSeconds),
+            effort);
     }
 
     public decimal EstimateMaximumRequestCostUsd(int inputUtf8ByteCount)

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.heightIn
@@ -28,7 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -53,6 +55,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dev.nextgen.mobile.ai.AiAssistPurpose
 import dev.nextgen.mobile.ai.AiConversationGatewayResult
 import dev.nextgen.mobile.ai.AiConversationHistoryMessage
@@ -326,10 +330,13 @@ internal fun EvidriloAiAssistCard(
     }
 
     if (opened) {
-        ModalBottomSheet(
+        Dialog(
             onDismissRequest = onDismiss,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            dev.nextgen.mobile.navigation.EvidriloBackGestureHost {
+            EvidriloBackGesture("Close AI chat", onDismiss)
+            Surface(Modifier.fillMaxSize(), color = EvidriloColors.Canvas) {
             EvidriloAiChatSheet(
                 state = state,
                 clearState = clearState,
@@ -384,6 +391,8 @@ internal fun EvidriloAiAssistCard(
                 },
                 onDismiss = onDismiss,
             )
+            }
+            }
         }
     }
 }
@@ -434,8 +443,8 @@ private fun EvidriloAiChatSheet(
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.86f)
+            .fillMaxSize()
+            .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
             .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),

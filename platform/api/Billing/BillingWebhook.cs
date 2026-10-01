@@ -72,9 +72,9 @@ public sealed class NpgsqlBillingStore : IBillingStore, IDisposable
             await using (var accountLockCommand = connection.CreateCommand())
             {
                 accountLockCommand.Transaction = transaction;
-                accountLockCommand.CommandText = "select id from auth.users where id = @account_id for update;";
+                accountLockCommand.CommandText = "select public.lock_runtime_account(@account_id);";
                 accountLockCommand.Parameters.AddWithValue("account_id", NpgsqlDbType.Uuid, envelope.AccountId);
-                if (await accountLockCommand.ExecuteScalarAsync(cancellationToken) is null)
+                if (await accountLockCommand.ExecuteScalarAsync(cancellationToken) is not true)
                 {
                     await transaction.CommitAsync(cancellationToken);
                     return "ignored";

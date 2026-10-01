@@ -100,8 +100,7 @@ coverage exists; device save/reopen and picker acceptance remain open.
 ### Project Lifecycle and History
 
 Autosave and revision checkpoints help preserve a student's work while they
-develop it. Projects can be completed, archived, moved to Trash, or restored;
-Free/Pro active-project limits are applied per installation.
+develop it. A single project list shows active and completed work, with catalog-first creation and export in the project menu. Permanent deletion requires confirmation. Free supports five projects total per installation; verified Pro supports 50. Existing legacy archive/Trash records remain readable for compatibility.
 
 [Project lifecycle and history →](docs/product/workflows.md)
 

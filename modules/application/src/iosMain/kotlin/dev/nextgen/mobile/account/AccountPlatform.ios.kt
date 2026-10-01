@@ -33,7 +33,7 @@ actual fun createAccountClientConfiguration(): AccountClientConfiguration = Acco
     publishableKey = infoValue("SUPABASE_PUBLISHABLE_KEY"),
     redirectUrl = infoValue("SUPABASE_AUTH_REDIRECT_URL").ifBlank { DEFAULT_ACCOUNT_AUTH_REDIRECT_URL },
     apiBaseUrl = infoValue("EVIDRILO_API_BASE_URL"),
-    googleAuthEnabled = infoValue("SUPABASE_GOOGLE_AUTH_ENABLED").toBooleanStrictOrNull() ?: true,
+    googleAuthEnabled = infoValue("SUPABASE_GOOGLE_AUTH_ENABLED").toBooleanStrictOrNull() ?: false,
     appleAuthEnabled = infoValue("SUPABASE_APPLE_AUTH_ENABLED").toBooleanStrictOrNull() ?: false,
 )
 
@@ -70,6 +70,7 @@ private class IosAccountHttpTransport : AccountHttpTransport {
         validateAccountHttpRequest(url, body)
         val request = NSMutableURLRequest.requestWithURL(NSURL(string = url)).apply {
             setHTTPMethod(method)
+            setTimeoutInterval(accountHttpReadTimeoutMillis(method, url).toDouble() / 1_000)
             headers.forEach { (name, value) -> setValue(value, forHTTPHeaderField = name) }
             body.toNSData()?.let(::setHTTPBody)
         }

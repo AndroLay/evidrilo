@@ -90,6 +90,16 @@ if ! docker exec -e "EVIDRILO_MIGRATION_DATABASE_URL=postgresql://postgres@127.0
     exit 1
 fi
 
+# Credentials are disposable on a loopback-only, trust-authenticated container.
+# Keep the owner connection solely for synthetic fixture seeding/assertions.
+if ! docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
+    < "$repo_root/platform/database/roles/provision-runtime-roles.sql" >"$artifacts_dir/runtime-roles.log" 2>&1; then
+    tail -20 "$artifacts_dir/runtime-roles.log" >&2
+    exit 1
+fi
+docker exec "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
+    -c 'alter role evidrilo_api login; alter role evidrilo_worker login;' >/dev/null
+
 mkdir -p "$cli_home"
 export DOTNET_ROOT="$dotnet_root"
 export PATH="$DOTNET_ROOT:$PATH"
@@ -124,6 +134,8 @@ if [[ ! -f "$worker_dll" || ! -f "$integration_dll" ]]; then
 fi
 
 if ! EVIDRILO_E2E_DATABASE_URL="$database_url" \
+    EVIDRILO_E2E_API_DATABASE_URL="${database_url/Username=postgres/Username=evidrilo_api}" \
+    EVIDRILO_E2E_WORKER_DATABASE_URL="${database_url/Username=postgres/Username=evidrilo_worker}" \
     EVIDRILO_DOTNET_ROOT="$dotnet_root" \
     EVIDRILO_REPO_ROOT="$repo_root" \
     EVIDRILO_WORKER_ASSEMBLY="$worker_dll" \

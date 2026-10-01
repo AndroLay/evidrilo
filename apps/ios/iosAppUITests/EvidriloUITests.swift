@@ -5,47 +5,40 @@ final class EvidriloUITests: XCTestCase {
     func testGuestCanOpenManualProjectBasicsFromHome() {
         let app = XCUIApplication()
         app.launch()
-
-        let firstRoute = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@", "Skip for now", "My projects"))
-            .firstMatch
-        XCTAssertTrue(firstRoute.waitForExistence(timeout: 30))
-
-        let skipOnboardingButton = button(in: app, containing: "Skip for now")
-        if skipOnboardingButton.exists {
-            if !skipOnboardingButton.isHittable {
-                app.swipeUp()
-            }
-            skipOnboardingButton.tap()
+        let entry = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@ OR label CONTAINS[c] %@",
+            "English", "Skip", "Home")).firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 30))
+        if button(in: app, containing: "Continue").exists &&
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "English")).firstMatch.exists {
+            button(in: app, containing: "Continue").tap()
         }
-
-        XCTAssertTrue(app.staticTexts["My projects"].waitForExistence(timeout: 30))
-
-        let continueProjectButton = button(in: app, containing: "Continue project")
-        let createProjectButton = button(in: app, containing: "Create a project")
-        let newProjectButton = button(in: app, containing: "New project")
-        let projectAction: XCUIElement?
-        if continueProjectButton.waitForExistence(timeout: 3) {
-            projectAction = continueProjectButton
-        } else if createProjectButton.waitForExistence(timeout: 20) {
-            projectAction = createProjectButton
-        } else if newProjectButton.waitForExistence(timeout: 20) {
-            projectAction = newProjectButton
-        } else {
-            projectAction = nil
-        }
-        XCTAssertNotNil(projectAction)
-        guard let projectAction else { return }
-
-        if !projectAction.isHittable {
-            app.swipeUp()
-        }
-        XCTAssertTrue(projectAction.isHittable)
-        projectAction.tap()
-
+        let skip = button(in: app, containing: "Skip")
+        if skip.waitForExistence(timeout: 3) { skip.tap() }
+        let projects = button(in: app, containing: "Projects")
+        XCTAssertTrue(projects.waitForExistence(timeout: 30))
+        projects.tap()
+        let create = button(in: app, containing: "Create a project")
+        reveal(create, in: app)
+        XCTAssertTrue(create.exists && create.isHittable)
+        guard create.exists && create.isHittable else { return }
+        create.tap()
+        let blank = button(in: app, containing: "Start without a template")
+        reveal(blank, in: app)
+        XCTAssertTrue(blank.exists && blank.isHittable)
+        guard blank.exists && blank.isHittable else { return }
+        blank.tap()
         XCTAssertTrue(app.staticTexts["Project basics"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@", "Project name")).firstMatch.exists)
     }
 
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 {
+            if element.exists && element.isHittable { return }
+            app.swipeUp()
+        }
+    }
     private func button(in app: XCUIApplication, containing label: String) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", label)).firstMatch
     }

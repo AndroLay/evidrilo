@@ -1,7 +1,7 @@
 # Render + Supabase staging handoff
 
-API staging status: `BLUEPRINT VERIFIED / NOT DEPLOYED / CANDIDATE CI AND DATABASE ROLE GATES REMAIN`.
-Full API-and-worker staging status: `NOT READY — no Render services, passing Verify candidate, runtime database roles, or applied migrations`.
+API staging status: `BLUEPRINT VERIFIED / NOT DEPLOYED / CURRENT OWNER-LOCAL MIGRATION CANDIDATE AND DATABASE ROLE GATES REMAIN`.
+Full API-and-worker staging status: `NOT READY — no Render services, frozen candidate containing the owner-local API/migrations, reviewed runtime database roles, or applied migrations`.
 
 The landing page has a separate Cloudflare Pages setup in
 [`cloudflare-pages-landing.md`](cloudflare-pages-landing.md). The default API
@@ -58,13 +58,14 @@ until the worker is running. Do not use real accounts or data.
 
 The API and worker must use separate, non-owner PostgreSQL logins with reviewed
 least-privilege grants. The migration/owner login must remain separate from
-both runtime logins. The current repository does not yet provision and prove
-those runtime grant sets, so neither Blueprint is ready to sync.
+both runtime logins. The candidate supplies the reviewed role plan and disposable grant checks in
+`platform/database/roles/`. Hosted runtime credentials and grants have not yet
+been provisioned; neither Blueprint is ready to sync.
 
-The root development worktree contains uncommitted application changes and
-must not be deployed. Candidate `e114571` is frozen on `main`, but its hosted
-mobile checks failed. Run GitHub `Verify` on the focused follow-up commit,
-review the migration set, and use only a passing exact SHA for Staging.
+The current worktree also contains uncommitted application and migration
+changes. Do not deploy that worktree or treat it as a release candidate. First
+freeze an exact commit, run the repository's GitHub `Verify` workflow for that
+commit, review the migration set, and use only that SHA for staging.
 
 ## Provider setup after the candidate is frozen
 
@@ -163,27 +164,33 @@ destination, managed backup/restore rehearsal, or production monitoring provider
 is configured. Those remain explicit operational gates before any production
 use.
 
-### Latest live Staging and CI check (2026-10-01)
+### Latest live Staging and CI check (2026-10-01; E289)
 
-- A read-only Supabase Staging check confirmed `Evidrilo Staging`
-  (`cdgzbrrrvlrrgpzbgqog`) remains `ACTIVE_HEALTHY`. The public schema has zero
-  tables and no `public.evidrilo_schema_migrations` ledger, so no repository
-  migrations have been applied. The last observed Auth user count remains the
-  2026-09-30 value of zero.
-- The Render service inventory is empty. No API or worker service, deployment,
-  or Render-side secret configuration exists.
-- Candidate `e114571b03185a84549e2a1feb16b2c9d1f1905d` is on `main`. Its
-  contract/migration, public-package, and ASP.NET/worker jobs passed. The
-  Android/JVM compile step passed, but the mobile release-configuration step
-  failed because that job lacked `rg`.
-- The separate iOS Simulator workflow for `e114571` failed because
-  `PracticeCourseStore.kt` called `toSortedMap()`, which is unavailable in
--  common Kotlin. Commit `0961fff` fixed that call and the missing Linux `rg`
-  dependency. Its hosted Android/JVM, API/worker, contract/migration, and public
-  package jobs passed, while iOS found a second `toSortedMap()` call in
-  `ProjectAiStageAssistGateway.kt`. The next focused change replaces it with
-  common Kotlin sorting and adds regression coverage; its hosted result is
-  pending.
+- GitHub `main` is `aa3c6079133db9c9227d8c405aac148104d7be8f`. Its hosted
+  [`Verify` workflow passed](https://github.com/AndroLay/evidrilo/actions/runs/36765705221).
+  The separate
+  [iOS Simulator workflow failed](https://github.com/AndroLay/evidrilo/actions/runs/36765705356)
+  in `testGuestCanOpenManualProjectBasicsFromHome` with three UI assertions.
+  Correction after inspecting the fetched tree: that SHA already includes
+  migrations `053` and `054`; it does not include the latest owner-local UI
+  and integration overlay.
+- A read-only Supabase check confirmed `Evidrilo Staging`
+  (`cdgzbrrrvlrrgpzbgqog`) is `ACTIVE_HEALTHY`; the public schema has no tables
+  and the migration list is empty. No repository migration has been applied.
+  The last observed Auth user count remains the 2026-09-30 value of zero.
+- Render's connected workspace is reachable, but its service inventory is
+  empty. No API or worker service or service-level environment configuration
+  exists; workspace-level groups were not inspected. The connected Render
+  tools do not expose Billing, so the promotional-credit balance and current
+  worker price were not refreshed.
+- RevenueCat `Evidrilo` has one Test Store app, active monthly/yearly products,
+  the active `evidrilo_pro` entitlement, and one current offering with both
+  packages attached. Test Store state reports USD 1.99/month and USD 19.99/year.
+  No webhook is configured and no SDK purchase/restore was exercised.
+- The previous Supabase-side Google client configuration and deep-link
+  allowlist are recorded above. Google Cloud's callback/test-user list and an
+  Android sign-in remain unverified; this session has no Google Cloud
+  integration or `gcloud` CLI.
 - A full `scripts/ci/verify-local.sh` run passed earlier on 2026-10-01:
   Kotlin/JVM and Android tests/build, 168 Node tests, 453 API tests, 30 worker
   tests, Docker Compose, architecture, audio assets, and deployment checks
@@ -200,9 +207,9 @@ use.
   regression and full API suite pass.
 - API and worker database logins still lack reviewed least-privilege grants.
   No migrations were applied and no Render service was created because the
-  migration set and runtime-role grants must be tied to a candidate that passes
-  hosted CI. The temporary `agentctl` Full lease is off. Production was not
-  changed.
+  current owner-local migration set and runtime-role grants must be tied to a
+  frozen candidate. The temporary `agentctl` Full lease is off. Production was
+  not changed.
 
 The initial credentialless snapshot in this document predates the current
 Supabase connection. As of 2026-09-29, the dedicated Staging project exists and
@@ -278,3 +285,34 @@ untouched.
 - [Supabase project pausing](https://supabase.com/docs/guides/platform/free-project-pausing)
 - [Supabase backups](https://supabase.com/docs/guides/platform/backups)
 - [Supabase database connections](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+### Alignment candidate refresh (2026-10-01)
+
+An isolated candidate is based on `aa3c6079133db9c9227d8c405aac148104d7be8f`.
+The latest owner-local UI overlay was reconciled, preserving main's portable
+Kotlin map sorting fix. Older statements above about untracked migrations or
+local checks describe their dated observation; main now includes 053 and 054.
+No push to main, Cloudflare Production publication, managed migration, runtime
+credential change or Render service creation was performed in this refresh.
+
+Fresh read-only inventory still shows healthy Supabase Staging with no public
+tables/migration records and an empty Render service inventory. RevenueCat's
+Test Store current offering contains `monthly` and `yearly` products. Its public
+SDK key and Staging's enabled modern publishable key are confined to ignored
+candidate build inputs. Google and Apple remain disabled until provider
+callback acceptance. The Android manual Staging workflow requires complete
+public environment inputs and an HTTPS API URL; those GitHub inputs and hosted
+API URL remain to be provisioned. iOS simulator acceptance requires macOS CI.
+
+The candidate role plan starts NOLOGIN, requires schema 055, and assigns API and
+worker separate table/operation allowlists. Disposable tests prove exact
+effective privileges, repeatable provisioning, server RLS reads/writes and
+rejected cross-role operations. The runtime API/worker E2E gate must also pass
+before an operator activates hosted logins. Keep the migration operator out of
+both services. For Npgsql connection URLs use the named runtime username and TLS.
+
+Luna 6 uses provider-default reasoning, as explicitly chosen by the owner.
+The synthetic Evidrilo adapter probe was rejected with HTTP 429; do not report
+AI delivery as accepted or publish Pro AI credits as a proven usable service.
+The request/monthly spend limits remain USD 0.01/USD 2. Stage activation still
+requires privacy consent, availability, verified account and credit acceptance.

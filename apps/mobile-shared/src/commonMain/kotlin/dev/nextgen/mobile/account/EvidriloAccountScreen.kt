@@ -1,5 +1,15 @@
 package dev.nextgen.mobile.account
 
+import dev.nextgen.mobile.uiText
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import dev.nextgen.mobile.EvidriloLogoMark
+import dev.nextgen.mobile.EvidriloExplanation
+import dev.nextgen.mobile.EvidriloGoogleSignInButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -10,7 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,14 +112,18 @@ internal fun EvidriloAccountScreen(
     val showAccountAuthForm = shouldShowAccountAuthForm(session, accountConfigured)
     val showSignedOutAuthIntro = session == AccountSession.SignedOut && showAccountAuthForm
 
-    EvidriloContentColumn {
+    EvidriloContentColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         EvidriloBackGesture(label = "Back", onClick = onBack)
         if (showSignedOutAuthIntro) {
-            Text(accountAuthHeading(mode), style = MaterialTheme.typography.headlineLarge)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                EvidriloLogoMark(size = 48.dp)
+                Text(accountAuthHeading(mode), style = MaterialTheme.typography.headlineMedium)
+            }
             if (mode != AccountAuthMode.RESET_PASSWORD) {
                 Text(
-                    "Sign-in is optional. Your projects stay on this device and are never uploaded by signing in.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    "Sign in for AI & Pro.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = EvidriloColors.Slate,
                 )
             }
         } else {
@@ -186,6 +200,15 @@ internal fun EvidriloAccountScreen(
                             onBackToSignIn = { mode = AccountAuthMode.SIGN_IN },
                         )
                     } else {
+                        if (googleConfigured) {
+                            EvidriloGoogleSignInButton(onGoogleSignIn, enabled = !isBusy)
+                        }
+                        if (appleConfigured) {
+                            EvidriloSecondaryButton("Continue with Apple", onAppleSignIn, enabled = !isBusy)
+                        }
+                        if (googleConfigured || appleConfigured) {
+                            Text("Or use email", style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Slate)
+                        }
                         EmailPasswordForm(
                             mode = mode,
                             email = email,
@@ -220,32 +243,7 @@ internal fun EvidriloAccountScreen(
                             },
                         )
                         if (googleConfigured || appleConfigured) {
-                            Text(
-                                "Or continue with",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = EvidriloColors.Slate,
-                            )
-                        }
-                        if (googleConfigured) {
-                            EvidriloSecondaryButton(
-                                label = "Continue with Google",
-                                onClick = onGoogleSignIn,
-                                enabled = !isBusy,
-                            )
-                        }
-                        if (appleConfigured) {
-                            EvidriloSecondaryButton(
-                                label = "Continue with Apple",
-                                onClick = onAppleSignIn,
-                                enabled = !isBusy,
-                            )
-                        }
-                        if (googleConfigured || appleConfigured) {
-                            Text(
-                                "Already have an account? Sign in first, then link another provider from Account. Accounts are never merged.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = EvidriloColors.Slate,
-                            )
+                            EvidriloExplanation("Sign-in methods", "Have an account already? Sign in with that method, then link Google or Apple from Account. Accounts are never merged.")
                         }
                     }
                 }
@@ -253,11 +251,8 @@ internal fun EvidriloAccountScreen(
         }
 
         if (showSignedOutAuthIntro && mode != AccountAuthMode.RESET_PASSWORD) {
-            Text(
-                "Pro requires a signed-in account and confirmed entitlement. AI and cloud sync are paused in this build. Evidrilo does not save your password.",
-                style = MaterialTheme.typography.bodySmall,
-                color = EvidriloColors.Slate,
-            )
+            EvidriloExplanation("Online features", "AI needs internet, a verified account, consent, credits and an available service. Pro requires confirmed access. Signing in never uploads your projects. Local projects and Free practice work without an account.")
+            TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Keep working locally", color = EvidriloColors.Cobalt) }
         }
     }
 
@@ -280,7 +275,7 @@ internal fun EvidriloAccountScreen(
                 ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDeletion = false }, enabled = !isBusy) { Text("Cancel") }
+                TextButton(onClick = { confirmDeletion = false }, enabled = !isBusy) { Text(uiText("Cancel")) }
             },
         )
     }
@@ -314,7 +309,7 @@ internal fun EvidriloAccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmAppleLink = false }, enabled = !isBusy) {
-                    Text("Cancel")
+                    Text(uiText("Cancel"))
                 }
             },
         )
@@ -323,7 +318,7 @@ internal fun EvidriloAccountScreen(
     if (exportJson != null) {
         AlertDialog(
             onDismissRequest = onDismissExport,
-            title = { Text("Account export") },
+            title = { Text(uiText("Account export")) },
             text = {
                 Column(
                     modifier = Modifier
@@ -340,7 +335,7 @@ internal fun EvidriloAccountScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismissExport) { Text("Close") }
+                TextButton(onClick = onDismissExport) { Text(uiText("Close")) }
             },
         )
     }
@@ -371,15 +366,17 @@ private fun EmailPasswordForm(
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Email address") },
         singleLine = true,
-        isError = validation.emailError != null,
-        supportingText = validation.emailError?.let { error -> { Text(error) } },
+        shape = RoundedCornerShape(16.dp),
+        enabled = !isBusy,
+        isError = email.isNotBlank() && validation.emailError != null,
+        supportingText = validation.emailError?.takeIf { email.isNotBlank() }?.let { error -> { Text(error) } },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
     )
     PasswordField(
         label = "Password",
         value = password,
         visible = passwordVisible,
-        error = validation.passwordError,
+        error = validation.passwordError?.takeIf { password.isNotEmpty() },
         enabled = !isBusy,
         onValueChange = onPasswordChange,
         onToggleVisibility = onTogglePassword,
@@ -389,17 +386,10 @@ private fun EmailPasswordForm(
             label = "Confirm password",
             value = confirmation,
             visible = passwordVisible,
-            error = validation.confirmationError,
+            error = validation.confirmationError?.takeIf { confirmation.isNotEmpty() },
             enabled = !isBusy,
             onValueChange = onConfirmationChange,
             onToggleVisibility = onTogglePassword,
-        )
-    }
-    if (!isSignIn) {
-        Text(
-            "Use the same password in both fields before creating the account.",
-            style = MaterialTheme.typography.bodySmall,
-            color = EvidriloColors.Slate,
         )
     }
     EvidriloPrimaryButton(
@@ -408,12 +398,12 @@ private fun EmailPasswordForm(
         enabled = !isBusy && accountConfigured && validation.isValid,
     )
     if (isSignIn) {
-        TextButton(onClick = onResetPassword, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-            Text("Forgot password?")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onResetPassword, enabled = !isBusy, modifier = Modifier.weight(1f)) { Text(uiText("Forgot password?")) }
+            TextButton(onClick = onToggleMode, enabled = !isBusy, modifier = Modifier.weight(1f)) { Text(uiText("Create account")) }
         }
-    }
-    TextButton(onClick = onToggleMode, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text(if (isSignIn) "Create a new account" else "I already have an account")
+    } else {
+        TextButton(onClick = onToggleMode, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("I already have an account") }
     }
 }
 
@@ -503,6 +493,7 @@ private fun PasswordField(
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
         label = { Text(label) },
         singleLine = true,
         isError = error != null,
@@ -539,7 +530,7 @@ private fun SignedInAccountPanel(
     EvidriloTintPanel {
         Text("You are signed in", style = MaterialTheme.typography.titleMedium)
         Text(
-            "This device is connected to your account. Projects stay local; cloud sync remains paused in local mode.",
+            "Your account can be used for online AI and Pro, subject to service and access checks. Projects stay on this device; signing in does not upload them.",
             style = MaterialTheme.typography.bodyMedium,
         )
         account.email?.let { email ->
@@ -606,7 +597,7 @@ private fun SignedInAccountPanel(
             Text(exportPresentation.title, style = MaterialTheme.typography.titleMedium)
             Text(exportPresentation.body, style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onDismissExportError, enabled = !isBusy) {
-                Text("Dismiss")
+                Text(uiText("Dismiss"))
             }
         }
     }

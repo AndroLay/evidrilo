@@ -8,25 +8,19 @@ import kotlin.test.assertTrue
 
 class GetStartedTourTest {
     @Test
-    fun introduction_moves_through_all_six_product_sections() {
+    fun introduction_visits_each_current_product_section_in_order() {
+        val expected = listOf("WELCOME", "ORGANIZE", "WORKSPACE", "REVIEW", "GRAPH", "PRACTICE", "ASSISTANCE", "PORTABILITY", "READY")
         var state = GetStartedTourState()
-
-        assertEquals("WELCOME", state.step.name)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals("ORGANIZE", state.step.name)
-        assertTrue(state.canContinue)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals("REVIEW", state.step.name)
-        assertTrue(state.canContinue)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals(GetStartedTourStep.ASSISTANCE, state.step)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals(GetStartedTourStep.PORTABILITY, state.step)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals(GetStartedTourStep.READY, state.step)
-        state = state.reduce(GetStartedTourEvent.Next)
-
+        for (section in expected) {
+            assertEquals(section, state.step.name)
+            assertTrue(state.canContinue)
+            assertFalse(state.isComplete)
+            state = state.reduce(GetStartedTourEvent.Next)
+        }
         assertTrue(state.isComplete)
+        assertFalse(state.canContinue)
+        assertEquals(GetStartedTourStep.READY, state.step)
+        assertEquals(state, state.reduce(GetStartedTourEvent.Next))
     }
 
     @Test
@@ -39,23 +33,14 @@ class GetStartedTourTest {
     }
 
     @Test
-    fun introduction_is_field_neutral_and_completes_after_six_sections() {
+    fun introduction_is_field_neutral_and_completion_does_not_reopen_the_tour() {
         var state = GetStartedTourState()
-        assertEquals(GetStartedTourStep.WELCOME, state.step)
-        assertTrue(state.canContinue)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals(GetStartedTourStep.ORGANIZE, state.step)
-        assertTrue(state.canContinue)
-        state = state.reduce(GetStartedTourEvent.Next)
-        assertEquals(GetStartedTourStep.REVIEW, state.step)
-        assertTrue(state.canContinue)
-        repeat(3) { state = state.reduce(GetStartedTourEvent.Next) }
+        repeat(8) { state = state.reduce(GetStartedTourEvent.Next) }
         assertEquals(GetStartedTourStep.READY, state.step)
+        assertFalse(state.isComplete)
         state = state.reduce(GetStartedTourEvent.Next)
-
         assertTrue(state.isComplete)
-        assertEquals(GetStartedTourStep.READY, state.step)
-        assertEquals(state, state.reduce(GetStartedTourEvent.Next))
+        assertEquals(state, state.reduce(GetStartedTourEvent.Back))
         assertFalse(GetStartedTourState().isComplete)
     }
 
@@ -65,7 +50,7 @@ class GetStartedTourTest {
             .reduce(GetStartedTourEvent.Next)
             .reduce(GetStartedTourEvent.Next)
 
-        assertEquals(GetStartedTourStep.REVIEW, state.step)
+        assertEquals(GetStartedTourStep.WORKSPACE, state.step)
         assertEquals(GetStartedTourStep.ORGANIZE, state.reduce(GetStartedTourEvent.Back).step)
         assertEquals(GetStartedTourStep.WELCOME, GetStartedTourState().reduce(GetStartedTourEvent.Back).step)
     }

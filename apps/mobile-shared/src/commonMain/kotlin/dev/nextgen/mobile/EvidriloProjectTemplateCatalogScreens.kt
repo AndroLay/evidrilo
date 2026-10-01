@@ -26,7 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
@@ -219,7 +219,7 @@ internal fun EvidriloProjectTemplateCatalogScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showCatalogHelp = false }) { Text("Got it") }
+                TextButton(onClick = { showCatalogHelp = false }) { Text(uiText("Got it")) }
             },
         )
     }
@@ -228,8 +228,7 @@ internal fun EvidriloProjectTemplateCatalogScreen(
         EvidriloContentColumn() {
             EvidriloBackGesture(label = "Home", onClick = onBack)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Start with your idea",
+                Text(uiText("Start with your idea"),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.headlineLarge,
                 )
@@ -242,18 +241,15 @@ internal fun EvidriloProjectTemplateCatalogScreen(
                     EvidriloIcon(EvidriloIconName.QUESTION, tint = EvidriloColors.Cobalt)
                 }
             }
-            Text(
-                "Choose a structure that fits your assignment, or start blank.",
+            Text(uiText("Choose a structure that fits your assignment, or start blank."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = EvidriloColors.Slate,
             )
             ProjectTemplateCatalogStatus(remoteFamilies, onRetryRemoteFamilies)
-            EvidriloPrimaryButton(label = "Start a blank project", onClick = onStartBlankProject)
-            EvidriloWorkflowScene(EvidriloIconName.FOLDER, listOf("Choose a project structure", "Add your own sources and evidence", "Review, revise, and export"), "catalog")
             projectTemplateFamilyOverviews.forEach { overview ->
-                EvidriloWorkspaceRow(projectTemplateFamilyCardDesign(overview.family).icon,
-                    projectFamilyShortName(overview.family), overview.selectionCue, { onSelectFamily(overview.family) })
+                EvidriloCatalogCover(overview.family, projectTemplateFamilyCardDesign(overview.family).cue) { onSelectFamily(overview.family) }
             }
+            EvidriloSecondaryButton(label = "Start without a template", onClick = onStartBlankProject)
             ProjectFamilyQuickGuide(
                 expanded = quickGuideExpanded,
                 onToggle = onToggleQuickGuide,
@@ -276,7 +272,7 @@ internal fun ProjectTemplateFamilyCard(
         onClick = onClick,
         modifier = Modifier
             .width(250.dp)
-            .height(224.dp * fontScale)
+            .heightIn(min = 224.dp * fontScale)
             .semantics(mergeDescendants = true) {
                 contentDescription = buildString {
                     append(overview.family.displayName)
@@ -295,6 +291,7 @@ internal fun ProjectTemplateFamilyCard(
         border = BorderStroke(2.dp, EvidriloColors.Separator),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
+        EvidriloFamilyArtwork(overview.family, Modifier.fillMaxWidth())
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -691,18 +688,12 @@ private fun ProjectTemplateCatalogStatus(
     when (state) {
         ProjectTemplateRemoteUiState.NotRequested -> Unit
         ProjectTemplateRemoteUiState.Loading -> ProjectTemplateRemoteLoading("Checking published templates…")
-        is ProjectTemplateRemoteUiState.Unavailable -> ProjectTemplateRemoteMessage(
-            title = when (state.reason) {
-                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "No online templates"
-                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "You’re offline"
-            },
-            message = when (state.reason) {
-                ProjectTemplateCatalogUnavailableReason.NOT_CONFIGURED -> "Offline family starters and blank projects remain available."
-                ProjectTemplateCatalogUnavailableReason.OFFLINE -> "Offline family starters and overviews remain available."
-            },
-            retryable = state.reason == ProjectTemplateCatalogUnavailableReason.OFFLINE,
-            onRetry = onRetry,
-        )
+        is ProjectTemplateRemoteUiState.Unavailable -> {
+            Text(uiText(if(state.reason==ProjectTemplateCatalogUnavailableReason.OFFLINE) "Offline · five starters available" else "Five offline starters available",
+                if(state.reason==ProjectTemplateCatalogUnavailableReason.OFFLINE) "Offline · lima pilihan tersedia" else "Lima pilihan tersedia offline"),
+                style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)
+            if(state.reason==ProjectTemplateCatalogUnavailableReason.OFFLINE) TextButton(onRetry) {Text(uiText("Try again"))}
+        }
         is ProjectTemplateRemoteUiState.Failed -> ProjectTemplateRemoteMessage(
             title = "Couldn’t check templates",
             message = "Offline family starters and overviews remain available. No remote template has been assumed available.",

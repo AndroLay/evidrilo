@@ -149,13 +149,22 @@ configured model and reviewed rates, plus per-request and monthly spend limits.
 endpoints. A key may be loaded from `AI_PROVIDER_API_KEY_FILE`; on Unix the file
 must be owner-readable only (for example, mode `0600`). The existing
 `OPENAI_API_KEY` setting remains supported for direct-provider deployments.
-The selected local model is `gpt-6-luna`, while the accepted internal credit
-accounting rates remain the standard GPT-6 Luna token rates. The adapter is
-covered by synthetic HTTP-handler tests and local PostgreSQL budget tests only;
-a separate synthetic request to the Experiential gateway returned HTTP 200,
-but no live request has been sent through the Evidrilo adapter. That direct
-smoke check does not verify application accounting, database settlement, or
-end-to-end API behavior.
+The selected Staging model is `gpt-6-luna` at Experiential Labs, using provider
+reasoning defaults (D-140). Leave `AI_REASONING_EFFORT` unset: the live model
+metadata currently marks reasoning controls unsupported. The optional setting
+is validated and serialized only when explicitly configured for a supported
+route. The Staging example caps output at 1,024 tokens, provider time at 60 seconds,
+request spend at USD 0.01 and shared monthly spend at USD 2. Ordinary mobile
+account calls retain their short timeout; calls waiting for AI allow 75 seconds.
+The outer gateway and provider-spend lease respect the configured provider time.
+
+On 1 October a synthetic request through the actual Evidrilo adapter reached
+Experiential and was rejected as rate-limited (HTTP 429). No successful live
+adapter completion, persisted provider settlement or authenticated device AI
+acceptance is established. The isolated probe used a recording budget, not a
+user-credit ledger. Local fixture tests and disposable database checks remain
+separate evidence. Hosted activation stays off until the full account → consent
+→ provider → authoritative credit settlement path is accepted.
 
 Project scaffold, stage-assist, and General chat adapters share that stateless Responses
 transport, token accounting, and provider-spend ledger. They remain off unless

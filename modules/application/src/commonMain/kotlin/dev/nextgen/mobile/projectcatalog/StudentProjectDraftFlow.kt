@@ -423,11 +423,11 @@ class StudentProjectDraftFlow(
             return StudentProjectDraftFlowResult.Rejected("PROJECT_IMPORT_ID_CONFLICT")
         }
 
-        val atCapacity = StudentProjectDraftRules.countsTowardActiveLimit(prepared.status) && isAtActiveLimit(existing)
-        if (atCapacity && !archiveWhenAtCapacity) {
+        val atCapacity = isAtActiveLimit(existing)
+        if (atCapacity) {
             return StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED")
         }
-        val archivedForCapacity = atCapacity && archiveWhenAtCapacity
+        val archivedForCapacity = false
         if (archivedForCapacity) {
             prepared = prepared.copy(
                 status = StudentProjectStatus.ARCHIVED,
@@ -933,7 +933,7 @@ class StudentProjectDraftFlow(
             is LocalStorageReadResult.Success -> loaded.value.orEmpty()
             else -> return loaded.toFlowFailure()
         }
-        val hasCapacity = !isAtActiveLimit(existing.filterNot { it.id == projectId })
+        val hasCapacity = true // Restoring an existing stored record consumes no new slot.
         if (!hasCapacity && !asArchivedWhenAtLimit) {
             return StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED")
         }
@@ -993,12 +993,6 @@ class StudentProjectDraftFlow(
         val current = loaded.singleOrNull { it.id == projectId } ?: return StudentProjectDraftFlowResult.NotFound
         if (current.status == StudentProjectStatus.TRASHED && status != StudentProjectStatus.TRASHED) {
             return StudentProjectDraftFlowResult.Rejected("PROJECT_RESTORE_REQUIRED")
-        }
-        if (!StudentProjectDraftRules.countsTowardActiveLimit(current.status) &&
-            StudentProjectDraftRules.countsTowardActiveLimit(status) &&
-            isAtActiveLimit(loaded.filterNot { it.id == projectId })
-        ) {
-            return StudentProjectDraftFlowResult.Rejected("PROJECT_ACTIVE_LIMIT_REACHED")
         }
         val timestamp = clock().coerceAtLeast(current.updatedAtEpochMillis)
         val updated = current.copy(
@@ -1066,8 +1060,7 @@ class StudentProjectDraftFlow(
     }
 
     private fun isAtActiveLimit(projects: List<StudentProjectDraft>): Boolean =
-        projects.count { StudentProjectDraftRules.countsTowardActiveLimit(it.status) } >=
-            StudentProjectDraftRules.activeProjectLimit(hasVerifiedProEntitlement())
+        projects.size >= StudentProjectDraftRules.projectLimit(hasVerifiedProEntitlement())
 
     private fun StudentProjectDraft.copyWithFreshIds(existingProjectIds: Set<String>): StudentProjectDraft {
         val usedProjectIds = existingProjectIds + id

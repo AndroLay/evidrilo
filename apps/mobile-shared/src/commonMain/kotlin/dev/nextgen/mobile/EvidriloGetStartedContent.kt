@@ -13,37 +13,25 @@ internal data class GetStartedSceneCopy(
     val action: String,
 )
 
-internal fun getStartedScene(step: GetStartedTourStep): GetStartedSceneCopy = when (step) {
-    GetStartedTourStep.WELCOME -> GetStartedSceneCopy(
-        "Meet Evidrilo", "Big ideas.\nSmall next steps.",
-        "A place to turn your questions into work you can explain.",
-        "Let's explore",
-    )
-    GetStartedTourStep.ORGANIZE -> GetStartedSceneCopy(
-        "Project structures", "A home for\nyour next idea.",
-        "Five project structures. Swipe to explore—or start blank.",
-        "Continue",
-    )
-    GetStartedTourStep.REVIEW -> GetStartedSceneCopy(
-        "Evidence links", "Make the\nconnection.",
-        "Drag a note onto a claim. Keep your reasoning connected.",
-        "Continue",
-    )
-    GetStartedTourStep.ASSISTANCE -> GetStartedSceneCopy(
-        "Optional AI", "A nudge when\nyou need one.",
-        "Explore, plan and review with optional AI. You decide what to keep.",
-        "Continue",
-    )
-    GetStartedTourStep.PORTABILITY -> GetStartedSceneCopy(
-        "History and exports", "Keep it.\nShape it. Share it.",
-        "Save local revisions. Take your work with you as a report or a project archive.",
-        "Continue",
-    )
-    GetStartedTourStep.READY -> GetStartedSceneCopy(
-        "Make it yours", "Your question.\nYour next chapter.",
-        "Start your own project. Or explore three cases in Practice.",
-        "Open My Projects",
-    )
+internal fun getStartedScene(step: GetStartedTourStep): GetStartedSceneCopy = when(step) {
+    GetStartedTourStep.WELCOME -> GetStartedSceneCopy("Meet Evidrilo","Big ideas.\nClear next steps.",
+        "Start with an assignment, a question or a hypothesis. Evidrilo helps you organize your own sources, observations and claims, then explain what your material supports and what remains uncertain. Explore the workflow with temporary examples.","Let's explore")
+    GetStartedTourStep.ORGANIZE -> GetStartedSceneCopy("Choose a structure","A starting point\nthat fits your work.",
+        "Choose from five project structures: experiment, survey, literature, qualitative study or design. Each provides places for your own material. Browse the sections before choosing; you can also start without a template. Swipe to compare them.","Continue")
+    GetStartedTourStep.WORKSPACE -> GetStartedSceneCopy("Your workspace","One project.\nClear next steps.",
+        "Move between sections using the Sections panel. Add source details and files, turn useful passages into notes, and develop your claims. Your work saves locally. A suggested next task helps you find a manageable place to continue.","Continue")
+    GetStartedTourStep.REVIEW -> GetStartedSceneCopy("Connect your reasoning","Make the\nconnection.",
+        "A note and a claim do different jobs. Record whether the note supports, challenges or gives context to the claim, and explain why. Keep the claim within the material's scope. Try connecting the two temporary cards below.","Continue")
+    GetStartedTourStep.GRAPH -> GetStartedSceneCopy("The project map","Your reasoning,\nvisible.",
+        "Explore the relationships you recorded, from sources through notes to claims and next actions. Tap a record to follow its connections. Unlinked records stay visible too. The map helps you inspect your reasoning; it does not decide whether a claim is true.","Continue")
+    GetStartedTourStep.PRACTICE -> GetStartedSceneCopy("Practice before your project","Learn the move.\nMake it your own.",
+        "Three guided cases let you inspect observations, compare studies and reconsider changed data. Make a first response, read specific feedback, then revise. The first case is Free; Pro opens the other two. Practice examples stay separate from your project.","Continue")
+    GetStartedTourStep.ASSISTANCE -> GetStartedSceneCopy("Optional AI","A nudge when\nyou need one.",
+        "Sign in for optional online AI. Review the text you choose to share and its credit conditions before sending. Ask for ideas, a plan or an opinion on a saved project excerpt. You decide what to keep and check the answer yourself.","Continue")
+    GetStartedTourStep.PORTABILITY -> GetStartedSceneCopy("Review and take your work","Keep it.\nShape it. Share it.",
+        "Review checks show recorded responses and links, with a practical next action. They are not an academic grade. Preview a report before export, or keep an .evproj backup for recovery. The project menu also lets you complete or permanently delete work with confirmation.","Continue")
+    GetStartedTourStep.READY -> GetStartedSceneCopy("Your next step","Your question.\nYour next chapter.",
+        "Choose a structure and begin with your own assignment. Free keeps five projects total; Pro keeps fifty and adds 200 AI credits each active month. A verified Free account receives 20 credits once. You can keep working locally and revisit this introduction from Settings.","Choose project structure")
 }
 
 /** Selections survive chapter navigation; none is bound to any application store. */

@@ -71,3 +71,14 @@ fun validateAccountHttpRequest(url: String, body: String) {
         "Auth request exceeded the bounded body limit."
     }
 }
+
+/** Provider work can take 60 seconds; preserve short waits for ordinary account requests. */
+internal fun accountHttpReadTimeoutMillis(method: String, url: String): Int {
+    val path = url.substringBefore('?').substringBefore('#').substringAfter("://").substringAfter('/', "")
+    val waitsForProvider = method == "POST" && (
+        path == "v1/ai/assist" || path == "v1/ai/conversations" ||
+            (path.startsWith("v1/ai/conversations/") && path.endsWith("/turns")) ||
+            path == "v1/project-ai/scaffold" || path == "v1/project-ai/stage-assist"
+        )
+    return if (waitsForProvider) 75_000 else 15_000
+}

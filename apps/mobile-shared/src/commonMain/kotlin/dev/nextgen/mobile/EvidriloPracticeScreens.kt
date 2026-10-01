@@ -43,7 +43,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
+import androidx.compose.material3.Text as RawText
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -110,6 +111,7 @@ internal fun EvidriloPracticeDraftScreen(
     var showHelp by remember(case.id) { mutableStateOf(false) }
     var confirmReset by remember(case.id) { mutableStateOf(false) }
     var showEvidence by remember(case.id, task) { mutableStateOf(false) }
+    val editableScopeCue=uiText("In these observations, ","Dalam pengamatan ini, ")
     var scopeCueMessage by remember(case.id, task) { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
     val focusManager = LocalFocusManager.current
@@ -211,7 +213,7 @@ internal fun EvidriloPracticeDraftScreen(
                                 minLines = 4,
                             )
                             TextButton(onClick = {
-                                val cue = "In these observations, "
+                                val cue = editableScopeCue
                                 when {
                                     draft.claimText.startsWith(cue, ignoreCase = true) -> scopeCueMessage = "You already have this scope cue. You can edit it in your sentence."
                                     draft.claimText.length + cue.length > PRACTICE_CLAIM_MAX -> scopeCueMessage = "Shorten the draft before adding this cue. Your wording has been kept."
@@ -327,12 +329,13 @@ internal fun PracticeFrame(
 @Composable
 private fun PracticeProgress(task: EvidriloPracticeTask) {
     val progress by animateFloatAsState((task.ordinal + 1f) / EvidriloPracticeTask.entries.size, tween(220, easing = FastOutSlowInEasing), label = "practiceProgress")
+    val spokenProgress=uiText("Practice progress: ","Progres latihan: ")+uiText(task.label)
     val color = EvidriloColors.Cobalt
     val track = EvidriloColors.Separator
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Canvas(Modifier.fillMaxWidth().height(7.dp).semantics {
             progressBarRangeInfo = ProgressBarRangeInfo((task.ordinal + 1f) / EvidriloPracticeTask.entries.size, 0f..1f)
-            contentDescription = "Practice progress: ${task.label}"
+            contentDescription = spokenProgress
         }) {
             drawLine(track, Offset(3.dp.toPx(), size.height / 2), Offset(size.width - 3.dp.toPx(), size.height / 2), strokeWidth = size.height, cap = StrokeCap.Round)
             drawLine(color, Offset(3.dp.toPx(), size.height / 2), Offset(3.dp.toPx() + (size.width - 6.dp.toPx()) * progress, size.height / 2), strokeWidth = size.height, cap = StrokeCap.Round)
@@ -378,9 +381,10 @@ private fun PracticeObservations(case: ConclusionCase, selectedIds: List<String>
             val choiceColors = evidriloChoiceColors(selected)
             val enabled = onToggle == null || selected || selectedIds.size < 3
             val interaction = if (onToggle != null) Modifier.toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle(fact) }) else Modifier
+            val spokenState=uiText(if(onToggle==null) "Available observation" else if(selected) "Connected to your claim" else if(enabled) "Not selected" else "Three evidence links already selected")
             Column(
                 modifier = Modifier.fillMaxWidth().then(interaction).semantics(mergeDescendants = true) {
-                    stateDescription = if (onToggle == null) "Available observation" else if (selected) "Connected to your claim" else if (enabled) "Not selected" else "Three evidence links already selected"
+                    stateDescription = spokenState
                 }.background(choiceColors.container, RoundedCornerShape(16.dp)).border(1.5.dp, choiceColors.border, RoundedCornerShape(16.dp)).padding(17.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -429,9 +433,10 @@ internal fun PracticeChoice(title: String, description: String, selected: Boolea
     val selectionReveal by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f, tween(180), label = "Evidence selected")
     val interaction = if (checkbox) Modifier.toggleable(selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
         else Modifier.selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+    val spokenSelection=uiText(if(selected) "Selected" else "Not selected")
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp).graphicsLayer { translationX = selectionReveal * 3.dp.toPx() }.then(interaction).semantics(mergeDescendants = true) {
-            stateDescription = if (selected) "Selected" else "Not selected"
+            stateDescription = spokenSelection
         }.background(colors.container, RoundedCornerShape(16.dp)).border(1.5.dp, colors.border, RoundedCornerShape(16.dp)).padding(17.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -530,7 +535,7 @@ internal fun PracticeTextInput(value: String, label: String, placeholder: String
 internal fun PracticeClaim(label: String, text: String) {
     Column(Modifier.fillMaxWidth().background(EvidriloColors.Card, RoundedCornerShape(16.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
-        Text(text.ifBlank { "No claim written yet." }, style = MaterialTheme.typography.bodyLarge)
+        RawText(text.ifBlank { uiText("No claim written yet.") }, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -760,7 +765,7 @@ internal fun EvidriloPracticeChangedSummaryScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("A move for your next project", style = MaterialTheme.typography.titleMedium)
                 Text("Link a claim to its sources. If a source changes or becomes unavailable, review the claim before reusing it.", style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
-                onOpenProjects?.let { open -> EvidriloSecondaryButton("Open my projects", open) }
+                onOpenProjects?.let { open -> EvidriloSecondaryButton("Use this move in my project", open) }
             }
             Text("This is a synthetic practice case. The comparison is not a real experiment or an academic grade.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
         }

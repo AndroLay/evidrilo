@@ -95,7 +95,8 @@ public static class EntryPoint
             using (var apiFactory = new E2eApiFactory(databaseConnectionString, repositoryRoot))
             using (var client = apiFactory.CreateClient())
             {
-                worker = StartWorker(dotnetRoot, workerAssembly, databaseConnectionString);
+                worker = StartWorker(dotnetRoot, workerAssembly,
+                    Environment.GetEnvironmentVariable("EVIDRILO_E2E_WORKER_DATABASE_URL") ?? databaseConnectionString);
                 await AssertReadyAsync(client);
                 await AssertBillingLifecycleFlowAsync(client, databaseConnectionString);
                 await AssertContentLifecycleFlowAsync(client, databaseConnectionString);
@@ -3543,7 +3544,7 @@ internal sealed class E2eApiFactory : WebApplicationFactory<global::Program>
         string repositoryRoot,
         bool useTestAiProvider = false)
     {
-        this.databaseConnectionString = databaseConnectionString;
+        this.databaseConnectionString = Environment.GetEnvironmentVariable("EVIDRILO_E2E_API_DATABASE_URL") ?? databaseConnectionString;
         this.repositoryRoot = repositoryRoot;
         this.useTestAiProvider = useTestAiProvider;
     }

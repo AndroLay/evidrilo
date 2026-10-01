@@ -11,6 +11,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -34,8 +35,9 @@ internal fun courseIcon(id: PracticeLessonId): EvidriloIconName = when (id) {
 @Composable
 internal fun CoursePathMap(course: PracticeCourseState) {
     val completed = course.sessions.values.count { it.stage == PracticeLessonStage.COMPLETE }
+    val spokenCount=uiText("$completed of three practice attempts completed. Completion is not a mastery score.","$completed dari tiga percobaan selesai. Penyelesaian bukan skor penguasaan.")
     Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-        contentDescription = completed.toString() + " of three practice attempts completed. Completion is not a mastery score."
+        contentDescription = spokenCount
     }, verticalAlignment = Alignment.CenterVertically) {
         PracticeLessonId.entries.forEachIndexed { index, id ->
             if (index > 0) HorizontalDivider(Modifier.weight(1f).padding(horizontal = 12.dp), color = EvidriloColors.Separator)
@@ -72,8 +74,9 @@ internal fun CourseProgress(session: PracticeLessonSession, revisionPart: Int) {
         PracticeLessonStage.COMPLETE -> 1f
     }
     val progress by animateFloatAsState(target, tween(220), label = "courseProgress")
+    val spokenProgress=uiText("Investigation progress")
     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(7.dp).semantics {
-        contentDescription = "Investigation progress"
+        contentDescription = spokenProgress
     }, color = EvidriloColors.Cobalt, trackColor = EvidriloColors.Separator)
 }
 

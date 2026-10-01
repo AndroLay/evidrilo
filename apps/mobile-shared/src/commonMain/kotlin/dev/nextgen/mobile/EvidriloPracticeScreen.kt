@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -109,8 +110,8 @@ private fun PracticeTabletDecisions(label: String, draft: ConclusionDraft, case:
         Text("Relation: " + (draft.relation?.practiceLabel() ?: "No relation selected"), style = MaterialTheme.typography.bodyMedium)
         Text("Scope: " + (draft.scope?.practiceLabel() ?: "No scope selected"), style = MaterialTheme.typography.bodyMedium)
         draft.limitationRefs.forEach { Text(it + " · " + (case.fact(it)?.text ?: "Unavailable"), style = MaterialTheme.typography.bodyMedium) }
-        Text(draft.limitationNote, style = MaterialTheme.typography.bodyMedium)
+        RawText(draft.limitationNote, style = MaterialTheme.typography.bodyMedium)
         Text("Next action: " + (draft.implication?.practiceLabel() ?: "No action selected"), style = MaterialTheme.typography.bodyMedium)
-        Text(draft.implicationReason, style = MaterialTheme.typography.bodyMedium)
+        RawText(draft.implicationReason, style = MaterialTheme.typography.bodyMedium)
     }
 }

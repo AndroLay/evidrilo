@@ -95,4 +95,12 @@ docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo
 docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
     < "$script_dir/project-ai-budget-smoke.sql"
 
+# Apply twice to prove the operator role plan is repeatable.
+for pass in 1 2; do
+    docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
+        < "$repo_root/platform/database/roles/provision-runtime-roles.sql" >/dev/null 2>&1
+done
+docker exec -i "$container_name" psql -v ON_ERROR_STOP=1 -U postgres -d evidrilo_it \
+    < "$script_dir/runtime-role-smoke.sql"
+
 echo "EVIDRILO_POSTGRES_INTEGRATION_PASS"

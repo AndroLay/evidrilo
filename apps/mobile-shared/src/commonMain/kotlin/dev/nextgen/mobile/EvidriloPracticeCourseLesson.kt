@@ -1,5 +1,6 @@
 package dev.nextgen.mobile
 
+import androidx.compose.material3.Text as RawText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -201,7 +203,7 @@ internal fun CourseLessonScreen(
                             if (id == PracticeLessonId.STUDIES) "Add your own sources and notes, compare outcomes and methods, then link a synthesis claim to the material that supports it."
                             else "Keep the denominator and corrected records alongside your own findings. When data changes, inspect the claims that rely on it.",
                             EvidriloIconName.LINK)
-                        EvidriloSecondaryButton("Open my projects", onOpenProjects)
+                        EvidriloSecondaryButton("Use this move in my project", onOpenProjects)
                         if (id == PracticeLessonId.STUDIES) EvidriloSecondaryButton("Try the corrected-survey case", onNextCase)
                         Text("No synthetic facts or practice wording will be copied. Completion records your attempt; it does not certify mastery.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                         TextButton(onRestart) { Text("Start a new attempt") }
@@ -322,10 +324,10 @@ private fun CourseRetainedDecisions(label: String, draft: PracticeLessonDraft) {
         }, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
         Text("Limit: " + (draft.limitation?.let(PracticeCourseContent::limitationText) ?: "No limit selected"),
             style = MaterialTheme.typography.bodyMedium)
-        Text(draft.limitationNote, style = MaterialTheme.typography.bodyMedium)
+        RawText(draft.limitationNote, style = MaterialTheme.typography.bodyMedium)
         Text("Next action: " + (draft.action?.let(PracticeCourseContent::actionText) ?: "No action selected"),
             style = MaterialTheme.typography.bodyMedium)
-        Text(draft.actionReason, style = MaterialTheme.typography.bodyMedium)
+        RawText(draft.actionReason, style = MaterialTheme.typography.bodyMedium)
         Text("Evidence set " + draft.evidenceVersion, style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate)
     }
 }

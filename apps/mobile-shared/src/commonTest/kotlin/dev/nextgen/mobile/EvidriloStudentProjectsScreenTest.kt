@@ -52,6 +52,9 @@ class EvidriloStudentProjectsScreenTest {
         assertEquals(
             listOf(
                 "Project basics",
+                "Frame your question",
+                "Set your boundaries",
+                "Plan your material",
                 "Sources and files",
                 "Evidence notes",
                 "Findings and comparison",
@@ -63,7 +66,7 @@ class EvidriloStudentProjectsScreenTest {
         )
         assertEquals(
             ManualLiteratureSynthesisFields.all.take(6).map { it.id },
-            sections.first().fieldIds,
+            sections.filter { it.kind == StudentProjectEditorSectionKind.TEMPLATE_STEP }.flatMap { it.fieldIds },
         )
         assertEquals(
             listOf(ManualLiteratureSynthesisFields.CLAIM, ManualLiteratureSynthesisFields.CLAIM_SCOPE),

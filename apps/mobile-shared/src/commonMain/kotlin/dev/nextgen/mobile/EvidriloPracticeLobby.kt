@@ -14,6 +14,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +35,7 @@ import dev.nextgen.mobile.domain.practice.*
 /** Presentation metadata only. The course reducer remains the source of access and progress. */
 internal data class PracticePathStation(val lesson: PracticeLessonId, val title: String, val minutes: String)
 
-internal val freePracticePath = listOf(
+internal val practicePath = listOf(
     PracticePathStation(PracticeLessonId.TABLET, "Trace observations", "8–12 min"),
     PracticePathStation(PracticeLessonId.STUDIES, "Compare sources", "8–10 min"),
     PracticePathStation(PracticeLessonId.SURVEY, "Reconsider data", "6–8 min"),
@@ -46,21 +47,23 @@ internal fun EvidriloPracticeLobby(
     onSelect: (PracticeLessonId) -> Unit, onOpen: (PracticeLessonId) -> Unit,
     onExit: () -> Unit, onHelp: () -> Unit, onOpenProjects: () -> Unit,
     storageNotice: @Composable () -> Unit,
-    stations: List<PracticePathStation> = freePracticePath,
+    hasVerifiedProAccess: Boolean,
+    stations: List<PracticePathStation> = practicePath,
 ) {
     val session = course.sessions[selected]
     val complete = session?.stage == PracticeLessonStage.COMPLETE
-    val completed = stations.count { course.sessions[it.lesson]?.stage == PracticeLessonStage.COMPLETE }
-    PracticeFrame(onExit, onHelp, "${stations.size} Free cases · choose any", footer = {
+    val available = stations.filter { PracticeCourseAccessRules.canOpen(it.lesson, hasVerifiedProAccess) }
+    val completed = available.count { course.sessions[it.lesson]?.stage == PracticeLessonStage.COMPLETE }
+    val selectedLocked = !PracticeCourseAccessRules.canOpen(selected, hasVerifiedProAccess)
+    PracticeFrame(onExit, onHelp, if (hasVerifiedProAccess) "Pro · all ${stations.size} cases available" else "1 Free case · 2 more with Pro", footer = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(PracticeCourseContent.title(selected), style = MaterialTheme.typography.titleMedium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
-                    EvidriloPrimaryButton(when { complete -> "Revisit case"; session != null -> "Resume case"; else -> "Start case" },
-                        { onOpen(selected) }, enabled = !busy, trailingIcon = EvidriloIconName.ARROW_FORWARD)
+                    EvidriloPrimaryButton(when { selectedLocked -> "Explore Pro"; complete -> "Revisit case"; session != null -> "Resume case"; else -> "Start case" },
+                        { onOpen(selected) }, enabled = !busy, trailingIcon = if (selectedLocked) EvidriloIconName.LOCK else EvidriloIconName.ARROW_FORWARD)
                 }
-                EvidriloIconButton(EvidriloIconName.FOLDER, "Open my projects", onOpenProjects, enabled = !busy)
             }
         }
     }) {
@@ -69,32 +72,33 @@ internal fun EvidriloPracticeLobby(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 EvidriloLogoMark(size = 44.dp)
                 Surface(shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp), color = EvidriloColors.Atmosphere) {
-                    Text("Every strong claim starts with evidence.", Modifier.padding(14.dp),
+                    Text(uiText("Every strong claim starts with evidence."), Modifier.padding(14.dp),
                         style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Ink)
                 }
             }
+            val spokenCount=uiText("$completed of ${available.size} accessible practice attempts completed. Not a mastery score.","$completed dari ${available.size} percobaan tersedia selesai. Bukan skor penguasaan.")
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Your evidence trail", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-                Text("$completed/${stations.size} completed", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate,
-                    modifier = Modifier.semantics { contentDescription = "$completed of ${stations.size} practice attempts completed. Not a mastery score." })
+                Text(uiText("Your evidence trail"), Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                Text("$completed/${available.size} ${if (hasVerifiedProAccess) "completed" else "Free"}", style = MaterialTheme.typography.labelMedium, color = EvidriloColors.Slate,
+                    modifier = Modifier.semantics { contentDescription = spokenCount })
             }
             storageNotice()
-            PracticeTrail(stations, selected, course, busy, onSelect)
+            PracticeTrail(stations, selected, course, busy, hasVerifiedProAccess, onSelect)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 EvidriloProEmblem(36.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("More investigations ahead", style = MaterialTheme.typography.titleMedium)
-                    Text("Additional Pro practice is planned.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                    Text(if (hasVerifiedProAccess) "Your full trail is open" else "Keep investigating with Pro", style = MaterialTheme.typography.titleMedium)
+                    Text(if (hasVerifiedProAccess) "Choose any case at your own pace." else "Unlock source comparison and changing data.", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                 }
             }
-            EvidriloExplanation("What Practice records", "These are synthetic cases. Completion records your attempt, not a grade or proof of mastery. Your project work stays separate. Choose any case; the path does not lock later cases.")
+            EvidriloExplanation("What Practice records", "These are synthetic cases. Completion records your attempt, not a grade or proof of mastery. Your project work stays separate. The first case is Free; the other two require active Pro access. Saved attempts are retained when Pro ends.")
         }
     }
 }
 
 @Composable
 private fun PracticeTrail(stations: List<PracticePathStation>, selected: PracticeLessonId, course: PracticeCourseState,
-    busy: Boolean, onSelect: (PracticeLessonId) -> Unit) {
+    busy: Boolean, hasVerifiedProAccess: Boolean, onSelect: (PracticeLessonId) -> Unit) {
     val rowHeight = 132.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
     val reveal = rememberGetStartedReveal("practice-trail", 550)
     val track = EvidriloColors.Tint
@@ -125,25 +129,28 @@ private fun PracticeTrail(stations: List<PracticePathStation>, selected: Practic
                     val active = station.lesson == selected
                     val progress = course.sessions[station.lesson]
                     val done = progress?.stage == PracticeLessonStage.COMPLETE
+                    val locked = !PracticeCourseAccessRules.canOpen(station.lesson, hasVerifiedProAccess)
                     val interactions = remember { MutableInteractionSource() }
                     val pressed by interactions.collectIsPressedAsState()
                     val lift by animateFloatAsState(if (pressed) 4f else if (active) -3f else 0f, tween(150), label = "Practice station press")
-                    val description = when { done -> "Completed · revisit"; progress != null -> "Saved attempt"; active -> "Ready to start"; else -> "Available" }
+                    val description = when { locked -> if (progress != null) "Pro · saved attempt retained" else "Unlock with Pro"; done -> "Completed · revisit"; progress != null -> "Saved attempt"; active -> "Ready to start"; else -> "Available" }
+                    val spokenStation=listOf(uiText(station.title),uiText(PracticeCourseContent.title(station.lesson)),uiText(station.minutes),uiText(description),uiText(if(station.lesson==PracticeLessonId.TABLET) "Free case" else "Pro case")).joinToString(". ")
+                    val spokenSelection=uiText(if(active) "Selected" else "Not selected")
                     Row(Modifier.fillMaxWidth().height(rowHeight).clip(RoundedCornerShape(16.dp))
                         .selectable(active, enabled = !busy, role = Role.RadioButton, interactionSource = interactions, indication = null,
                             onClick = { onSelect(station.lesson) })
                         .semantics(mergeDescendants = true) {
-                            contentDescription = "${station.title}. ${PracticeCourseContent.title(station.lesson)}. ${station.minutes}. $description. Free case."
-                            stateDescription = if (active) "Selected" else "Not selected"
+                            contentDescription = spokenStation
+                            stateDescription = spokenSelection
                         }.padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        if (index % 2 == 0) PracticeStationTile(station.lesson, active, done, lift)
+                        if (index % 2 == 0) PracticeStationTile(station.lesson, active, done, locked, lift)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(station.title, style = MaterialTheme.typography.titleMedium, color = if (active) EvidriloColors.Cobalt else EvidriloColors.Ink)
                             Text(station.minutes, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
                             Text(description, style = MaterialTheme.typography.labelSmall, color = if (active || done) EvidriloColors.Cobalt else EvidriloColors.Slate)
                         }
-                        if (index % 2 == 1) PracticeStationTile(station.lesson, active, done, lift)
+                        if (index % 2 == 1) PracticeStationTile(station.lesson, active, done, locked, lift)
                     }
                 }
             }
@@ -152,10 +159,10 @@ private fun PracticeTrail(stations: List<PracticePathStation>, selected: Practic
 }
 
 @Composable
-private fun PracticeStationTile(lesson: PracticeLessonId, selected: Boolean, completed: Boolean, lift: Float) {
+private fun PracticeStationTile(lesson: PracticeLessonId, selected: Boolean, completed: Boolean, locked: Boolean, lift: Float) {
     val face by animateColorAsState(if (selected) EvidriloColors.PrimaryAction else EvidriloColors.Atmosphere, tween(180), label = "Station selection")
     val base = if (selected) EvidriloColors.CobaltPressed else EvidriloColors.PatternBlue
-    val icon = if (completed) EvidriloIconName.CHECK else courseIcon(lesson)
+    val icon = if (locked) EvidriloIconName.LOCK else EvidriloIconName.CHECK
     Box(Modifier.size(112.dp, 100.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize().clearAndSetSemantics {}) {
             val diamond = Path().apply {
@@ -180,7 +187,7 @@ private fun PracticeStationTile(lesson: PracticeLessonId, selected: Boolean, com
             drawContext.canvas.restore()
         }
         PracticeEvidenceObject(lesson, Modifier.size(76.dp).graphicsLayer { translationY = lift.dp.toPx() - 13.dp.toPx() })
-        if (completed) Surface(Modifier.align(Alignment.BottomEnd).padding(end = 9.dp, bottom = 8.dp).size(24.dp),
+        if (completed || locked) Surface(Modifier.align(Alignment.BottomEnd).padding(end = 9.dp, bottom = 8.dp).size(26.dp),
             shape = RoundedCornerShape(12.dp), color = EvidriloColors.PrimaryAction) {
             Box(contentAlignment = Alignment.Center) { EvidriloIcon(icon, tint = EvidriloColors.White, modifier = Modifier.size(15.dp)) }
         }
@@ -251,7 +258,7 @@ internal fun EvidriloPracticeEntry(onClick: () -> Unit) {
             EvidriloIcon(EvidriloIconName.EVIDENCE_GRAPH, tint = EvidriloColors.Cobalt, modifier = Modifier.size(32.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Find your evidence trail", style = MaterialTheme.typography.titleMedium)
-                Text("3 Free cases · practice a useful move", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                Text("1 Free case · 2 more with Pro", style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
             }
             EvidriloIcon(EvidriloIconName.ARROW_FORWARD, tint = EvidriloColors.Cobalt)
         }

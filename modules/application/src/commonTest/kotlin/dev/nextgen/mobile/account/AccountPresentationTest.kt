@@ -69,7 +69,9 @@ class AccountPresentationTest {
         ).toPresentation()
 
         assertEquals("Account connected", presentation.title)
-        assertTrue(presentation.body.contains("cloud sync remains paused in local mode"))
+        assertTrue(presentation.body.contains("Local projects stay here"))
+        assertTrue(presentation.body.contains("signing in does not upload them"))
+        assertTrue(presentation.body.contains("their own service and access checks"))
         assertEquals("Sign out", presentation.actionLabel)
         assertEquals(AccountPresentationAction.SIGN_OUT, presentation.action)
         assertFalse(presentation.isBusy)

@@ -97,7 +97,7 @@ private class AndroidAccountHttpTransport : AccountHttpTransport {
                 connection = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
                     requestMethod = method
                     connectTimeout = 10_000
-                    readTimeout = 15_000
+                    readTimeout = accountHttpReadTimeoutMillis(method, url)
                     instanceFollowRedirects = ACCOUNT_HTTP_REDIRECTS_ALLOWED
                     useCaches = false
                     doInput = true

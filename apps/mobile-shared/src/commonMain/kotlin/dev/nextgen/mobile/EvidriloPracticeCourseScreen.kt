@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -37,6 +38,12 @@ public fun EvidriloPracticeCourseScreen(
     onOpenTabletHistory: (() -> Unit)? = null,
     store: PracticeCourseStore? = null,
     temporaryPreview: Boolean = false,
+    initialSelectedLesson: PracticeLessonId? = null,
+    onConsumeInitialLesson: () -> Unit = {},
+    hasVerifiedProAccess: Boolean = false,
+    proAccessChecking: Boolean = false,
+    onOpenPro: () -> Unit = {},
+    onCarrySkillToProjects: ((PracticeLessonId) -> Unit)? = null,
 ) {
     val localStore = store ?: rememberPracticeCourseStore()
     var course by remember(localStore) { mutableStateOf(PracticeCourseState()) }
@@ -51,7 +58,7 @@ public fun EvidriloPracticeCourseScreen(
     var replaceUnreadable by remember { mutableStateOf(false) }
     var failedExit by remember { mutableStateOf<(() -> Unit)?>(null) }
     var exiting by remember { mutableStateOf(false) }
-    var selectedPracticeLesson by remember { mutableStateOf(PracticeLessonId.TABLET) }
+    var selectedPracticeLesson by remember { mutableStateOf(initialSelectedLesson ?: PracticeLessonId.TABLET) }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val saveMutex = remember(localStore) { Mutex() }
@@ -74,7 +81,7 @@ public fun EvidriloPracticeCourseScreen(
         }
     }
     fun send(event: PracticeCourseEvent) {
-        if (ready && !exiting) course = PracticeCourseReducer.reduce(course, event)
+        if (ready && !exiting) course = PracticeCourseAccessRules.reduce(course, event, hasVerifiedProAccess)
     }
     fun exitSafely(destination: () -> Unit) {
         if (exiting) return
@@ -90,7 +97,22 @@ public fun EvidriloPracticeCourseScreen(
             else failedExit = destination
         }
     }
-    val active = course.active
+    LaunchedEffect(ready, initialSelectedLesson) {
+        if (ready && initialSelectedLesson != null) {
+            send(PracticeCourseEvent.Leave)
+            selectedPracticeLesson = initialSelectedLesson
+            onConsumeInitialLesson()
+        }
+    }
+    // Retain saved work when access ends; never render a restored Pro-only session to Free.
+    val active = course.active?.takeIf { PracticeCourseAccessRules.canOpen(it, hasVerifiedProAccess) }
+    LaunchedEffect(ready, course.active, hasVerifiedProAccess, proAccessChecking) {
+        if (ready && !proAccessChecking && course.active != null && active == null) {
+            send(PracticeCourseEvent.Leave)
+            showHelp = false
+            restart = null
+        }
+    }
     LaunchedEffect(active) { onLessonVisibilityChanged(active != null) }
     DisposableEffect(Unit) { onDispose { onLessonVisibilityChanged(false) } }
     val session = active?.let { course.sessions[it] }
@@ -122,6 +144,13 @@ public fun EvidriloPracticeCourseScreen(
             Text("Opening your practice.", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 32.dp))
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 20.dp))
         }
+    } else if (proAccessChecking && course.active != null && course.active != PracticeLessonId.TABLET) {
+        PracticeFrame({ exitSafely(onExit) }, {}, "Checking Pro access", footer = {
+            Text("Your saved attempt stays on this device.", style = MaterialTheme.typography.bodySmall)
+        }) {
+            Text("Checking your access…", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 32.dp))
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 20.dp))
+        }
     } else if (tabletContent) {
         EvidriloPracticeScreen(
             state = tabletState,
@@ -136,7 +165,7 @@ public fun EvidriloPracticeCourseScreen(
             },
             onExit = { send(PracticeCourseEvent.Leave) },
             case = tabletCase,
-            onOpenProjects = { exitSafely(onOpenProjects) },
+            onOpenProjects = { exitSafely { onCarrySkillToProjects?.invoke(PracticeLessonId.TABLET) ?: onOpenProjects() } },
             onSelectionSound = onSelectionSound,
             audioControls = tabletAudioControls,
             onOpenHistory = onOpenTabletHistory?.let { destination -> { exitSafely(destination) } },
@@ -146,12 +175,17 @@ public fun EvidriloPracticeCourseScreen(
             course = course,
             selected = selectedPracticeLesson,
             busy = exiting,
+            hasVerifiedProAccess = hasVerifiedProAccess,
             onSelect = { selectedPracticeLesson = it },
             onOpen = { id ->
-                val progress = course.sessions[id]
-                if (id == PracticeLessonId.TABLET && progress?.stage == PracticeLessonStage.COMPLETE && tabletState is ConclusionState.Intro)
-                    restart = id
-                else send(PracticeCourseEvent.Open(id))
+                if (!PracticeCourseAccessRules.canOpen(id, hasVerifiedProAccess)) {
+                    exitSafely(onOpenPro)
+                } else {
+                    val progress = course.sessions[id]
+                    if (id == PracticeLessonId.TABLET && progress?.stage == PracticeLessonStage.COMPLETE && tabletState is ConclusionState.Intro)
+                        restart = id
+                    else send(PracticeCourseEvent.Open(id))
+                }
             },
             onExit = { exitSafely(onExit) },
             onHelp = { showHelp = true },
@@ -184,7 +218,7 @@ public fun EvidriloPracticeCourseScreen(
             onLeave = { send(PracticeCourseEvent.Leave) },
             onHelp = { showHelp = true },
             onRestart = { restart = session.lesson },
-            onOpenProjects = { exitSafely(onOpenProjects) },
+            onOpenProjects = { exitSafely { onCarrySkillToProjects?.invoke(session.lesson) ?: onOpenProjects() } },
             onNextCase = {
                 send(PracticeCourseEvent.Open(if (session.lesson == PracticeLessonId.STUDIES) PracticeLessonId.SURVEY else PracticeLessonId.TABLET))
             },

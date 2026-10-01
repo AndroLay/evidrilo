@@ -13,13 +13,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.nextgen.mobile.navigation.EvidriloDestination
 import dev.nextgen.mobile.navigation.EvidriloSystemBackHandler
 
@@ -38,7 +42,7 @@ internal fun EvidriloWorkspaceShell(
     onSelect: (EvidriloDestination) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val roots = listOf(EvidriloDestination.HOME, EvidriloDestination.PROJECTS, EvidriloDestination.PRACTICE, EvidriloDestination.PROFILE)
+    val roots = listOf(EvidriloDestination.HOME, EvidriloDestination.PROJECTS, EvidriloDestination.PRACTICE, EvidriloDestination.CASES, EvidriloDestination.PROFILE)
     val navigationVisible = showNavigation && destination in roots && destination != EvidriloDestination.PRACTICE
     Column(Modifier.fillMaxSize().background(EvidriloColors.Canvas)) {
         Box(Modifier.weight(1f).fillMaxWidth()) { content() }
@@ -46,12 +50,16 @@ internal fun EvidriloWorkspaceShell(
             NavigationBar(containerColor = EvidriloColors.Card, tonalElevation = 0.dp) {
                 roots.forEachIndexed { index, route ->
                     val selected = destination == route
-                    val label = listOf("Home", "Projects", "Practice", "Profile")[index]
-                    val icon = listOf(EvidriloIconName.HOME, EvidriloIconName.FOLDER, EvidriloIconName.BOOK, EvidriloIconName.ACCOUNT)[index]
+                    val label = listOf("Home", "Projects", "Practice", "Cases", "Profile")[index]
+                    val icon = listOf(EvidriloIconName.HOME, EvidriloIconName.FOLDER, EvidriloIconName.BOOK, EvidriloIconName.EVIDENCE_GRAPH, EvidriloIconName.ACCOUNT)[index]
                     NavigationBarItem(
                         selected = selected, onClick = { if (!selected) onSelect(route) },
                         icon = { EvidriloIcon(icon, tint = if (selected) EvidriloColors.Cobalt else EvidriloColors.Slate, modifier = Modifier.size(24.dp)) },
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        label = {
+                            Text(uiText(label), Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = EvidriloColors.Cobalt, selectedTextColor = EvidriloColors.Cobalt,
                             unselectedTextColor = EvidriloColors.Slate, indicatorColor = EvidriloColors.Tint),
                     )
@@ -65,8 +73,8 @@ internal fun EvidriloWorkspaceShell(
 internal fun EvidriloPageHeading(title: String, description: String? = null, action: (@Composable () -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium, color = EvidriloColors.Ink, modifier = Modifier.semantics { heading() })
-            description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate) }
+            Text(uiText(title), style = MaterialTheme.typography.headlineMedium, color = EvidriloColors.Ink, modifier = Modifier.semantics { heading() })
+            description?.let { Text(uiText(it), style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate) }
         }
         action?.invoke()
     }
