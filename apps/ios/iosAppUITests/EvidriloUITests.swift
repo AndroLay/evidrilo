@@ -28,7 +28,20 @@ final class EvidriloUITests: XCTestCase {
         XCTAssertTrue(blank.exists && blank.isHittable)
         guard blank.exists && blank.isHittable else { return }
         blank.tap()
-        XCTAssertTrue(app.staticTexts["Project basics"].waitForExistence(timeout: 30))
+        // Compose headings can be exported as accessibility "other" elements
+        // on iOS. Assert the exact visible heading across element types.
+        let basics = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@", "Project basics")).firstMatch
+        let openedBasics = basics.waitForExistence(timeout: 30)
+        if !openedBasics {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        XCTAssertTrue(openedBasics, "Manual project must open its Project basics heading")
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(
             format: "label CONTAINS[c] %@", "Project name")).firstMatch.exists)
     }
