@@ -116,7 +116,7 @@ class BillingPresentationTest {
 
         assertEquals(BillingUiState.UNLOCKED, presentation.state)
         assertFalse(presentation.canPurchase)
-        assertFalse(presentation.canRestore)
+        assertTrue(presentation.canRestore)
     }
 
     @Test

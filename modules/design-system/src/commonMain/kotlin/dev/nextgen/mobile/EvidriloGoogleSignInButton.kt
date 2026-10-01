@@ -26,10 +26,15 @@ public fun EvidriloGoogleSignInButton(onClick: () -> Unit, enabled: Boolean = tr
         borderColor = EvidriloColors.Separator, lipColor = EvidriloColors.Separator) {
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center) {
-            Image(painterResource(Res.drawable.google_g), null, Modifier.size(24.dp))
+            EvidriloGoogleMark(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             Text(uiText("Continue with Google"), style = MaterialTheme.typography.titleMedium,
                 color = Color(0xFF202124).copy(alpha=if(enabled) 1f else .5f))
         }
     }
+}
+
+@Composable
+public fun EvidriloGoogleMark(modifier: Modifier = Modifier.size(24.dp)) {
+    Image(painterResource(Res.drawable.google_g), null, modifier)
 }

@@ -16,7 +16,7 @@ public static class EntitlementEndpoints
     {
         endpoints.MapGet(
             "/v1/billing/entitlements",
-            async (HttpContext context, IEntitlementStore store, CancellationToken cancellationToken) =>
+            async (HttpContext context, IEntitlementStore store, IRevenueCatSandboxReconciler reconciler, CancellationToken cancellationToken) =>
             {
                 if (!AuthenticatedUser.TryGetAccountId(context.User, out var accountId))
                 {
@@ -32,6 +32,7 @@ public static class EntitlementEndpoints
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
+                await reconciler.RefreshAsync(accountId, cancellationToken);
                 var entitlements = await store.GetOwnAsync(accountId, cancellationToken);
                 return Results.Ok(new EntitlementResponse(
                     "evidrilo.entitlements",

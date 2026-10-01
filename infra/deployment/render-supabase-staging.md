@@ -1,7 +1,7 @@
 # Render + Supabase staging handoff
 
-API staging status: `BLUEPRINT VERIFIED / NOT DEPLOYED / CURRENT OWNER-LOCAL MIGRATION CANDIDATE AND DATABASE ROLE GATES REMAIN`.
-Full API-and-worker staging status: `NOT READY — no Render services, frozen candidate containing the owner-local API/migrations, reviewed runtime database roles, or applied migrations`.
+API staging status: `SCHEMA AND RUNTIME ROLES PROVISIONED / RENDER CREATION BLOCKED HTTP 402 / NOT DEPLOYED`.
+Full API-and-worker staging status: `NOT READY — Render payment setup, Google callback/sign-in, hosted AI, RevenueCat transactions and final native UI acceptance remain`.
 
 The landing page has a separate Cloudflare Pages setup in
 [`cloudflare-pages-landing.md`](cloudflare-pages-landing.md). The default API
@@ -316,3 +316,104 @@ The synthetic Evidrilo adapter probe was rejected with HTTP 429; do not report
 AI delivery as accepted or publish Pro AI credits as a proven usable service.
 The request/monthly spend limits remain USD 0.01/USD 2. Stage activation still
 requires privacy consent, availability, verified account and credit acceptance.
+
+### Hosted configuration acceptance refresh (2026-10-01)
+
+Supabase Staging now has 55 checksum-matched repository migrations through
+`055_runtime_account_lock` and 45 public tables. Separately approved API and
+worker runtime logins are active with distinct table-operation grants. All 630
+effective public-table permission checks match the manifest; both logins pass
+a session-pooler TLS `verify-full` connection check, with no Auth table read or
+public-schema CREATE privilege. SSL enforcement is enabled and confirmed.
+A temporary local API process connected using the Staging API role and returned
+HTTP 200 from `/health/live` and `/health/ready`; its readiness dependencies were
+ready. This is cloud-database acceptance, not a hosted Render deployment.
+
+Render service creation was refused with HTTP 402. The workspace dashboard
+confirms no card on file and USD 50 promotional credit, valid until 2027-08-01.
+The owner requested preserving this blocker and next steps. No API or paid
+worker exists; payment setup must be completed before another creation attempt.
+
+Google OAuth preflight returned `redirect_uri_mismatch`. The existing Google
+Cloud Evidrilo Web client matches Staging's configured client and contains only
+the Production callback. The Staging callback is being added while preserving
+the Production URI; save/readback and authorized-account sign-in are still open.
+
+The original AI key returned `insufficient_quota`. With the owner's dedicated
+Evidrilo key, the real Luna 6 adapter now returns a valid synthetic structured
+response with provider-default effort and measured cost USD 0.000048. This does
+not prove mobile account/credit acceptance or hosted AI activation. Existing
+request/monthly limits remain USD 0.01/USD 2; no credentials belong in Git.
+
+Main `676b4c9` passes hosted Verify (run 36839418558). The prior main `ef5dbac`
+passed the unsigned native iOS Release build and Simulator launch, but the guest
+UI test failed on the static-text-only heading query. The exact heading query
+now checks all accessibility element types and preserves the Project-name
+assertion; native CI run 36839418513 is still running. Signed-device/App Store
+and RevenueCat purchase/restore acceptance remain unproved.
+
+### 2026-10-01: local Android account and AI acceptance
+
+Google sign-in and session restoration were exercised in the native Android
+emulator against Staging. Enabling the migrated custom access-token hook and
+obtaining a fresh session resolved the API's verified-email rejection; credits,
+consent, and entitlement endpoints returned 200. Local API general chat returned
+200 with a live Luna 6 answer and the displayed balance changed from 20 to 19.
+The client now sends bounded conversation history and optionally selected local
+project notes. A synthetic project provider probe returned a valid reviewed-field
+edit without inventing measurements (measured cost USD 0.000264). Changes require
+client confirmation and a matching saved revision; existing owner projects were
+not edited during verification. Chats remain local and account-scoped.
+
+The API is running locally on port 15080, with the native emulator's reverse
+mapping. Limits remain USD 0.01/request and USD 2/month. This is local acceptance,
+not evidence of a hosted API, deployed worker, production readiness, or completed
+RevenueCat purchases. Render billing remains blocked.
+
+### 2026-10-01: RevenueCat Test Store purchase and credit acceptance
+
+Native Android Debug used the official Test Store SDK and current offering.
+Monthly checkout cancellation, failed purchase, retry, successful purchase,
+restore, and relaunch were exercised. RevenueCat recorded initial purchase,
+renewals, and expiration in sandbox. Annually also completed a Test Store
+purchase; Pro remained active after relaunch/restore and Customer Center showed
+the active subscription. No real store purchase or payment was attempted.
+
+The local Staging API now has explicitly enabled server-to-RevenueCat sandbox
+reconciliation. It uses provider-owned periods and the existing transactional
+credit ledger, not a client entitlement flag. The first verified grant changed
+the actual chat balance from 18 to 218; repeat refresh kept 218. Following the
+separate Annually test purchase, the account has two period grants totalling 400,
+plus its original 20-credit grant with 2 consumed. Restore did not mint another
+grant. Monthly-anniversary fixtures cover annual accrual, renewal, month ends,
+duplicate history, and expiry/revocation. Focused checks: 52 client tests and
+44 API tests, all passing; Android Release rejects the Test Store key.
+
+iOS local inputs are Debug-only, but native iOS transactions were not run here.
+This does not prove a hosted webhook, Production billing, or store acceptance.
+Render billing remains blocked; the API is still local on port 15080.
+
+The final accumulated-credit client check found and fixed the former 220-credit
+parser ceiling. 17 focused AiGateway checks pass, and 418 is now directly visible
+in the Android chat header. Repeated restore still leaves exactly two subscription
+grants totalling 400. Local snapshot reconciliation and webhook ingestion are
+mutually exclusive; any later switch must reconcile timestamp precision before
+importing events into this existing sandbox ledger.
+
+## Hosted Staging setup — 1 October 2026
+
+Owner approved Render deployment after adding billing. API service
+`evidrilo-staging-api` uses Free Docker in Singapore at
+`https://evidrilo-staging-api.onrender.com`; worker `evidrilo-staging-worker`
+uses the previously approved `0.5c-512mb` plan. Both use manual deployment
+from `main`, distinct runtime database roles, and verify-full pooler TLS.
+Production remains unchanged. Secrets are entered through the project-scoped
+operator broker and never committed.
+
+Staging AI uses the owner-approved dedicated Experiential Luna 6 key with
+provider-default effort, USD 0.01/request and USD 2/month limits. Billing is
+Test Store only, with server-verified sandbox subscription reconciliation;
+production webhook ingestion is not enabled alongside that mode.
+The mobile Debug build points to hosted Staging. This is a judging/test build,
+not evidence of real App Store/Play billing readiness. Hosted health, verified
+account/device calls, and final deploy SHA must be recorded after deployment.

@@ -81,6 +81,6 @@ class PremiumPaywallModelTest {
         assertTrue(locked.canRestore)
         assertEquals(PremiumPaywallState.UNLOCKED, unlocked.state)
         assertFalse(unlocked.canPurchase)
-        assertFalse(unlocked.canRestore)
+        assertTrue(unlocked.canRestore)
     }
 }

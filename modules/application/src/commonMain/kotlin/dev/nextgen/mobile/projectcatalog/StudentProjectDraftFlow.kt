@@ -652,12 +652,16 @@ class StudentProjectDraftFlow(
         attachments: List<StudentProjectAttachmentRef>? = null,
         limitationActions: List<StudentProjectLimitationActionRecord>? = null,
         deadlineChange: StudentProjectDeadlineChange = StudentProjectDeadlineChange.Keep,
+        expectedRevision: Int? = null,
     ): StudentProjectDraftFlowResult<StudentProjectDraft> {
         val current = when (val loaded = store.load()) {
             is LocalStorageReadResult.Success -> loaded.value.orEmpty().singleOrNull { it.id == projectId }
             else -> return loaded.toFlowFailure()
         } ?: return StudentProjectDraftFlowResult.NotFound
 
+        if (expectedRevision != null && current.revision != expectedRevision) {
+            return StudentProjectDraftFlowResult.Rejected("PROJECT_AI_STALE_REVISION")
+        }
         val updatedAt = clock().coerceAtLeast(current.createdAtEpochMillis).coerceAtLeast(current.updatedAtEpochMillis)
         val nextFieldValues = fieldValues.toMap()
         val nextClaims = claims?.toList() ?: if (

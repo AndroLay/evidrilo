@@ -57,6 +57,19 @@ Apple hardware is available.
 
 ## Release candidate on macOS
 
+For Test Store testing, use conditional settings in ignored
+`Configuration/Config.local.xcconfig`:
+
+```text
+REVENUECAT_PUBLIC_SDK_KEY[config=Debug] = <public Test Store SDK key>
+REVENUECAT_ENTITLEMENT_ID[config=Debug] = evidrilo_pro
+REVENUECAT_PRODUCT_IDS[config=Debug] = monthly,yearly
+```
+
+Keep the Test Store key out of Release. TestFlight and App Store builds require
+the platform-specific public SDK key and platform sandbox testing. Android
+Test Store results do not substitute for a native iOS purchase/restore run.
+
 1. Copy `Configuration/Release.xcconfig.example` to the ignored
    `Configuration/Release.xcconfig` or `Configuration/Local.xcconfig`.
 2. Set the Apple `TEAM_ID` and the provider values only in that local file.

@@ -94,6 +94,35 @@ payloads. Account deletion purges queued and retained export jobs.
 
 ## Local verification
 
+### Local RevenueCat Test Store credit reconciliation
+
+When a local Staging API has no public webhook URL, explicitly enable
+`REVENUECAT_TEST_STORE_RECONCILIATION_ENABLED=true` and supply the public
+`REVENUECAT_TEST_STORE_SDK_KEY` through its environment. Startup rejects this
+mode outside Staging, without a database, or with a non-Test-Store key. It is
+disabled by default; Production retains authenticated webhook delivery.
+Do not combine this local sandbox ledger with webhook ingestion: startup rejects
+both modes being enabled. Before switching an existing sandbox database to
+webhooks, reconcile its historic grants because provider snapshots and webhook
+period timestamps can have different precision. Production uses its separate
+database and webhook source.
+
+Verified-account credit and entitlement reads fetch the account's status directly
+from RevenueCat over HTTPS. Only `test_store`, sandbox, `evidrilo_pro`, and the
+approved monthly/yearly products qualify. Client success flags cannot grant
+credits. Verified original purchases can be recovered when the local API was
+offline. Existing ledger transactions add 200 credits for each earned monthly
+anniversary, including annual subscriptions, and use unique grant keys to make
+refresh/restore idempotent. Accelerated sandbox renewals retain the original
+anniversary rather than adding 200 every five minutes. Expiry/revocation stops
+new months while earned credits remain. Purchase accounting does not require
+AI data consent; consent still gates AI spending and provider dispatch.
+
+Grant reconciliation runs when the balance is read, including the automatic
+refresh after purchase or restore. It catches up earned months without requiring
+a timer inside the mobile app. This local mode does not establish hosted webhook,
+worker, store-release, or Production acceptance.
+
 From the repository root, run the canonical check:
 
 ```
@@ -175,8 +204,17 @@ Project AI consent. General chat also requires the separate
 `PROJECT_AI_GENERAL_CHAT_POLICY_APPROVED` setting, which defaults to false.
 Every General chat request must also include
 `X-Evidrilo-General-Chat-Consent: general-chat.v1`; the API checks this before
-credit reservation or provider dispatch. Its route sends only a bounded redacted
-message, stores no transcript, and writes metadata-only activity. General chat
+credit reservation or provider dispatch. Its route sends a bounded redacted
+message, optional recent conversation (eight turns, 16,000 characters), and
+an explicitly selected local project snapshot. The API stores no transcript
+and writes metadata-only activity. The mobile client stores account-scoped
+session history locally. Sending requires verified sign-in, credits, and current
+AI consent; consent is requested once rather than through a per-message checkbox.
+Project replies may propose changes to known editable fields. The client previews
+these changes and requires confirmation before saving an assistance-marked revision;
+stale revisions, dirty editor state, and unknown fields are rejected. The snapshot
+is untrusted input, not proof of server ownership, and this route does not modify
+server project records. General chat
 remains unavailable until its separate cost, limit, and retention policy is
 approved. These settings do not prove that
 provider terms, retention controls, privacy review, or hosted configuration
@@ -191,7 +229,7 @@ but that does not guarantee zero retention at the gateway or upstream provider.
 Review the Experiential organization capture setting and provider route before
 using real student content. Provider terms, retention controls, privacy
 approval, and live runtime evidence remain open; keep the adapter disabled until
-those gates are explicitly approved. See the AI assistance contract.
+those gates are explicitly approved. See the [AI assistance contract](../docs/architecture/ai-assistance.md).
 
 Deployment preparation and ownership boundaries are described in
 [infra/README.md](../infra/README.md).

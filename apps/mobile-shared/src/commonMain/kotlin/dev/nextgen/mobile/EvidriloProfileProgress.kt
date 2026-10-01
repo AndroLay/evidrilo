@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.nextgen.mobile.domain.practice.*
 import dev.nextgen.mobile.domain.project.*
@@ -30,6 +31,7 @@ internal fun EvidriloProfileProgress(
     onPreferences: () -> Unit, onNotifications: () -> Unit,
     onPrivacy: () -> Unit, onSupport: () -> Unit,
     onOpenPracticeLesson: (PracticeLessonId) -> Unit = { onOpenPractice() },
+    googleLinked: Boolean? = null,
 ) {
     val courseStore = rememberPracticeCourseStore()
     var courseRead by remember(courseStore) { mutableStateOf<LocalStorageReadResult<PracticeCourseState>?>(null) }
@@ -49,19 +51,12 @@ internal fun EvidriloProfileProgress(
         }
     }
     if (dev.nextgen.mobile.billing.REVENUECAT_PRO_FEATURE_ENABLED) EvidriloProEntry(onOpenPro)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Surface(shape = CircleShape, color = EvidriloColors.Tint) {
-            Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) { EvidriloLogoMark(size = 42.dp) }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            RawText(profileName, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(uiText(if (hasPro) "Evidrilo Pro" else if (signedIn) "Account connected" else "Local workspace"),
-                style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
-        }
-        TextButton(onOpenAccount) { Text(uiText(if (signedIn) "Account" else "Sign in"), color = EvidriloColors.Cobalt) }
+    Surface(onClick = onOpenAccount, shape = RoundedCornerShape(20.dp), color = EvidriloColors.Atmosphere) {
+        EvidriloAccountIdentity(profileName, signedIn, hasPro,
+            modifier = Modifier.fillMaxWidth().padding(20.dp), compact = true)
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(uiText("Your recorded work"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Text(uiText("Your progress", "Progres Anda"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         IconButton({ explainProgress = true }, Modifier.semantics { contentDescription = "How progress is counted" }) {
             EvidriloIcon(EvidriloIconName.QUESTION, tint = EvidriloColors.Slate, modifier = Modifier.size(20.dp))
         }
@@ -118,14 +113,17 @@ internal fun EvidriloProfileProgress(
             EvidriloWorkspaceRow(if(finished) EvidriloIconName.CHECK else courseIcon(lesson),title,status,
                 { onOpenPracticeLesson(lesson) })
         }
-        Text(uiText("Completed practice stays recorded, even when Pro access ends.", "Latihan yang selesai tetap tercatat meski akses Pro berakhir."),
-            style=MaterialTheme.typography.bodySmall,color=EvidriloColors.Slate)
     }
     EvidriloWorkspaceRow(EvidriloIconName.HISTORY, uiText("Local history","Riwayat lokal"), null, onOpenHistory)
     if (explainProgress) AlertDialog(onDismissRequest = { explainProgress = false }, title = { Text("Recorded progress") },
         text = { Text("Projects and notes come from this device. Response bars count required fields with recorded content; finished cases come from saved Practice sessions. These counts are not grades or assessments of research quality. Previously finished Pro cases remain history, not proof of current access.") },
         confirmButton = { TextButton({ explainProgress = false }) { Text(uiText("Got it")) } })
 }
+
+internal fun profileDisplayName(value: String): String = if ('@' in value) value.substringBefore('@')
+    .replace('.', ' ').replace('_', ' ').replace('-', ' ').split(' ').filter(String::isNotBlank)
+    .joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }.take(48)
+    else value
 
 @Composable
 private fun ProfileRecordedCount(icon: EvidriloIconName, value: String, label: String, modifier: Modifier) {

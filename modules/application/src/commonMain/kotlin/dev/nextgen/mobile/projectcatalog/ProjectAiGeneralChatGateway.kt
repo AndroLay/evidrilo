@@ -12,6 +12,8 @@ import dev.nextgen.mobile.security.SecureSessionMaterial
 import dev.nextgen.mobile.security.SecureSessionStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -27,13 +29,22 @@ data class ProjectAiGeneralChatRequest(
     val locale: String,
     val message: String,
     val consentConfirmed: Boolean,
+    val history: List<ProjectAiChatTurn> = emptyList(),
+    val projectContext: ProjectAiChatContext? = null,
 )
+
+data class ProjectAiChatTurn(val role: String, val text: String)
+data class ProjectAiChatField(val id: String, val label: String, val value: String)
+data class ProjectAiChatContext(val projectId: String, val revision: Int, val title: String,
+    val notes: String, val fields: List<ProjectAiChatField>)
+data class ProjectAiChatEdit(val fieldId: String, val value: String, val reason: String)
 
 data class ProjectAiGeneralChatAnswer(
     val answer: String,
     val recommendedNextPrompts: List<String>,
     val requestId: String,
     val creditCost: Int,
+    val proposedEdits: List<ProjectAiChatEdit> = emptyList(),
 )
 
 sealed interface ProjectAiGeneralChatResult {
@@ -55,7 +66,7 @@ enum class ProjectAiGeneralChatDeferredReason {
     SECURE_STORAGE,
 }
 
-/** Sends exactly one consented, standalone message; no project or transcript is accepted. */
+/** Sends an explicitly submitted message and bounded, selected conversation/project context. */
 class ProjectAiGeneralChatGateway(
     private val configuration: AiClientConfiguration,
     private val transport: AccountHttpTransport,
@@ -140,7 +151,7 @@ class ProjectAiGeneralChatGateway(
             else -> return ProjectAiGeneralChatResult.Rejected("PROJECT_AI_GENERAL_CHAT_REJECTED")
         }
 
-        val answer = parseAnswer(response, idempotencyKey)
+        val answer = parseAnswer(response, idempotencyKey, request.projectContext)
             ?: return ProjectAiGeneralChatResult.Rejected("INVALID_PROJECT_AI_GENERAL_CHAT_RESPONSE")
         return ProjectAiGeneralChatResult.Answer(answer)
     }
@@ -169,14 +180,25 @@ class ProjectAiGeneralChatGateway(
         put("installationId", request.installationId)
         put("locale", request.locale)
         put("message", request.message)
+        if (request.history.isNotEmpty()) put("history", JsonArray(request.history.map { turn ->
+            buildJsonObject { put("role", turn.role); put("text", turn.text) }
+        }))
+        request.projectContext?.let { project -> put("projectContext", buildJsonObject {
+            put("projectId", project.projectId); put("revision", project.revision)
+            put("title", project.title); put("notes", project.notes)
+            put("fields", JsonArray(project.fields.map { field -> buildJsonObject {
+                put("id", field.id); put("label", field.label); put("value", field.value)
+            } }))
+        }) }
     }.toString()
 
     private fun parseAnswer(
         response: AccountHttpResponse,
         idempotencyKey: String,
+        projectContext: ProjectAiChatContext?,
     ): ProjectAiGeneralChatAnswer? = runCatching {
         val root = json.parseToJsonElement(response.body) as? JsonObject ?: return@runCatching null
-        require(root.keys == RESPONSE_KEYS)
+        require(root.keys == RESPONSE_KEYS || root.keys == RESPONSE_KEYS + "proposedEdits")
         require(root.requiredString("schema") == REQUEST_SCHEMA)
         require(root.requiredString("version") == "2")
         require(root.requiredString("mode") == "GENERAL")
@@ -196,7 +218,17 @@ class ProjectAiGeneralChatGateway(
         require(requestId == idempotencyKey)
         val creditCost = root.requiredInt("creditCost")
         require(creditCost in 1..MAX_CREDIT_COST)
-        ProjectAiGeneralChatAnswer(answer, prompts, requestId, creditCost)
+        val edits = root["proposedEdits"]?.jsonArray?.map { element ->
+            val edit = element.jsonObject
+            require(edit.keys == setOf("fieldId", "value", "reason"))
+            ProjectAiChatEdit(edit.requiredString("fieldId"), edit.requiredString("value"), edit.requiredString("reason"))
+                .also {
+                    require(projectContext?.fields?.any { field -> field.id == it.fieldId } == true)
+                    require(it.value.isNotBlank() && it.value.length <= 8000 && it.reason.isNotBlank() && it.reason.length <= 400)
+                }
+        }.orEmpty()
+        require(edits.size <= 6 && edits.map { it.fieldId }.distinct().size == edits.size)
+        ProjectAiGeneralChatAnswer(answer, prompts, requestId, creditCost, edits)
     }.getOrNull()
 
     private fun failed(failure: RemoteFailureKind): ProjectAiGeneralChatResult.Failed {
@@ -237,6 +269,15 @@ class ProjectAiGeneralChatGateway(
             && request.message.isNotBlank()
             && request.message.length <= MAX_MESSAGE_LENGTH
             && '\u0000' !in request.message
+            && request.history.size <= 8 && request.history.sumOf { it.text.length } <= 16000
+            && request.history.all { it.role in setOf("user", "assistant") && it.text.isNotBlank() && it.text.length <= 8000 && '\u0000' !in it.text }
+            && (request.projectContext?.let { project ->
+                uuidPattern.matches(project.projectId) && project.revision >= 1 && project.title.length in 1..160 &&
+                    project.notes.length <= 6000 && '\u0000' !in project.notes && project.fields.size <= 16 &&
+                    project.fields.sumOf { it.value.length } <= 16000 &&
+                    project.fields.all { it.id.length in 1..96 && it.label.length in 1..160 && it.value.length <= 8000 && '\u0000' !in it.value } &&
+                    project.fields.map { it.id }.distinct().size == project.fields.size
+            } ?: true)
 
     private fun JsonObject.string(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull
 
@@ -259,7 +300,7 @@ class ProjectAiGeneralChatGateway(
         const val MAX_RECOMMENDED_PROMPTS = 3
         const val MAX_RECOMMENDED_PROMPT_LENGTH = 240
         const val MAX_CREDIT_COST = 200
-        const val MAX_REQUEST_BYTES = 16 * 1024
+        const val MAX_REQUEST_BYTES = 64 * 1024
         const val MAX_RESPONSE_BYTES = 48 * 1024
         val RESPONSE_KEYS = setOf(
             "schema", "version", "mode", "status", "answer", "recommendedNextPrompts", "requestId", "creditCost",

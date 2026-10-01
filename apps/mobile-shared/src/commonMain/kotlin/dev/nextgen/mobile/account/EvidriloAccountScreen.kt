@@ -4,6 +4,7 @@ import dev.nextgen.mobile.uiText
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
@@ -71,6 +72,7 @@ internal fun EvidriloAccountScreen(
     onDeleteAccount: () -> Unit,
     onExportAccount: () -> Unit,
     onDismissExport: () -> Unit,
+    hasVerifiedPro: Boolean = false,
 ) {
     if (!accountRestoreComplete) {
         EvidriloContentColumn {
@@ -126,6 +128,8 @@ internal fun EvidriloAccountScreen(
                     color = EvidriloColors.Slate,
                 )
             }
+        } else if (session is AccountSession.SignedIn) {
+            Text(uiText("Account", "Akun"), style = MaterialTheme.typography.headlineMedium)
         } else {
             Text(presentation.title, style = MaterialTheme.typography.headlineLarge)
             Text(presentation.body, style = MaterialTheme.typography.bodyLarge)
@@ -136,6 +140,7 @@ internal fun EvidriloAccountScreen(
             session is AccountSession.SignedIn -> {
                 SignedInAccountPanel(
                     account = session.account,
+                    hasVerifiedPro = hasVerifiedPro,
                     googleLinkOutcome = session.googleLinkOutcome,
                     appleLinkOutcome = session.appleLinkOutcome,
                     googleConfigured = googleConfigured,
@@ -511,6 +516,7 @@ private fun PasswordField(
 @Composable
 private fun SignedInAccountPanel(
     account: AccountSummary,
+    hasVerifiedPro: Boolean,
     googleLinkOutcome: GoogleIdentityLinkOutcome?,
     appleLinkOutcome: IdentityLinkOutcome?,
     googleConfigured: Boolean,
@@ -527,39 +533,42 @@ private fun SignedInAccountPanel(
     onDismissExportError: () -> Unit,
     isBusy: Boolean,
 ) {
-    EvidriloTintPanel {
-        Text("You are signed in", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Your account can be used for online AI and Pro, subject to service and access checks. Projects stay on this device; signing in does not upload them.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        account.email?.let { email ->
-            Text(
-                if (account.emailVerified) "Account email · $email · verified" else "Account email · $email",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+    androidx.compose.material3.Surface(shape = RoundedCornerShape(20.dp), color = EvidriloColors.Atmosphere) {
+        dev.nextgen.mobile.EvidriloAccountIdentity(
+            email = account.email ?: uiText("Your account", "Akun Anda"), signedIn = true,
+            hasPro = hasVerifiedPro,
+            modifier = Modifier.fillMaxWidth().padding(20.dp))
+    }
+    if (googleConfigured || account.googleLinked == true) {
+        androidx.compose.material3.Surface(shape = RoundedCornerShape(16.dp), color = EvidriloColors.Atmosphere) {
+            dev.nextgen.mobile.EvidriloGoogleConnection(true, account.googleLinked,
+                Modifier.fillMaxWidth().padding(14.dp))
         }
     }
-    if (googleConfigured) EvidriloTintPanel {
-        Text("Google sign-in", style = MaterialTheme.typography.titleMedium)
-        Text(
-            when {
-                account.googleLinked == true -> "Google is linked to this account. Your Evidrilo account and data stay under the same account ID."
-                googleLinkOutcome == GoogleIdentityLinkOutcome.STARTED -> "Finish linking in your browser, then return here. This account remains active while you do that."
-                googleLinkOutcome == GoogleIdentityLinkOutcome.CANCELLED -> "Google linking did not complete. Your current session remains active; if you approved Google, try again to refresh the link status."
-                googleLinkOutcome == GoogleIdentityLinkOutcome.CONFLICT -> "This Google identity is already associated with an account. No accounts were merged or switched."
-                googleLinkOutcome == GoogleIdentityLinkOutcome.SETUP_REQUIRED -> "Google identity linking is not enabled for this Supabase project. Your current account remains unchanged."
-                googleLinkOutcome == GoogleIdentityLinkOutcome.FAILED -> "We could not verify the link result. Your existing session was preserved; try again to check the Google status."
-                account.googleLinked == false -> "Google is not linked yet. Linking adds Google sign-in to this account without creating or merging accounts."
-                else -> "The Google link status will be checked before linking. This will not replace your current account."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        dev.nextgen.mobile.EvidriloIcon(dev.nextgen.mobile.EvidriloIconName.SHIELD, tint = EvidriloColors.Cobalt)
+        Text(uiText(if (account.emailVerified) "Email verified" else "Email not verified",
+            if (account.emailVerified) "Email terverifikasi" else "Email belum terverifikasi"),
+            style = MaterialTheme.typography.bodyMedium)
+    }
+    Text(uiText("Projects stay on this device. Cloud sync is managed in Settings.",
+        "Proyek tersimpan di perangkat ini. Sinkronisasi cloud diatur di Pengaturan."),
+        style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+    if (googleConfigured && account.googleLinked != true) {
+        Text(when (googleLinkOutcome) {
+            GoogleIdentityLinkOutcome.STARTED -> uiText("Finish connecting in your browser.", "Selesaikan di browser Anda.")
+            GoogleIdentityLinkOutcome.CONFLICT -> uiText("Google is linked to another account.", "Google terhubung ke akun lain.")
+            GoogleIdentityLinkOutcome.SETUP_REQUIRED -> uiText("Google linking is unavailable.", "Penautan Google belum tersedia.")
+            GoogleIdentityLinkOutcome.FAILED -> uiText("Connection failed. Try again.", "Gagal terhubung. Coba lagi.")
+            GoogleIdentityLinkOutcome.CANCELLED -> uiText("Connection cancelled.", "Koneksi dibatalkan.")
+            else -> uiText("Connect Google to this account.", "Hubungkan Google ke akun ini.")
+        }, style = MaterialTheme.typography.bodyMedium, color = EvidriloColors.Slate)
     }
     if (googleConfigured && account.googleLinked != true) {
         val linking = googleLinkOutcome == GoogleIdentityLinkOutcome.STARTED
         EvidriloSecondaryButton(
-            label = if (linking) "Cancel Google linking" else "Link Google to this account",
+            label = if (linking) uiText("Cancel connection", "Batalkan koneksi") else uiText("Connect Google", "Hubungkan Google"),
             onClick = if (linking) onCancelGoogleLink else onGoogleLink,
             enabled = !isBusy,
         )

@@ -139,6 +139,12 @@ class PremiumPracticeReducer(
                     PremiumPracticeState.Locked(presentation)
                 }
 
+                is BillingOutcome.OfferAvailable -> state.copy(billing = BillingPresentation.fromOutcome(
+                    BillingOutcome.Access(PremiumAccess.UNLOCKED),
+                    offer = presentation.offer,
+                    offers = presentation.offers,
+                    selectedProductId = presentation.selectedProductId,
+                ))
                 else -> state.copy(billing = presentation)
             }
 

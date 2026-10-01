@@ -52,6 +52,26 @@ import kotlin.test.assertTrue
 
 class StudentProjectDraftFlowTest {
     @Test
+    fun `chat edits save assistance provenance and reject a stale snapshot`() {
+        val store = InMemoryDraftStore()
+        val flow = flow(store)
+        val original = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.startManual("Synthetic campus shade"),
+        ).value
+        val edited = assertIs<StudentProjectDraftFlowResult.Value<StudentProjectDraft>>(
+            flow.update(original.id, original.title,
+                mapOf(ManualLiteratureSynthesisFields.RESEARCH_QUESTION to "How does shade affect campus heat exposure?"),
+                revisionActor = StudentProjectRevisionActor.CONFIRMED_ASSISTANCE,
+                expectedRevision = original.revision),
+        ).value
+        assertEquals(original.revision + 1, edited.revision)
+        assertEquals(StudentProjectRevisionActor.CONFIRMED_ASSISTANCE, edited.revisionSnapshots.last().actor)
+        val saved = store.drafts.toList()
+        assertEquals(StudentProjectDraftFlowResult.Rejected("PROJECT_AI_STALE_REVISION"),
+            flow.update(original.id, original.title, emptyMap(), expectedRevision = original.revision))
+        assertEquals(saved, store.drafts)
+    }
+    @Test
     fun `start saves a valid published template snapshot for offline resume`() {
         val store = InMemoryDraftStore()
         val flow = flow(store)

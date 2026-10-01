@@ -168,13 +168,12 @@ class EvidriloGeneralAiChatTest {
     @Test
     fun `provider usage notice reports server charge without claiming the balance refresh succeeded`() {
         val charged = generalChatProviderUsageNotice(creditCost = 3, consentMustBeReviewed = false)
-        assertContains(charged, "charged 3 shared AI credits")
-        assertContains(charged, "Check your current balance")
+        assertContains(charged, "3 credits used")
         assertFalse(charged.contains("balance has been refreshed", ignoreCase = true))
 
         val consentChanged = generalChatProviderUsageNotice(creditCost = 1, consentMustBeReviewed = true)
-        assertContains(consentChanged, "charged 1 shared AI credit")
-        assertContains(consentChanged, "review consent")
+        assertContains(consentChanged, "1 credits used")
+        assertContains(consentChanged, "Review AI permission")
         assertFalse(consentChanged.contains("balance has been refreshed", ignoreCase = true))
     }
 }

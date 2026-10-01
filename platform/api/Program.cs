@@ -27,6 +27,18 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 4 * 1024 * 1024;
 });
 var platformOptions = PlatformOptions.From(builder.Configuration, builder.Environment.EnvironmentName);
+if (builder.Configuration.GetValue<bool>("REVENUECAT_TEST_STORE_RECONCILIATION_ENABLED"))
+{
+    var sdkKey = builder.Configuration["REVENUECAT_TEST_STORE_SDK_KEY"];
+    if (!builder.Environment.IsStaging() || !platformOptions.DatabaseConfigured || platformOptions.BillingConfigured ||
+        sdkKey is null || !sdkKey.StartsWith("test_", StringComparison.Ordinal))
+        throw new InvalidOperationException("Test Store reconciliation requires Staging, a database, a Test Store SDK key, and no simultaneous webhook ingestion.");
+    builder.Services.AddSingleton<IRevenueCatSandboxReconciler>(services =>
+        new RevenueCatSandboxReconciler(new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            { Timeout = TimeSpan.FromSeconds(10) }, sdkKey, services.GetRequiredService<IBillingStore>(),
+            services.GetRequiredService<ILogger<RevenueCatSandboxReconciler>>()));
+}
+else builder.Services.AddSingleton<IRevenueCatSandboxReconciler, DisabledRevenueCatSandboxReconciler>();
 var aiProviderOptions = AiProviderOptions.From(builder.Configuration);
 var projectAiProviderOptions = ProjectAiProviderOptions.From(builder.Configuration, aiProviderOptions);
 if (aiProviderOptions.Enabled && !platformOptions.DatabaseConfigured)

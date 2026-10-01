@@ -53,7 +53,7 @@ internal fun premiumPaywallModel(
             PremiumPaywallState.PENDING -> "Purchase is being reconciled"
             PremiumPaywallState.CANCELLED -> "Purchase cancelled"
             PremiumPaywallState.UNKNOWN -> "Purchase state needs reconciliation"
-            PremiumPaywallState.UNLOCKED -> "Premium evidence cases are unlocked"
+            PremiumPaywallState.UNLOCKED -> "Evidrilo Pro is active"
         },
         message = billing.message.ifBlank {
             "The signed-in Free evidence workflow remains available offline without a subscription."

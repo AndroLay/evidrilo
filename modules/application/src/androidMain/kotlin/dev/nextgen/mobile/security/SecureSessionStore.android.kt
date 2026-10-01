@@ -5,7 +5,6 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.security.KeyStore
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -56,9 +55,11 @@ private class AndroidSecureSessionStore(
     }
 
     private fun encrypt(value: String): String {
-        val iv = ByteArray(12).also(SecureRandom()::nextBytes)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key(), GCMParameterSpec(128, iv))
+        // Android Keystore requires randomized encryption and generates the IV.
+        // Supplying our own IV is rejected for keys with that protection enabled.
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val iv = cipher.iv
         val ciphertext = cipher.doFinal(value.encodeToByteArray())
         return listOf(encode(iv), encode(ciphertext)).joinToString(CIPHERTEXT_SEPARATOR)
     }

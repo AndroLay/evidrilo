@@ -72,6 +72,9 @@ class PremiumPracticeStateTest {
         val updatedCatalog = assertIs<PremiumPracticeState.Catalog>(withOffers)
 
         assertEquals(listOf(offer, yearly), updatedCatalog.billing.offers)
+        assertEquals(BillingUiState.UNLOCKED, updatedCatalog.billing.state)
+        assertTrue(updatedCatalog.billing.canRestore)
+        assertTrue(!updatedCatalog.billing.canPurchase)
     }
 
     @Test

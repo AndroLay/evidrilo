@@ -584,6 +584,8 @@ private fun EvidriloAppContent(
     fun requestGeneralChatMessage(
         message: String,
         locale: String,
+        history: List<dev.nextgen.mobile.projectcatalog.ProjectAiChatTurn>,
+        projectContext: dev.nextgen.mobile.projectcatalog.ProjectAiChatContext?,
         onResult: (ProjectAiGeneralChatResult) -> Unit,
     ) {
         if (!accountBoundFeaturesEnabled) {
@@ -612,6 +614,8 @@ private fun EvidriloAppContent(
                 locale = locale,
                 message = message,
                 consentConfirmed = true,
+                history = history,
+                projectContext = projectContext,
             ),
             idempotencyKey = newAnalyticsEventId(),
             onResult = onResult,
@@ -3515,6 +3519,10 @@ private fun EvidriloAppContent(
                 audioCoordinator.stop()
         }
         premiumState = premiumReducer.reduce(premiumState, event)
+        if (event is PremiumPracticeEvent.BillingResult && event.outcome is BillingOutcome.Access) {
+            projectProEntitlementActive.value = event.outcome.value == PremiumAccess.UNLOCKED
+            refreshAiCreditBalance()
+        }
         if (event is PremiumPracticeEvent.BillingResult && preferredProProductId != null) {
             premiumState = premiumReducer.reduce(premiumState, PremiumPracticeEvent.SelectOffer(preferredProProductId!!))
         }
@@ -3867,7 +3875,8 @@ private fun EvidriloAppContent(
     val generalChatCanOpenAccount = accountBoundFeaturesEnabled &&
         accountRestoreComplete &&
         (generalChatAccount == null || !generalChatAccount.account.emailVerified)
-    val generalChatVisible = navigationState.current == EvidriloDestination.HOME &&
+    val generalChatVisible = navigationState.current in setOf(EvidriloDestination.HOME,
+        EvidriloDestination.PROJECTS, EvidriloDestination.PROJECT_EDITOR, EvidriloDestination.PROFILE) &&
         !proComparisonVisible &&
         !onboardingPresentation.isVisible &&
         !accountGateVisible &&
@@ -3971,7 +3980,8 @@ private fun EvidriloAppContent(
             },
             onRestore = {
                 val current = premiumState
-                if (canUseRevenueCatForCurrentAccount() && !premiumBusy && current is PremiumPracticeState.Locked) {
+                if (canUseRevenueCatForCurrentAccount() && !premiumBusy &&
+                    (current is PremiumPracticeState.Locked || current is PremiumPracticeState.Catalog)) {
                     val requestId = premiumRequestId
                     val requestToken = billingRequestGate.begin(currentBillingAccountId())
                     premiumBusy = true
@@ -4012,6 +4022,7 @@ private fun EvidriloAppContent(
                 else -> "Home"
             },
             onBack = leavePremium,
+            onManageSubscription = openCustomerCenter,
             audioState = audioState,
             onNarration = playNarration,
             onPauseOrResumeAudio = pauseOrResumeAudio,
@@ -4357,6 +4368,7 @@ private fun EvidriloAppContent(
         )
         EvidriloTargetProfileScreen(
             signedIn = profileSignedIn,
+            googleLinked = (accountSession as? AccountSession.SignedIn)?.account?.googleLinked,
             profileName = if (profileSignedIn) (accountSession as? AccountSession.SignedIn)?.account?.email?.takeIf { it.isNotBlank() } ?: uiText("Your account") else uiText("Local student"),
             projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty(),
             projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
@@ -4397,6 +4409,7 @@ private fun EvidriloAppContent(
         )
     } else if (navigationState.current == EvidriloDestination.ACCOUNT) {
         EvidriloAccountScreen(
+            hasVerifiedPro = canUseRevenueCatForCurrentAccount() && projectProEntitlementActive.value,
             session = accountSession,
             isBusy = accountBusy,
             accountRestoreComplete = accountAuthRestoreComplete,
@@ -4767,19 +4780,12 @@ private fun EvidriloAppContent(
             result is StudentProjectDraftFlowResult.Value && result.value.revision==revision
         },
         editorMode = navigationState.current == EvidriloDestination.PROJECT_EDITOR,
+        initialProject = activeStudentProjectDraft?.let(::projectChatContext),
         visible = generalChatVisible,
         accountKey = currentBillingAccountId(),
         projects = (studentProjectListState as? StudentProjectListUiState.Loaded)?.projects.orEmpty()
-            .mapNotNull { project ->
-                projectAiEntryProjectOption(
-                    projectId = project.id,
-                    title = project.title,
-                    isActive = project.status == StudentProjectStatus.DRAFT || project.status == StudentProjectStatus.ACTIVE,
-                    templatePublished = project.templateSnapshot?.publication ==
-                        dev.nextgen.mobile.domain.project.ProjectTemplatePublication.PUBLISHED,
-                    hasDeclaredAiOperation = project.templateSnapshot?.steps?.any { it.aiOperations.isNotEmpty() } == true,
-                )
-            },
+            .filter { it.status != StudentProjectStatus.TRASHED }
+            .map { ProjectAiEntryProject(it.id, it.title, projectChatContext(it)) },
         projectsLoading = studentProjectListState is StudentProjectListUiState.Loading,
         accessMessage = generalChatAccessMessage,
         apiConfigured = dev.nextgen.mobile.ai.AiClientConfiguration(accountConfiguration.normalizedApiBaseUrl).isConfigured,
@@ -4801,6 +4807,26 @@ private fun EvidriloAppContent(
         onRefreshActivityHistory = ::refreshProjectAiActivity,
         onLoadMoreActivityHistory = ::loadMoreProjectAiActivity,
         onSendMessage = ::requestGeneralChatMessage,
+        onApplyEdits = { owner, context, edits ->
+            val current = (studentProjectDraftFlow.resume(context.projectId) as? StudentProjectDraftFlowResult.Value)?.value
+            if (owner != currentBillingAccountId() || current == null ||
+                projectAiConsentState != ProjectAiConsentUiState.Granted || studentProjectEditorIsDirty ||
+                !validProjectChatEdits(context, current, edits)) null
+            else {
+                val result = studentProjectDraftFlow.update(
+                    projectId = current.id, title = current.title,
+                    fieldValues = current.fieldValues + edits.associate { it.fieldId to it.value },
+                    revisionActor = dev.nextgen.mobile.domain.project.StudentProjectRevisionActor.CONFIRMED_ASSISTANCE,
+                    changeSummary = "AI chat edits reviewed and applied by the student",
+                    expectedRevision = context.revision,
+                )
+                (result as? StudentProjectDraftFlowResult.Value)?.value?.let { updated ->
+                    replaceStudentProjectInList(updated)
+                    if (activeStudentProjectDraft?.id == updated.id) activeStudentProjectDraft = updated
+                    projectChatContext(updated)
+                }
+            }
+        },
     )
 
     }
@@ -4966,6 +4992,7 @@ private fun EvidriloPremiumSurface(
     onReturnToCatalog: () -> Unit,
     backLabel: String,
     onBack: () -> Unit,
+    onManageSubscription: () -> Unit,
     audioState: AudioPlaybackState = AudioPlaybackState.Idle,
     onNarration: (AudioNarrationId, String) -> Unit = { _, _ -> },
     onPauseOrResumeAudio: () -> Unit = {},
@@ -5005,10 +5032,16 @@ private fun EvidriloPremiumSurface(
             selected = EvidriloTargetSection.PROFILE,
             onNavigate = onNavigate,
         ) {
-            EvidriloPremiumCatalogScreen(
-                state = state,
-                onSelectCase = onSelectCase,
-                onBeginCase = onBeginCase,
+            EvidriloPremiumPaywall(
+                billing = state.billing,
+                isBusy = isBusy,
+                managedPaywallAvailable = managedPaywallAvailable,
+                onOpenManagedPaywall = onOpenManagedPaywall,
+                onPurchase = onPurchase,
+                onRestore = onRestore,
+                onRetry = onRetry,
+                onSelectOffer = onSelectOffer,
+                onManageSubscription = onManageSubscription,
                 onBack = onBack,
                 backLabel = backLabel,
             )

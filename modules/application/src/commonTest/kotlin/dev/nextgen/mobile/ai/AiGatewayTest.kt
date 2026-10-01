@@ -16,6 +16,20 @@ import kotlin.test.assertTrue
 
 class AiGatewayTest {
     @Test
+    fun accumulated_monthly_credits_above_the_first_allowance_are_usable() {
+        val transport = QueueAiTransport(AccountHttpResponse(200, """
+            {"schema":"evidrilo.ai-credits","version":"1","consentRecorded":true,"available":418,
+            "grants":[
+              {"grantKind":"free_once","grantKey":"once","granted":20,"reserved":0,"consumed":2,"available":18,"expiresAt":null},
+              {"grantKind":"subscription_month","grantKey":"period-1","granted":200,"reserved":0,"consumed":0,"available":200,"expiresAt":null},
+              {"grantKind":"subscription_month","grantKey":"period-2","granted":200,"reserved":0,"consumed":0,"available":200,"expiresAt":null}
+            ],"requestId":"req-ai-accumulated"}
+        """.trimIndent()))
+        val result = assertIs<AiGatewayResult.CreditsFound>(runSuspendTest { gateway(transport).getCredits() })
+        assertEquals(418, result.value.available)
+        assertEquals(3, result.value.grants.size)
+    }
+    @Test
     fun credits_parse_and_assist_sends_bounded_opted_in_request() {
         val transport = QueueAiTransport(
             AccountHttpResponse(

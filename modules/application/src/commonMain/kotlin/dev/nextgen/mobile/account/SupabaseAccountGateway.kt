@@ -137,7 +137,7 @@ class SupabaseAccountGateway(
             append("&scopes=")
             append(encodeAuthUrlComponent(provider.scopes))
             append("&redirect_to=")
-            append(encodeAuthUrlComponent(configuration.redirectUrl))
+            append(encodeAuthUrlComponent(oauthCallbackUrl(pkce.state)))
             append("&code_challenge=")
             append(encodeAuthUrlComponent(pkce.challenge))
             append("&code_challenge_method=S256&state=")
@@ -150,6 +150,11 @@ class SupabaseAccountGateway(
         }
         return AccountGatewayResult.OAuthStarted
     }
+
+    // Supabase owns the provider's OAuth state. Our local correlation value must
+    // travel in redirect_to so it is retained when Supabase adds the auth code.
+    private fun oauthCallbackUrl(state: String): String =
+        "${configuration.redirectUrl}?state=${encodeAuthUrlComponent(state)}"
 
     override suspend fun startIdentityLink(provider: AccountOAuthProvider): AccountGatewayResult {
         if (!configuration.isConfigured) return AccountGatewayResult.NotConfigured
@@ -214,7 +219,7 @@ class SupabaseAccountGateway(
                 append("&scopes=")
                 append(encodeAuthUrlComponent(provider.scopes))
                 append("&redirect_to=")
-                append(encodeAuthUrlComponent(configuration.redirectUrl))
+                append(encodeAuthUrlComponent(oauthCallbackUrl(pkce.state)))
                 append("&code_challenge=")
                 append(encodeAuthUrlComponent(pkce.challenge))
                 append("&code_challenge_method=s256&state=")

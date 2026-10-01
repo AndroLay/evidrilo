@@ -98,7 +98,19 @@ public static class ProjectAiGeneralChatEndpoints
                     accountId,
                     requestId,
                     AiRedactor.Redact(validRequest.Message!),
-                    validRequest.Locale!);
+                    validRequest.Locale!)
+                {
+                    History = validRequest.History?.Select(turn => turn with { Text = AiRedactor.Redact(turn.Text) }).ToArray(),
+                    ProjectContext = validRequest.ProjectContext is { } selected ? selected with
+                    {
+                        Title = AiRedactor.Redact(selected.Title),
+                        Notes = AiRedactor.Redact(selected.Notes),
+                        Fields = selected.Fields.Select(field => field with
+                        {
+                            Label = AiRedactor.Redact(field.Label), Value = AiRedactor.Redact(field.Value)
+                        }).ToArray()
+                    } : null,
+                };
                 int maximumCreditCost;
                 try
                 {
@@ -126,7 +138,9 @@ public static class ProjectAiGeneralChatEndpoints
                     installationId,
                     providerRequest.Locale,
                     providerRequest.Message,
-                    maximumCreditCost);
+                    maximumCreditCost,
+                    providerRequest.History,
+                    providerRequest.ProjectContext);
                 var reservation = await creditLedger.TryReserveAsync(
                     accountId,
                     requestId,
@@ -276,7 +290,8 @@ public static class ProjectAiGeneralChatEndpoints
                         afterProviderConsent is null ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status403Forbidden);
                 }
 
-                if (string.IsNullOrWhiteSpace(output.Answer)
+                if (!ProjectAiGeneralChatValidator.ValidEdits(output.ProposedEdits, providerRequest.ProjectContext)
+                    || string.IsNullOrWhiteSpace(output.Answer)
                     || output.Answer.Length > ProjectAiGeneralChatValidator.MaximumAnswerLength
                     || output.RecommendedNextPrompts is null
                     || output.RecommendedNextPrompts.Count is < ProjectAiGeneralChatValidator.MinimumRecommendedNextPrompts
@@ -331,7 +346,8 @@ public static class ProjectAiGeneralChatEndpoints
                         output.Answer,
                         output.RecommendedNextPrompts,
                         requestId,
-                        settledCreditCost),
+                        settledCreditCost)
+                    { ProposedEdits = output.ProposedEdits.Count > 0 ? output.ProposedEdits : null },
                     options: ResponseJsonOptions);
             })
             .RequireAuthorization()
@@ -358,7 +374,9 @@ public static class ProjectAiGeneralChatEndpoints
         Guid installationId,
         string locale,
         string redactedMessage,
-        int maximumCreditCost)
+        int maximumCreditCost,
+        IReadOnlyList<ProjectAiChatTurn>? history,
+        ProjectAiChatContext? projectContext)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -367,6 +385,8 @@ public static class ProjectAiGeneralChatEndpoints
             InstallationId = installationId,
             Locale = locale,
             Message = redactedMessage,
+            History = history,
+            ProjectContext = projectContext,
             MaximumCreditCost = maximumCreditCost,
         });
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();

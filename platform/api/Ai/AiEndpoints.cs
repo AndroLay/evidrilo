@@ -134,6 +134,7 @@ public static class AiEndpoints
             async (
                 HttpContext context,
                 IAiCreditLedger creditLedger,
+                Evidrilo.Api.Billing.IRevenueCatSandboxReconciler billingReconciler,
                 CancellationToken cancellationToken) =>
             {
                 if (!AuthenticatedUser.TryGetAccountId(context.User, out var accountId))
@@ -150,6 +151,7 @@ public static class AiEndpoints
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
+                await billingReconciler.RefreshAsync(accountId, cancellationToken);
                 var balance = await creditLedger.GetBalanceAsync(accountId, cancellationToken);
                 return Results.Ok(ToResponse(balance, RequestIdMiddleware.Get(context)));
             })

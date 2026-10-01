@@ -51,6 +51,7 @@ internal fun EvidriloPremiumPaywall(
     onBack: () -> Unit,
     backLabel: String,
     onChooseAnotherPlan: (() -> Unit)? = null,
+    onManageSubscription: (() -> Unit)? = null,
 ) {
     val model = premiumPaywallModel(billing.copy(isBusy = isBusy))
 
@@ -111,6 +112,11 @@ internal fun EvidriloPremiumPaywall(
                     enabled = !model.isBusy,
                 )
             }
+            if (model.state == PremiumPaywallState.UNLOCKED) {
+                onManageSubscription?.let { manage ->
+                    EvidriloPrimaryButton("Manage subscription", manage, enabled = !model.isBusy)
+                }
+            }
             if (model.showRetry) {
                 EvidriloSecondaryButton(
                     label = "Try again",
@@ -128,7 +134,7 @@ internal fun EvidriloPremiumPaywall(
                     enabled = !model.isBusy,
                 )
             }
-            EvidriloSecondaryButton(label = "Continue with Free", onClick = onBack)
+            EvidriloSecondaryButton(label = if (model.state == PremiumPaywallState.UNLOCKED) "Done" else "Continue with Free", onClick = onBack)
             Spacer(modifier = Modifier.size(4.dp))
             Text(
                 "The first synthetic Practice case is Free. Pro opens all three. Purchases and access follow your account's subscription status.",

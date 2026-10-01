@@ -1561,6 +1561,7 @@ internal fun EvidriloTargetProfileScreen(
     projectsError: String? = null,
     profileName: String = if (signedIn) "Your account" else "Local student",
     hasVerifiedPro: Boolean = false,
+    googleLinked: Boolean? = null,
     onRetryProjects: () -> Unit = {},
     onResumeProject: (dev.nextgen.mobile.domain.project.StudentProjectDraft) -> Unit = {},
     onOpenPractice: () -> Unit = {},
@@ -1571,7 +1572,7 @@ internal fun EvidriloTargetProfileScreen(
             EvidriloBackGesture(label = "Home", onClick = onBack)
             EvidriloProfileProgress(signedIn, profileName, projects, projectsLoading, projectsError, hasVerifiedPro,
                 onOpenAccount, onOpenLocalProjects, onResumeProject, onOpenPractice, onOpenHistory, onOpenPremium,
-                onRetryProjects, onOpenWorkspacePreferences, onOpenNotifications, onOpenPrivacyData, onOpenSupport, onOpenPracticeLesson)
+                onRetryProjects, onOpenWorkspacePreferences, onOpenNotifications, onOpenPrivacyData, onOpenSupport, onOpenPracticeLesson, googleLinked)
         }
     }
 }

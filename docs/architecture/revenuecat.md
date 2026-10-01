@@ -184,6 +184,21 @@ when the server ledger reconciles a verified entitlement period idempotently.
 
 ## Verification boundary
 
+Purchase and restore outcomes automatically refresh the displayed server credit
+balance. Subscription credit accounting earns 200 at the start of each eligible
+monthly period; annual coverage is divided into monthly anniversaries rather
+than prepaid credits for the whole year. Earned credits accumulate. AI consent
+controls spending/provider use, independently of accounting for paid benefits.
+Duplicate callbacks, restore, and repeated balance reads must not duplicate a
+period grant. Active subscriptions retain Restore and Manage actions, and loading
+offers must preserve verified active access.
+
+For a local-only Staging Test Store run, the default-off server reconciliation
+mode reads RevenueCat directly and validates sandbox/store/product/period data.
+It recovers verified purchase periods when no hosted webhook is available.
+Production continues to require its authenticated provider-event integration;
+the client never awards credits from a purchase success flag.
+
 Repository tests can establish reducer, allowlist, webhook, and failure
 behavior under their test fixtures. A provider claim requires an authorized
 Test Store run on the claimed build. The run should cover offering load,

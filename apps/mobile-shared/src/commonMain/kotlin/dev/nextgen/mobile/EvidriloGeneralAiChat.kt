@@ -4,68 +4,43 @@ import androidx.compose.material3.Text as RawText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import dev.nextgen.mobile.EvidriloUiText as Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatAnswer
-import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatDeferredReason
-import dev.nextgen.mobile.projectcatalog.ProjectAiGeneralChatResult
+import dev.nextgen.mobile.EvidriloUiText as Text
+import dev.nextgen.mobile.projectcatalog.*
+import dev.nextgen.mobile.analytics.newAnalyticsEventId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-internal data class ProjectAiEntryProject(val id: String, val title: String)
+internal data class ProjectAiEntryProject(val id: String, val title: String, val context: ProjectAiChatContext? = null)
 
 internal fun projectAiEntryEmptyStateMessage(): String =
     "No project with a supported AI stage is available yet. Your saved projects remain available in Home."
@@ -170,706 +145,346 @@ internal fun reduceProjectAiEntrySurface(
 
 @Composable
 internal fun EvidriloGeneralAiChat(
-    visible: Boolean,
-    editorMode: Boolean = false,
-    accountKey: String?,
-    projects: List<ProjectAiEntryProject>,
-    projectsLoading: Boolean,
-    accessMessage: String?,
-    apiConfigured: Boolean,
+    visible: Boolean, editorMode: Boolean = false, accountKey: String?,
+    initialProject: ProjectAiChatContext? = null,
+    projects: List<ProjectAiEntryProject>, projectsLoading: Boolean,
+    accessMessage: String?, apiConfigured: Boolean,
     aiCreditBalance: AiCreditBalancePresentation = AiCreditBalancePresentation.SignInRequired,
-    consentState: ProjectAiConsentUiState,
-    canOpenAccount: Boolean,
-    onOpenAccount: () -> Unit,
-    onRefreshConsent: () -> Unit,
-    onRefreshAiCreditBalance: () -> Unit = {},
-    onGrantConsent: () -> Unit,
-    onRevokeConsent: () -> Unit,
-    onOpenProjects: () -> Unit,
-    onOpenProject: (String) -> Unit,
+    consentState: ProjectAiConsentUiState, canOpenAccount: Boolean,
+    onOpenAccount: () -> Unit, onRefreshConsent: () -> Unit,
+    onRefreshAiCreditBalance: () -> Unit = {}, onGrantConsent: () -> Unit,
+    onRevokeConsent: () -> Unit, onOpenProjects: () -> Unit, onOpenProject: (String) -> Unit,
     activityHistoryState: ProjectAiActivityHistoryUiState,
-    onRefreshActivityHistory: (String?) -> Unit,
-    onLoadMoreActivityHistory: (String?, String) -> Unit,
-    onSendMessage: (message: String, locale: String, onResult: (ProjectAiGeneralChatResult) -> Unit) -> Unit,
-    opinionIntent: ProjectOpinionIntent? = null,
-    onConsumeOpinionIntent: () -> Unit = {},
-    isOpinionCurrent: (String,Int) -> Boolean = { _,_ -> true },
+    onRefreshActivityHistory: (String?) -> Unit, onLoadMoreActivityHistory: (String?, String) -> Unit,
+    onSendMessage: (String, String, List<ProjectAiChatTurn>, ProjectAiChatContext?, (ProjectAiGeneralChatResult) -> Unit) -> Unit,
+    onApplyEdits: (String, ProjectAiChatContext, List<ProjectAiChatEdit>) -> ProjectAiChatContext? = { _, _, _ -> null },
+    opinionIntent: ProjectOpinionIntent? = null, onConsumeOpinionIntent: () -> Unit = {},
+    isOpinionCurrent: (String, Int) -> Boolean = { _, _ -> true },
 ) {
-    var entrySurface by remember { mutableStateOf(ProjectAiEntrySurface.CLOSED) }
+    var open by remember { mutableStateOf(false) }
     var input by remember(accountKey) { mutableStateOf("") }
-    var consentConfirmed by remember(accountKey) { mutableStateOf(false) }
     var sending by remember(accountKey) { mutableStateOf(false) }
-    var aiShortcutPosition by remember(editorMode) { mutableStateOf<AiShortcutPosition?>(null) }
+    var selectedProject by remember(accountKey) { mutableStateOf<ProjectAiChatContext?>(null) }
     val entries = remember(accountKey) { mutableStateListOf<GeneralChatEntry>() }
     val listState = rememberLazyListState()
     val locale = LocalEvidriloLanguage.current.tag
-    var opinionContext by remember(accountKey) { mutableStateOf<ProjectOpinionIntent?>(null) }
-    var showOpinionExcerpt by remember(accountKey) { mutableStateOf(false) }
-    var opinionChanged by remember(accountKey) { mutableStateOf(false) }
-    LaunchedEffect(opinionIntent,sending,accountKey) {
-        if(opinionIntent!=null && !sending) {
-            opinionContext=opinionIntent; opinionChanged=false
-            entrySurface=ProjectAiEntrySurface.GENERAL_CHAT
-            input=opinionIntent.prompt
-            consentConfirmed=false
-            onConsumeOpinionIntent()
+    var shortcutX by rememberSaveable { mutableStateOf<Float?>(null) }
+    var shortcutY by rememberSaveable { mutableStateOf<Float?>(null) }
+    val shortcut = shortcutX?.let { x -> shortcutY?.let { y -> AiShortcutPosition(x, y) } }
+    var draggingShortcut by remember { mutableStateOf(false) }
+    val shortcutScale by animateFloatAsState(if (draggingShortcut) 1.08f else 1f)
+    var menu by remember { mutableStateOf(false) }
+    var historyOpen by remember { mutableStateOf(false) }
+    var projectPicker by remember { mutableStateOf(false) }
+    var privacyOpen by remember { mutableStateOf(false) }
+    var approveSend by remember(accountKey) { mutableStateOf(false) }
+    var awaitingConsent by remember(accountKey) { mutableStateOf(false) }
+    var excerptOpen by remember { mutableStateOf(false) }
+    var proposal by remember(accountKey) { mutableStateOf<GeneralChatEntry.Answer?>(null) }
+    var localNotice by remember(accountKey) { mutableStateOf<String?>(null) }
+    val historyStore = remember { createChatSessionStore() }
+    var sessions by remember { mutableStateOf<List<ChatSession>>(emptyList()) }
+    var historyLoaded by remember { mutableStateOf(false) }
+    var sessionId by remember(accountKey) { mutableStateOf(newAnalyticsEventId()) }
+    val historyPrefix = "live-ai:${accountKey.orEmpty()}:"
+
+    LaunchedEffect(historyStore) {
+        val result = withContext(Dispatchers.Default) { historyStore.load() }
+        sessions = result.getOrDefault(emptyList()); historyLoaded = result.isSuccess
+        if (result.isFailure) localNotice = chatCopy(locale, "History couldn't be read.", "Riwayat tidak dapat dibaca.")
+    }
+    LaunchedEffect(entries.size, sending, sessionId, historyLoaded, accountKey) {
+        if (entries.isNotEmpty()) listState.animateScrollToItem(entries.lastIndex)
+        if (historyLoaded && accountKey != null && entries.isNotEmpty()) {
+            val messages = entries.mapNotNull { entry -> when (entry) {
+                is GeneralChatEntry.User -> ChatMessage(true, entry.text)
+                is GeneralChatEntry.Answer -> ChatMessage(false, entry.value.answer)
+                is GeneralChatEntry.Notice -> null
+            } }.takeLast(80)
+            val session = ChatSession(sessionId, historyPrefix + (selectedProject?.projectId ?: "general"),
+                selectedProject?.title ?: "General Chat", messages.firstOrNull()?.text?.take(60).orEmpty(),
+                kotlin.time.Clock.System.now().toEpochMilliseconds(), messages)
+            val latest = withContext(Dispatchers.Default) { historyStore.load() }.getOrNull()
+            if (latest == null) {
+                localNotice = chatCopy(locale, "Chat history wasn't saved.", "Riwayat chat belum tersimpan.")
+                return@LaunchedEffect
+            }
+            val updated = (latest.filterNot { it.id == sessionId } + session).sortedByDescending { it.updatedAtMillis }
+            val own = updated.filter { it.contextKey.startsWith(historyPrefix) }.take(30).map { it.id }.toSet()
+            val kept = updated.filter { !it.contextKey.startsWith(historyPrefix) || it.id in own }
+            if (withContext(Dispatchers.Default) { historyStore.save(kept) }) sessions = kept
+            else localNotice = chatCopy(locale, "Chat history wasn't saved.", "Riwayat chat belum tersimpan.")
         }
     }
-
-    fun send(rawMessage: String) {
-        val message = rawMessage.trim()
-        val opinion=opinionContext
-        if(opinion!=null && !isOpinionCurrent(opinion.projectId,opinion.revision)) {
-            opinionChanged=true; consentConfirmed=false; return
+    fun fresh(context: ProjectAiChatContext? = null) {
+        if (sending) return
+        selectedProject = context; entries.clear(); input = ""; sessionId = newAnalyticsEventId(); localNotice = null
+    }
+    fun send() {
+        val message = input.trim()
+        if (!canSendGeneralAiMessage(message, true, consentState, accessMessage, apiConfigured, sending)) return
+        val context = selectedProject
+        if (context != null && !isOpinionCurrent(context.projectId, context.revision)) {
+            localNotice = chatCopy(locale, "Project changed. Select it again to use its latest version.", "Proyek berubah. Pilih kembali untuk memakai revisi terbaru."); return
         }
-        if (!canSendGeneralAiMessage(message, consentConfirmed, consentState, accessMessage, apiConfigured, sending)) return
-        input = ""
-        consentConfirmed = false
-        sending = true
+        val history = entries.mapNotNull { entry -> when (entry) {
+            is GeneralChatEntry.User -> ProjectAiChatTurn("user", entry.text)
+            is GeneralChatEntry.Answer -> ProjectAiChatTurn("assistant", entry.value.answer)
+            is GeneralChatEntry.Notice -> null
+        } }.takeLast(8).let { turns ->
+            var size = 0
+            turns.asReversed().takeWhile { size += it.text.length; size <= 16000 }.asReversed()
+        }
+        input = ""; sending = true; localNotice = null
         entries += GeneralChatEntry.User("user-${entries.size}", message)
-        onSendMessage(message, locale) { result ->
+        onSendMessage(message, locale, history, context) { result ->
             sending = false
             when (result) {
-                is ProjectAiGeneralChatResult.Answer ->
-                    entries += GeneralChatEntry.Answer("answer-${entries.size}", result.value)
-                is ProjectAiGeneralChatResult.Deferred -> entries += GeneralChatEntry.Notice(
-                    "notice-${entries.size}",
-                    when (result.reason) {
-                        ProjectAiGeneralChatDeferredReason.NOT_CONFIGURED -> "AI service is not configured in this build."
-                        ProjectAiGeneralChatDeferredReason.AUTH_REQUIRED -> "A verified account is required. Sign in again before sending a message."
-                        ProjectAiGeneralChatDeferredReason.SESSION_EXPIRED -> "Your account session expired. Sign in again before sending a message."
-                        ProjectAiGeneralChatDeferredReason.SECURE_STORAGE -> "Secure session storage is unavailable; the message was not sent."
-                    },
-                )
-                is ProjectAiGeneralChatResult.Unavailable -> entries += GeneralChatEntry.Notice(
-                    "notice-${entries.size}",
-                    if (result.code == "PROJECT_AI_GENERAL_CHAT_NOT_READY") {
-                        "General Chat is not enabled by the platform right now. Your message was not answered; your project remains available."
-                    } else {
-                        "The AI service is temporarily unavailable. No answer was shown. Try again later."
-                    },
-                )
-                is ProjectAiGeneralChatResult.Rejected -> entries += GeneralChatEntry.Notice(
-                    "notice-${entries.size}",
-                    when {
-                        result.code in setOf(
-                            "PROJECT_AI_CONSENT_REQUIRED",
-                            "PROJECT_AI_CONSENT_POLICY_STALE",
-                            "PROJECT_AI_CONSENT_REVOKED_AFTER_PROVIDER",
-                            "PROJECT_AI_CONSENT_CHECK_UNAVAILABLE_AFTER_PROVIDER",
-                        ) -> {
-                            onRefreshConsent()
-                            if (result.creditCost != null) {
-                                generalChatProviderUsageNotice(requireNotNull(result.creditCost), consentMustBeReviewed = true)
-                            } else {
-                                "Account-level AI data-use consent is missing or out of date. Refresh and review consent before sending again."
-                            }
-                        }
-                        result.creditCost != null -> generalChatProviderUsageNotice(requireNotNull(result.creditCost), consentMustBeReviewed = false)
-                        result.code == "AI_CREDITS_INSUFFICIENT" -> "There are not enough AI credits for this request. No answer was returned."
-                        result.code == "GENERAL_CHAT_CONSENT_REQUIRED" -> "Confirm the General chat notice for this message, then try again."
-                        else -> "The response could not be verified, so it was not displayed. Check your credit balance before sending again."
-                    },
-                )
-                is ProjectAiGeneralChatResult.Failed -> entries += GeneralChatEntry.Notice(
-                    "notice-${entries.size}",
-                    if (result.outcomeUnknown) {
-                        "We could not confirm whether the request completed. It may have used credits; check your AI credit balance before sending again."
-                    } else if (result.retryable) {
-                        "The device appears offline. Reconnect before sending this message."
-                    } else {
-                        "The request failed. No response was shown."
-                    },
-                )
+                is ProjectAiGeneralChatResult.Answer -> entries += GeneralChatEntry.Answer("answer-${entries.size}", result.value, context)
+                else -> entries += GeneralChatEntry.Notice("notice-${entries.size}", generalChatFailureMessage(result, locale))
+            }
+            onRefreshAiCreditBalance()
+        }
+    }
+    fun submit() {
+        if (input.isBlank() || sending || accessMessage != null || !apiConfigured) return
+        if (consentState == ProjectAiConsentUiState.Granted) send()
+        else { approveSend = true; onRefreshConsent() }
+    }
+    LaunchedEffect(consentState, awaitingConsent) {
+        if (awaitingConsent && consentState == ProjectAiConsentUiState.Granted) { awaitingConsent = false; send() }
+        if (awaitingConsent && consentState is ProjectAiConsentUiState.Unavailable) awaitingConsent = false
+    }
+    LaunchedEffect(opinionIntent, sending) {
+        opinionIntent?.let { intent ->
+            if (!sending) {
+                fresh(projects.firstOrNull { it.id == intent.projectId }?.context)
+                input = chatCopy(locale, "Review this project and suggest practical next steps.", "Tinjau proyek ini dan sarankan langkah berikutnya.")
+                open = true; onConsumeOpinionIntent()
             }
         }
     }
-
-    LaunchedEffect(visible) {
-        if (!visible) entrySurface = ProjectAiEntrySurface.CLOSED
-    }
-    LaunchedEffect(entrySurface, accountKey, accessMessage, apiConfigured) {
-        if (shouldRefreshAiCreditBalance(entrySurface)) onRefreshAiCreditBalance()
-        if (entrySurface == ProjectAiEntrySurface.GENERAL_CHAT && accessMessage == null && apiConfigured) {
-            onRefreshConsent()
-        }
-    }
-    if (entries.isNotEmpty() || sending) {
-        LaunchedEffect(entries.size, sending) {
-            val lastIndex = (if (sending) entries.size else entries.size - 1).coerceAtLeast(0)
-            listState.animateScrollToItem(lastIndex)
-        }
-    }
+    LaunchedEffect(visible) { if (!visible) open = false }
+    LaunchedEffect(open, accountKey) { if (open && accountKey != null) { onRefreshConsent(); onRefreshAiCreditBalance() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
-        val viewportWidthPx = with(density) { maxWidth.toPx() }
-        val viewportHeightPx = with(density) { maxHeight.toPx() }
-        val shortcutSizePx = with(density) { 48.dp.toPx() }
-        val edgeInsetPx = with(density) { 16.dp.toPx() }
-        val endInsetPx = with(density) { (if (editorMode) 16.dp else 80.dp).toPx() }
-        val bottomInsetPx = with(density) { 100.dp.toPx() }
-        val bounds = AiShortcutBounds(
-            minXPx = edgeInsetPx,
-            minYPx = edgeInsetPx,
-            maxXPx = (viewportWidthPx - shortcutSizePx - edgeInsetPx).coerceAtLeast(edgeInsetPx),
-            maxYPx = (viewportHeightPx - shortcutSizePx - bottomInsetPx).coerceAtLeast(edgeInsetPx),
-        )
-        val initialPosition = initialAiShortcutPosition(
-            viewportWidthPx = viewportWidthPx,
-            viewportHeightPx = viewportHeightPx,
-            shortcutSizePx = shortcutSizePx,
-            endInsetPx = endInsetPx,
-            // Start beside the Home header, away from the main continuation action.
-            bottomInsetPx = if (editorMode) with(density) { 160.dp.toPx() }
-                else viewportHeightPx - shortcutSizePx - with(density) { 52.dp.toPx() },
-            bounds = bounds,
-        )
-        val displayedPosition = clampAiShortcutPosition(aiShortcutPosition ?: initialPosition, bounds)
-
-        LaunchedEffect(bounds) {
-            aiShortcutPosition = aiShortcutPosition?.let { clampAiShortcutPosition(it, bounds) }
-        }
-
-        AnimatedVisibility(
-            visible = visible,
-            modifier = Modifier.offset {
-                IntOffset(displayedPosition.xPx.roundToInt(), displayedPosition.yPx.roundToInt())
-            },
-            enter = fadeIn() + scaleIn(),
-        ) {
-            FloatingActionButton(
-                onClick = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.OPEN) },
-                modifier = Modifier
-                    .size(48.dp)
-                    .pointerInput(bounds, initialPosition) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            val position = aiShortcutPosition ?: initialPosition
-                            aiShortcutPosition = dragAiShortcutPosition(
-                                current = position,
-                                deltaXPx = dragAmount.x,
-                                deltaYPx = dragAmount.y,
-                                bounds = bounds,
-                            )
-                        }
-                    }
-                    .semantics {
-                        contentDescription = "AI chat shortcut. Tap to open AI modes. Drag to move."
-                        customActions = listOf(
-                            CustomAccessibilityAction("Move AI shortcut to upper left") {
-                                aiShortcutPosition = AiShortcutPosition(bounds.minXPx, bounds.minYPx)
-                                true
-                            },
-                            CustomAccessibilityAction("Move AI shortcut to upper right") {
-                                aiShortcutPosition = AiShortcutPosition(bounds.maxXPx, bounds.minYPx)
-                                true
-                            },
-                            CustomAccessibilityAction("Move AI shortcut to lower left") {
-                                aiShortcutPosition = AiShortcutPosition(bounds.minXPx, bounds.maxYPx)
-                                true
-                            },
-                            CustomAccessibilityAction("Move AI shortcut to lower right") {
-                                aiShortcutPosition = AiShortcutPosition(bounds.maxXPx, bounds.maxYPx)
-                                true
-                            },
-                        )
-                    },
-                shape = androidx.compose.foundation.shape.CircleShape,
-                containerColor = EvidriloColors.Tint,
-                contentColor = EvidriloColors.Cobalt,
-            ) {
+        val size = with(density) { 48.dp.toPx() }; val inset = with(density) { 16.dp.toPx() }
+        val bounds = AiShortcutBounds(inset, inset,
+            (with(density) { maxWidth.toPx() } - size - inset).coerceAtLeast(inset),
+            (with(density) { maxHeight.toPx() } - size - with(density) { 100.dp.toPx() }).coerceAtLeast(inset))
+        val initial = AiShortcutPosition(bounds.maxXPx - with(density) { (if (editorMode) 0.dp else 64.dp).toPx() },
+            if (editorMode) bounds.maxYPx - with(density) { 60.dp.toPx() } else with(density) { 52.dp.toPx() })
+        val position = clampAiShortcutPosition(shortcut ?: initial, bounds)
+        AnimatedVisibility(visible, Modifier.offset { IntOffset(position.xPx.roundToInt(), position.yPx.roundToInt()) }, enter = fadeIn() + scaleIn()) {
+            FloatingActionButton({
+                if (editorMode && initialProject != null && selectedProject?.projectId != initialProject.projectId) fresh(initialProject)
+                open = true
+            }, Modifier.size(48.dp).graphicsLayer { scaleX = shortcutScale; scaleY = shortcutScale }.pointerInput(bounds) {
+                detectDragGestures(
+                    onDragStart = { draggingShortcut = true },
+                    onDragEnd = { draggingShortcut = false },
+                    onDragCancel = { draggingShortcut = false },
+                ) { change, delta ->
+                    change.consume()
+                    val current = shortcutX?.let { x -> shortcutY?.let { y -> AiShortcutPosition(x, y) } } ?: initial
+                    val moved = dragAiShortcutPosition(current, delta.x, delta.y, bounds)
+                    shortcutX = moved.xPx; shortcutY = moved.yPx
+                }
+            }.semantics { contentDescription = chatCopy(locale, "Open AI chat. Drag to move.", "Buka chat AI. Geser untuk memindahkan.") },
+                shape = CircleShape, containerColor = EvidriloColors.Tint, contentColor = EvidriloColors.Cobalt) {
                 EvidriloIcon(EvidriloIconName.CHAT_BUBBLE, tint = EvidriloColors.Cobalt, modifier = Modifier.size(23.dp))
             }
         }
     }
-
-    if(showOpinionExcerpt) AlertDialog(onDismissRequest={showOpinionExcerpt=false},containerColor=EvidriloColors.Card,
-        title={Text(uiText("Selected project excerpt","Cuplikan proyek pilihan"))},
-        text={Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text(uiText("Only this message will be sent after your explicit approval. No original files. AI usage consumes credits.",
-                "Hanya pesan ini yang dikirim setelah persetujuan Anda. Tanpa berkas asli. Penggunaan AI memakai kredit."))
-            androidx.compose.foundation.text.selection.SelectionContainer {RawText(input)}
-        }},confirmButton={TextButton({showOpinionExcerpt=false}) {Text(uiText("Close","Tutup"))}})
-
-    if (entrySurface != ProjectAiEntrySurface.CLOSED) {
-        Dialog(
-            onDismissRequest = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.DISMISS) },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            dev.nextgen.mobile.navigation.EvidriloBackGestureHost {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(0.dp),
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    AiWorkspaceHeader(
-                        surface = entrySurface,
-                        onBack = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.BACK) },
-                        onClose = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.DISMISS) },
-                    )
-
-                    if (entrySurface == ProjectAiEntrySurface.MODE_PICKER) {
-                        Surface(color = EvidriloColors.Atmosphere, shape = RoundedCornerShape(18.dp)) {
-                            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(when {
-                                    !apiConfigured -> "AI is not connected in this build"
-                                    accessMessage != null -> "Your account needs attention"
-                                    consentState == ProjectAiConsentUiState.NotGranted -> "Review AI data use before asking"
-                                    consentState != ProjectAiConsentUiState.Granted -> "Check AI consent before sending"
-                                    else -> "Choose the help you need"
-                                }, style = MaterialTheme.typography.titleMedium)
-                                Text(when {
-                                    !apiConfigured -> "Keep working locally. Questions and project material are not sent from this build."
-                                    accessMessage != null -> accessMessage
-                                    consentState == ProjectAiConsentUiState.NotGranted -> "You choose what to share. Each request keeps its own context and confirmation."
-                                    consentState is ProjectAiConsentUiState.Unavailable -> consentState.message
-                                    consentState != ProjectAiConsentUiState.Granted -> "Consent status needs to be checked. Open a chat to check it before sending."
-                                    else -> "Your account and connection are configured. Service availability is checked when you send a request."
-                                }, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
-                            }
+    if (open) Dialog(onDismissRequest = { open = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = EvidriloColors.Surface) {
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp)) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton({ historyOpen = true }, enabled = !sending, modifier = Modifier.semantics { contentDescription = chatCopy(locale, "Chat history", "Riwayat chat") }) {
+                        EvidriloIcon(EvidriloIconName.HISTORY, tint = EvidriloColors.Slate)
+                    }
+                    Box(Modifier.weight(1f)) {
+                        TextButton({ menu = true }) {
+                            Text(chatCopy(locale, "Evidrilo AI"), style = MaterialTheme.typography.titleMedium, color = EvidriloColors.Ink)
+                            EvidriloIcon(EvidriloIconName.CHEVRON_DOWN, tint = EvidriloColors.Slate, modifier = Modifier.padding(start = 4.dp).size(16.dp))
                         }
-                        EvidriloAiCreditBalancePanel(
-                            presentation = aiCreditBalance,
-                            onRefresh = onRefreshAiCreditBalance,
-                        )
-                        EvidriloWorkspaceRow(EvidriloIconName.CHAT_BUBBLE, "General Chat", "Ask a study question. No project is connected.",
-                            { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_GENERAL) })
-                        EvidriloWorkspaceRow(EvidriloIconName.FOLDER, "Project AI", when {
-                            projectsLoading -> "Reading your supported project stages…"
-                            projects.isEmpty() -> "No supported project yet. Local starters remain available for manual work."
-                            else -> "${projects.size} supported ${if (projects.size == 1) "project" else "projects"}. Choose the stage and material to share."
-                        },
-                            { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_PROJECT) })
-                    } else {
-                        if (entrySurface == ProjectAiEntrySurface.GENERAL_CHAT || entrySurface == ProjectAiEntrySurface.PROJECT_PICKER) {
-                            AiWorkspaceModeSelector(
-                                selected = if (entrySurface == ProjectAiEntrySurface.GENERAL_CHAT) AiWorkspaceMode.GENERAL else AiWorkspaceMode.PROJECT,
-                                onChooseGeneral = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_GENERAL) },
-                                onChooseProject = { entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_PROJECT) },
-                            )
+                        DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem(text = { Text(chatCopy(locale, "New chat", "Chat baru")) }, onClick = { menu = false; fresh() }, enabled = !sending)
+                            DropdownMenuItem(text = { Text(chatCopy(locale, "Choose a project", "Pilih proyek")) }, onClick = { menu = false; projectPicker = true }, enabled = !sending)
+                            DropdownMenuItem(text = { Text(chatCopy(locale, "AI privacy", "Privasi AI")) }, onClick = { menu = false; privacyOpen = true })
                         }
-
-                        when (entrySurface) {
-                            ProjectAiEntrySurface.PROJECT_PICKER -> {
-                                EvidriloAiCreditBalancePanel(
-                                    presentation = aiCreditBalance,
-                                    onRefresh = onRefreshAiCreditBalance,
-                                )
-                                Text(
-                                    "Choose an eligible project",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    "Only a published template with a declared AI operation appears here. The server rechecks the template and project revision; other work remains manual.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                when {
-                                    projectsLoading -> Row(
-                                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                                    }
-                                    projects.isEmpty() -> Column(
-                                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                                        verticalArrangement = Arrangement.Center,
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Text(projectAiEntryEmptyStateMessage(), style = MaterialTheme.typography.bodyMedium)
-                                        TextButton(
-                                            onClick = {
-                                                entrySurface = ProjectAiEntrySurface.CLOSED
-                                                onOpenProjects()
-                                            },
-                                        ) { Text("Create or open a project") }
-                                    }
-                                    else -> LazyColumn(
-                                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        itemsIndexed(projects, key = { _, project -> project.id }) { _, project ->
-                                            TextButton(
-                                                onClick = {
-                                                    entrySurface = ProjectAiEntrySurface.CLOSED
-                                                    onOpenProject(project.id)
-                                                },
-                                                modifier = Modifier.fillMaxWidth(),
-                                            ) {
-                                                RawText(project.title.ifBlank { "Untitled project" }, modifier = Modifier.fillMaxWidth())
-                                            }
-                                        }
-                                    }
+                    }
+                    EvidriloAiCreditBadge(aiCreditBalance, onRefreshAiCreditBalance)
+                    IconButton({ open = false }, Modifier.semantics { contentDescription = chatCopy(locale, "Close chat", "Tutup chat") }) {
+                        EvidriloIcon(EvidriloIconName.PLUS, tint = EvidriloColors.Slate, modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = 45f })
+                    }
+                }
+                selectedProject?.let { context ->
+                    Surface(color = EvidriloColors.Tint, shape = RoundedCornerShape(12.dp), onClick = { excerptOpen = true }) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EvidriloIcon(EvidriloIconName.FOLDER, tint = EvidriloColors.Cobalt, modifier = Modifier.size(18.dp))
+                            RawText(context.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                            Text(chatCopy(locale, "Context", "Konteks"), color = EvidriloColors.Cobalt, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                if (accountKey == null || accessMessage != null) {
+                    Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                        EvidriloIcon(EvidriloIconName.CHAT_BUBBLE, tint = EvidriloColors.Cobalt, modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.height(20.dp))
+                        Text(chatCopy(locale, "Sign in to chat with AI", "Masuk untuk menggunakan AI"), style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.height(16.dp))
+                        if (canOpenAccount) EvidriloPrimaryButton(chatCopy(locale, "Sign in", "Masuk"), { open = false; onOpenAccount() })
+                    }
+                } else {
+                    if (entries.isEmpty()) {
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp),
+                            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                            EvidriloLogoMark(size = 56.dp); Spacer(Modifier.height(22.dp))
+                            Text(chatCopy(locale, "What are you working on?", "Sedang mengerjakan apa?"), style = MaterialTheme.typography.headlineSmall)
+                            Spacer(Modifier.height(24.dp))
+                            val prompts = if (selectedProject == null) listOf(
+                                chatCopy(locale, "Help me shape a research question", "Bantu rumuskan pertanyaan penelitian"),
+                                chatCopy(locale, "Explain claims and evidence", "Jelaskan klaim dan bukti"), chatCopy(locale, "Plan my next step", "Rencanakan langkah berikutnya"))
+                            else listOf(chatCopy(locale, "Review my project", "Tinjau proyek saya"),
+                                chatCopy(locale, "Improve my research question", "Perbaiki pertanyaan penelitian saya"), chatCopy(locale, "What evidence is missing?", "Bukti apa yang masih kurang?"))
+                            prompts.forEach { prompt -> TextButton({ input = prompt }, Modifier.fillMaxWidth()) { Text(prompt, color = EvidriloColors.Slate) } }
+                        }
+                    } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState,
+                        contentPadding = PaddingValues(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+                        itemsIndexed(entries, key = { _, entry -> entry.key }) { _, entry -> when (entry) {
+                            is GeneralChatEntry.User -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Surface(shape = RoundedCornerShape(18.dp), color = EvidriloColors.Atmosphere, modifier = Modifier.widthIn(max = 300.dp)) {
+                                    SelectionContainer { RawText(entry.text, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyLarge) }
                                 }
                             }
-
-                            ProjectAiEntrySurface.ACTIVITY -> {
-                                EvidriloProjectAiActivityHistory(
-                                    state = activityHistoryState,
-                                    accountId = accountKey,
-                                    projectId = null,
-                                    onRefresh = { onRefreshActivityHistory(null) },
-                                    onLoadMore = { cursor -> onLoadMoreActivityHistory(null, cursor) },
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                )
-                            }
-
-                            ProjectAiEntrySurface.GENERAL_CHAT -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                    ) {
-                                        Text(
-                                            if(opinionContext!=null) uiText("Project excerpt · AI opinion","Cuplikan proyek · pendapat AI") else uiText("General Chat","Chat umum"),
-                                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        )
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            entrySurface = reduceProjectAiEntrySurface(entrySurface, ProjectAiEntryEvent.CHOOSE_ACTIVITY)
-                                            onRefreshActivityHistory(null)
-                                        },
-                                    ) { Text(uiText("Activity")) }
-                                    if (entries.isNotEmpty()) {
-                                        TextButton(
-                                            onClick = {
-                                                opinionContext=null; opinionChanged=false
-                                            entries.clear()
-                                                input = ""
-                                                consentConfirmed = false
-                                            },
-                                        ) { Text(uiText("Clear")) }
-                                    }
+                            is GeneralChatEntry.Answer -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                SelectionContainer { RawText(entry.value.answer, style = MaterialTheme.typography.bodyLarge) }
+                                if (entry.value.proposedEdits.isNotEmpty()) OutlinedButton({ proposal = entry }, enabled = !sending) {
+                                    Text(chatCopy(locale, "Review ${entry.value.proposedEdits.size} suggested edits", "Tinjau ${entry.value.proposedEdits.size} usulan perubahan"))
                                 }
-                                if(opinionContext!=null) TextButton({showOpinionExcerpt=true}) {
-                                    Text(uiText("Review selected excerpt","Tinjau cuplikan pilihan"))
-                                }
-                                if(opinionContext!=null) Text(uiText("Saved revision ${opinionContext?.revision}. A bounded excerpt, not a complete project evaluation.",
-                                    "Revisi tersimpan ${opinionContext?.revision}. Cuplikan terbatas, bukan evaluasi seluruh proyek."),style=MaterialTheme.typography.bodySmall)
-                                if(opinionChanged) Text(uiText("This project changed. Close chat and prepare a fresh excerpt from Review before sending.",
-                                    "Proyek berubah. Tutup chat dan siapkan cuplikan baru dari Tinjauan sebelum mengirim."),color=EvidriloColors.Error)
-                                EvidriloExplanation("What this chat sends", "Each request sends only its current message. Earlier turns are not sent or saved to account history.")
-                                EvidriloAiCreditBalancePanel(
-                                    presentation = aiCreditBalance,
-                                    onRefresh = onRefreshAiCreditBalance,
-                                )
-
-                                if (accessMessage == null && apiConfigured) {
-                                    when (val savedConsent = consentState) {
-                                        ProjectAiConsentUiState.Unknown -> TextButton(onClick = onRefreshConsent) {
-                                            Text(uiText("Check saved AI data-use consent"))
-                                        }
-                                        ProjectAiConsentUiState.Checking -> Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        ) {
-                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                            Text("Checking account consent…", style = MaterialTheme.typography.bodySmall)
-                                        }
-                                        ProjectAiConsentUiState.NotGranted -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(
-                                                "The platform requires account-level AI data-use consent. Granting it sends nothing; each message still needs separate approval. Only the text you choose in the composer is sent.",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                            TextButton(onClick = onGrantConsent) { Text(uiText("Allow AI data processing")) }
-                                        }
-                                        ProjectAiConsentUiState.Granted -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(uiText("Account-level AI consent is active. You approve each message separately."),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                            TextButton(onClick = onRevokeConsent, enabled = !sending) {
-                                                Text(uiText("Revoke saved AI consent"))
-                                            }
-                                        }
-                                        is ProjectAiConsentUiState.Unavailable -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(savedConsent.message, style = MaterialTheme.typography.bodySmall)
-                                            TextButton(onClick = onRefreshConsent) { Text("Check consent again") }
-                                        }
-                                    }
-                                } else if (accessMessage == null) {
-                                    ChatNotice("The Evidrilo AI API is not configured in this build. No message can be sent; your project remains usable manually.")
-                                }
-
-                                if (accessMessage != null) {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(16.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                    ) {
-                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text(accessMessage, style = MaterialTheme.typography.bodyMedium)
-                                            if (canOpenAccount) TextButton(onClick = onOpenAccount) { Text("Open account") }
-                                        }
-                                    }
-                                }
-
-                                if (entries.isEmpty() && accessMessage == null) {
-                                    Column(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center) {
-                                        Text("Start with", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                                        listOf(
-                                            "Help me turn an assignment into a focused research question.",
-                                            "What should I check before saying evidence supports a claim?",
-                                            "Help me choose a manageable next step for my project.",
-                                        ).forEach { prompt ->
-                                            TextButton(
-                                                onClick = {
-                                                    input = prompt
-                                                    opinionContext = null
-                                                    opinionChanged = false
-                                                    consentConfirmed = false
-                                                },
-                                                modifier = Modifier.fillMaxWidth(),
-                                            ) { Text(prompt, modifier = Modifier.fillMaxWidth()) }
-                                        }
-                                    }
-                                } else {
-                                    LazyColumn(
-                                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                                        state = listState,
-                                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    ) {
-                                        itemsIndexed(entries, key = { index, entry -> "$index-${entry.key}" }) { _, entry ->
-                                            when (entry) {
-                                                is GeneralChatEntry.User -> ChatMessageBubble(text = entry.text, fromUser = true)
-                                                is GeneralChatEntry.Answer -> GeneralChatAnswerBubble(entry.value) { prompt ->
-                                                    input = prompt
-                                                    opinionContext = null
-                                                    opinionChanged = false
-                                                    consentConfirmed = false
-                                                }
-                                                is GeneralChatEntry.Notice -> ChatNotice(entry.text)
-                                            }
-                                        }
-                                        if (sending) {
-                                            item(key = "general-ai-working") {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                                    modifier = Modifier.padding(vertical = 4.dp),
-                                                ) {
-                                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                                    Text("Checking AI availability…", style = MaterialTheme.typography.bodySmall)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (accessMessage == null) {
-                                    OutlinedTextField(
-                                        value = input,
-                                        onValueChange = { value -> if (value.length <= 4_000) input = value },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Ask a general study question") },
-                                        supportingText = { Text(uiText("Up to 4,000 characters · composer text only; no original files")) },
-                                        minLines = 1,
-                                        maxLines = 3,
-                                        enabled = !sending && apiConfigured,
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                        keyboardActions = KeyboardActions(onSend = {
-                                            if (canSendGeneralAiMessage(input, consentConfirmed, consentState, accessMessage, apiConfigured, sending)) send(input)
-                                        }),
-                                    )
-                                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Checkbox(
-                                            checked = consentConfirmed,
-                                            onCheckedChange = { checked -> consentConfirmed = checked },
-                                            enabled = !sending && apiConfigured && consentState is ProjectAiConsentUiState.Granted,
-                                        )
-                                        Text(
-                                            "Allow this message to be sent to AI. Actual verified usage (up to 200 credits) is charged; a reply is not guaranteed.",
-                                            modifier = Modifier.padding(top = 11.dp),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    Button(
-                                        onClick = { send(input) },
-                                        enabled = canSendGeneralAiMessage(input, consentConfirmed, consentState, accessMessage, apiConfigured, sending),
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                                    ) {
-                                        if (sending) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                            )
-                                        } else {
-                                            Text("Send message")
-                                        }
-                                    }
+                                if (entry == entries.lastOrNull()) entry.value.recommendedNextPrompts.take(2).forEach { prompt ->
+                                    TextButton({ input = prompt }, Modifier.fillMaxWidth()) { RawText(prompt, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate) }
                                 }
                             }
-
-                            else -> Unit
+                            is GeneralChatEntry.Notice -> Text(entry.text, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                        } }
+                        if (sending) item { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = EvidriloColors.Cobalt)
+                            Text(chatCopy(locale, "Thinking…", "Sedang berpikir…"), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                        } }
+                    }
+                    localNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate, modifier = Modifier.padding(vertical = 6.dp)) }
+                    if (!apiConfigured) Text(chatCopy(locale, "AI is unavailable right now.", "AI belum tersedia saat ini."), style = MaterialTheme.typography.bodySmall)
+                    Surface(shape = RoundedCornerShape(24.dp), color = EvidriloColors.Atmosphere, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.Bottom) {
+                            TextField(input, { if (it.length <= 4000) input = it }, Modifier.weight(1f),
+                                placeholder = { Text(chatCopy(locale, "Message Evidrilo…", "Kirim pesan…")) }, minLines = 1, maxLines = 5, enabled = !sending && apiConfigured,
+                                colors = TextFieldDefaults.colors(focusedContainerColor = EvidriloColors.Atmosphere, unfocusedContainerColor = EvidriloColors.Atmosphere,
+                                    disabledContainerColor = EvidriloColors.Atmosphere, focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { submit() }))
+                            FilledIconButton({ submit() }, enabled = input.isNotBlank() && !sending && apiConfigured,
+                                modifier = Modifier.padding(bottom = 4.dp).semantics { contentDescription = chatCopy(locale, "Send message", "Kirim pesan") }) {
+                                EvidriloIcon(EvidriloIconName.ARROW_FORWARD, tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = -90f })
+                            }
                         }
                     }
                 }
             }
-            }
         }
     }
-
+    if (projectPicker) AlertDialog(onDismissRequest = { projectPicker = false }, title = { Text(chatCopy(locale, "Choose a project", "Pilih proyek")) },
+        text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+            if (projectsLoading) CircularProgressIndicator(Modifier.size(24.dp))
+            else if (projects.isEmpty()) Text(chatCopy(locale, "Create a project to get help with it.", "Buat proyek untuk mendapatkan bantuan."))
+            projects.forEach { project -> TextButton({ fresh(project.context); projectPicker = false }, Modifier.fillMaxWidth()) {
+                RawText(project.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            } }
+        } }, confirmButton = { TextButton({ projectPicker = false }) { Text(chatCopy(locale, "Done", "Selesai")) } })
+    if (historyOpen) AlertDialog(onDismissRequest = { historyOpen = false }, title = { Text(chatCopy(locale, "Chat history", "Riwayat chat")) },
+        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            val own = sessions.filter { it.contextKey.startsWith(historyPrefix) }
+            if (own.isEmpty()) Text(chatCopy(locale, "Your conversations will appear here.", "Percakapan Anda akan muncul di sini."))
+            own.forEach { session -> TextButton({
+                if (!sending) {
+                    val id = session.contextKey.removePrefix(historyPrefix)
+                    selectedProject = projects.firstOrNull { it.id == id }?.context
+                    entries.clear(); entries.addAll(session.messages.mapIndexed { index, message ->
+                        if (message.fromLearner) GeneralChatEntry.User("restored-$index", message.text)
+                        else GeneralChatEntry.Answer("restored-$index", ProjectAiGeneralChatAnswer(message.text, emptyList(), "history", 0), selectedProject)
+                    }); sessionId = session.id; input = ""; historyOpen = false
+                }
+            }, Modifier.fillMaxWidth()) { RawText(session.title, maxLines = 2, overflow = TextOverflow.Ellipsis) } }
+        } }, confirmButton = { TextButton({ historyOpen = false; fresh() }, enabled = !sending) { Text(chatCopy(locale, "New chat", "Chat baru")) } })
+    if (approveSend || privacyOpen) AlertDialog(onDismissRequest = { approveSend = false; privacyOpen = false }, title = { Text(chatCopy(locale, "Chat with Evidrilo AI", "Chat dengan Evidrilo AI")) },
+        text = { Text(chatCopy(locale, "Sending shares your message, recent conversation and selected project notes with Experiential Labs. AI uses credits and can make mistakes. You can revoke permission here anytime.",
+            "Mengirim pesan membagikan pesan, percakapan terakhir, dan catatan proyek pilihan ke Experiential Labs. AI memakai kredit dan dapat keliru. Izin dapat dicabut di sini kapan saja.")) },
+        confirmButton = { TextButton({ if (approveSend) { approveSend = false; awaitingConsent = true; onGrantConsent() } else privacyOpen = false }) {
+            Text(if (approveSend) chatCopy(locale, "Allow & send", "Izinkan & kirim") else chatCopy(locale, "Done", "Selesai")) } },
+        dismissButton = { if (privacyOpen && consentState == ProjectAiConsentUiState.Granted) TextButton({ onRevokeConsent(); privacyOpen = false }) { Text(chatCopy(locale, "Revoke permission", "Cabut izin")) }
+            else TextButton({ approveSend = false; privacyOpen = false }) { Text(chatCopy(locale, "Cancel", "Batal")) } })
+    if (excerptOpen) selectedProject?.let { context -> AlertDialog(onDismissRequest = { excerptOpen = false }, title = { RawText(context.title) },
+        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(chatCopy(locale, "Saved revision ${context.revision} · selected notes only", "Revisi ${context.revision} · catatan pilihan saja"), style = MaterialTheme.typography.labelMedium)
+            context.fields.forEach { field -> Text(field.label, style = MaterialTheme.typography.titleSmall); RawText(field.value.ifBlank { "—" }) }; RawText(context.notes)
+        } }, confirmButton = { TextButton({ excerptOpen = false }) { Text(chatCopy(locale, "Done", "Selesai")) } }) }
+    proposal?.let { answer ->
+        val context = answer.context
+        val current = context != null && isOpinionCurrent(context.projectId, context.revision)
+        AlertDialog(onDismissRequest = { proposal = null }, title = { Text(chatCopy(locale, "Review suggested edits", "Tinjau usulan perubahan")) },
+            text = { Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!current) Text(chatCopy(locale, "Project changed. These edits cannot be applied.", "Proyek berubah. Usulan ini tidak dapat diterapkan."))
+                answer.value.proposedEdits.forEach { edit ->
+                    Text(context?.fields?.firstOrNull { it.id == edit.fieldId }?.label ?: edit.fieldId, style = MaterialTheme.typography.titleSmall)
+                    RawText(context?.fields?.firstOrNull { it.id == edit.fieldId }?.value.orEmpty(), style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                    RawText(edit.value, style = MaterialTheme.typography.bodyMedium); RawText(edit.reason, style = MaterialTheme.typography.bodySmall, color = EvidriloColors.Slate)
+                }
+            } }, confirmButton = { TextButton({
+                val updated = if (context != null && accountKey != null) onApplyEdits(accountKey, context, answer.value.proposedEdits) else null
+                if (updated != null) {
+                    selectedProject = updated
+                    val index = entries.indexOf(answer)
+                    if (index >= 0) entries[index] = answer.copy(value = answer.value.copy(proposedEdits = emptyList()))
+                    localNotice = chatCopy(locale, "Edits saved.", "Perubahan tersimpan.")
+                } else localNotice = chatCopy(locale, "Edits weren't saved. Reopen the project and try again.", "Perubahan belum tersimpan. Buka ulang proyek lalu coba lagi.")
+                proposal = null
+            }, enabled = current && !sending) { Text(chatCopy(locale, "Apply edits", "Terapkan perubahan")) } },
+            dismissButton = { TextButton({ proposal = null }) { Text(chatCopy(locale, "Keep original", "Pertahankan versi awal")) } })
+    }
 }
 
 private sealed interface GeneralChatEntry {
     val key: String
-
     data class User(override val key: String, val text: String) : GeneralChatEntry
-    data class Answer(override val key: String, val value: ProjectAiGeneralChatAnswer) : GeneralChatEntry
+    data class Answer(override val key: String, val value: ProjectAiGeneralChatAnswer, val context: ProjectAiChatContext?) : GeneralChatEntry
     data class Notice(override val key: String, val text: String) : GeneralChatEntry
 }
 
-private enum class AiWorkspaceMode { GENERAL, PROJECT }
-
-@Composable
-private fun AiWorkspaceHeader(
-    surface: ProjectAiEntrySurface,
-    onBack: () -> Unit,
-    onClose: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (surface != ProjectAiEntrySurface.MODE_PICKER) {
-            EvidriloBackGesture(label = "AI workspace", onClick = onBack)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                when (surface) {
-                    ProjectAiEntrySurface.MODE_PICKER -> "AI workspace"
-                    ProjectAiEntrySurface.PROJECT_PICKER -> "Project AI"
-                    ProjectAiEntrySurface.GENERAL_CHAT -> "General Chat"
-                    ProjectAiEntrySurface.ACTIVITY -> "AI activity"
-                    ProjectAiEntrySurface.CLOSED -> "AI workspace"
-                },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            if (surface == ProjectAiEntrySurface.MODE_PICKER) {
-                Text(
-                    "Choose a separate chat or project workspace",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        TextButton(onClick = onClose) { Text(uiText("Close")) }
+private fun generalChatFailureMessage(result: ProjectAiGeneralChatResult, locale: String): String = when (result) {
+    is ProjectAiGeneralChatResult.Deferred -> chatCopy(locale, "Sign in again to continue.", "Masuk kembali untuk melanjutkan.")
+    is ProjectAiGeneralChatResult.Rejected -> when {
+        result.code == "AI_CREDITS_INSUFFICIENT" -> chatCopy(locale, "Not enough AI credits.", "Kredit AI tidak cukup.")
+        result.code.contains("CONSENT") -> chatCopy(locale, "Please review AI permission in the menu.", "Tinjau izin AI melalui menu.")
+        result.creditCost != null -> generalChatProviderUsageNotice(requireNotNull(result.creditCost), false)
+        else -> chatCopy(locale, "AI couldn't return a valid answer. Try again.", "AI belum dapat memberikan jawaban yang valid. Coba lagi.")
     }
+    is ProjectAiGeneralChatResult.Failed -> if (result.outcomeUnknown)
+        chatCopy(locale, "Connection lost. This request may have used credits.", "Koneksi terputus. Permintaan ini mungkin memakai kredit.")
+        else chatCopy(locale, "Check your connection and try again.", "Periksa koneksi lalu coba lagi.")
+    else -> chatCopy(locale, "AI is temporarily unavailable. Try again shortly.", "AI sementara tidak tersedia. Coba lagi sebentar.")
 }
 
-@Composable
-private fun AiWorkspaceModeSelector(
-    selected: AiWorkspaceMode?,
-    onChooseGeneral: () -> Unit,
-    onChooseProject: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilterChip(
-            selected = selected == AiWorkspaceMode.GENERAL,
-            onClick = onChooseGeneral,
-            label = { Text(uiText("General Chat")) },
-        )
-        FilterChip(
-            selected = selected == AiWorkspaceMode.PROJECT,
-            onClick = onChooseProject,
-            label = { Text("Project AI") },
-        )
-    }
-}
+internal fun canSendGeneralAiMessage(input: String, consentConfirmed: Boolean, consentState: ProjectAiConsentUiState,
+    accessMessage: String?, apiConfigured: Boolean, sending: Boolean): Boolean =
+    input.isNotBlank() && input.length <= 4000 && consentConfirmed && consentState == ProjectAiConsentUiState.Granted &&
+        accessMessage == null && apiConfigured && !sending
 
-@Composable
-private fun ChatMessageBubble(text: String, fromUser: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(0.88f),
-            shape = RoundedCornerShape(18.dp),
-            color = if (fromUser) EvidriloColors.Cobalt else EvidriloColors.Tint,
-            contentColor = if (fromUser) EvidriloColors.White else EvidriloColors.Ink,
-        ) {
-            RawText(text, modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp), style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
+internal fun generalChatProviderUsageNotice(creditCost: Int, consentMustBeReviewed: Boolean): String =
+    if (consentMustBeReviewed) "Reply withheld · $creditCost credits used. Review AI permission before retrying."
+    else "Reply withheld · $creditCost credits used."
 
-@Composable
-private fun GeneralChatAnswerBubble(
-    answer: ProjectAiGeneralChatAnswer,
-    onUsePrompt: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        ChatMessageBubble(answer.answer, fromUser = false)
-        Text(
-            "${answer.creditCost} AI credit${if (answer.creditCost == 1) "" else "s"} · suggestions are optional",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        answer.recommendedNextPrompts.forEach { prompt ->
-            TextButton(
-                onClick = { onUsePrompt(prompt) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(prompt, modifier = Modifier.fillMaxWidth()) }
-        }
-    }
-}
-
-@Composable
-private fun ChatNotice(text: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-    ) {
-        Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-internal fun canSendGeneralAiMessage(
-    input: String,
-    consentConfirmed: Boolean,
-    consentState: ProjectAiConsentUiState,
-    accessMessage: String?,
-    apiConfigured: Boolean,
-    sending: Boolean,
-): Boolean = input.isNotBlank() && input.length <= 4_000 && consentConfirmed &&
-    consentState is ProjectAiConsentUiState.Granted && accessMessage == null && apiConfigured && !sending
-
-internal fun generalChatProviderUsageNotice(creditCost: Int, consentMustBeReviewed: Boolean): String {
-    val credits = if (creditCost == 1) "1 shared AI credit" else "$creditCost shared AI credits"
-    return if (consentMustBeReviewed) {
-        "The reply was withheld. Verified provider usage charged $credits. AI consent is being rechecked; review consent before sending again."
-    } else {
-        "The reply was withheld. Verified provider usage charged $credits. Check your current balance before retrying."
-    }
-}
+private fun chatCopy(locale: String, english: String, indonesian: String = english): String =
+    if (locale.startsWith("id")) indonesian else english

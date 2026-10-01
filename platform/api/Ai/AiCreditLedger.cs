@@ -953,15 +953,14 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
                 consentRecorded = (bool)(await consentCommand.ExecuteScalarAsync(cancellationToken) ?? false);
             }
 
-            if (consentRecorded)
-            {
-                await ReconcileSubscriptionCreditPeriodsAsync(
-                    connection,
-                    transaction,
-                    accountId,
-                    now,
-                    cancellationToken);
-            }
+            // Paid credit entitlement is earned by subscription. AI data consent
+            // still gates spending/provider requests, not accounting for purchases.
+            await ReconcileSubscriptionCreditPeriodsAsync(
+                connection,
+                transaction,
+                accountId,
+                now,
+                cancellationToken);
 
             await using (var grantCommand = connection.CreateCommand())
             {
@@ -1040,12 +1039,6 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private sealed record SubscriptionEntitlementEvent(
-        string Status,
-        DateTimeOffset OccurredAt,
-        DateTimeOffset? PeriodStartedAt,
-        DateTimeOffset? PeriodExpiresAt);
-
     private static async Task ReconcileSubscriptionCreditPeriodsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -1053,7 +1046,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var events = new List<SubscriptionEntitlementEvent>();
+        var events = new List<SubscriptionCreditPeriod>();
         await using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -1069,7 +1062,7 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                events.Add(new SubscriptionEntitlementEvent(
+                events.Add(new SubscriptionCreditPeriod(
                     reader.GetString(0),
                     reader.GetFieldValue<DateTimeOffset>(1),
                     reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2),
@@ -1077,50 +1070,9 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
             }
         }
 
-        var nowUtc = now.ToUniversalTime();
-        var grantStarts = new Dictionary<long, DateTimeOffset>();
-        foreach (var activeEvent in events.Where(item =>
-                     item.Status == "active"
-                     && item.PeriodStartedAt is not null
-                     && item.PeriodExpiresAt is not null
-                     && item.OccurredAt <= nowUtc))
-        {
-            var periodStart = activeEvent.PeriodStartedAt!.Value.ToUniversalTime();
-            var periodEnd = activeEvent.PeriodExpiresAt!.Value.ToUniversalTime();
-            if (periodStart > nowUtc || periodEnd <= periodStart)
-                continue;
+        var orderedStarts = AiSubscriptionCreditSchedule.GrantStarts(events, now).ToArray();
+        if (orderedStarts.Length == 0) return;
 
-            var activeUntil = periodEnd < nowUtc ? periodEnd : nowUtc;
-            foreach (var terminalEvent in events)
-            {
-                if (terminalEvent.Status is not ("expired" or "revoked")
-                    || terminalEvent.OccurredAt < activeEvent.OccurredAt
-                    || terminalEvent.OccurredAt >= activeUntil)
-                    continue;
-                activeUntil = terminalEvent.OccurredAt.ToUniversalTime();
-                break;
-            }
-            if (activeUntil <= periodStart)
-                continue;
-
-            var firstMonth = EntitlementMonthOffset(periodStart, activeEvent.OccurredAt.ToUniversalTime());
-            if (firstMonth > MaximumReconciledEntitlementMonths)
-                throw InvalidEntitlementCreditHistory();
-            for (var month = firstMonth; month <= MaximumReconciledEntitlementMonths; month++)
-            {
-                var grantStartsAt = periodStart.AddMonths(month);
-                if (grantStartsAt > nowUtc || grantStartsAt >= activeUntil)
-                    break;
-                grantStarts.TryAdd(grantStartsAt.ToUnixTimeMilliseconds(), grantStartsAt);
-                if (grantStarts.Count > MaximumReconciledEntitlementMonths)
-                    throw InvalidEntitlementCreditHistory();
-            }
-        }
-
-        if (grantStarts.Count == 0)
-            return;
-
-        var orderedStarts = grantStarts.Values.OrderBy(value => value).ToArray();
         var grantKeys = orderedStarts.Select(PeriodGrantKey).ToArray();
         await using var insert = connection.CreateCommand();
         insert.Transaction = transaction;
@@ -1151,24 +1103,6 @@ public sealed class NpgsqlAiCreditLedger : IAiCreditLedger, IProjectAiCreditSett
         });
         await insert.ExecuteNonQueryAsync(cancellationToken);
     }
-
-    private const int MaximumReconciledEntitlementMonths = 1200;
-
-    private static int EntitlementMonthOffset(DateTimeOffset periodStart, DateTimeOffset instant)
-    {
-        if (instant <= periodStart)
-            return 0;
-
-        var month = (instant.Year - periodStart.Year) * 12 + instant.Month - periodStart.Month;
-        if (periodStart.AddMonths(month) > instant)
-            month--;
-        return Math.Max(0, month);
-    }
-
-    private static ApiException InvalidEntitlementCreditHistory() => new(
-        StatusCodes.Status503ServiceUnavailable,
-        "AI_CREDIT_LEDGER_CORRUPT",
-        "The AI credit ledger could not reconcile the entitlement history.");
 
     private static string PeriodGrantKey(DateTimeOffset periodStart) =>
         "period-" + periodStart.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);

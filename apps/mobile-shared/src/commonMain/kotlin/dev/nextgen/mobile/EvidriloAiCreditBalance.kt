@@ -14,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import dev.nextgen.mobile.EvidriloUiText as Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,23 @@ internal fun presentAiCreditBalance(
     !failureMessage.isNullOrBlank() -> AiCreditBalancePresentation.Unavailable(failureMessage, canRetry)
     credits != null -> AiCreditBalancePresentation.Ready(credits)
     else -> AiCreditBalancePresentation.Unavailable("The shared balance has not been loaded yet.", canRetry)
+}
+
+@Composable
+internal fun EvidriloAiCreditBadge(presentation: AiCreditBalancePresentation, onRefresh: () -> Unit) {
+    if (presentation == AiCreditBalancePresentation.SignInRequired) return
+    val label = uiText("AI credits", "Kredit AI")
+    Surface(onClick = onRefresh, color = EvidriloColors.Tint, shape = RoundedCornerShape(50),
+        modifier = Modifier.semantics { contentDescription = label }) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            EvidriloIcon(EvidriloIconName.LIGHTNING, tint = EvidriloColors.Cobalt, modifier = Modifier.size(16.dp))
+            if (presentation == AiCreditBalancePresentation.Refreshing)
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = EvidriloColors.Cobalt)
+            else Text((presentation as? AiCreditBalancePresentation.Ready)?.credits?.available?.toString() ?: "—",
+                style = MaterialTheme.typography.labelLarge, color = EvidriloColors.Cobalt)
+        }
+    }
 }
 
 @Composable

@@ -24,6 +24,19 @@ val releaseKeystorePath = releaseSetting("androidReleaseKeystore", "EVIDRILO_AND
 val releaseStorePassword = releaseSetting("androidReleaseStorePassword", "EVIDRILO_ANDROID_RELEASE_STORE_PASSWORD")
 val releaseKeyAlias = releaseSetting("androidReleaseKeyAlias", "EVIDRILO_ANDROID_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = releaseSetting("androidReleaseKeyPassword", "EVIDRILO_ANDROID_RELEASE_KEY_PASSWORD")
+val revenueCatSdkKey = releaseSetting("revenuecatAndroidApiKey", "ORG_GRADLE_PROJECT_revenuecatAndroidApiKey")
+val verifyReleaseBillingConfiguration = tasks.register("verifyReleaseBillingConfiguration") {
+    group = "verification"
+    description = "Prevents a RevenueCat Test Store key from entering an Android release."
+    doLast {
+        check(!revenueCatSdkKey.trim().startsWith("test_")) {
+            "RevenueCat Test Store is Debug-only. Supply a platform SDK key or leave billing disabled for Release."
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(verifyReleaseBillingConfiguration)
+}
 val androidVersionName = rootProject.version.toString().removeSuffix("-SNAPSHOT")
 val androidVersionCode = releaseSetting("androidVersionCode", "EVIDRILO_ANDROID_VERSION_CODE")
     .ifBlank { "1" }

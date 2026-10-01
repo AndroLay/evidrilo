@@ -7,6 +7,26 @@ is configured locally with `androidVersionCode`.
 
 ## Local candidate
 
+### RevenueCat Test Store (Debug only)
+
+Set the ignored `local.properties` entries `revenuecatAndroidApiKey` to the
+project's public Test Store SDK key, `revenuecatEntitlementId=evidrilo_pro`, and
+`revenuecatProductIds=monthly,yearly`. Build `:androidApp:assembleDebug` for tests.
+The official SDK purchase dialog offers successful, failed, and cancelled test
+transactions; it does not charge real money. `verifyReleaseBillingConfiguration`
+rejects a `test_` key before Release builds. For a store release, select the
+platform's public SDK key or leave billing unconfigured.
+
+Active Pro keeps Restore purchase and Manage subscription available. Catalog
+loading cannot overwrite an already verified active entitlement. Customer Center
+and access refresh use the same signed-in RevenueCat customer identity.
+
+The local API is not an internet webhook destination. Local Staging may explicitly
+enable the [server Test Store reconciliation mode](../../platform/README.md)
+to verify provider periods and grant credits through its ledger. Client success
+flags never grant credits. Hosted/Production uses its separate authenticated
+webhook integration.
+
 From the repository root:
 
 ```bash

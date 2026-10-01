@@ -722,7 +722,8 @@ class AiGateway(
             val expiresAt = grant.optionalString("expiresAt")?.also { require(dateTimeOffsetPattern.matches(it)) }
             AiCreditGrant(kind, key, granted, reserved, consumed, grantAvailable, expiresAt)
         } ?: error("grants required")
-        require(grants.sumOf { it.available } == available)
+        require(grants.map { it.grantKind to it.grantKey }.distinct().size == grants.size)
+        require(grants.sumOf { it.available.toLong() } == available.toLong())
         AiCredits(consent, available, grants, root.requestId())
     }.getOrNull()
 
@@ -814,7 +815,8 @@ class AiGateway(
 
     private companion object {
         const val MAX_AI_CREDIT_GRANT = 200
-        const val MAX_AI_CREDIT_BALANCE = 220
+        // Credits accumulate across earned periods; 220 is only the first allowance.
+        const val MAX_AI_CREDIT_BALANCE = 1_000_000
         val creditsKeys = setOf("schema", "version", "consentRecorded", "available", "grants", "requestId")
         val grantKeys = setOf("grantKind", "grantKey", "granted", "reserved", "consumed", "available", "expiresAt")
         val assistKeys = setOf("schema", "version", "status", "text", "reasonCode", "promptVersion", "groundedAnchorIds", "requestId")

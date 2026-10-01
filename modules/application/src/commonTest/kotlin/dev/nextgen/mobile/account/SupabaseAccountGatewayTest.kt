@@ -180,6 +180,9 @@ class SupabaseAccountGatewayTest {
         assertTrue(url.contains("provider=google"))
         assertTrue(url.contains("code_challenge_method=S256"))
         val state = url.substringAfter("state=")
+        // Supabase returns redirect_to plus code, rather than echoing the
+        // application's top-level state parameter.
+        assertTrue(url.contains("redirect_to=${encodeAuthUrlComponent("evidrilo://auth/callback?state=$state")}"))
 
         assertIs<AccountGatewayResult.InvalidRedirect>(
             runSuspendTest {
@@ -187,7 +190,7 @@ class SupabaseAccountGatewayTest {
             },
         )
         val result = runSuspendTest {
-            gateway.completeRedirect("evidrilo://auth/callback?code=auth-code&state=$state")
+            gateway.completeRedirect("evidrilo://auth/callback?state=$state&code=auth-code")
         }
         assertIs<AccountGatewayResult.Verified>(result)
         assertEquals("student@example.test", result.session.account.email)

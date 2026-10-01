@@ -35,7 +35,7 @@ data class BillingPresentation(
             )
 
     val canRestore: Boolean
-        get() = state != BillingUiState.UNLOCKED && !isBusy
+        get() = !isBusy && state != BillingUiState.LOADING
 
     fun selectOffer(productId: String): BillingPresentation =
         offers.firstOrNull {
@@ -73,7 +73,7 @@ data class BillingPresentation(
                         ?: availableOffers.first()
                     BillingPresentation(
                         state = BillingUiState.OFFER_AVAILABLE,
-                        message = "Premium evidence cases are available.",
+                        message = "Review your plan and confirm it in your store.",
                         offer = selectedOffer,
                         offers = availableOffers,
                         selectedProductId = selectedOffer.productId,
@@ -88,7 +88,7 @@ data class BillingPresentation(
                     BillingUiState.LOCKED
                 },
                 message = if (outcome.value == PremiumAccess.UNLOCKED) {
-                    "Premium evidence cases unlocked."
+                    "Your subscription is active. Restore or manage it here."
                 } else {
                     "Premium access is not active on this customer."
                 },

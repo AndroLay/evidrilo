@@ -81,8 +81,11 @@ Use this sequence after the application and migration set are frozen:
    leave the mobile flag disabled until its Google Cloud callback, test-user
    allowlist, and Android sign-in are verified. Keep Apple disabled under D-132
    until its credentials, redirect URIs, and device sign-in flow are verified.
-4. Add `evidrilo://auth/callback` to that project's Supabase Auth redirect
-   allowlist. Review email confirmation and recovery redirects, sender
+4. Add `evidrilo://auth/callback` and
+   `evidrilo://auth/callback?state=*` to that project's Supabase Auth redirect
+   allowlist. The second entry preserves the app's per-attempt correlation
+   value when Supabase returns the PKCE code; keep the callback path restricted.
+   Review email confirmation and recovery redirects, sender
    configuration, signup policy, and provider settings separately for each
    project. Keep manual identity linking disabled until its account-linking
    behavior has been explicitly reviewed.
@@ -102,6 +105,17 @@ Use this sequence after the application and migration set are frozen:
 8. Verify health endpoints, email sign-up and confirmation, password recovery,
    callback handling, API Auth/JWKS validation, and only the worker flows that
    are actually deployed. Use synthetic Staging accounts and data.
+
+### Verified-email access token hook
+
+After applying the migrations that define `public.custom_access_token_hook`,
+enable the Supabase Auth custom access token hook with URI
+`pg-functions://postgres/public/custom_access_token_hook`. Confirm the Auth admin
+role has its migration-defined execute grant. The API requires the server-derived
+root `email_verified` claim; Google identity metadata alone is insufficient.
+Existing sessions must obtain a fresh token after activation. Verify authenticated
+credits, consent, and entitlement endpoints return 200 with that fresh token.
+This hook is enabled in Staging; activation there does not configure Production.
 
 For Production, repeat these steps with the Production project and its own
 credentials, database roles, sender/provider configuration, and release

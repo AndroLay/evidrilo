@@ -122,13 +122,13 @@ public sealed class OpenAiProjectAiGeneratorTests
         Assert.Equal("project_general_chat_v2", provider.Request.StructuredOutputSchemaName);
         using var schema = JsonDocument.Parse(provider.Request.StructuredOutputSchema!.ToJsonString());
         Assert.Equal(
-            new[] { "answer", "recommendedNextPrompts" },
+            new[] { "answer", "recommendedNextPrompts", "proposedEdits" },
             schema.RootElement.GetProperty("required").EnumerateArray().Select(item => item.GetString()).ToArray());
         Assert.False(schema.RootElement.GetProperty("additionalProperties").GetBoolean());
         var promptSchema = schema.RootElement.GetProperty("properties").GetProperty("recommendedNextPrompts");
         Assert.Equal(1, promptSchema.GetProperty("minItems").GetInt32());
         Assert.Equal(3, promptSchema.GetProperty("maxItems").GetInt32());
-        Assert.Contains("without access to any project", provider.Request.SystemInstructions!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("limited student-selected snapshot", provider.Request.SystemInstructions!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
