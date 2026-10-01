@@ -46,7 +46,7 @@ test('rejects marketing-version drift without exposing unrelated values', () => 
     const releaseConfig = path.join(root, 'apps/ios/Configuration/Release.xcconfig.example');
     fs.writeFileSync(
       releaseConfig,
-      fs.readFileSync(releaseConfig, 'utf8').replace('MARKETING_VERSION = 0.1.0', 'MARKETING_VERSION = 9.9.9'),
+      fs.readFileSync(releaseConfig, 'utf8').replace(/^MARKETING_VERSION\s*=\s*[^\r\n]+/m, 'MARKETING_VERSION = 9.9.9'),
     );
     const result = runChecker(root);
     assert.notEqual(result.status, 0);

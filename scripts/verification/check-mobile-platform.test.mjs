@@ -73,12 +73,14 @@ test('Kotlin/Native release builds have separate heaps and bounded worker concur
   assert.match(properties, /^kotlin\.native\.jvmArgs=-Xmx4g$/m);
 
   const workflow = read('.github/workflows/ios-simulator.yml');
-  const buildStart = workflow.indexOf('- name: Build unsigned iOS Release host');
-  assert.notEqual(buildStart, -1, 'iOS Release build step is missing');
+  const buildStart = workflow.indexOf('- name: Build unsigned iOS host');
+  assert.notEqual(buildStart, -1, 'iOS native build step is missing');
 
   const nextStep = workflow.indexOf('\n      - name:', buildStart + 1);
   const buildStep = workflow.slice(buildStart, nextStep === -1 ? undefined : nextStep);
   assert.match(buildStep, /xcodebuild/);
+  assert.match(buildStep, /-configuration "\$IOS_BUILD_CONFIGURATION"/);
+  assert.match(buildStep, /build-for-testing/);
   assert.doesNotMatch(buildStep, /GRADLE_OPTS:/);
 });
 
