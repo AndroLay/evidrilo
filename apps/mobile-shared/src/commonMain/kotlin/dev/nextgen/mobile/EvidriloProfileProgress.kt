@@ -34,7 +34,7 @@ internal fun EvidriloProfileProgress(
     val courseStore = rememberPracticeCourseStore()
     var courseRead by remember(courseStore) { mutableStateOf<LocalStorageReadResult<PracticeCourseState>?>(null) }
     var retry by remember { mutableIntStateOf(0) }
-    LaunchedEffect(courseStore, retry) { courseRead = withContext(Dispatchers.IO) { courseStore.load() } }
+    LaunchedEffect(courseStore, retry) { courseRead = withContext(Dispatchers.Default) { courseStore.load() } }
     val course = courseRead?.value ?: PracticeCourseState()
     val courseAvailable = courseRead is LocalStorageReadResult.Success
     val visible = projects.filter { it.status != StudentProjectStatus.TRASHED }
